@@ -47,7 +47,6 @@ jobs:
         with:
           unityVersion: 2022.3.22f1
           testMode: EditMode
-          coverageEnabled: false
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload EditMode results
