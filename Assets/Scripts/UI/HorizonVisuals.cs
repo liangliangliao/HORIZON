@@ -197,4 +197,41 @@ namespace Horizon.UI
             pending = null;
         }
     }
+
+    public sealed class PredictionAxisDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
+    {
+        public Action<int> Changed;
+        private RectTransform rect;
+        private int value;
+
+        private void Awake() { rect = (RectTransform)transform; }
+
+        public void OnPointerDown(PointerEventData eventData) { OnDrag(eventData); }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, eventData.position,
+                eventData.pressEventCamera, out Vector2 local);
+            float position = Mathf.InverseLerp(rect.rect.yMin, rect.rect.yMax, local.y);
+            int next = Mathf.RoundToInt(Mathf.Lerp(-3, 3, position));
+            if (next == value) return;
+            value = next;
+            Changed?.Invoke(value);
+        }
+    }
+
+    public sealed class StationSwipe : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        public Action Advanced;
+        public float ReadyAt;
+        private Vector2 down;
+
+        public void OnBeginDrag(PointerEventData eventData) { down = eventData.position; }
+        public void OnDrag(PointerEventData eventData) { }
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (Time.unscaledTime >= ReadyAt && eventData.position.y - down.y > Screen.height * 0.09f)
+                Advanced?.Invoke();
+        }
+    }
 }

@@ -15,6 +15,7 @@ namespace Horizon
         public List<RunRecord> runs = new List<RunRecord>();
         public RunSnapshot active;
         public bool seenFirstEcho;
+        public int calibrations;
     }
 
     public sealed class HorizonApp : MonoBehaviour
@@ -32,6 +33,8 @@ namespace Horizon
         private bool busy;
         private bool detailVisible;
         private int mapIndex;
+        private int stationStage;
+        private readonly int[] forecastOffsets = new int[3];
         private Rect lastSafeArea;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -189,7 +192,6 @@ namespace Horizon
             try
             {
                 session = GameSession.Restore(archive.active);
-                if (session.HasChosen && session.Day < GameSession.LastDay) session.Advance();
             }
             catch (Exception exception)
             {
@@ -197,9 +199,22 @@ namespace Horizon
                 StartNewRun();
                 return;
             }
-            archive.active = session.Snapshot();
-            Save();
             detailVisible = false;
+            if (session.HasChosen && session.Day == 4 && !session.StationVisited)
+            {
+                ShowInRunStation(0);
+                return;
+            }
+            if (session.HasChosen && session.Day < GameSession.LastDay)
+            {
+                StartCoroutine(AdvanceDay());
+                return;
+            }
+            if (session.HasPredictionReview)
+            {
+                ShowPredictionReview();
+                return;
+            }
             BuildBoard();
         }
 
@@ -222,6 +237,7 @@ namespace Horizon
 
         private void BuildBoard()
         {
+            if (session != null && session.CanPredict) { ShowPrediction(); return; }
             Clear();
             if (session == null) return;
             FutureRegion();
@@ -229,6 +245,113 @@ namespace Horizon
             ResourceRegion();
             TimelineRegion();
             HandRegion();
+        }
+
+        private void ShowPrediction()
+        {
+            Clear();
+            Array.Clear(forecastOffsets, 0, forecastOffsets.Length);
+            View.Fill(root, "Prediction hush", new Color(0.01f, 0.03f, 0.05f, 0.75f), 0, 0, 1, 1);
+            View.Label(root, "Day", "DAY 04  /  12", 31, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.1f, 0.88f, 0.9f, 0.94f);
+            View.Label(root, "Prediction title", "画下三天后的自己", 47, Palette.Text,
+                TextAnchor.MiddleCenter, 0.06f, 0.77f, 0.94f, 0.85f);
+            View.Label(root, "Prediction note", "沿着轨道拖动，猜猜 Day 7 会如何变化。", 28,
+                Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.7f, 0.93f, 0.77f);
+            string[] names = { "精力", "心情", "洞察" };
+            for (int i = 0; i < 3; i++)
+            {
+                int index = i;
+                float x = 0.14f + i * 0.29f;
+                View.Label(root, "Axis name", names[i], 31, Palette.Text,
+                    TextAnchor.MiddleCenter, x - 0.035f, 0.625f, x + 0.18f, 0.68f);
+                Image track = View.Fill(root, "Draw future", new Color(0.04f, 0.11f, 0.14f, 0.88f),
+                    x, 0.33f, x + 0.15f, 0.625f, true);
+                View.Fill(track.transform, "Zero", new Color(0.84f, 0.88f, 0.85f, 0.4f),
+                    0.12f, 0.498f, 0.88f, 0.502f);
+                View.Label(track.transform, "Up", "+", 25, Palette.Muted,
+                    TextAnchor.MiddleCenter, 0.34f, 0.82f, 0.66f, 0.96f);
+                View.Label(track.transform, "Down", "-", 25, Palette.Muted,
+                    TextAnchor.MiddleCenter, 0.34f, 0.04f, 0.66f, 0.18f);
+                RectTransform marker = View.Panel(track.transform, "Forecast mark", Palette.Mint,
+                    0.23f, 0.47f, 0.77f, 0.53f, 23).rectTransform;
+                Text value = View.Label(root, "Forecast value", "不变", 27, Palette.Mint,
+                    TextAnchor.MiddleCenter, x - 0.05f, 0.26f, x + 0.2f, 0.32f);
+                track.gameObject.AddComponent<PredictionAxisDrag>().Changed = next =>
+                {
+                    forecastOffsets[index] = next;
+                    float center = 0.1f + (next + 3) / 6f * 0.8f;
+                    marker.anchorMin = new Vector2(0.23f, center - 0.03f);
+                    marker.anchorMax = new Vector2(0.77f, center + 0.03f);
+                    value.text = Direction(next);
+                };
+            }
+            View.Label(root, "Seal line", "预测不是答案，是你此刻理解世界的方式。", 29,
+                Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.19f, 0.92f, 0.25f);
+            View.Button(root, "Lock prediction", "封存预测  /  LOCK", () =>
+            {
+                session.LockPrediction(forecastOffsets[0], forecastOffsets[1], forecastOffsets[2]);
+                archive.active = session.Snapshot();
+                Save();
+                BuildBoard();
+            }, 0.15f, 0.075f, 0.85f, 0.15f, Palette.Mint, Palette.Ink, 31);
+        }
+
+        private static string Direction(int value)
+        {
+            return value == 0 ? "不变" : value > 0 ? "上升 " + value : "下降 " + -value;
+        }
+
+        private void ShowPredictionReview()
+        {
+            Clear();
+            PredictionRecord prediction = session.Prediction;
+            bool close = prediction.accurate;
+            View.Fill(root, "Comparison hush", new Color(0.01f, 0.03f, 0.05f, 0.82f), 0, 0, 1, 1);
+            View.Label(root, "Day", "DAY 07  /  DAY 04", 29, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.08f, 0.89f, 0.92f, 0.95f);
+            View.Label(root, "Verdict", close ? "SYNCHRONIZED" : "SURPRISE", 53,
+                close ? Palette.Mint : Palette.Gold, TextAnchor.MiddleCenter,
+                0.04f, 0.75f, 0.96f, 0.85f);
+            View.Label(root, "Verdict line", close ? "你看见了一部分即将到来的自己。" :
+                "这里，与你想的不一样。", 33, Palette.Text,
+                TextAnchor.MiddleCenter, 0.06f, 0.69f, 0.94f, 0.76f);
+            string[] names = { "精力", "心情", "洞察" };
+            int[] expected = { prediction.energy, prediction.mood, prediction.insight };
+            int[] actual = { prediction.actualEnergy, prediction.actualMood, prediction.actualInsight };
+            View.Label(root, "Legend", "琥珀 · 你的预测       薄荷 · 真实结果", 24, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.08f, 0.62f, 0.92f, 0.68f);
+            for (int i = 0; i < 3; i++)
+            {
+                float y = 0.55f - i * 0.115f;
+                View.Label(root, "Axis name", names[i], 29, Palette.Text,
+                    TextAnchor.MiddleLeft, 0.11f, y + 0.015f, 0.27f, y + 0.068f);
+                View.Fill(root, "Comparison rail", new Color(0.44f, 0.65f, 0.64f, 0.52f),
+                    0.31f, y + 0.032f, 0.81f, y + 0.034f);
+                float forecastX = 0.31f + (expected[i] + 3) / 6f * 0.5f;
+                float actualX = 0.31f + Mathf.Clamp01((actual[i] + 3) / 6f) * 0.5f;
+                View.Panel(root, "Forecast point", Palette.Gold,
+                    forecastX - 0.012f, y + 0.035f, forecastX + 0.012f, y + 0.048f, 13);
+                View.Panel(root, "Actual point", Palette.Mint,
+                    actualX - 0.012f, y + 0.018f, actualX + 0.012f, y + 0.031f, 13);
+                View.Label(root, "Comparison text", Direction(expected[i]) + "  /  " + Direction(actual[i]),
+                    22, Palette.Muted, TextAnchor.MiddleLeft, 0.31f, y - 0.015f, 0.89f, y + 0.016f);
+            }
+            if (close)
+                View.Label(root, "Understanding", archive.calibrations == 0 ?
+                    "解锁 · 未来方向" : "未来方向更加清晰", 29, Palette.Mint,
+                    TextAnchor.MiddleCenter, 0.08f, 0.165f, 0.92f, 0.245f);
+            else
+                View.Button(root, "Why", "为什么？  查看因果线", () => ShowMap(true),
+                    0.18f, 0.16f, 0.82f, 0.225f, Palette.Panel, Palette.Text, 26);
+            View.Button(root, "Continue", "继续前行", () =>
+            {
+                if (prediction.accurate) archive.calibrations++;
+                session.MarkPredictionReviewed();
+                archive.active = session.Snapshot();
+                Save();
+                BuildBoard();
+            }, 0.17f, 0.06f, 0.83f, 0.13f, Palette.Mint, Palette.Ink);
         }
 
         private void FutureRegion()
@@ -239,7 +362,8 @@ namespace Horizon
                 TextAnchor.MiddleLeft, 0.07f, 0.935f, 0.55f, 0.979f);
             View.Label(root, "Vision", "HORIZON " + Roman(session.HorizonLevel), 23, Palette.Mint,
                 TextAnchor.MiddleRight, 0.53f, 0.937f, 0.92f, 0.978f);
-            View.Label(root, "Future caption", "未来 · 尚未发生", 24, Palette.Muted,
+            View.Label(root, "Future caption", archive.calibrations > 0 ?
+                "未来 · 方向正在显形" : "未来 · 尚未发生", 24, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.875f, 0.49f, 0.91f);
             View.Fill(root, "Future rail", new Color(0.55f, 0.90f, 0.80f, 0.40f),
                 0.12f, 0.843f, 0.88f, 0.844f);
@@ -276,7 +400,8 @@ namespace Horizon
         {
             View.Label(root, "Now", "现在 / 夜", 22, Palette.Mint, TextAnchor.MiddleLeft,
                 0.08f, 0.682f, 0.48f, 0.717f);
-            View.Label(root, "Scene line", session.Day == 1 ? "今天的你，会留给未来什么？" :
+            View.Label(root, "Scene line", session.Day == 4 && session.Prediction != null ?
+                "你已画下未来，今天会走向哪里？" : session.Day == 1 ? "今天的你，会留给未来什么？" :
                 session.Pending.Count > 0 ? "你留下的选择，正在路上。" : "今晚，你想把什么送向明天？", 37,
                 Palette.Text, TextAnchor.MiddleLeft, 0.08f, 0.565f, 0.83f, 0.639f);
             View.Fill(root, "Present accent", new Color(0.59f, 0.98f, 0.82f, 0.86f),
@@ -519,15 +644,86 @@ namespace Horizon
                 yield return BossSequence(session.CompletedRun);
                 yield break;
             }
+            if (session.Day == 4 && !session.StationVisited)
+            {
+                ShowInRunStation(0);
+                yield break;
+            }
+            yield return AdvanceDay();
+        }
+
+        private IEnumerator AdvanceDay()
+        {
             DayTransition transition = session.Advance();
             detailVisible = false;
             archive.active = session.Snapshot();
             Save();
             foreach (PendingEcho echo in transition.Echos)
-            {
                 yield return EchoSequence(echo);
+            if (session.HasPredictionReview) ShowPredictionReview();
+            else BuildBoard();
+        }
+
+        private void ShowInRunStation(int stage)
+        {
+            stationStage = stage;
+            Clear();
+            View.Fill(root, "Station veil", new Color(0.005f, 0.02f, 0.035f, 0.45f), 0, 0, 1, 1);
+            Image touch = View.Fill(root, "Walk forward", new Color(0, 0, 0, 0), 0, 0, 1, 1, true);
+            StationSwipe swipe = touch.gameObject.AddComponent<StationSwipe>();
+            swipe.ReadyAt = Time.unscaledTime + 1.1f;
+            swipe.Advanced = () =>
+            {
+                Handheld.Vibrate();
+                if (stationStage < 2) ShowInRunStation(stationStage + 1);
+                else FinishStation();
+            };
+            View.Label(root, "Station title", "F U T U R E   S T A T I O N", 35, Palette.Mint,
+                TextAnchor.MiddleCenter, 0.05f, 0.87f, 0.95f, 0.95f);
+            View.Label(root, "Station day", "DAY 04  /  在地平线的另一边", 26, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.08f, 0.78f, 0.92f, 0.85f);
+            string voice = stage == 0 ? "「你终于来了。」" :
+                stage == 1 ? "「你最近留下了很多东西。」" : "「它们还会继续生长。」";
+            View.Label(root, "Future voice", voice, 42, Palette.Text,
+                TextAnchor.MiddleCenter, 0.07f, 0.39f, 0.93f, 0.49f);
+            if (stage == 1)
+            {
+                int shown = 0;
+                for (int i = session.Actions.Count - 1; i >= 0 && shown < 3; i--)
+                {
+                    ActionRecord action = session.Actions[i];
+                    float y = 0.3f - shown * 0.07f;
+                    View.Panel(root, "Memory", new Color(0.08f, 0.18f, 0.2f, 0.65f),
+                        0.15f, y, 0.85f, y + 0.057f, 18);
+                    View.Label(root, "Memory line", "D" + action.day + "  /  " + action.cardName,
+                        27, action.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
+                        TextAnchor.MiddleCenter, 0.18f, y + 0.004f, 0.82f, y + 0.053f);
+                    shown++;
+                }
             }
-            BuildBoard();
+            else if (stage == 2)
+            {
+                ActionRecord cause = session.Actions.FindLast(a => a.echoDay > a.day);
+                if (cause != null)
+                {
+                    View.Label(root, "Cause", "DAY " + cause.day + "  /  " + cause.cardName, 31,
+                        Palette.Mint, TextAnchor.MiddleCenter, 0.08f, 0.29f, 0.92f, 0.35f);
+                    View.Fill(root, "Cause line", new Color(0.54f, 0.97f, 0.79f, 0.72f),
+                        0.49f, 0.23f, 0.51f, 0.285f);
+                    View.Label(root, "Possible echo", "DAY " + cause.echoDay + "  /  " + cause.echoName,
+                        31, Palette.Gold, TextAnchor.MiddleCenter, 0.08f, 0.165f, 0.92f, 0.23f);
+                }
+            }
+            View.Label(root, "Walk hint", stage == 2 ? "向前滑动，回到现在" : "向前滑动，靠近未来的自己",
+                26, Palette.Muted, TextAnchor.MiddleCenter, 0.1f, 0.045f, 0.9f, 0.11f);
+        }
+
+        private void FinishStation()
+        {
+            session.VisitStation();
+            archive.active = session.Snapshot();
+            Save();
+            StartCoroutine(AdvanceDay());
         }
 
         private IEnumerator EchoSequence(PendingEcho echo)
@@ -606,6 +802,9 @@ namespace Horizon
                 float y = 0.61f - i * 0.102f;
                 View.Panel(overlay, "Future event", Palette.Panel, 0.11f, y, 0.89f, y + 0.082f);
                 string detail = session.HorizonLevel >= 2 ? echo.echoName :
+                    archive.calibrations > 0 ?
+                        (echo.kind == CardKind.Temptation ? "状态可能下降" :
+                            echo.kind == CardKind.Growth ? "洞察可能上升" : "有人可能回应") :
                     echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
                 View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " + detail, 29,
                     echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
@@ -688,6 +887,21 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.07f, 0.835f, 0.93f, 0.895f);
             View.Fill(overlay, "Map spine", new Color(0.46f, 0.76f, 0.72f, 0.36f),
                 0.19f, 0.1f, 0.192f, 0.814f);
+            for (int i = 0; i < actions.Count; i++)
+            {
+                ActionRecord action = actions[i];
+                if (action.echoDay <= action.day || action.echoDay > GameSession.LastDay) continue;
+                float from = 0.788f - (action.day - 1) * 0.055f + 0.007f;
+                float to = 0.788f - (action.echoDay - 1) * 0.055f + 0.007f;
+                float x = 0.79f + (i % 4) * 0.029f;
+                Color baseColor = action.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint;
+                Color thread = new Color(baseColor.r, baseColor.g, baseColor.b,
+                    action.echoed ? 0.66f : 0.32f);
+                View.Fill(overlay, "Causal thread", thread, x, to, x + 0.002f, from);
+                View.Fill(overlay, "Causal start", thread, 0.73f, from, x, from + 0.002f);
+                View.Panel(overlay, "Causal arrival", thread,
+                    x - 0.007f, to - 0.005f, x + 0.011f, to + 0.006f, 9);
+            }
             for (int day = 1; day <= GameSession.LastDay; day++)
             {
                 float y = 0.788f - (day - 1) * 0.055f;
@@ -699,10 +913,17 @@ namespace Horizon
                 View.Label(overlay, "Day", day.ToString("00"), 23, Palette.Muted,
                     TextAnchor.MiddleRight, 0.07f, y - 0.01f, 0.16f, y + 0.029f);
                 string label = action == null ? "尚未到来" : action.cardName +
-                    (action.echoDay > 0 ? "   →   D" + action.echoDay + (action.echoed ? "  已兑现" : "  ·") : "");
+                    (action.echoDay > 0 ? "  → D" + action.echoDay : "");
                 View.Label(overlay, "Action", label, 28, action == null ? Palette.Muted : Palette.Text,
-                    TextAnchor.MiddleLeft, 0.25f, y - 0.016f, 0.92f, y + 0.036f);
+                    TextAnchor.MiddleLeft, 0.25f, y - 0.016f, 0.73f, y + 0.036f);
             }
+            PredictionRecord prediction = duringRun && session != null ? session.Prediction :
+                run != null ? run.prediction : null;
+            if (prediction != null)
+                View.Label(overlay, "Prediction mark", prediction.evaluated ?
+                    "D4 的预测  →  D7 的自己  /  " + (prediction.accurate ? "接近" : "出乎意料") :
+                    "D4 的预测，等待 D7 回答", 23, Palette.Gold,
+                    TextAnchor.MiddleCenter, 0.1f, 0.123f, 0.9f, 0.167f);
             if (!duringRun && archive.runs.Count > 1)
             {
                 View.Button(overlay, "Previous", "‹", () => { mapIndex = (mapIndex + archive.runs.Count - 1) % archive.runs.Count; RenderMap(false); },

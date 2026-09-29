@@ -58,6 +58,7 @@ namespace Horizon.Tests
             session.Advance();
             session.Choose("episode");
             session.Advance();
+            session.LockPrediction(0, 0, 0);
             Assert.IsFalse(session.CanPlay(session.Hand[1]));
             Assert.IsTrue(session.CanPlay(session.Hand[2]));
         }
@@ -68,7 +69,10 @@ namespace Horizon.Tests
             var session = new GameSession(1);
             for (int day = 1; day <= 12; day++)
             {
+                if (session.HasPredictionReview) session.MarkPredictionReviewed();
+                if (day == 4) session.LockPrediction(0, 0, 0);
                 session.Choose(session.Hand[2].Id);
+                if (day == 4) session.VisitStation();
                 if (day < 12) session.Advance();
             }
             Assert.AreEqual(12, session.CompletedRun.actions.Count);
@@ -92,6 +96,62 @@ namespace Horizon.Tests
             restored.Advance();
             Assert.IsTrue(restored.TryFocus());
         }
+
+        [Test]
+        public void FourthDayPredictionIsSealedAndMeasuredAfterTheSeventhDayEchoes()
+        {
+            var session = new GameSession(1);
+            for (int day = 1; day <= 3; day++)
+            {
+                session.Choose(session.Hand[2].Id);
+                session.Advance();
+            }
+            Assert.AreEqual(4, session.Day);
+            Assert.IsTrue(session.CanPredict);
+            Assert.IsFalse(session.CanPlay(session.Hand[2]));
+            session.LockPrediction(0, 1, 0);
+            session.Choose(session.Hand[2].Id);
+            Assert.Throws<InvalidOperationException>(() => session.Advance());
+            session.VisitStation();
+            GameSession restored = GameSession.Restore(session.Snapshot());
+            Assert.IsTrue(restored.StationVisited);
+            Assert.AreEqual(1, restored.Prediction.mood);
+            restored.Advance();
+            restored.Choose(restored.Hand[2].Id);
+            restored.Advance();
+            restored.Choose(restored.Hand[2].Id);
+            DayTransition seventh = restored.Advance();
+            Assert.AreEqual(7, seventh.Day);
+            Assert.IsTrue(restored.Prediction.evaluated);
+            Assert.IsTrue(restored.Prediction.accurate);
+            Assert.AreEqual(1, restored.Prediction.actualMood);
+            Assert.IsTrue(restored.HasPredictionReview);
+            restored.MarkPredictionReviewed();
+            Assert.IsFalse(restored.HasPredictionReview);
+        }
+
+        [Test]
+        public void ASurprisingPredictionDoesNotChangeResourcesOrGrantPower()
+        {
+            var session = new GameSession(1);
+            for (int day = 1; day <= 3; day++)
+            {
+                session.Choose(session.Hand[2].Id);
+                session.Advance();
+            }
+            Assert.Throws<ArgumentOutOfRangeException>(() => session.LockPrediction(4, 0, 0));
+            int energy = session.Energy;
+            session.LockPrediction(-3, -3, -3);
+            Assert.AreEqual(energy, session.Energy);
+            session.Choose(session.Hand[2].Id);
+            session.VisitStation();
+            for (int day = 5; day <= 7; day++)
+            {
+                session.Advance();
+                if (day < 7) session.Choose(session.Hand[2].Id);
+            }
+            Assert.IsFalse(session.Prediction.accurate);
+            Assert.IsTrue(session.HasPredictionReview);
+        }
     }
 }
-

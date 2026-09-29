@@ -39,6 +39,25 @@ namespace Horizon.Game
     }
 
     [Serializable]
+    public sealed class PredictionRecord
+    {
+        public int sourceDay;
+        public int dueDay;
+        public int baseEnergy;
+        public int baseMood;
+        public int baseInsight;
+        public int energy;
+        public int mood;
+        public int insight;
+        public int actualEnergy;
+        public int actualMood;
+        public int actualInsight;
+        public bool evaluated;
+        public bool accurate;
+        public bool reviewed;
+    }
+
+    [Serializable]
     public sealed class RunRecord
     {
         public int number;
@@ -48,6 +67,7 @@ namespace Horizon.Game
         public int finalEnergy;
         public int finalMood;
         public int finalInsight;
+        public PredictionRecord prediction;
     }
 
     [Serializable]
@@ -61,6 +81,8 @@ namespace Horizon.Game
         public int supportActions;
         public int focusUses;
         public bool hasChosen;
+        public bool stationVisited;
+        public PredictionRecord prediction;
         public List<ActionRecord> actions = new List<ActionRecord>();
         public List<PendingEcho> pending = new List<PendingEcho>();
     }
@@ -90,6 +112,10 @@ namespace Horizon.Game
         public int SupportActions { get; private set; }
         public int FocusUses { get; private set; }
         public bool HasChosen { get; private set; }
+        public bool StationVisited { get; private set; }
+        public PredictionRecord Prediction { get; private set; }
+        public bool CanPredict { get { return Day == 4 && !HasChosen && Prediction == null; } }
+        public bool HasPredictionReview { get { return Prediction != null && Prediction.evaluated && !Prediction.reviewed; } }
         public RunRecord CompletedRun { get; private set; }
         public readonly List<ActionRecord> Actions = new List<ActionRecord>();
         public readonly List<PendingEcho> Pending = new List<PendingEcho>();
@@ -117,7 +143,8 @@ namespace Horizon.Game
             {
                 Day = saved.day, Energy = saved.energy, Mood = saved.mood,
                 Insight = saved.insight, SupportActions = saved.supportActions,
-                FocusUses = saved.focusUses, HasChosen = saved.hasChosen
+                FocusUses = saved.focusUses, HasChosen = saved.hasChosen,
+                StationVisited = saved.stationVisited, Prediction = saved.prediction
             };
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
@@ -130,21 +157,48 @@ namespace Horizon.Game
             {
                 day = Day, runNumber = RunNumber, energy = Energy, mood = Mood,
                 insight = Insight, supportActions = SupportActions, focusUses = FocusUses,
-                hasChosen = HasChosen, actions = new List<ActionRecord>(Actions),
+                hasChosen = HasChosen, stationVisited = StationVisited,
+                prediction = Prediction, actions = new List<ActionRecord>(Actions),
                 pending = new List<PendingEcho>(Pending)
             };
         }
 
+        public void LockPrediction(int energy, int mood, int insight)
+        {
+            if (!CanPredict) throw new InvalidOperationException("Prediction is available once on day four.");
+            if (Math.Abs(energy) > 3 || Math.Abs(mood) > 3 || Math.Abs(insight) > 3)
+                throw new ArgumentOutOfRangeException("Prediction must be within three points per resource.");
+            Prediction = new PredictionRecord
+            {
+                sourceDay = Day, dueDay = Day + 3,
+                baseEnergy = Energy, baseMood = Mood, baseInsight = Insight,
+                energy = energy, mood = mood, insight = insight
+            };
+        }
+
+        public void VisitStation()
+        {
+            if (Day != 4 || !HasChosen || StationVisited)
+                throw new InvalidOperationException("The station follows the fourth action.");
+            StationVisited = true;
+        }
+
+        public void MarkPredictionReviewed()
+        {
+            if (!HasPredictionReview) throw new InvalidOperationException("No prediction is ready to review.");
+            Prediction.reviewed = true;
+        }
+
         public bool CanPlay(CardSpec card)
         {
-            return !HasChosen && CompletedRun == null &&
+            return !CanPredict && !HasPredictionReview && !HasChosen && CompletedRun == null &&
                 Energy + card.Now.energy >= 0 && Mood + card.Now.mood >= 0 &&
                 Insight + card.Now.insight >= 0;
         }
 
         public bool TryFocus()
         {
-            if (FocusUses >= 1 || HasChosen || CompletedRun != null) return false;
+            if (FocusUses >= 1 || HasPredictionReview || HasChosen || CompletedRun != null) return false;
             FocusUses++;
             return true;
         }
@@ -152,6 +206,8 @@ namespace Horizon.Game
         public ActionRecord Choose(string cardId)
         {
             if (HasChosen || CompletedRun != null) throw new InvalidOperationException("Day already played.");
+            if (HasPredictionReview) throw new InvalidOperationException("Review the prediction first.");
+            if (CanPredict) throw new InvalidOperationException("Lock a prediction before the fourth choice.");
             CardSpec card = Array.Find(Hand, c => c.Id == cardId);
             if (card == null) throw new ArgumentException("Card not in today's hand.", "cardId");
             if (!CanPlay(card)) throw new InvalidOperationException("Insufficient resources.");
@@ -182,6 +238,8 @@ namespace Horizon.Game
         public DayTransition Advance()
         {
             if (!HasChosen || Day == LastDay) throw new InvalidOperationException("Choose before advancing.");
+            if (Day == 4 && !StationVisited)
+                throw new InvalidOperationException("Visit the future station before advancing.");
             Day++;
             HasChosen = false;
             FocusUses = 0;
@@ -198,6 +256,17 @@ namespace Horizon.Game
                 Apply(echo.delta);
                 ActionRecord source = Actions.Find(a => a.day == echo.sourceDay);
                 if (source != null) source.echoed = true;
+            }
+            if (Prediction != null && !Prediction.evaluated && Day >= Prediction.dueDay)
+            {
+                Prediction.actualEnergy = Energy - Prediction.baseEnergy;
+                Prediction.actualMood = Mood - Prediction.baseMood;
+                Prediction.actualInsight = Insight - Prediction.baseInsight;
+                int distance = Math.Abs(Prediction.energy - Prediction.actualEnergy) +
+                    Math.Abs(Prediction.mood - Prediction.actualMood) +
+                    Math.Abs(Prediction.insight - Prediction.actualInsight);
+                Prediction.accurate = distance <= 2;
+                Prediction.evaluated = true;
             }
             return new DayTransition(Day, due);
         }
@@ -231,7 +300,8 @@ namespace Horizon.Game
                     boss.passed == 0 ? "这一次，我看见了另一条路" : "从「" + definingAction + "」开始的日子",
                 boss = boss,
                 actions = new List<ActionRecord>(Actions),
-                finalEnergy = Energy, finalMood = Mood, finalInsight = Insight
+                finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
+                prediction = Prediction
             };
         }
     }
