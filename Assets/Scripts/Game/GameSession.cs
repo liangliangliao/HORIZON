@@ -14,6 +14,8 @@ namespace Horizon.Game
         public bool echoed;
         public string echoName;
         public bool givesSupport;
+        public ResourceDelta now;
+        public ResourceDelta later;
     }
 
     [Serializable]
@@ -218,7 +220,8 @@ namespace Horizon.Game
             {
                 day = Day, cardId = card.Id, cardName = card.Name, kind = card.Kind,
                 echoDay = card.Delay > 0 ? Day + card.Delay : 0,
-                echoName = card.EchoName, givesSupport = card.GivesSupport
+                echoName = card.EchoName, givesSupport = card.GivesSupport,
+                now = card.Now, later = card.Later
             };
             Actions.Add(action);
             if (card.Delay > 0 && action.echoDay <= LastDay)

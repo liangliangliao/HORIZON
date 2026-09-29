@@ -23,6 +23,8 @@ namespace Horizon.Tests
             session.Choose("practice");
             Assert.AreEqual(2, session.Insight);
             Assert.AreEqual(4, session.Actions[0].echoDay);
+            Assert.AreEqual(-2, session.Actions[0].now.energy);
+            Assert.AreEqual(3, session.Actions[0].later.insight);
             session.Advance();
             session.Choose(session.Hand[2].Id);
             session.Advance();

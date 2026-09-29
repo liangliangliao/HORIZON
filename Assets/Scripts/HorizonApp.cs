@@ -912,10 +912,18 @@ namespace Horizon
                 View.Panel(overlay, "Node", color, 0.178f, y, 0.205f, y + 0.015f, 14);
                 View.Label(overlay, "Day", day.ToString("00"), 23, Palette.Muted,
                     TextAnchor.MiddleRight, 0.07f, y - 0.01f, 0.16f, y + 0.029f);
-                string label = action == null ? "尚未到来" : action.cardName +
-                    (action.echoDay > 0 ? "  → D" + action.echoDay : "");
-                View.Label(overlay, "Action", label, 28, action == null ? Palette.Muted : Palette.Text,
-                    TextAnchor.MiddleLeft, 0.25f, y - 0.016f, 0.73f, y + 0.036f);
+                string label = action == null ? "尚未到来" : action.cardName;
+                View.Label(overlay, "Action", label, 27, action == null ? Palette.Muted : Palette.Text,
+                    TextAnchor.MiddleLeft, 0.25f, y + 0.002f, 0.73f, y + 0.039f);
+                if (action != null)
+                {
+                    string immediate = action.now == null ? "" : "当下 " + action.now.ShortLabel();
+                    string future = action.echoDay > 0 ? "D" + action.echoDay + " " +
+                        (action.later == null ? action.echoName : action.later.ShortLabel()) : "";
+                    View.Label(overlay, "Why", immediate + (future.Length > 0 ? "   → " + future : ""),
+                        19, action.echoed ? Palette.Mint : Palette.Muted,
+                        TextAnchor.MiddleLeft, 0.25f, y - 0.017f, 0.73f, y + 0.009f);
+                }
             }
             PredictionRecord prediction = duringRun && session != null ? session.Prediction :
                 run != null ? run.prediction : null;
