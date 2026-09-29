@@ -44,6 +44,30 @@ namespace Horizon.Game
         public bool support;
         public int passed;
         public string ghost;
+        public List<int> abilityDays = new List<int>();
+        public List<int> stateDays = new List<int>();
+        public List<int> supportDays = new List<int>();
+        public GhostTimeline ghostTimeline;
+    }
+
+    [Serializable]
+    public sealed class GhostTimeline
+    {
+        public int sourceDay;
+        public string originalName;
+        public string alternativeId;
+        public string alternativeName;
+        public int echoDay;
+        public string echoName;
+        public int changedChoiceDay;
+        public string changedChoiceName;
+        public string gateName;
+        public bool gateOpens;
+        public int beforePassed;
+        public int afterPassed;
+        public int finalEnergy;
+        public int finalMood;
+        public int finalInsight;
     }
 
     [Serializable]
@@ -154,6 +178,7 @@ namespace Horizon.Game
         public RunRecord CompletedRun { get; private set; }
         public readonly List<ActionRecord> Actions = new List<ActionRecord>();
         public readonly List<PendingEcho> Pending = new List<PendingEcho>();
+        private readonly bool replaying;
 
         public int HorizonLevel
         {
@@ -170,10 +195,13 @@ namespace Horizon.Game
             }
         }
 
-        public GameSession(int runNumber)
+        public GameSession(int runNumber) : this(runNumber, false) { }
+
+        private GameSession(int runNumber, bool replaying)
         {
             if (runNumber < 1) throw new ArgumentOutOfRangeException("runNumber");
             RunNumber = runNumber;
+            this.replaying = replaying;
             Day = 1;
             Energy = 6;
             Mood = 5;
@@ -400,6 +428,114 @@ namespace Horizon.Game
 
         private static int Clamp(int value) { return Math.Max(0, Math.Min(ResourceCap, value)); }
 
+        // Reuse the actual rules for a counterfactual; after the changed day, keep the
+        // player's recorded choices when legal and use recovery if that path disappeared.
+        public static RunRecord ReplayAlternative(RunRecord original, int sourceDay, string alternativeId)
+        {
+            if (original == null || original.actions == null || original.actions.Count != LastDay ||
+                original.number < 1 || sourceDay < 1 || sourceDay > LastDay ||
+                string.IsNullOrEmpty(alternativeId))
+                throw new ArgumentException("A completed twelve-day run and one alternative are required.");
+            var replay = new GameSession(original.number, true);
+            for (int day = 1; day <= LastDay; day++)
+            {
+                if (replay.HasPredictionReview) replay.MarkPredictionReviewed();
+                if (day == 4)
+                {
+                    PredictionRecord prediction = original.prediction;
+                    replay.LockPrediction(prediction == null ? 0 : ClampForecast(prediction.energy),
+                        prediction == null ? 0 : ClampForecast(prediction.mood),
+                        prediction == null ? 0 : ClampForecast(prediction.insight));
+                }
+                ActionRecord recorded = original.actions[day - 1];
+                if (recorded == null) return null;
+                string desired = day == sourceDay ? alternativeId : recorded.cardId;
+                CardSpec choice = Array.Find(replay.Hand, c => c.Id == desired);
+                if (day == sourceDay && (desired == recorded.cardId || choice == null || !replay.CanPlay(choice)))
+                    return null;
+                if (choice == null || !replay.CanPlay(choice))
+                {
+                    if (day <= sourceDay) return null; // The original prefix must be identical.
+                    choice = replay.Hand[2];
+                    if (!replay.CanPlay(choice)) return null;
+                }
+                replay.Choose(choice.Id);
+                if (day == 4) replay.VisitStation();
+                if (day < LastDay) replay.Advance();
+            }
+            return replay.CompletedRun;
+        }
+
+        private static int ClampForecast(int value) { return Math.Max(-3, Math.Min(3, value)); }
+
+        private static int Deficit(RunRecord run, BossResult baseline)
+        {
+            int gap = 0;
+            if (!baseline.ability) gap += Math.Max(0, 7 - run.finalInsight);
+            if (!baseline.state) gap += Math.Max(0, 4 - run.finalEnergy) + Math.Max(0, 4 - run.finalMood);
+            if (!baseline.support)
+            {
+                int supports = run.actions.FindAll(a => a.givesSupport).Count;
+                gap += Math.Max(0, 2 - supports);
+            }
+            return gap;
+        }
+
+        private static GhostTimeline BuildGhost(RunRecord original)
+        {
+            BossResult before = original.boss;
+            GhostTimeline best = null;
+            int bestScore = -1;
+            int originalGap = Deficit(original, before);
+            for (int day = 1; day <= LastDay; day++)
+            {
+                foreach (CardSpec card in CardCatalog.ForDay(day, original.number))
+                {
+                    RunRecord alternate = ReplayAlternative(original, day, card.Id);
+                    if (alternate == null) continue;
+                    BossResult after = alternate.boss;
+                    int opened = (!before.ability && after.ability ? 1 : 0) +
+                        (!before.state && after.state ? 1 : 0) +
+                        (!before.support && after.support ? 1 : 0);
+                    int closed = (before.ability && !after.ability ? 1 : 0) +
+                        (before.state && !after.state ? 1 : 0) +
+                        (before.support && !after.support ? 1 : 0);
+                    int score = opened * 100 - closed * 120 +
+                        (originalGap - Deficit(alternate, before)) * 6;
+                    if (score <= bestScore) continue;
+                    string gate = !before.ability && after.ability ? "能力" :
+                        !before.state && after.state ? "状态" :
+                        !before.support && after.support ? "支援" :
+                        !before.ability ? "能力" : !before.state ? "状态" : "支援";
+                    ActionRecord changed = alternate.actions[day - 1];
+                    int shiftDay = 0;
+                    string shiftName = "";
+                    for (int later = day + 1; later <= LastDay; later++)
+                    {
+                        if (alternate.actions[later - 1].cardId == original.actions[later - 1].cardId) continue;
+                        shiftDay = later;
+                        shiftName = alternate.actions[later - 1].cardName;
+                        break;
+                    }
+                    bestScore = score;
+                    best = new GhostTimeline
+                    {
+                        sourceDay = day, originalName = original.actions[day - 1].cardName,
+                        alternativeId = changed.cardId,
+                        alternativeName = changed.cardName,
+                        echoDay = changed.echoDay <= LastDay ? changed.echoDay : 0,
+                        echoName = changed.echoName,
+                        changedChoiceDay = shiftDay, changedChoiceName = shiftName,
+                        gateName = gate, gateOpens = opened > 0,
+                        beforePassed = before.passed, afterPassed = after.passed,
+                        finalEnergy = alternate.finalEnergy, finalMood = alternate.finalMood,
+                        finalInsight = alternate.finalInsight
+                    };
+                }
+            }
+            return best;
+        }
+
         private void Complete()
         {
             var boss = new BossResult
@@ -409,9 +545,17 @@ namespace Horizon.Game
                 support = SupportActions >= 2
             };
             boss.passed = (boss.ability ? 1 : 0) + (boss.state ? 1 : 0) + (boss.support ? 1 : 0);
-            boss.ghost = !boss.ability ? "如果更早种下一颗成长的种子，能力之门会怎样？" :
-                !boss.state ? "如果某一天先休息，状态之门会怎样？" :
-                !boss.support ? "如果给一个朋友发消息，支援之门会怎样？" : "你留下的路，已经连成了星图。";
+            foreach (ActionRecord action in Actions)
+            {
+                ResourceDelta now = action.now;
+                ResourceDelta later = action.echoed ? action.later : null;
+                if ((now != null && now.insight > 0) || (later != null && later.insight > 0))
+                    boss.abilityDays.Add(action.day);
+                if ((now != null && (now.energy != 0 || now.mood != 0)) ||
+                    (later != null && (later.energy != 0 || later.mood != 0)) || action.secondaryResolved)
+                    boss.stateDays.Add(action.day);
+                if (action.givesSupport) boss.supportDays.Add(action.day);
+            }
             string definingAction = Actions.FindLast(a => a.kind == CardKind.Growth)?.cardName ?? Actions[0].cardName;
             CompletedRun = new RunRecord
             {
@@ -423,6 +567,13 @@ namespace Horizon.Game
                 finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
                 prediction = Prediction
             };
+            if (boss.passed < 3 && !replaying) boss.ghostTimeline = BuildGhost(CompletedRun);
+            boss.ghost = boss.passed == 3 ? "你留下的路，已经连成了星图。" :
+                boss.ghostTimeline == null ? "没有一个单点改变能保证通过，下一条路还要继续探索。" :
+                boss.ghostTimeline.gateOpens ? "如果 D" + boss.ghostTimeline.sourceDay +
+                    " 改为「" + boss.ghostTimeline.alternativeName + "」，" + boss.ghostTimeline.gateName +
+                    "之门会打开。" : "这条支线接近了" + boss.ghostTimeline.gateName +
+                    "之门，但仍未通过。";
         }
     }
 }

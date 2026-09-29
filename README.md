@@ -23,13 +23,13 @@ Android/iOS 目标为竖屏、单指操作。运行时请求竖屏并根据 `Scr
 - 每日一次 FOCUS MODE；第二局解锁 Horizon II 的节点类型提示。
 - 第三局开始，低精力的透支回声可能造成一次后续邀约缺席，触发三节点的 CASCADE ×3；恢复手牌仍可打出。这是改变可选行动的二阶后果，不是额外的纯数值惩罚。
 - HORIZON II 只透露未来事件类型；第三次未来站后 HORIZON III 才可比较两条条件未来。投影不消耗卡牌、不修改局内状态，也不模拟尚未作出的行动。
-- 12 天三门结算、可能分支提示、自动重开；当前与已完成的时间地图包含行动、回声、二阶后果之间的因果线与资源变化，连同预测与未来站进度保存在本地。
+- 12 天三门结算逐门点亮贡献过的行动节点；失败时重放一次替代行动，按同一套规则生成 GHOST TIMELINE。若替代分支仍未过门，会如实显示。随后自动重开；时间地图保留行动、回声和二阶后果因果线。
 
-未来站已经进入第 4 天的主循环，但仍是三段短互动；目前只有一种二阶因果链和三节点 CASCADE。方案中 40～60 秒的完整未来站演出、更复杂的因果网络、六资源完整版、分享动画、长期内容和商业化尚未实现。详见 `docs/PLAYABILITY_GAPS.md` 的逐项验收清单。
+未来站已经进入第 4 天的主循环，但仍是三段短互动；目前只有一种二阶因果链和三节点 CASCADE。Boss 的可重放幻影是单点改动，并非完整的平行人生模拟；三门仍使用原型门槛。方案中 40～60 秒的未来站演出、通用因果网络、六资源完整版、分享动画和长期内容尚未实现。详见 `docs/PLAYABILITY_GAPS.md`。
 
 ## 检查
 
-Unity 内打开 **Window → General → Test Runner → EditMode**，运行 `GameSessionTests`。测试覆盖首日手牌、延迟回声、即时成本、零精力恢复、预测兑现、未来站、二阶选择损失与 12 天结算。也可以在具有 Unity Editor 的机器上运行：
+Unity 内打开 **Window → General → Test Runner → EditMode**，运行 `GameSessionTests`。测试覆盖首日手牌、延迟回声、零精力恢复、预测兑现、未来站、二阶选择损失、12 天三门证据与幻影分支的规则重放。也可以在具有 Unity Editor 的机器上运行：
 
 ```bash
 Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults TestResults.xml -quit

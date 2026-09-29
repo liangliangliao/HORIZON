@@ -83,6 +83,9 @@ namespace Horizon.Tests
             Assert.IsTrue(session.CompletedRun.boss.state);
             Assert.IsTrue(session.CompletedRun.boss.support);
             Assert.AreEqual(2, session.CompletedRun.boss.passed);
+            Assert.IsNotNull(session.CompletedRun.boss.ghostTimeline);
+            Assert.IsFalse(session.CompletedRun.boss.ghostTimeline.gateOpens);
+            Assert.That(session.CompletedRun.boss.ghost, Does.Contain("仍未通过"));
             Assert.Throws<InvalidOperationException>(() => session.Advance());
         }
 
@@ -286,6 +289,47 @@ namespace Horizon.Tests
             GameSession exhausted = GameSession.Restore(low);
             Assert.IsFalse(exhausted.ProjectFuture(exhausted.Hand[0].Id).Available);
             Assert.IsTrue(exhausted.ProjectFuture(exhausted.Hand[2].Id).Available);
+        }
+
+        [Test]
+        public void BossLightsActionEvidenceAndReplayedGhostReallyOpensAGate()
+        {
+            var session = new GameSession(1);
+            for (int day = 1; day <= 12; day++)
+            {
+                if (session.HasPredictionReview) session.MarkPredictionReviewed();
+                if (day == 4) session.LockPrediction(0, 0, 0);
+                session.Choose(day == 1 ? "practice" : session.Hand[2].Id);
+                if (day == 4) session.VisitStation();
+                if (day < 12) session.Advance();
+            }
+            RunRecord original = session.CompletedRun;
+            Assert.IsFalse(original.boss.ability);
+            Assert.IsTrue(original.boss.state);
+            Assert.IsTrue(original.boss.support);
+            CollectionAssert.Contains(original.boss.abilityDays, 1);
+            CollectionAssert.Contains(original.boss.stateDays, 1);
+            Assert.GreaterOrEqual(original.boss.supportDays.Count, 2);
+
+            GhostTimeline ghost = original.boss.ghostTimeline;
+            Assert.IsNotNull(ghost);
+            Assert.IsTrue(ghost.gateOpens);
+            Assert.AreEqual("能力", ghost.gateName);
+            RunRecord replayed = GameSession.ReplayAlternative(original, ghost.sourceDay, ghost.alternativeId);
+            Assert.IsNotNull(replayed);
+            Assert.IsTrue(replayed.boss.ability);
+            Assert.AreEqual(ghost.afterPassed, replayed.boss.passed);
+            Assert.AreEqual(ghost.finalEnergy, replayed.finalEnergy);
+            Assert.AreEqual(ghost.finalInsight, replayed.finalInsight);
+            for (int day = 0; day < ghost.sourceDay - 1; day++)
+                Assert.AreEqual(original.actions[day].cardId, replayed.actions[day].cardId);
+            Assert.AreEqual(original.boss.passed, ghost.beforePassed);
+            Assert.AreEqual(12, original.actions.Count);
+
+            RunRecord saved = JsonUtility.FromJson<RunRecord>(JsonUtility.ToJson(original));
+            Assert.AreEqual(ghost.alternativeId, saved.boss.ghostTimeline.alternativeId);
+            CollectionAssert.Contains(saved.boss.abilityDays, 1);
+            Assert.IsNull(GameSession.ReplayAlternative(original, 1, "not-in-hand"));
         }
     }
 }

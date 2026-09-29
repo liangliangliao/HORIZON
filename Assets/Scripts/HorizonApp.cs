@@ -949,15 +949,25 @@ namespace Horizon
             for (int i = 0; i < run.actions.Count; i++)
             {
                 float x = 0.12f + i * 0.068f;
-                Color color = run.actions[i].kind == CardKind.Growth ? Palette.Mint :
-                    run.actions[i].kind == CardKind.Temptation ? Palette.Coral : Palette.Gold;
-                View.Panel(root, "Action star", color, x, 0.721f, x + 0.018f, 0.739f, 10);
+                View.Panel(root, "Action star", new Color(0.44f, 0.62f, 0.64f, 0.52f),
+                    x, 0.721f, x + 0.018f, 0.739f, 10);
             }
             bool[] gates = { run.boss.ability, run.boss.state, run.boss.support };
             string[] names = { "能力", "状态", "支援" };
-            string[] notes = { "洞察达到 7", "精力与心情达到 4", "向朋友伸出手至少 2 次" };
+            string[] notes = { "成长留下的能力", "休息、透支与恢复的轨迹", "主动建立的连接" };
+            List<int>[] evidence = { run.boss.abilityDays, run.boss.stateDays, run.boss.supportDays };
             for (int i = 0; i < 3; i++)
             {
+                List<int> days = evidence[i] ?? new List<int>();
+                Color beam = i == 0 ? Palette.Mint : i == 1 ? Palette.Gold : Palette.Text;
+                foreach (int day in days)
+                {
+                    if (day < 1 || day > GameSession.LastDay) continue;
+                    float x = 0.12f + (day - 1) * 0.068f;
+                    View.Panel(root, "Gate evidence", beam,
+                        x - 0.006f, 0.715f, x + 0.024f, 0.745f, 18);
+                    yield return new WaitForSeconds(0.045f);
+                }
                 float y = 0.58f - i * 0.145f;
                 View.Panel(root, "Gate", Palette.Panel, 0.1f, y, 0.9f, y + 0.118f);
                 View.Label(root, "Gate sign", gates[i] ? "已开" : "未开", 30,
@@ -965,21 +975,78 @@ namespace Horizon
                     0.14f, y + 0.02f, 0.25f, y + 0.098f);
                 View.Label(root, "Gate name", names[i], 36, Palette.Text,
                     TextAnchor.MiddleLeft, 0.29f, y + 0.047f, 0.52f, y + 0.105f);
-                View.Label(root, "Gate note", notes[i], 22, Palette.Muted,
+                View.Label(root, "Gate note", notes[i] + "  ·  " + EvidenceSummary(days), 22, Palette.Muted,
                     TextAnchor.MiddleLeft, 0.29f, y + 0.011f, 0.85f, y + 0.055f);
+                yield return new WaitForSeconds(0.35f);
             }
-            yield return new WaitForSeconds(2.1f);
             View.Label(root, "Future voice", run.boss.passed == 3 ? "「这条路，是你亲手照亮的。」" :
                 "「如果这里不同，会发生什么？」", 34, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.08f, 0.13f, 0.92f, 0.21f);
-            View.Label(root, "Ghost", run.boss.ghost, 28, Palette.Text,
-                TextAnchor.MiddleCenter, 0.11f, 0.05f, 0.89f, 0.13f);
-            yield return new WaitForSeconds(4.0f);
+            yield return new WaitForSeconds(0.8f);
+            if (run.boss.passed < 3)
+                yield return GhostSequence(run.boss);
+            else
+                yield return new WaitForSeconds(0.9f);
             View.Fill(root, "Collapse", Palette.Ink, 0, 0, 1, 1);
             View.Label(root, "New horizon", "另一条时间线，正在形成。", 35, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.08f, 0.43f, 0.92f, 0.57f);
             yield return new WaitForSeconds(1.7f);
             StartNewRun();
+        }
+
+        private static string EvidenceSummary(List<int> days)
+        {
+            if (days == null || days.Count == 0) return "没有对应的行动";
+            string label = "";
+            for (int i = 0; i < Mathf.Min(3, days.Count); i++)
+                label += (i == 0 ? "" : " · ") + "D" + days[i];
+            return days.Count > 3 ? label + " 等" : label;
+        }
+
+        private IEnumerator GhostSequence(BossResult boss)
+        {
+            GhostTimeline ghost = boss.ghostTimeline;
+            View.Fill(root, "Ghost sky", new Color(0.025f, 0.048f, 0.078f, 0.98f),
+                0, 0, 1, 1);
+            View.Label(root, "Ghost title", "G H O S T   T I M E L I N E", 43,
+                Palette.Muted, TextAnchor.MiddleCenter, 0.04f, 0.82f, 0.96f, 0.91f);
+            if (ghost == null)
+            {
+                View.Label(root, "No single switch", boss.ghost, 34, Palette.Text,
+                    TextAnchor.MiddleCenter, 0.09f, 0.39f, 0.91f, 0.59f);
+                yield return new WaitForSeconds(1.8f);
+                yield break;
+            }
+            View.Label(root, "Pointed node", "「如果这里不同，会发生什么？」", 32,
+                Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.69f, 0.92f, 0.77f);
+            View.Fill(root, "Phantom rail", new Color(0.87f, 0.78f, 0.97f, 0.35f),
+                0.17f, 0.52f, 0.83f, 0.523f);
+            View.Panel(root, "Changed origin", Palette.Gold, 0.143f, 0.499f, 0.193f, 0.543f, 25);
+            View.Label(root, "Original", "DAY " + ghost.sourceDay + "  /  原来是「" + ghost.originalName + "」",
+                26, Palette.Muted, TextAnchor.MiddleCenter, 0.05f, 0.57f, 0.95f, 0.63f);
+            View.Label(root, "Alternative", "如果改为「" + ghost.alternativeName + "」",
+                31, Palette.Gold, TextAnchor.MiddleCenter, 0.06f, 0.395f, 0.42f, 0.5f);
+            yield return new WaitForSeconds(0.32f);
+            View.Fill(root, "Ghost first link", Palette.Gold, 0.19f, 0.518f, 0.5f, 0.527f);
+            View.Panel(root, "Changed echo", Palette.Mint, 0.475f, 0.499f, 0.525f, 0.543f, 25);
+            string middle = ghost.echoDay > 0 ?
+                "D" + ghost.echoDay + "  " + ghost.echoName : ghost.changedChoiceDay > 0 ?
+                "D" + ghost.changedChoiceDay + "  " + ghost.changedChoiceName : "后续的资源轨迹改变";
+            View.Label(root, "Consequential node", middle, 27, Palette.Text,
+                TextAnchor.MiddleCenter, 0.35f, 0.395f, 0.65f, 0.5f);
+            yield return new WaitForSeconds(0.25f);
+            View.Fill(root, "Ghost second link", Palette.Mint, 0.5f, 0.518f, 0.81f, 0.527f);
+            View.Panel(root, "Ghost gate", ghost.gateOpens ? Palette.Mint : Palette.Coral,
+                0.805f, 0.499f, 0.855f, 0.543f, 25);
+            View.Label(root, "Gate consequence", "D12  " + ghost.gateName +
+                (ghost.gateOpens ? "门打开" : "门仍未开"), 27,
+                ghost.gateOpens ? Palette.Mint : Palette.Coral,
+                TextAnchor.MiddleCenter, 0.69f, 0.395f, 0.97f, 0.5f);
+            View.Label(root, "Honest branch", boss.ghost + "  （" + ghost.beforePassed +
+                " → " + ghost.afterPassed + " 门）", 30, Palette.Text,
+                TextAnchor.MiddleCenter, 0.07f, 0.23f, 0.93f, 0.33f);
+            Handheld.Vibrate();
+            yield return new WaitForSeconds(1.7f);
         }
 
         private void ShowMap(bool duringRun)
