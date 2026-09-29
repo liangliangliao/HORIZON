@@ -79,6 +79,14 @@ namespace Horizon.Game
         public static readonly CardSpec SoloRecovery = new CardSpec("solo", "独处休息", CardKind.Recovery,
             new ResourceDelta(2), new ResourceDelta(), 0, "先照顾好此刻的自己", "");
 
+        // Consequences can open a different action rather than only changing a number.
+        public static readonly CardSpec Opportunity = new CardSpec("opportunity", "接住机会", CardKind.Growth,
+            new ResourceDelta(-2, 0, 1), new ResourceDelta(0, 0, 0, 0, 2, 2), 2,
+            "2日后  ·  机会", "机会变成了作品");
+        public static readonly CardSpec Together = new CardSpec("together", "并肩准备", CardKind.Growth,
+            new ResourceDelta(-1, 0, 0, 1), new ResourceDelta(0, 1, 0, 0, 1, 1), 2,
+            "2日后  ·  同行", "有人一起走到了这里", true);
+
         private static readonly CardSpec[] Temptations =
         {
             new CardSpec("scroll", "刷到凌晨", CardKind.Temptation,
@@ -144,6 +152,8 @@ namespace Horizon.Game
         public static CardSpec FindById(string id)
         {
             if (id == SoloRecovery.Id) return SoloRecovery;
+            if (id == Opportunity.Id) return Opportunity;
+            if (id == Together.Id) return Together;
             CardSpec card = Array.Find(Temptations, candidate => candidate.Id == id);
             if (card != null) return card;
             card = Array.Find(Growth, candidate => candidate.Id == id);

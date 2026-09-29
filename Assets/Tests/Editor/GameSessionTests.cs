@@ -458,5 +458,122 @@ namespace Horizon.Tests
             Assert.AreEqual(2, opportunity.delta.ability);
             Assert.AreEqual(2, restored.Actions[0].later.ability);
         }
+
+        [Test]
+        public void GrowthEchoChangesAChoiceAndThatChoiceBuildsALongerSavedChain()
+        {
+            var session = new GameSession(3);
+            session.Choose("portfolio");
+            session.Advance();
+            session.Choose("review");
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            DayTransition fourth = session.Advance();
+            Assert.AreEqual(2, fourth.Echos.Count);
+            Assert.AreEqual(8, session.Insight);
+            Assert.AreEqual(1, session.Pending.FindAll(e => e.depth == 2 && e.dueDay == 5 &&
+                e.replacementSlot == CardKind.Growth).Count);
+
+            session.LockPrediction(0, 0, 0);
+            session.Choose(session.Hand[2].Id);
+            session.VisitStation();
+            DayTransition fifth = session.Advance();
+            PendingEcho changedHand = fifth.Echos.Find(e => e.replacementId == "opportunity");
+            Assert.IsNotNull(changedHand);
+            Assert.AreEqual(3, session.CausalPath(changedHand.nodeId).Count);
+            Assert.AreEqual("opportunity", session.Hand[1].Id);
+            Assert.AreEqual(3, session.Hand.Length);
+            Assert.IsTrue(session.CanPlay(session.Hand[2]));
+
+            session.Choose("opportunity");
+            Assert.AreEqual(changedHand.nodeId, session.Actions[4].parentNodeId);
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            session.Advance();
+            session.MarkPredictionReviewed();
+            PendingEcho opportunityEcho = session.Pending.Find(e => e.cardId == "opportunity" && e.depth == 1);
+            // The echo is due now, so it has moved out of Pending but remains in the graph.
+            Assert.IsNull(opportunityEcho);
+            CausalNode echoNode = session.CausalNodes.Find(n => n.cardId == "opportunity" &&
+                n.type == CausalNodeKind.Echo);
+            Assert.IsNotNull(echoNode);
+            Assert.AreEqual(5, session.CausalPath(echoNode.id).Count);
+            Assert.IsTrue(echoNode.resolved);
+
+            session.Choose(session.Hand[2].Id);
+            DayTransition eighth = session.Advance();
+            PendingEcho nextChoice = eighth.Echos.Find(e => e.replacementId == "opportunity");
+            Assert.IsNotNull(nextChoice);
+            Assert.AreEqual(6, session.CausalPath(nextChoice.nodeId).Count);
+            session.Choose("opportunity");
+            Assert.AreEqual(7, session.CausalPath(session.Actions[7].nodeId).Count);
+
+            RunSnapshot saved = JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(session.Snapshot()));
+            GameSession restored = GameSession.Restore(saved);
+            Assert.AreEqual(7, restored.CausalPath(restored.Actions[7].nodeId).Count);
+            Assert.AreEqual(session.Pending.Count, restored.Pending.Count);
+            restored.Advance();
+            restored.Choose(restored.Hand[2].Id);
+            restored.Advance();
+            restored.Choose(restored.Hand[2].Id);
+            DayTransition eleventh = restored.Advance();
+            PendingEcho longChain = eleventh.Echos.Find(e => e.replacementId == "opportunity");
+            Assert.IsNotNull(longChain);
+            Assert.AreEqual(9, restored.CausalPath(longChain.nodeId).Count);
+        }
+
+        [Test]
+        public void SupportResponseOpensARecoverySafeCollaborativeChoice()
+        {
+            var session = new GameSession(3);
+            session.Choose(session.Hand[2].Id);
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            session.Advance();
+            session.LockPrediction(0, 0, 0);
+            session.Choose(session.Hand[2].Id);
+            session.VisitStation();
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            session.Advance();
+            Assert.AreEqual("friend", session.Hand[2].Id);
+            session.Choose("friend");
+            session.Advance();
+            session.MarkPredictionReviewed();
+            session.Choose(session.Hand[2].Id);
+            DayTransition eighth = session.Advance();
+            Assert.GreaterOrEqual(session.Relation, 7);
+            Assert.IsNotNull(eighth.Echos.Find(e => e.cardId == "friend"));
+            session.Choose(session.Hand[2].Id);
+            DayTransition ninth = session.Advance();
+            Assert.IsNotNull(ninth.Echos.Find(e => e.replacementId == "together"));
+            Assert.AreEqual("together", session.Hand[1].Id);
+            Assert.IsTrue(session.CanPlay(session.Hand[2]));
+        }
+
+        [Test]
+        public void VersionTwoSaveRebuildsPendingAndResolvedCausalLinksWithoutChangingResources()
+        {
+            var session = new GameSession(3);
+            session.Choose("episode");
+            session.Advance();
+            session.Choose("avoid");
+            session.Advance();
+            RunSnapshot old = JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(session.Snapshot()));
+            old.rulesVersion = 2;
+            old.causalNodes = null;
+            int energy = old.energy, money = old.money, relation = old.relation;
+            GameSession restored = GameSession.Restore(old);
+            Assert.AreEqual(GameSession.RulesVersion, restored.Snapshot().rulesVersion);
+            Assert.AreEqual(energy, restored.Energy);
+            Assert.AreEqual(money, restored.Money);
+            Assert.AreEqual(relation, restored.Relation);
+            PendingEcho missed = restored.Pending.Find(e => e.depth == 2);
+            Assert.IsNotNull(missed);
+            Assert.AreEqual(3, restored.CausalPath(missed.nodeId).Count);
+            Assert.AreEqual("solo", missed.replacementId);
+        }
     }
 }

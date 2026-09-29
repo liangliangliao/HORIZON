@@ -20,6 +20,8 @@ namespace Horizon.Game
         public string secondaryName;
         public ResourceDelta secondary;
         public bool secondaryResolved;
+        public string nodeId;
+        public string parentNodeId;
     }
 
     [Serializable]
@@ -34,6 +36,27 @@ namespace Horizon.Game
         public CardKind kind;
         public int depth;
         public int parentDay;
+        public string nodeId;
+        public string parentNodeId;
+        public string replacementId;
+        public CardKind replacementSlot;
+    }
+
+    public enum CausalNodeKind { Action, Echo, Choice }
+
+    [Serializable]
+    public sealed class CausalNode
+    {
+        public string id;
+        public string parentId;
+        public CausalNodeKind type;
+        public int day;
+        public int depth;
+        public string label;
+        public string cardId;
+        public bool resolved;
+        public string replacementId;
+        public CardKind replacementSlot;
     }
 
     [Serializable]
@@ -106,6 +129,7 @@ namespace Horizon.Game
         public int finalMoney;
         public int finalAbility;
         public PredictionRecord prediction;
+        public List<CausalNode> causalNodes = new List<CausalNode>();
     }
 
     [Serializable]
@@ -128,6 +152,7 @@ namespace Horizon.Game
         public PredictionRecord prediction;
         public List<ActionRecord> actions = new List<ActionRecord>();
         public List<PendingEcho> pending = new List<PendingEcho>();
+        public List<CausalNode> causalNodes = new List<CausalNode>();
     }
 
     public sealed class DayTransition
@@ -177,7 +202,7 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 2;
+        public const int RulesVersion = 3;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -201,7 +226,45 @@ namespace Horizon.Game
         public RunRecord CompletedRun { get; private set; }
         public readonly List<ActionRecord> Actions = new List<ActionRecord>();
         public readonly List<PendingEcho> Pending = new List<PendingEcho>();
+        public readonly List<CausalNode> CausalNodes = new List<CausalNode>();
         private readonly bool replaying;
+
+        private sealed class CausalRule
+        {
+            public readonly CardKind Trigger;
+            public readonly Func<GameSession, PendingEcho, bool> Matches;
+            public readonly Func<GameSession, int> DueDay;
+            public readonly CardKind Slot;
+            public readonly CardSpec Replacement;
+            public readonly ResourceDelta Delta;
+            public readonly string Label;
+
+            public CausalRule(CardKind trigger, Func<GameSession, PendingEcho, bool> matches,
+                Func<GameSession, int> dueDay, CardKind slot, CardSpec replacement,
+                ResourceDelta delta, string label)
+            {
+                Trigger = trigger; Matches = matches; DueDay = dueDay;
+                Slot = slot; Replacement = replacement; Delta = delta; Label = label;
+            }
+        }
+
+        // A rule turns an arriving echo into a future choice event. The event may be
+        // ignored, or its replacement action can produce another echo and more links.
+        private static readonly CausalRule[] CausalRules =
+        {
+            new CausalRule(CardKind.Temptation,
+                (s, e) => e.delta != null && e.delta.energy < 0 && s.Energy <= 2,
+                s => s.NextSupportDay(), CardKind.Recovery, CardCatalog.SoloRecovery,
+                new ResourceDelta(0, -1, 0, -1), "错过了一次邀约"),
+            new CausalRule(CardKind.Growth,
+                (s, e) => s.Insight >= 6,
+                s => s.Day + 1, CardKind.Growth, CardCatalog.Opportunity,
+                new ResourceDelta(), "一次新的机会"),
+            new CausalRule(CardKind.Recovery,
+                (s, e) => CardCatalog.FindById(e.cardId)?.GivesSupport == true && s.Relation >= 7,
+                s => s.Day + 1, CardKind.Growth, CardCatalog.Together,
+                new ResourceDelta(), "有人愿意并肩准备")
+        };
 
         public int HorizonLevel
         {
@@ -212,8 +275,14 @@ namespace Horizon.Game
             get
             {
                 CardSpec[] hand = CardCatalog.ForDay(Day, RunNumber);
-                if (SocialUnavailableToday && hand[2].GivesSupport)
-                    hand[2] = CardCatalog.SoloRecovery;
+                foreach (CausalNode node in CausalNodes)
+                {
+                    if (node.type != CausalNodeKind.Choice || !node.resolved || node.day != Day) continue;
+                    CardSpec replacement = CardCatalog.FindById(node.replacementId);
+                    if (replacement != null) hand[(int)node.replacementSlot] = replacement;
+                }
+                // For pre-graph saves which have already arrived at this day.
+                if (SocialUnavailableToday && hand[2].GivesSupport) hand[2] = CardCatalog.SoloRecovery;
                 return hand;
             }
         }
@@ -241,7 +310,13 @@ namespace Horizon.Game
                 saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap ||
                 saved.rulesVersion > RulesVersion || saved.rulesVersion < 0)
                 throw new ArgumentException("Invalid run snapshot.", "saved");
-            if (saved.rulesVersion < RulesVersion) MigrateLegacyResources(saved);
+            if (saved.rulesVersion < 2) MigrateLegacyResources(saved);
+            if (saved.rulesVersion < 3 || saved.causalNodes == null ||
+                (saved.causalNodes.Count == 0 && saved.actions != null && saved.actions.Count > 0))
+            {
+                saved.causalNodes = RebuildGraph(saved.actions, saved.pending);
+                saved.rulesVersion = RulesVersion;
+            }
             if (saved.relation < 0 || saved.relation > ResourceCap ||
                 saved.money < 0 || saved.money > ResourceCap ||
                 saved.ability < 0 || saved.ability > ResourceCap)
@@ -258,6 +333,7 @@ namespace Horizon.Game
             };
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
+            session.CausalNodes.AddRange(saved.causalNodes);
             return session;
         }
 
@@ -307,7 +383,7 @@ namespace Horizon.Game
             saved.relation = relation;
             saved.money = money;
             saved.ability = ability;
-            saved.rulesVersion = RulesVersion;
+            saved.rulesVersion = 2;
         }
 
         private static void ApplyAdditional(ResourceDelta delta, ref int relation, ref int money, ref int ability)
@@ -329,8 +405,95 @@ namespace Horizon.Game
                 hasChosen = HasChosen, stationVisited = StationVisited,
                 socialUnavailableToday = SocialUnavailableToday,
                 prediction = Prediction, actions = new List<ActionRecord>(Actions),
-                pending = new List<PendingEcho>(Pending)
+                pending = new List<PendingEcho>(Pending),
+                causalNodes = new List<CausalNode>(CausalNodes)
             };
+        }
+
+        // Older six-resource saves retain their actual effects. Reconstruct only the
+        // missing links; pending events keep their original due dates and deltas.
+        private static List<CausalNode> RebuildGraph(List<ActionRecord> actions, List<PendingEcho> pending)
+        {
+            var nodes = new List<CausalNode>();
+            if (actions == null) return nodes;
+            foreach (ActionRecord action in actions)
+            {
+                if (action == null) continue;
+                CausalNode choice = nodes.Find(n => n.type == CausalNodeKind.Choice &&
+                    n.day == action.day && n.replacementId == action.cardId);
+                var origin = AddNode(nodes, choice == null ? null : choice.id,
+                    CausalNodeKind.Action, action.day, action.cardName, action.cardId, true);
+                action.nodeId = origin.id;
+                action.parentNodeId = origin.parentId;
+                if (action.echoDay > action.day && action.echoDay <= LastDay)
+                {
+                    CausalNode echo = AddNode(nodes, origin.id, CausalNodeKind.Echo,
+                        action.echoDay, action.echoName, action.cardId, action.echoed);
+                    if (pending != null)
+                        foreach (PendingEcho item in pending)
+                            if (item != null && item.depth == 1 && item.sourceDay == action.day)
+                            { item.nodeId = echo.id; item.parentNodeId = origin.id; }
+                    if (action.secondaryDay > action.echoDay && action.secondaryDay <= LastDay)
+                    {
+                        CausalNode consequence = AddNode(nodes, echo.id, CausalNodeKind.Choice,
+                            action.secondaryDay, action.secondaryName, action.cardId, action.secondaryResolved);
+                        consequence.replacementId = CardCatalog.SoloRecovery.Id;
+                        consequence.replacementSlot = CardKind.Recovery;
+                        if (pending != null)
+                            foreach (PendingEcho item in pending)
+                                if (item != null && item.depth >= 2 && item.sourceDay == action.day &&
+                                    item.dueDay == action.secondaryDay)
+                                {
+                                    item.nodeId = consequence.id; item.parentNodeId = echo.id;
+                                    item.replacementId = consequence.replacementId;
+                                    item.replacementSlot = consequence.replacementSlot;
+                                }
+                    }
+                }
+            }
+            return nodes;
+        }
+
+        public static List<CausalNode> GraphForRun(RunRecord run)
+        {
+            if (run == null) return new List<CausalNode>();
+            return run.causalNodes != null && run.causalNodes.Count > 0 ?
+                run.causalNodes : RebuildGraph(run.actions, null);
+        }
+
+        private static CausalNode AddNode(List<CausalNode> nodes, string parentId,
+            CausalNodeKind type, int day, string label, string cardId, bool resolved)
+        {
+            CausalNode parent = nodes.Find(n => n.id == parentId);
+            var node = new CausalNode
+            {
+                id = "n" + (nodes.Count + 1), parentId = parentId, type = type,
+                day = day, depth = parent == null ? 1 : parent.depth + 1,
+                label = label, cardId = cardId, resolved = resolved
+            };
+            nodes.Add(node);
+            return node;
+        }
+
+        public List<CausalNode> CausalPath(string nodeId)
+        {
+            return CausalPath(CausalNodes, nodeId);
+        }
+
+        public static List<CausalNode> CausalPath(List<CausalNode> graph, string nodeId)
+        {
+            var path = new List<CausalNode>();
+            if (graph == null || string.IsNullOrEmpty(nodeId)) return path;
+            string cursor = nodeId;
+            // A malformed save must never freeze the game on a cycle.
+            for (int i = 0; i < graph.Count && !string.IsNullOrEmpty(cursor); i++)
+            {
+                CausalNode node = graph.Find(n => n != null && n.id == cursor);
+                if (node == null || path.Contains(node)) break;
+                path.Insert(0, node);
+                cursor = node.parentId;
+            }
+            return path;
         }
 
         public void LockPrediction(int energy, int mood, int insight)
@@ -427,21 +590,29 @@ namespace Horizon.Game
 
             Apply(card.Now);
             if (card.GivesSupport) SupportActions++;
+            CausalNode changedChoice = CausalNodes.Find(n => n.type == CausalNodeKind.Choice &&
+                n.resolved && n.day == Day && n.replacementId == card.Id);
+            CausalNode origin = AddNode(CausalNodes, changedChoice == null ? null : changedChoice.id,
+                CausalNodeKind.Action, Day, card.Name, card.Id, true);
             var action = new ActionRecord
             {
                 day = Day, cardId = card.Id, cardName = card.Name, kind = card.Kind,
                 echoDay = card.Delay > 0 ? Day + card.Delay : 0,
                 echoName = card.EchoName, givesSupport = card.GivesSupport,
-                now = card.Now, later = card.Later
+                now = card.Now, later = card.Later,
+                nodeId = origin.id, parentNodeId = origin.parentId
             };
             Actions.Add(action);
             if (card.Delay > 0 && action.echoDay <= LastDay)
             {
+                CausalNode result = AddNode(CausalNodes, origin.id, CausalNodeKind.Echo,
+                    action.echoDay, card.EchoName, card.Id, false);
                 Pending.Add(new PendingEcho
                 {
                     sourceDay = Day, dueDay = action.echoDay, cardId = card.Id,
                     cardName = card.Name, echoName = card.EchoName,
-                    delta = card.Later, kind = card.Kind, depth = 1
+                    delta = card.Later, kind = card.Kind, depth = 1,
+                    nodeId = result.id, parentNodeId = origin.id
                 });
             }
             HasChosen = true;
@@ -469,19 +640,22 @@ namespace Horizon.Game
                 a.sourceDay.CompareTo(b.sourceDay));
             foreach (PendingEcho echo in due)
             {
-                Apply(echo.delta);
+                if (echo.delta != null) Apply(echo.delta);
+                CausalNode node = CausalNodes.Find(n => n.id == echo.nodeId);
+                if (node != null) node.resolved = true;
                 ActionRecord source = Actions.Find(a => a.day == echo.sourceDay);
                 if (echo.depth >= 2)
                 {
-                    SocialUnavailableToday = true;
-                    if (source != null) source.secondaryResolved = true;
+                    if (echo.replacementId == CardCatalog.SoloRecovery.Id)
+                    {
+                        SocialUnavailableToday = true;
+                        if (source != null) source.secondaryResolved = true;
+                    }
                 }
                 else
                 {
                     if (source != null) source.echoed = true;
-                    if (RunNumber >= 3 && echo.kind == CardKind.Temptation &&
-                        echo.delta != null && echo.delta.energy < 0 && Energy <= 2)
-                        ScheduleMissedInvitation(echo, source);
+                    if (RunNumber >= 3) ScheduleConsequences(echo, source);
                 }
             }
             if (Prediction != null && !Prediction.evaluated && Day >= Prediction.dueDay)
@@ -498,26 +672,42 @@ namespace Horizon.Game
             return new DayTransition(Day, due);
         }
 
-        private void ScheduleMissedInvitation(PendingEcho cause, ActionRecord source)
+        private int NextSupportDay()
         {
-            if (source == null || source.secondaryDay > 0) return;
             for (int day = Day + 1; day <= LastDay; day++)
+                if (CardCatalog.ForDay(day, RunNumber)[2].GivesSupport &&
+                    !Pending.Exists(e => e.depth >= 2 && e.dueDay == day &&
+                        e.replacementSlot == CardKind.Recovery)) return day;
+            return 0;
+        }
+
+        private void ScheduleConsequences(PendingEcho cause, ActionRecord source)
+        {
+            if (source == null) return;
+            foreach (CausalRule rule in CausalRules)
             {
-                if (!CardCatalog.ForDay(day, RunNumber)[2].GivesSupport) continue;
-                // A day can lose its social invitation only once, even if several echoes arrive together.
-                if (Pending.Exists(e => e.depth >= 2 && e.dueDay == day)) continue;
-                var loss = new ResourceDelta(0, -1, 0, -1);
-                source.secondaryDay = day;
-                source.secondaryName = "错过了一次邀约";
-                source.secondary = loss;
+                if (cause.kind != rule.Trigger || !rule.Matches(this, cause)) continue;
+                int day = rule.DueDay(this);
+                if (day <= Day || day > LastDay || Pending.Exists(e => e.depth >= 2 &&
+                    e.dueDay == day && e.replacementSlot == rule.Slot)) continue;
+                CausalNode eventNode = AddNode(CausalNodes, cause.nodeId,
+                    CausalNodeKind.Choice, day, rule.Label, cause.cardId, false);
+                eventNode.replacementId = rule.Replacement.Id;
+                eventNode.replacementSlot = rule.Slot;
                 Pending.Add(new PendingEcho
                 {
                     sourceDay = cause.sourceDay, parentDay = Day, dueDay = day,
                     cardId = cause.cardId, cardName = cause.cardName,
-                    echoName = source.secondaryName, delta = loss,
-                    kind = CardKind.Temptation, depth = 2
+                    echoName = rule.Label, delta = rule.Delta, kind = cause.kind,
+                    depth = 2, nodeId = eventNode.id, parentNodeId = cause.nodeId,
+                    replacementId = rule.Replacement.Id, replacementSlot = rule.Slot
                 });
-                return;
+                if (rule.Replacement.Id == CardCatalog.SoloRecovery.Id && source.secondaryDay == 0)
+                {
+                    source.secondaryDay = day;
+                    source.secondaryName = rule.Label;
+                    source.secondary = rule.Delta;
+                }
             }
         }
 
@@ -679,7 +869,7 @@ namespace Horizon.Game
                 actions = new List<ActionRecord>(Actions),
                 finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
                 finalRelation = Relation, finalMoney = Money, finalAbility = Ability,
-                prediction = Prediction
+                prediction = Prediction, causalNodes = new List<CausalNode>(CausalNodes)
             };
             if (boss.passed < 3 && !replaying) boss.ghostTimeline = BuildGhost(CompletedRun);
             boss.ghost = boss.passed == 3 ? "你留下的路，已经连成了星图。" :

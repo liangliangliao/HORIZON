@@ -843,43 +843,61 @@ namespace Horizon
 
         private IEnumerator CascadeSequence(PendingEcho echo)
         {
+            List<CausalNode> path = session.CausalPath(echo.nodeId);
+            if (path.Count < 3) yield break;
             Clear();
             View.Fill(root, "Chain darkness", new Color(0.009f, 0.026f, 0.045f, 0.96f),
                 0, 0, 1, 1);
             View.Label(root, "Chain title", "C H A I N   F O U N D", 45, Palette.Gold,
-                TextAnchor.MiddleCenter, 0.05f, 0.76f, 0.95f, 0.85f);
-            View.Label(root, "Chain clue", "后果，又改变了一个选择。", 30, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.08f, 0.68f, 0.92f, 0.75f);
-            View.Fill(root, "Causal rail", new Color(0.91f, 0.63f, 0.42f, 0.25f),
-                0.17f, 0.521f, 0.83f, 0.523f);
-            yield return new WaitForSeconds(0.18f);
-            View.Panel(root, "Origin pulse", Palette.Coral, 0.145f, 0.502f, 0.195f, 0.542f, 29);
-            View.Label(root, "Origin day", "DAY " + echo.sourceDay, 26, Palette.Coral,
-                TextAnchor.MiddleCenter, 0.045f, 0.565f, 0.295f, 0.615f);
-            View.Label(root, "Origin action", echo.cardName, 27, Palette.Text,
-                TextAnchor.MiddleCenter, 0.035f, 0.44f, 0.305f, 0.5f);
-            yield return new WaitForSeconds(0.25f);
-            View.Fill(root, "First link", Palette.Coral, 0.19f, 0.518f, 0.5f, 0.526f);
-            View.Panel(root, "First echo pulse", Palette.Coral, 0.475f, 0.502f, 0.525f, 0.542f, 29);
-            View.Label(root, "First echo day", "DAY " + echo.parentDay, 26, Palette.Coral,
-                TextAnchor.MiddleCenter, 0.37f, 0.565f, 0.63f, 0.615f);
-            View.Label(root, "First echo", "精力见底", 27, Palette.Text,
-                TextAnchor.MiddleCenter, 0.35f, 0.44f, 0.65f, 0.5f);
-            yield return new WaitForSeconds(0.18f);
-            View.Fill(root, "Second link", Palette.Gold, 0.5f, 0.518f, 0.81f, 0.526f);
-            View.Panel(root, "Second echo pulse", Palette.Gold, 0.805f, 0.502f, 0.855f, 0.542f, 29);
-            View.Label(root, "Second echo day", "DAY " + echo.dueDay, 26, Palette.Gold,
-                TextAnchor.MiddleCenter, 0.695f, 0.565f, 0.955f, 0.615f);
-            View.Label(root, "Second echo", "错过邀约", 27, Palette.Text,
-                TextAnchor.MiddleCenter, 0.685f, 0.44f, 0.965f, 0.5f);
-            yield return new WaitForSeconds(0.13f);
+                TextAnchor.MiddleCenter, 0.05f, 0.82f, 0.95f, 0.91f);
+            bool network = path.Count >= 7;
+            View.Label(root, "Chain clue", network ? "这一刻，只剩下你走出的因果网络。" :
+                "一个选择，正在改变后来的选择。", 30, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.08f, 0.74f, 0.92f, 0.81f);
+            for (int i = 0; i < path.Count; i++)
+            {
+                CausalNode node = path[i];
+                Color color = node.type == CausalNodeKind.Choice ? Palette.Gold :
+                    node.type == CausalNodeKind.Action ? Palette.Coral : Palette.Mint;
+                if (network)
+                {
+                    float y = 0.69f - i * (0.49f / Mathf.Max(1, path.Count - 1));
+                    if (i > 0) View.Fill(root, "Causal link", new Color(0.8f, 0.76f, 0.61f, 0.65f),
+                        0.202f, y + 0.025f, 0.206f,
+                        0.69f - (i - 1) * (0.49f / (path.Count - 1)) + 0.017f);
+                    View.Panel(root, "Causal node", color, 0.186f, y, 0.22f, y + 0.032f, 18);
+                    View.Label(root, "Causal day", "D" + node.day, 24, color,
+                        TextAnchor.MiddleLeft, 0.27f, y - 0.005f, 0.39f, y + 0.038f);
+                    View.Label(root, "Causal event", node.label, 26, Palette.Text,
+                        TextAnchor.MiddleLeft, 0.4f, y - 0.005f, 0.89f, y + 0.038f);
+                }
+                else
+                {
+                    float x = 0.15f + i * (0.7f / (path.Count - 1));
+                    if (i > 0) View.Fill(root, "Causal link", color,
+                        0.15f + (i - 1) * (0.7f / (path.Count - 1)) + 0.018f,
+                        0.519f, x, 0.526f);
+                    View.Panel(root, "Causal node", color, x - 0.018f, 0.502f, x + 0.018f, 0.542f, 22);
+                    View.Label(root, "Causal day", "DAY " + node.day, 25, color,
+                        TextAnchor.MiddleCenter, x - 0.11f, 0.555f, x + 0.11f, 0.61f);
+                    View.Label(root, "Causal event", node.label, 26, Palette.Text,
+                        TextAnchor.MiddleCenter, x - 0.11f, 0.42f, x + 0.11f, 0.495f);
+                }
+                yield return new WaitForSeconds(i == 0 ? 0.25f : 0.25f / i);
+            }
             View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1);
-            View.Label(root, "Cascade", "C A S C A D E  × 3", 51, Palette.Gold,
-                TextAnchor.MiddleCenter, 0.06f, 0.28f, 0.94f, 0.37f);
-            View.Label(root, "Changed hand", "邀约没有到来。今天你仍可以选择独处休息。", 27,
-                Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.2f, 0.93f, 0.28f);
+            View.Label(root, "Cascade", "C A S C A D E  × " + path.Count, 51, Palette.Gold,
+                TextAnchor.MiddleCenter, 0.06f, network ? 0.08f : 0.28f,
+                0.94f, network ? 0.16f : 0.37f);
+            if (!network)
+            {
+                CardSpec replacement = CardCatalog.FindById(echo.replacementId);
+                View.Label(root, "Changed hand", echo.echoName + (replacement == null ? "" :
+                    "。今天，你可以选择「" + replacement.Name + "」。"), 27,
+                    Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.2f, 0.93f, 0.28f);
+            }
             Handheld.Vibrate();
-            yield return new WaitForSeconds(0.66f);
+            yield return new WaitForSeconds(network ? 0.95f : 0.66f);
         }
 
         private static float EchoX(int day, int source, int due)
@@ -934,6 +952,7 @@ namespace Horizon
                     float y = 0.61f - i * 0.102f;
                     View.Panel(overlay, "Future event", Palette.Panel, 0.11f, y, 0.89f, y + 0.082f);
                     string detail = session.HorizonLevel >= 3 ? echo.echoName :
+                        session.HorizonLevel >= 2 && echo.depth >= 2 ? "一次选择可能改变" :
                         session.HorizonLevel >= 2 ? (echo.kind == CardKind.Temptation ? "火种" :
                             echo.kind == CardKind.Growth ? "芽" : "回应") :
                         archive.calibrations > 0 ?
@@ -1125,32 +1144,28 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.07f, 0.835f, 0.93f, 0.895f);
             View.Fill(overlay, "Map spine", new Color(0.46f, 0.76f, 0.72f, 0.36f),
                 0.19f, 0.1f, 0.192f, 0.814f);
-            for (int i = 0; i < actions.Count; i++)
+            List<CausalNode> graph = duringRun && session != null ? session.CausalNodes :
+                GameSession.GraphForRun(run);
+            for (int i = 0; i < graph.Count; i++)
             {
-                ActionRecord action = actions[i];
-                if (action.echoDay <= action.day || action.echoDay > GameSession.LastDay) continue;
-                float from = 0.788f - (action.day - 1) * 0.055f + 0.007f;
-                float to = 0.788f - (action.echoDay - 1) * 0.055f + 0.007f;
-                float x = 0.79f + (i % 4) * 0.029f;
-                Color baseColor = action.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint;
+                CausalNode node = graph[i];
+                CausalNode parent = graph.Find(n => n.id == node.parentId);
+                if (parent == null || node.day > GameSession.LastDay) continue;
+                float from = 0.795f - (parent.day - 1) * 0.055f;
+                float to = 0.795f - (node.day - 1) * 0.055f;
+                float x = 0.77f + (i % 5) * 0.027f;
+                Color baseColor = node.type == CausalNodeKind.Choice ? Palette.Gold : Palette.Mint;
                 Color thread = new Color(baseColor.r, baseColor.g, baseColor.b,
-                    action.echoed ? 0.66f : 0.32f);
-                View.Fill(overlay, "Causal thread", thread, x, to, x + 0.002f, from);
-                View.Fill(overlay, "Causal start", thread, 0.73f, from, x, from + 0.002f);
-                View.Panel(overlay, "Causal arrival", thread,
-                    x - 0.007f, to - 0.005f, x + 0.011f, to + 0.006f, 9);
-                if (action.secondaryDay > action.echoDay)
+                    node.resolved ? 0.75f : 0.32f);
+                if (parent.day < node.day)
                 {
-                    float second = 0.788f - (action.secondaryDay - 1) * 0.055f + 0.007f;
-                    Color next = new Color(Palette.Gold.r, Palette.Gold.g, Palette.Gold.b,
-                        action.secondaryResolved ? 0.85f : 0.38f);
-                    View.Fill(overlay, "Second-order thread", next,
-                        x + 0.013f, second, x + 0.016f, to);
-                    View.Fill(overlay, "Chain turn", next,
-                        x, to, x + 0.016f, to + 0.003f);
-                    View.Panel(overlay, "Lost possibility", next,
-                        x + 0.006f, second - 0.005f, x + 0.023f, second + 0.007f, 9);
+                    View.Fill(overlay, "Causal thread", thread, x, to, x + 0.003f, from);
+                    View.Fill(overlay, "Causal start", thread, 0.73f, from, x, from + 0.003f);
+                    View.Panel(overlay, "Causal arrival", thread,
+                        x - 0.007f, to - 0.005f, x + 0.011f, to + 0.006f, 9);
                 }
+                else if (node.type == CausalNodeKind.Action)
+                    View.Fill(overlay, "Choice became action", thread, 0.73f, to, x, to + 0.003f);
             }
             for (int day = 1; day <= GameSession.LastDay; day++)
             {
@@ -1170,8 +1185,8 @@ namespace Horizon
                     string immediate = action.now == null ? "" : "当下 " + action.now.ShortLabel();
                     string future = action.echoDay > 0 ? "D" + action.echoDay + " " +
                         (action.later == null ? action.echoName : action.later.ShortLabel()) : "";
-                    if (action.secondaryDay > 0)
-                        future += "  →  D" + action.secondaryDay + " 邀约缺席";
+                    CausalNode choice = graph.Find(n => n.day == day && n.type == CausalNodeKind.Choice);
+                    if (choice != null) future += "  ·  " + choice.label;
                     View.Label(overlay, "Why", immediate + (future.Length > 0 ? "   → " + future : ""),
                         19, action.echoed ? Palette.Mint : Palette.Muted,
                         TextAnchor.MiddleLeft, 0.25f, y - 0.017f, 0.73f, y + 0.009f);
