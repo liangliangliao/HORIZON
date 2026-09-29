@@ -68,6 +68,9 @@ namespace Horizon.Game
         public int finalEnergy;
         public int finalMood;
         public int finalInsight;
+        public int finalRelation;
+        public int finalMoney;
+        public int finalAbility;
     }
 
     [Serializable]
@@ -99,17 +102,24 @@ namespace Horizon.Game
         public int finalEnergy;
         public int finalMood;
         public int finalInsight;
+        public int finalRelation;
+        public int finalMoney;
+        public int finalAbility;
         public PredictionRecord prediction;
     }
 
     [Serializable]
     public sealed class RunSnapshot
     {
+        public int rulesVersion;
         public int day;
         public int runNumber;
         public int energy;
         public int mood;
         public int insight;
+        public int relation;
+        public int money;
+        public int ability;
         public int supportActions;
         public int focusUses;
         public bool hasChosen;
@@ -142,9 +152,12 @@ namespace Horizon.Game
         public readonly int Energy;
         public readonly int Mood;
         public readonly int Insight;
+        public readonly int Relation;
+        public readonly int Money;
+        public readonly int Ability;
 
         public FutureProjection(CardSpec card, bool available, int sourceDay, int targetDay,
-            int energy, int mood, int insight)
+            int energy, int mood, int insight, int relation, int money, int ability)
         {
             CardName = card.Name;
             Available = available;
@@ -154,6 +167,9 @@ namespace Horizon.Game
             Energy = energy;
             Mood = mood;
             Insight = insight;
+            Relation = relation;
+            Money = money;
+            Ability = ability;
         }
     }
 
@@ -161,12 +177,19 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
+        public const int RulesVersion = 2;
+        public const int AbilityGate = 6;
+        public const int RelationGate = 6;
+        public const int MoneyGate = 2;
 
         public int Day { get; private set; }
         public int RunNumber { get; private set; }
         public int Energy { get; private set; }
         public int Mood { get; private set; }
         public int Insight { get; private set; }
+        public int Relation { get; private set; }
+        public int Money { get; private set; }
+        public int Ability { get; private set; }
         public int SupportActions { get; private set; }
         public int FocusUses { get; private set; }
         public bool HasChosen { get; private set; }
@@ -206,18 +229,29 @@ namespace Horizon.Game
             Energy = 6;
             Mood = 5;
             Insight = 2;
+            Relation = 4;
+            Money = 5;
+            Ability = 2;
         }
 
         public static GameSession Restore(RunSnapshot saved)
         {
             if (saved == null || saved.runNumber < 1 || saved.day < 1 || saved.day > LastDay ||
                 saved.energy < 0 || saved.energy > ResourceCap || saved.mood < 0 ||
-                saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap)
+                saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap ||
+                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0)
                 throw new ArgumentException("Invalid run snapshot.", "saved");
+            if (saved.rulesVersion < RulesVersion) MigrateLegacyResources(saved);
+            if (saved.relation < 0 || saved.relation > ResourceCap ||
+                saved.money < 0 || saved.money > ResourceCap ||
+                saved.ability < 0 || saved.ability > ResourceCap)
+                throw new ArgumentException("Invalid extended resources.", "saved");
             var session = new GameSession(saved.runNumber)
             {
                 Day = saved.day, Energy = saved.energy, Mood = saved.mood,
-                Insight = saved.insight, SupportActions = saved.supportActions,
+                Insight = saved.insight, Relation = saved.relation,
+                Money = saved.money, Ability = saved.ability,
+                SupportActions = saved.supportActions,
                 FocusUses = saved.focusUses, HasChosen = saved.hasChosen,
                 StationVisited = saved.stationVisited, SocialUnavailableToday = saved.socialUnavailableToday,
                 Prediction = saved.prediction
@@ -227,12 +261,71 @@ namespace Horizon.Game
             return session;
         }
 
+        // Old saves contained three resources. Rebuild new dimensions in day order so
+        // returning players keep their current run, including already paid-out echoes.
+        private static void MigrateLegacyResources(RunSnapshot saved)
+        {
+            int relation = 4, money = 5, ability = 2;
+            if (saved.actions != null)
+            {
+                foreach (ActionRecord action in saved.actions)
+                {
+                    if (action == null) continue;
+                    CardSpec card = CardCatalog.FindById(action.cardId);
+                    if (card == null) continue;
+                    action.now = card.Now;
+                    action.later = card.Later;
+                    if (action.secondaryDay > 0)
+                        action.secondary = new ResourceDelta(0, -1, 0, -1);
+                }
+            }
+            if (saved.pending != null)
+            {
+                foreach (PendingEcho echo in saved.pending)
+                {
+                    if (echo == null) continue;
+                    CardSpec card = CardCatalog.FindById(echo.cardId);
+                    if (echo.depth >= 2) echo.delta = new ResourceDelta(0, -1, 0, -1);
+                    else if (card != null) echo.delta = card.Later;
+                }
+            }
+            for (int day = 1; day <= saved.day; day++)
+            {
+                if (saved.actions == null) continue;
+                foreach (ActionRecord action in saved.actions)
+                {
+                    if (action == null) continue;
+                    if (action.echoed && action.echoDay == day)
+                        ApplyAdditional(action.later, ref relation, ref money, ref ability);
+                    if (action.secondaryResolved && action.secondaryDay == day)
+                        ApplyAdditional(action.secondary, ref relation, ref money, ref ability);
+                }
+                foreach (ActionRecord action in saved.actions)
+                    if (action != null && action.day == day)
+                        ApplyAdditional(action.now, ref relation, ref money, ref ability);
+            }
+            saved.relation = relation;
+            saved.money = money;
+            saved.ability = ability;
+            saved.rulesVersion = RulesVersion;
+        }
+
+        private static void ApplyAdditional(ResourceDelta delta, ref int relation, ref int money, ref int ability)
+        {
+            if (delta == null) return;
+            relation = Clamp(relation + delta.relation);
+            money = Clamp(money + delta.money);
+            ability = Clamp(ability + delta.ability);
+        }
+
         public RunSnapshot Snapshot()
         {
             return new RunSnapshot
             {
-                day = Day, runNumber = RunNumber, energy = Energy, mood = Mood,
-                insight = Insight, supportActions = SupportActions, focusUses = FocusUses,
+                rulesVersion = RulesVersion, day = Day, runNumber = RunNumber,
+                energy = Energy, mood = Mood, insight = Insight,
+                relation = Relation, money = Money, ability = Ability,
+                supportActions = SupportActions, focusUses = FocusUses,
                 hasChosen = HasChosen, stationVisited = StationVisited,
                 socialUnavailableToday = SocialUnavailableToday,
                 prediction = Prediction, actions = new List<ActionRecord>(Actions),
@@ -271,7 +364,8 @@ namespace Horizon.Game
             return card != null && Array.Exists(Hand, candidate => candidate.Id == card.Id) &&
                 !CanPredict && !HasPredictionReview && !HasChosen && CompletedRun == null &&
                 Energy + card.Now.energy >= 0 && Mood + card.Now.mood >= 0 &&
-                Insight + card.Now.insight >= 0;
+                Insight + card.Now.insight >= 0 && Relation + card.Now.relation >= 0 &&
+                Money + card.Now.money >= 0 && Ability + card.Now.ability >= 0;
         }
 
         public bool TryFocus()
@@ -290,11 +384,15 @@ namespace Horizon.Game
             if (card == null) throw new ArgumentException("Card not in today's hand.", "cardId");
             int target = Math.Min(LastDay, Day + 3);
             bool available = CanPlay(card);
-            if (!available) return new FutureProjection(card, false, Day, target, Energy, Mood, Insight);
+            if (!available) return new FutureProjection(card, false, Day, target,
+                Energy, Mood, Insight, Relation, Money, Ability);
 
             int energy = Clamp(Energy + card.Now.energy);
             int mood = Clamp(Mood + card.Now.mood);
             int insight = Clamp(Insight + card.Now.insight);
+            int relation = Clamp(Relation + card.Now.relation);
+            int money = Clamp(Money + card.Now.money);
+            int ability = Clamp(Ability + card.Now.ability);
             var projected = new List<PendingEcho>(Pending);
             if (card.Delay > 0 && Day + card.Delay <= target)
                 projected.Add(new PendingEcho
@@ -310,8 +408,12 @@ namespace Horizon.Game
                 energy = Clamp(energy + echo.delta.energy);
                 mood = Clamp(mood + echo.delta.mood);
                 insight = Clamp(insight + echo.delta.insight);
+                relation = Clamp(relation + echo.delta.relation);
+                money = Clamp(money + echo.delta.money);
+                ability = Clamp(ability + echo.delta.ability);
             }
-            return new FutureProjection(card, true, Day, target, energy, mood, insight);
+            return new FutureProjection(card, true, Day, target,
+                energy, mood, insight, relation, money, ability);
         }
 
         public ActionRecord Choose(string cardId)
@@ -404,7 +506,7 @@ namespace Horizon.Game
                 if (!CardCatalog.ForDay(day, RunNumber)[2].GivesSupport) continue;
                 // A day can lose its social invitation only once, even if several echoes arrive together.
                 if (Pending.Exists(e => e.depth >= 2 && e.dueDay == day)) continue;
-                var loss = new ResourceDelta(0, -1);
+                var loss = new ResourceDelta(0, -1, 0, -1);
                 source.secondaryDay = day;
                 source.secondaryName = "错过了一次邀约";
                 source.secondary = loss;
@@ -424,6 +526,9 @@ namespace Horizon.Game
             Energy = Clamp(Energy + delta.energy);
             Mood = Clamp(Mood + delta.mood);
             Insight = Clamp(Insight + delta.insight);
+            Relation = Clamp(Relation + delta.relation);
+            Money = Clamp(Money + delta.money);
+            Ability = Clamp(Ability + delta.ability);
         }
 
         private static int Clamp(int value) { return Math.Max(0, Math.Min(ResourceCap, value)); }
@@ -471,12 +576,14 @@ namespace Horizon.Game
         private static int Deficit(RunRecord run, BossResult baseline)
         {
             int gap = 0;
-            if (!baseline.ability) gap += Math.Max(0, 7 - run.finalInsight);
+            if (!baseline.ability) gap += Math.Max(0, AbilityGate - run.finalAbility);
             if (!baseline.state) gap += Math.Max(0, 4 - run.finalEnergy) + Math.Max(0, 4 - run.finalMood);
             if (!baseline.support)
             {
                 int supports = run.actions.FindAll(a => a.givesSupport).Count;
-                gap += Math.Max(0, 2 - supports);
+                gap += Math.Max(0, 2 - supports) +
+                    Math.Max(0, RelationGate - run.finalRelation) +
+                    Math.Max(0, MoneyGate - run.finalMoney);
             }
             return gap;
         }
@@ -529,7 +636,10 @@ namespace Horizon.Game
                         gateName = gate, gateOpens = opened > 0,
                         beforePassed = before.passed, afterPassed = after.passed,
                         finalEnergy = alternate.finalEnergy, finalMood = alternate.finalMood,
-                        finalInsight = alternate.finalInsight
+                        finalInsight = alternate.finalInsight,
+                        finalRelation = alternate.finalRelation,
+                        finalMoney = alternate.finalMoney,
+                        finalAbility = alternate.finalAbility
                     };
                 }
             }
@@ -540,21 +650,24 @@ namespace Horizon.Game
         {
             var boss = new BossResult
             {
-                ability = Insight >= 7,
+                ability = Ability >= AbilityGate,
                 state = Energy >= 4 && Mood >= 4,
-                support = SupportActions >= 2
+                support = SupportActions >= 2 && Relation >= RelationGate && Money >= MoneyGate
             };
             boss.passed = (boss.ability ? 1 : 0) + (boss.state ? 1 : 0) + (boss.support ? 1 : 0);
             foreach (ActionRecord action in Actions)
             {
                 ResourceDelta now = action.now;
                 ResourceDelta later = action.echoed ? action.later : null;
-                if ((now != null && now.insight > 0) || (later != null && later.insight > 0))
+                if ((now != null && now.ability > 0) || (later != null && later.ability > 0))
                     boss.abilityDays.Add(action.day);
                 if ((now != null && (now.energy != 0 || now.mood != 0)) ||
                     (later != null && (later.energy != 0 || later.mood != 0)) || action.secondaryResolved)
                     boss.stateDays.Add(action.day);
-                if (action.givesSupport) boss.supportDays.Add(action.day);
+                if (action.givesSupport ||
+                    (now != null && (now.relation > 0 || now.money > 0)) ||
+                    (later != null && (later.relation > 0 || later.money > 0)))
+                    boss.supportDays.Add(action.day);
             }
             string definingAction = Actions.FindLast(a => a.kind == CardKind.Growth)?.cardName ?? Actions[0].cardName;
             CompletedRun = new RunRecord
@@ -565,6 +678,7 @@ namespace Horizon.Game
                 boss = boss,
                 actions = new List<ActionRecord>(Actions),
                 finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
+                finalRelation = Relation, finalMoney = Money, finalAbility = Ability,
                 prediction = Prediction
             };
             if (boss.passed < 3 && !replaying) boss.ghostTimeline = BuildGhost(CompletedRun);

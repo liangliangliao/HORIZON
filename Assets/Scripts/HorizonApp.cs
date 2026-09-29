@@ -411,29 +411,31 @@ namespace Horizon
 
         private void ResourceRegion()
         {
-            int[] values = { session.Energy, session.Mood, session.Insight };
-            string[] names = { "精力", "心情", "洞察" };
+            int[] values = { session.Energy, session.Mood, session.Insight,
+                session.Relation, session.Money, session.Ability };
+            string[] names = { "⚡ 精力", "☀ 心情", "◎ 洞察", "♥ 关系", "¥ 金钱", "▲ 能力" };
             View.Label(root, "State heading", "此刻的状态", 22, Palette.Muted, TextAnchor.MiddleLeft,
-                0.07f, 0.496f, 0.54f, 0.532f);
-            for (int row = 0; row < 3; row++)
+                0.07f, 0.521f, 0.54f, 0.548f);
+            for (int row = 0; row < values.Length; row++)
             {
-                float x0 = 0.065f + row * 0.295f;
+                float x0 = 0.065f + (row % 3) * 0.295f;
                 float x1 = x0 + 0.28f;
+                float y = row < 3 ? 0.463f : 0.405f;
                 View.Panel(root, "State glass", new Color(0.025f, 0.07f, 0.105f, 0.81f),
-                    x0, 0.407f, x1, 0.491f, 18);
-                View.Label(root, "Resource", names[row], 25, values[row] <= 2 ? Palette.Coral : Palette.Text,
-                    TextAnchor.MiddleLeft, x0 + 0.025f, 0.449f, x1 - 0.02f, 0.481f);
+                    x0, y, x1, y + 0.052f, 15);
+                View.Label(root, "Resource", names[row], 22, values[row] <= 2 ? Palette.Coral : Palette.Text,
+                    TextAnchor.MiddleLeft, x0 + 0.025f, y + 0.021f, x1 - 0.02f, y + 0.048f);
                 for (int pip = 0; pip < 5; pip++)
                 {
                     float x = x0 + 0.025f + pip * 0.047f;
                     View.Panel(root, "State trace", pip * 2 < values[row] ?
                         (values[row] <= 2 ? Palette.Coral : Palette.Mint) : new Color(0.36f, 0.52f, 0.55f, 0.42f),
-                        x, 0.427f, x + 0.035f, 0.431f, 4);
+                        x, y + 0.01f, x + 0.035f, y + 0.014f, 4);
                 }
                 if (detailVisible || values[row] <= 2)
-                    View.Label(root, "Value", values[row].ToString(), 24,
+                    View.Label(root, "Value", values[row].ToString(), 20,
                         values[row] <= 2 ? Palette.Coral : Palette.Text, TextAnchor.MiddleCenter,
-                        x1 - 0.065f, 0.45f, x1 - 0.02f, 0.48f);
+                        x1 - 0.065f, y + 0.021f, x1 - 0.02f, y + 0.048f);
             }
         }
 
@@ -501,7 +503,7 @@ namespace Horizon
                     TextAnchor.MiddleLeft, 0.105f, 0.48f, 0.91f, 0.71f);
                 View.Fill(rect, "Now divider", new Color(accent.r, accent.g, accent.b, 0.3f),
                     0.105f, 0.445f, 0.895f, 0.448f);
-                View.Label(rect, "Now", available ? card.Now.ShortLabel() : "精力不足",
+                View.Label(rect, "Now", available ? card.Now.ShortLabel() : "资源不足",
                     25, available ? Palette.Text : Palette.Coral,
                     TextAnchor.MiddleLeft, 0.105f, 0.278f, 0.91f, 0.43f);
                 string futureLabel = card.Delay > 0 && session.Day + card.Delay > GameSession.LastDay ?
@@ -927,8 +929,11 @@ namespace Horizon
             View.Label(panel, "Path detail", future.Available ?
                 "DAY " + future.TargetDay + "  ·  精力" + Tendency(future.Energy - session.Energy) +
                 "  心情" + Tendency(future.Mood - session.Mood) +
-                "  洞察" + Tendency(future.Insight - session.Insight) : "此刻资源不足，这条路暂时走不通。",
-                27, Palette.Text, TextAnchor.MiddleLeft, 0.07f, 0.32f, 0.94f, 0.67f);
+                "  洞察" + Tendency(future.Insight - session.Insight) + "\n" +
+                "关系" + Tendency(future.Relation - session.Relation) +
+                "  金钱" + Tendency(future.Money - session.Money) +
+                "  能力" + Tendency(future.Ability - session.Ability) : "此刻资源不足，这条路暂时走不通。",
+                25, Palette.Text, TextAnchor.MiddleLeft, 0.07f, 0.29f, 0.94f, 0.7f);
             View.Label(panel, "Possible echo", future.Available && future.EchoDay > GameSession.LastDay ?
                 "截止日之后 · 本局不会兑现" : future.Available && future.EchoDay > 0 ?
                 "D" + future.EchoDay + " · " + card.FutureHint : "未来仍有未写下的部分",
@@ -954,7 +959,7 @@ namespace Horizon
             }
             bool[] gates = { run.boss.ability, run.boss.state, run.boss.support };
             string[] names = { "能力", "状态", "支援" };
-            string[] notes = { "成长留下的能力", "休息、透支与恢复的轨迹", "主动建立的连接" };
+            string[] notes = { "▲ 达到 6", "精力、心情各达到 4", "♥ 达到 6 · ¥ 至少 2 · 两次支援行动" };
             List<int>[] evidence = { run.boss.abilityDays, run.boss.stateDays, run.boss.supportDays };
             for (int i = 0; i < 3; i++)
             {

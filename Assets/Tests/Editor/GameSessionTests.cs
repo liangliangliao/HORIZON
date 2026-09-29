@@ -97,6 +97,9 @@ namespace Horizon.Tests
             session.Choose(session.Hand[1].Id);
             GameSession restored = GameSession.Restore(session.Snapshot());
             Assert.AreEqual(session.Energy, restored.Energy);
+            Assert.AreEqual(session.Relation, restored.Relation);
+            Assert.AreEqual(session.Money, restored.Money);
+            Assert.AreEqual(session.Ability, restored.Ability);
             Assert.AreEqual(session.Pending.Count, restored.Pending.Count);
             Assert.IsFalse(restored.TryFocus());
             restored.Advance();
@@ -267,6 +270,9 @@ namespace Horizon.Tests
             int energy = session.Energy;
             int mood = session.Mood;
             int insight = session.Insight;
+            int relation = session.Relation;
+            int money = session.Money;
+            int ability = session.Ability;
             int pending = session.Pending.Count;
             FutureProjection temptation = session.ProjectFuture(session.Hand[0].Id);
             FutureProjection growth = session.ProjectFuture(session.Hand[1].Id);
@@ -277,9 +283,13 @@ namespace Horizon.Tests
             Assert.AreEqual(8, growth.EchoDay);
             Assert.Less(temptation.Energy, energy);
             Assert.Greater(growth.Insight, insight);
+            Assert.Greater(growth.Ability, ability);
             Assert.AreEqual(energy, session.Energy);
             Assert.AreEqual(mood, session.Mood);
             Assert.AreEqual(insight, session.Insight);
+            Assert.AreEqual(relation, session.Relation);
+            Assert.AreEqual(money, session.Money);
+            Assert.AreEqual(ability, session.Ability);
             Assert.AreEqual(pending, session.Pending.Count);
             Assert.IsFalse(session.HasChosen);
             Assert.Throws<ArgumentException>(() => session.ProjectFuture("not-in-hand"));
@@ -321,6 +331,9 @@ namespace Horizon.Tests
             Assert.AreEqual(ghost.afterPassed, replayed.boss.passed);
             Assert.AreEqual(ghost.finalEnergy, replayed.finalEnergy);
             Assert.AreEqual(ghost.finalInsight, replayed.finalInsight);
+            Assert.AreEqual(ghost.finalRelation, replayed.finalRelation);
+            Assert.AreEqual(ghost.finalMoney, replayed.finalMoney);
+            Assert.AreEqual(ghost.finalAbility, replayed.finalAbility);
             for (int day = 0; day < ghost.sourceDay - 1; day++)
                 Assert.AreEqual(original.actions[day].cardId, replayed.actions[day].cardId);
             Assert.AreEqual(original.boss.passed, ghost.beforePassed);
@@ -330,6 +343,120 @@ namespace Horizon.Tests
             Assert.AreEqual(ghost.alternativeId, saved.boss.ghostTimeline.alternativeId);
             CollectionAssert.Contains(saved.boss.abilityDays, 1);
             Assert.IsNull(GameSession.ReplayAlternative(original, 1, "not-in-hand"));
+        }
+
+        [Test]
+        public void SixResourcesPayImmediateCostsAndDelayedAbilityAndOpportunity()
+        {
+            var session = new GameSession(1);
+            Assert.AreEqual(4, session.Relation);
+            Assert.AreEqual(5, session.Money);
+            Assert.AreEqual(2, session.Ability);
+            session.Choose("practice");
+            session.Advance();
+            session.Choose("friend");
+            Assert.AreEqual(6, session.Relation);
+            session.Advance();
+            session.Choose("portfolio");
+            Assert.AreEqual(5, session.Money);
+            Assert.AreEqual(2, session.Ability);
+            DayTransition dayFour = session.Advance();
+            Assert.AreEqual(2, dayFour.Echos.Count);
+            Assert.AreEqual(4, session.Ability);
+            Assert.AreEqual(7, session.Relation);
+            session.LockPrediction(0, 0, 0);
+            session.Choose(session.Hand[2].Id);
+            session.VisitStation();
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            DayTransition daySix = session.Advance();
+            Assert.AreEqual("portfolio", daySix.Echos[0].cardId);
+            Assert.AreEqual(6, session.Ability);
+            Assert.AreEqual(7, session.Money);
+        }
+
+        [Test]
+        public void MoneyBlocksSpendingButNeverBlocksRecovery()
+        {
+            RunSnapshot low = new GameSession(2).Snapshot();
+            low.money = 1;
+            var session = GameSession.Restore(low);
+            Assert.AreEqual("impulse", session.Hand[0].Id);
+            Assert.IsFalse(session.CanPlay(session.Hand[0]));
+            Assert.IsTrue(session.CanPlay(session.Hand[2]));
+            Assert.Throws<InvalidOperationException>(() => session.Choose("impulse"));
+            session.Choose(session.Hand[2].Id);
+            Assert.AreEqual(1, session.Money);
+        }
+
+        [Test]
+        public void BossAbilityAndSupportReadSixResourcesAndRecordedActions()
+        {
+            var session = new GameSession(1);
+            for (int day = 1; day <= GameSession.LastDay; day++)
+            {
+                if (session.HasPredictionReview) session.MarkPredictionReviewed();
+                if (day == 4) session.LockPrediction(0, 0, 0);
+                session.Choose(day == 1 ? "practice" : day == 3 ? "portfolio" : session.Hand[2].Id);
+                if (day == 4) session.VisitStation();
+                if (day < GameSession.LastDay) session.Advance();
+            }
+            Assert.AreEqual(6, session.Ability);
+            Assert.IsTrue(session.CompletedRun.boss.ability);
+            Assert.IsTrue(session.CompletedRun.boss.support);
+            CollectionAssert.Contains(session.CompletedRun.boss.abilityDays, 3);
+            CollectionAssert.Contains(session.CompletedRun.boss.supportDays, 2);
+
+            var deprived = new GameSession(1);
+            for (int day = 1; day < GameSession.LastDay; day++)
+            {
+                if (deprived.HasPredictionReview) deprived.MarkPredictionReviewed();
+                if (day == 4) deprived.LockPrediction(0, 0, 0);
+                deprived.Choose(deprived.Hand[2].Id);
+                if (day == 4) deprived.VisitStation();
+                deprived.Advance();
+            }
+            RunSnapshot low = deprived.Snapshot();
+            Assert.GreaterOrEqual(low.supportActions, 2);
+            low.money = 1;
+            low.relation = 2;
+            deprived = GameSession.Restore(low);
+            deprived.Choose(deprived.Hand[2].Id);
+            Assert.IsFalse(deprived.CompletedRun.boss.support);
+        }
+
+        [Test]
+        public void OldThreeResourceSnapshotRebuildsPaidAndPendingEchoes()
+        {
+            var session = new GameSession(1);
+            session.Choose("practice");
+            session.Advance();
+            session.Choose("friend");
+            session.Advance();
+            session.Choose("portfolio");
+            session.Advance();
+            RunSnapshot old = JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(session.Snapshot()));
+            old.rulesVersion = 0;
+            old.relation = old.money = old.ability = 0;
+            foreach (ActionRecord action in old.actions)
+            {
+                action.now = new ResourceDelta(action.now.energy, action.now.mood, action.now.insight);
+                action.later = new ResourceDelta(action.later.energy, action.later.mood, action.later.insight);
+            }
+            foreach (PendingEcho echo in old.pending)
+                echo.delta = new ResourceDelta(echo.delta.energy, echo.delta.mood, echo.delta.insight);
+
+            GameSession restored = GameSession.Restore(old);
+            Assert.AreEqual(GameSession.RulesVersion, restored.Snapshot().rulesVersion);
+            Assert.AreEqual(session.Energy, restored.Energy);
+            Assert.AreEqual(7, restored.Relation);
+            Assert.AreEqual(5, restored.Money);
+            Assert.AreEqual(4, restored.Ability);
+            PendingEcho opportunity = restored.Pending.Find(e => e.cardId == "portfolio");
+            Assert.IsNotNull(opportunity);
+            Assert.AreEqual(2, opportunity.delta.money);
+            Assert.AreEqual(2, opportunity.delta.ability);
+            Assert.AreEqual(2, restored.Actions[0].later.ability);
         }
     }
 }
