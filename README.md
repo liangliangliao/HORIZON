@@ -31,6 +31,12 @@ Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -te
 
 当前开发环境没有 Unity Editor，提交前只能进行源文件与项目结构检查；实际导入、编译、设备比例、字形和动效节奏仍需在 Unity 与手机上验证。
 
+## Android APK 工作流
+
+`.github/workflows/android-apk.yml` 在原型分支或 `main` 收到提交时运行，也可在工作流进入默认分支后从 Actions 页面手动启动。它使用 Unity 2022.3.22f1 构建 Android APK，并将结果保存为 `HORIZON-Android-APK` 工作流产物（保留 14 天）。这是用于试玩的 APK；上架前需要另配正式签名与发布配置。
+
+首次构建前，在仓库 **Settings → Secrets and variables → Actions** 设置 Unity 授权：个人版使用 `UNITY_LICENSE`（`.ulf` 文件完整内容）、`UNITY_EMAIL`、`UNITY_PASSWORD`；Pro 使用 `UNITY_SERIAL`、`UNITY_EMAIL`、`UNITY_PASSWORD`。不要把授权文件或密码提交到仓库。缺少密钥时工作流会在授权检查步骤明确报错。
+
 ## 下一阶段
 
 先用 9:16 设备试玩记录拖动成功率、TIME ECHO 识别率和一局完成时间；再做玩家亲手绘制预测、Day 4 未来站完整分镜、因果链和 CASCADE。保持规则逻辑在 `Assets/Scripts/Game`，把表现与存储放在 `HorizonApp` 和 `Assets/Scripts/UI`，便于以后用正式视觉与音效替换。
