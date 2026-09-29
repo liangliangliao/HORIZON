@@ -222,5 +222,70 @@ namespace Horizon.Tests
             Assert.Greater(recovered.Energy, 2);
             Assert.IsFalse(recovered.Pending.Exists(e => e.depth >= 2));
         }
+
+        [Test]
+        public void HorizonThreeUnlocksOnlyAfterTheThirdFutureStation()
+        {
+            var session = new GameSession(3);
+            Assert.AreEqual(2, session.HorizonLevel);
+            Assert.Throws<InvalidOperationException>(() => session.ProjectFuture(session.Hand[0].Id));
+            for (int day = 1; day <= 3; day++)
+            {
+                session.Choose(session.Hand[2].Id);
+                session.Advance();
+            }
+            session.LockPrediction(0, 0, 0);
+            session.Choose(session.Hand[2].Id);
+            Assert.AreEqual(2, session.HorizonLevel);
+            session.VisitStation();
+            Assert.AreEqual(3, session.HorizonLevel);
+            GameSession restored = GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(
+                JsonUtility.ToJson(session.Snapshot())));
+            Assert.AreEqual(3, restored.HorizonLevel);
+            restored.Advance();
+            Assert.AreEqual(3, restored.HorizonLevel);
+            Assert.AreEqual(3, new GameSession(4).HorizonLevel);
+        }
+
+        [Test]
+        public void TwoFutureProjectionsAreConditionalAndDoNotPlayCards()
+        {
+            var session = new GameSession(3);
+            for (int day = 1; day <= 3; day++)
+            {
+                session.Choose(session.Hand[2].Id);
+                session.Advance();
+            }
+            session.LockPrediction(0, 0, 0);
+            session.Choose(session.Hand[2].Id);
+            session.VisitStation();
+            session.Advance();
+
+            int energy = session.Energy;
+            int mood = session.Mood;
+            int insight = session.Insight;
+            int pending = session.Pending.Count;
+            FutureProjection temptation = session.ProjectFuture(session.Hand[0].Id);
+            FutureProjection growth = session.ProjectFuture(session.Hand[1].Id);
+            Assert.IsTrue(temptation.Available);
+            Assert.IsTrue(growth.Available);
+            Assert.AreEqual(8, temptation.TargetDay);
+            Assert.AreEqual(7, temptation.EchoDay);
+            Assert.AreEqual(8, growth.EchoDay);
+            Assert.Less(temptation.Energy, energy);
+            Assert.Greater(growth.Insight, insight);
+            Assert.AreEqual(energy, session.Energy);
+            Assert.AreEqual(mood, session.Mood);
+            Assert.AreEqual(insight, session.Insight);
+            Assert.AreEqual(pending, session.Pending.Count);
+            Assert.IsFalse(session.HasChosen);
+            Assert.Throws<ArgumentException>(() => session.ProjectFuture("not-in-hand"));
+
+            RunSnapshot low = session.Snapshot();
+            low.energy = 0;
+            GameSession exhausted = GameSession.Restore(low);
+            Assert.IsFalse(exhausted.ProjectFuture(exhausted.Hand[0].Id).Available);
+            Assert.IsTrue(exhausted.ProjectFuture(exhausted.Hand[2].Id).Available);
+        }
     }
 }

@@ -686,8 +686,18 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.05f, 0.87f, 0.95f, 0.95f);
             View.Label(root, "Station day", "DAY 04  /  在地平线的另一边", 26, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.78f, 0.92f, 0.85f);
+            bool reveal = session.RunNumber == 3 && stage == 2;
+            View.Panel(root, "Distant glow", new Color(0.43f, 0.84f, 0.79f, reveal ? 0.24f : 0.09f),
+                0.37f, 0.51f, 0.63f, 0.72f, 90);
+            View.Panel(root, "Future silhouette", new Color(0.04f, 0.11f, 0.16f, 0.96f),
+                0.42f, 0.52f, 0.58f, 0.65f, 50);
+            View.Panel(root, "Future face", reveal ? Palette.Mint : new Color(0.11f, 0.24f, 0.26f, 0.92f),
+                0.466f, 0.62f, 0.534f, 0.674f, 35);
+            View.Panel(root, "Station bench", new Color(0.24f, 0.43f, 0.45f, 0.55f),
+                0.27f, 0.505f, 0.73f, 0.516f, 8);
             string voice = stage == 0 ? "「你终于来了。」" :
-                stage == 1 ? "「你最近留下了很多东西。」" : "「它们还会继续生长。」";
+                stage == 1 ? "「你最近留下了很多东西。」" :
+                reveal ? "「现在你终于看见我了。」" : "「它们还会继续生长。」";
             View.Label(root, "Future voice", voice, 42, Palette.Text,
                 TextAnchor.MiddleCenter, 0.07f, 0.39f, 0.93f, 0.49f);
             if (stage == 1)
@@ -707,15 +717,25 @@ namespace Horizon
             }
             else if (stage == 2)
             {
-                ActionRecord cause = session.Actions.FindLast(a => a.echoDay > a.day);
-                if (cause != null)
+                if (reveal)
                 {
-                    View.Label(root, "Cause", "DAY " + cause.day + "  /  " + cause.cardName, 31,
-                        Palette.Mint, TextAnchor.MiddleCenter, 0.08f, 0.29f, 0.92f, 0.35f);
-                    View.Fill(root, "Cause line", new Color(0.54f, 0.97f, 0.79f, 0.72f),
-                        0.49f, 0.23f, 0.51f, 0.285f);
-                    View.Label(root, "Possible echo", "DAY " + cause.echoDay + "  /  " + cause.echoName,
-                        31, Palette.Gold, TextAnchor.MiddleCenter, 0.08f, 0.165f, 0.92f, 0.23f);
+                    View.Label(root, "Revelation", "那个人，就是未来的你。", 32, Palette.Text,
+                        TextAnchor.MiddleCenter, 0.08f, 0.27f, 0.92f, 0.34f);
+                    View.Label(root, "Horizon unlock", "HORIZON III  /  两条可能未来", 32, Palette.Mint,
+                        TextAnchor.MiddleCenter, 0.08f, 0.17f, 0.92f, 0.24f);
+                }
+                else
+                {
+                    ActionRecord cause = session.Actions.FindLast(a => a.echoDay > a.day);
+                    if (cause != null)
+                    {
+                        View.Label(root, "Cause", "DAY " + cause.day + "  /  " + cause.cardName, 31,
+                            Palette.Mint, TextAnchor.MiddleCenter, 0.08f, 0.29f, 0.92f, 0.35f);
+                        View.Fill(root, "Cause line", new Color(0.54f, 0.97f, 0.79f, 0.72f),
+                            0.49f, 0.23f, 0.51f, 0.285f);
+                        View.Label(root, "Possible echo", "DAY " + cause.echoDay + "  /  " + cause.echoName,
+                            31, Palette.Gold, TextAnchor.MiddleCenter, 0.08f, 0.165f, 0.92f, 0.23f);
+                    }
                 }
             }
             View.Label(root, "Walk hint", stage == 2 ? "向前滑动，回到现在" : "向前滑动，靠近未来的自己",
@@ -833,37 +853,89 @@ namespace Horizon
             if (busy || session == null || !session.TryFocus()) return;
             archive.active = session.Snapshot();
             Save();
+            RenderFocus(false);
+        }
+
+        private void RenderFocus(bool compare)
+        {
+            if (overlay != null) Destroy(overlay.gameObject);
             overlay = View.Rect(root, "FOCUS MODE", 0, 0, 1, 1);
             View.Fill(overlay, "Veil", new Color(0.015f, 0.05f, 0.08f, 0.97f), 0, 0, 1, 1, true);
-            View.Label(overlay, "Title", "F O C U S   M O D E", 44, Palette.Mint,
+            View.Label(overlay, "Title", compare ? "T W O   F U T U R E S" : "F O C U S   M O D E",
+                44, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.05f, 0.78f, 0.95f, 0.89f);
-            View.Label(overlay, "Subtitle", "你在未来留下的微光", 32, Palette.Text,
+            View.Label(overlay, "Subtitle", compare ? "同一个今天，可以走向不同方向。" : "你在未来留下的微光",
+                32, Palette.Text,
                 TextAnchor.MiddleCenter, 0.1f, 0.69f, 0.9f, 0.77f);
-            List<PendingEcho> echoes = new List<PendingEcho>(session.Pending);
-            echoes.Sort((a, b) => a.dueDay.CompareTo(b.dueDay));
-            for (int i = 0; i < Mathf.Min(5, echoes.Count); i++)
+            if (compare)
             {
-                PendingEcho echo = echoes[i];
-                float y = 0.61f - i * 0.102f;
-                View.Panel(overlay, "Future event", Palette.Panel, 0.11f, y, 0.89f, y + 0.082f);
-                string detail = session.HorizonLevel >= 2 ? echo.echoName :
-                    archive.calibrations > 0 ?
-                        (echo.kind == CardKind.Temptation ? "状态可能下降" :
-                            echo.kind == CardKind.Growth ? "洞察可能上升" : "有人可能回应") :
-                    echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
-                View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " +
-                    (echo.depth >= 2 ? "连锁 · " : "") + detail, 29,
-                    echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
-                    TextAnchor.MiddleLeft, 0.16f, y + 0.01f, 0.84f, y + 0.072f);
+                CardSpec[] hand = session.Hand;
+                CardSpec first = session.CanPlay(hand[0]) ? hand[0] : hand[2];
+                CardSpec second = session.CanPlay(hand[1]) ? hand[1] :
+                    first.Id == hand[2].Id ? hand[0] : hand[2];
+                DrawFutureBranch(first, 0.5f, "可能 A");
+                DrawFutureBranch(second, 0.29f, "可能 B");
+                View.Label(overlay, "Conditional", "只计算已埋下的回声；之后的行动和连锁仍会改写未来。",
+                    24, Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.205f, 0.93f, 0.26f);
+                View.Button(overlay, "Return to echoes", "查看已埋下的回声", () => RenderFocus(false),
+                    0.16f, 0.125f, 0.84f, 0.19f, Palette.Panel, Palette.Text, 25);
             }
-            if (echoes.Count == 0)
-                View.Label(overlay, "Empty", "这里还没有被埋下的回声。", 31, Palette.Muted,
-                    TextAnchor.MiddleCenter, 0.12f, 0.49f, 0.88f, 0.6f);
-            View.Label(overlay, "Boss", "距截止日还有 " + (GameSession.LastDay - session.Day) + " 天",
-                30, Palette.Muted, TextAnchor.MiddleCenter, 0.13f, 0.14f, 0.87f, 0.21f);
+            else
+            {
+                List<PendingEcho> echoes = new List<PendingEcho>(session.Pending);
+                echoes.Sort((a, b) => a.dueDay.CompareTo(b.dueDay));
+                int limit = session.HorizonLevel >= 3 ? 3 : 5;
+                for (int i = 0; i < Mathf.Min(limit, echoes.Count); i++)
+                {
+                    PendingEcho echo = echoes[i];
+                    float y = 0.61f - i * 0.102f;
+                    View.Panel(overlay, "Future event", Palette.Panel, 0.11f, y, 0.89f, y + 0.082f);
+                    string detail = session.HorizonLevel >= 3 ? echo.echoName :
+                        session.HorizonLevel >= 2 ? (echo.kind == CardKind.Temptation ? "火种" :
+                            echo.kind == CardKind.Growth ? "芽" : "回应") :
+                        archive.calibrations > 0 ?
+                            (echo.kind == CardKind.Temptation ? "状态可能下降" :
+                                echo.kind == CardKind.Growth ? "洞察可能上升" : "有人可能回应") :
+                        echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
+                    View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " +
+                        (echo.depth >= 2 ? "连锁 · " : "") + detail, 29,
+                        echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
+                        TextAnchor.MiddleLeft, 0.16f, y + 0.01f, 0.84f, y + 0.072f);
+                }
+                if (echoes.Count == 0)
+                    View.Label(overlay, "Empty", "这里还没有被埋下的回声。", 31, Palette.Muted,
+                        TextAnchor.MiddleCenter, 0.12f, 0.49f, 0.88f, 0.6f);
+                if (session.HorizonLevel >= 3)
+                    View.Button(overlay, "Two futures", "查看两条可能未来", () => RenderFocus(true),
+                        0.16f, 0.14f, 0.84f, 0.205f, Palette.Panel, Palette.Mint, 27);
+                else
+                    View.Label(overlay, "Boss", "距截止日还有 " + (GameSession.LastDay - session.Day) + " 天",
+                        30, Palette.Muted, TextAnchor.MiddleCenter, 0.13f, 0.14f, 0.87f, 0.21f);
+            }
             View.Button(overlay, "Close", "回到现在", () => BuildBoard(),
                 0.19f, 0.055f, 0.81f, 0.12f, Palette.Mint, Palette.Ink);
         }
+
+        private void DrawFutureBranch(CardSpec card, float y, string title)
+        {
+            FutureProjection future = session.ProjectFuture(card.Id);
+            RectTransform panel = View.Rect(overlay, title, 0.11f, y, 0.89f, y + 0.17f);
+            View.Panel(panel, "Path", Palette.Panel, 0, 0, 1, 1, 22);
+            View.Label(panel, "Action", title + "  /  " + card.Name, 31,
+                future.Available ? Palette.Mint : Palette.Muted,
+                TextAnchor.MiddleLeft, 0.07f, 0.66f, 0.94f, 0.94f);
+            View.Label(panel, "Path detail", future.Available ?
+                "DAY " + future.TargetDay + "  ·  精力" + Tendency(future.Energy - session.Energy) +
+                "  心情" + Tendency(future.Mood - session.Mood) +
+                "  洞察" + Tendency(future.Insight - session.Insight) : "此刻资源不足，这条路暂时走不通。",
+                27, Palette.Text, TextAnchor.MiddleLeft, 0.07f, 0.32f, 0.94f, 0.67f);
+            View.Label(panel, "Possible echo", future.Available && future.EchoDay > GameSession.LastDay ?
+                "截止日之后 · 本局不会兑现" : future.Available && future.EchoDay > 0 ?
+                "D" + future.EchoDay + " · " + card.FutureHint : "未来仍有未写下的部分",
+                23, Palette.Muted, TextAnchor.MiddleLeft, 0.07f, 0.08f, 0.94f, 0.32f);
+        }
+
+        private static string Tendency(int delta) { return delta > 0 ? "↑" : delta < 0 ? "↓" : "→"; }
 
         private IEnumerator BossSequence(RunRecord run)
         {

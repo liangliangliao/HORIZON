@@ -108,6 +108,31 @@ namespace Horizon.Game
         }
     }
 
+    public sealed class FutureProjection
+    {
+        public readonly string CardName;
+        public readonly bool Available;
+        public readonly int TargetDay;
+        public readonly int EchoDay;
+        public readonly string EchoName;
+        public readonly int Energy;
+        public readonly int Mood;
+        public readonly int Insight;
+
+        public FutureProjection(CardSpec card, bool available, int sourceDay, int targetDay,
+            int energy, int mood, int insight)
+        {
+            CardName = card.Name;
+            Available = available;
+            TargetDay = targetDay;
+            EchoDay = card.Delay > 0 ? sourceDay + card.Delay : 0;
+            EchoName = card.EchoName;
+            Energy = energy;
+            Mood = mood;
+            Insight = insight;
+        }
+    }
+
     public sealed class GameSession
     {
         public const int LastDay = 12;
@@ -130,7 +155,10 @@ namespace Horizon.Game
         public readonly List<ActionRecord> Actions = new List<ActionRecord>();
         public readonly List<PendingEcho> Pending = new List<PendingEcho>();
 
-        public int HorizonLevel { get { return Math.Min(3, RunNumber); } }
+        public int HorizonLevel
+        {
+            get { return RunNumber >= 4 || (RunNumber == 3 && StationVisited) ? 3 : Math.Min(2, RunNumber); }
+        }
         public CardSpec[] Hand
         {
             get
@@ -223,6 +251,39 @@ namespace Horizon.Game
             if (FocusUses >= 1 || HasPredictionReview || HasChosen || CompletedRun != null) return false;
             FocusUses++;
             return true;
+        }
+
+        // A conditional view, not a promise: future choices and newly formed chains are unknown.
+        public FutureProjection ProjectFuture(string cardId)
+        {
+            if (HorizonLevel < 3 || HasChosen || CanPredict || HasPredictionReview || CompletedRun != null)
+                throw new InvalidOperationException("Two futures unlock after the third station.");
+            CardSpec card = Array.Find(Hand, c => c.Id == cardId);
+            if (card == null) throw new ArgumentException("Card not in today's hand.", "cardId");
+            int target = Math.Min(LastDay, Day + 3);
+            bool available = CanPlay(card);
+            if (!available) return new FutureProjection(card, false, Day, target, Energy, Mood, Insight);
+
+            int energy = Clamp(Energy + card.Now.energy);
+            int mood = Clamp(Mood + card.Now.mood);
+            int insight = Clamp(Insight + card.Now.insight);
+            var projected = new List<PendingEcho>(Pending);
+            if (card.Delay > 0 && Day + card.Delay <= target)
+                projected.Add(new PendingEcho
+                {
+                    sourceDay = Day, dueDay = Day + card.Delay,
+                    delta = card.Later, depth = 1
+                });
+            projected.Sort((a, b) => a.dueDay != b.dueDay ? a.dueDay.CompareTo(b.dueDay) :
+                a.depth != b.depth ? a.depth.CompareTo(b.depth) : a.sourceDay.CompareTo(b.sourceDay));
+            foreach (PendingEcho echo in projected)
+            {
+                if (echo.dueDay <= Day || echo.dueDay > target || echo.delta == null) continue;
+                energy = Clamp(energy + echo.delta.energy);
+                mood = Clamp(mood + echo.delta.mood);
+                insight = Clamp(insight + echo.delta.insight);
+            }
+            return new FutureProjection(card, true, Day, target, energy, mood, insight);
         }
 
         public ActionRecord Choose(string cardId)
