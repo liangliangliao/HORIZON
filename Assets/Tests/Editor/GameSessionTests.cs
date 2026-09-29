@@ -520,6 +520,14 @@ namespace Horizon.Tests
             PendingEcho longChain = eleventh.Echos.Find(e => e.replacementId == "opportunity");
             Assert.IsNotNull(longChain);
             Assert.AreEqual(9, restored.CausalPath(longChain.nodeId).Count);
+            restored.Choose(restored.Hand[2].Id);
+            restored.Advance();
+            restored.Choose(restored.Hand[2].Id);
+            RunRecord completed = restored.CompletedRun;
+            Assert.AreEqual(9, GameSession.CausalPath(GameSession.GraphForRun(completed), longChain.nodeId).Count);
+            RunRecord alternate = GameSession.ReplayAlternative(completed, 1, "episode");
+            Assert.IsNotNull(alternate);
+            Assert.AreEqual(12, alternate.actions.Count);
         }
 
         [Test]
@@ -574,6 +582,30 @@ namespace Horizon.Tests
             Assert.IsNotNull(missed);
             Assert.AreEqual(3, restored.CausalPath(missed.nodeId).Count);
             Assert.AreEqual("solo", missed.replacementId);
+        }
+
+        [Test]
+        public void AccuratePredictionsRevealDirectionStrengthThenSecondOrderOrigin()
+        {
+            var primary = new PendingEcho
+            {
+                sourceDay = 2, dueDay = 4, echoName = "疲惫回来了",
+                kind = CardKind.Temptation, depth = 1, delta = new ResourceDelta(-2)
+            };
+            Assert.That(ForecastKnowledge.Clue(primary, 1, 0), Does.Not.Contain("精力"));
+            Assert.That(ForecastKnowledge.Clue(primary, 1, 1), Does.Contain("精力↓"));
+            Assert.That(ForecastKnowledge.Clue(primary, 2, 3), Does.Contain("精力明显↓"));
+            Assert.AreEqual("解锁 · 未来方向", ForecastKnowledge.UnlockAt(1));
+            Assert.AreEqual("解锁 · 影响强度", ForecastKnowledge.UnlockAt(3));
+            Assert.AreEqual("解锁 · 二阶影响", ForecastKnowledge.UnlockAt(10));
+
+            var consequence = new PendingEcho
+            {
+                sourceDay = 2, dueDay = 6, echoName = "错过了一次邀约",
+                kind = CardKind.Temptation, depth = 2, delta = new ResourceDelta(0, -1, 0, -1)
+            };
+            Assert.That(ForecastKnowledge.Clue(consequence, 3, 3), Does.Not.Contain("错过"));
+            Assert.That(ForecastKnowledge.Clue(consequence, 3, 10), Does.Contain("源自 D2"));
         }
     }
 }

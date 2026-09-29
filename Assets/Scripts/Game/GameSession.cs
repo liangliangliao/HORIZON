@@ -198,6 +198,42 @@ namespace Horizon.Game
         }
     }
 
+    // Calibration only changes what the player can inspect. It never changes a
+    // resource, the chance of an event, or the outcome of a choice.
+    public static class ForecastKnowledge
+    {
+        public static string Clue(PendingEcho echo, int horizonLevel, int calibrations)
+        {
+            if (echo == null) throw new ArgumentNullException("echo");
+            string clue = echo.depth >= 2 ?
+                calibrations >= 10 ? echo.echoName + " · 源自 D" + echo.sourceDay :
+                horizonLevel >= 2 ? "一次选择可能改变" : "一处尚未看清的回声" :
+                horizonLevel >= 3 ? echo.echoName :
+                horizonLevel >= 2 ? echo.kind == CardKind.Temptation ? "火种" :
+                    echo.kind == CardKind.Growth ? "芽" : "回应" :
+                echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
+            if (calibrations == 0 || echo.delta == null) return clue;
+            int[] effects = { echo.delta.energy, echo.delta.mood, echo.delta.insight,
+                echo.delta.relation, echo.delta.money, echo.delta.ability };
+            string[] names = { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+            int strongest = -1;
+            for (int i = 0; i < effects.Length; i++)
+                if (effects[i] != 0 && (strongest < 0 ||
+                    Math.Abs(effects[i]) > Math.Abs(effects[strongest]))) strongest = i;
+            if (strongest < 0) return clue;
+            string strength = calibrations >= 3 && Math.Abs(effects[strongest]) >= 2 ? "明显" : "";
+            return clue + " · " + names[strongest] + strength +
+                (effects[strongest] > 0 ? "↑" : "↓");
+        }
+
+        public static string UnlockAt(int successfulPredictions)
+        {
+            return successfulPredictions == 1 ? "解锁 · 未来方向" :
+                successfulPredictions == 3 ? "解锁 · 影响强度" :
+                successfulPredictions == 10 ? "解锁 · 二阶影响" : "未来方向更加清晰";
+        }
+    }
+
     public sealed class GameSession
     {
         public const int LastDay = 12;

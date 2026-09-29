@@ -339,8 +339,8 @@ namespace Horizon
                     22, Palette.Muted, TextAnchor.MiddleLeft, 0.31f, y - 0.015f, 0.89f, y + 0.016f);
             }
             if (close)
-                View.Label(root, "Understanding", archive.calibrations == 0 ?
-                    "解锁 · 未来方向" : "未来方向更加清晰", 29, Palette.Mint,
+                View.Label(root, "Understanding", ForecastKnowledge.UnlockAt(archive.calibrations + 1),
+                    29, Palette.Mint,
                     TextAnchor.MiddleCenter, 0.08f, 0.165f, 0.92f, 0.245f);
             else
                 View.Button(root, "Why", "为什么？  查看因果线", () => ShowMap(true),
@@ -363,7 +363,9 @@ namespace Horizon
                 TextAnchor.MiddleLeft, 0.07f, 0.935f, 0.55f, 0.979f);
             View.Label(root, "Vision", "HORIZON " + Roman(session.HorizonLevel), 23, Palette.Mint,
                 TextAnchor.MiddleRight, 0.53f, 0.937f, 0.92f, 0.978f);
-            View.Label(root, "Future caption", archive.calibrations > 0 ?
+            View.Label(root, "Future caption", archive.calibrations >= 10 ?
+                "未来 · 看见二阶影响" : archive.calibrations >= 3 ?
+                "未来 · 影响强度可见" : archive.calibrations > 0 ?
                 "未来 · 方向正在显形" : "未来 · 尚未发生", 24, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.875f, 0.49f, 0.91f);
             View.Fill(root, "Future rail", new Color(0.55f, 0.90f, 0.80f, 0.40f),
@@ -951,14 +953,7 @@ namespace Horizon
                     PendingEcho echo = echoes[i];
                     float y = 0.61f - i * 0.102f;
                     View.Panel(overlay, "Future event", Palette.Panel, 0.11f, y, 0.89f, y + 0.082f);
-                    string detail = session.HorizonLevel >= 3 ? echo.echoName :
-                        session.HorizonLevel >= 2 && echo.depth >= 2 ? "一次选择可能改变" :
-                        session.HorizonLevel >= 2 ? (echo.kind == CardKind.Temptation ? "火种" :
-                            echo.kind == CardKind.Growth ? "芽" : "回应") :
-                        archive.calibrations > 0 ?
-                            (echo.kind == CardKind.Temptation ? "状态可能下降" :
-                                echo.kind == CardKind.Growth ? "洞察可能上升" : "有人可能回应") :
-                        echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
+                    string detail = ForecastKnowledge.Clue(echo, session.HorizonLevel, archive.calibrations);
                     if (echo.kind.ToString() == archive.preferredIntent) detail = "关注 · " + detail;
                     View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " +
                         (echo.depth >= 2 ? "连锁 · " : "") + detail, 29,
@@ -1007,7 +1002,12 @@ namespace Horizon
                 23, Palette.Muted, TextAnchor.MiddleLeft, 0.07f, 0.08f, 0.94f, 0.32f);
         }
 
-        private static string Tendency(int delta) { return delta > 0 ? "↑" : delta < 0 ? "↓" : "→"; }
+        private string Tendency(int delta)
+        {
+            if (delta == 0) return "→";
+            string direction = delta > 0 ? "↑" : "↓";
+            return archive.calibrations >= 3 && Mathf.Abs(delta) >= 2 ? direction + direction : direction;
+        }
 
         private IEnumerator BossSequence(RunRecord run)
         {
@@ -1141,7 +1141,11 @@ namespace Horizon
             string title = duringRun && session != null ? "RUN " + session.RunNumber.ToString("000") + "  ·  正在发生" :
                 run != null ? "RUN " + run.number.ToString("000") + "  ·  " + run.title : "还没有走过的时间线";
             View.Label(overlay, "Run title", title, 31, Palette.Mint,
-                TextAnchor.MiddleCenter, 0.07f, 0.835f, 0.93f, 0.895f);
+                TextAnchor.MiddleCenter, 0.07f, 0.835f,
+                duringRun || run == null ? 0.93f : 0.79f, 0.895f);
+            if (!duringRun && run != null)
+                View.Button(overlay, "Rename", "改标题", () => ShowRenameRun(run),
+                    0.8f, 0.846f, 0.94f, 0.892f, Palette.Panel, Palette.Mint, 22);
             View.Fill(overlay, "Map spine", new Color(0.46f, 0.76f, 0.72f, 0.36f),
                 0.19f, 0.1f, 0.192f, 0.814f);
             List<CausalNode> graph = duringRun && session != null ? session.CausalNodes :
@@ -1208,6 +1212,38 @@ namespace Horizon
             }
             View.Button(overlay, "Close map", "返回", () => { Destroy(overlay.gameObject); overlay = null; },
                 0.32f, 0.044f, 0.68f, 0.105f, Palette.Mint, Palette.Ink);
+        }
+
+        private void ShowRenameRun(RunRecord run)
+        {
+            RectTransform prompt = View.Rect(overlay, "Rename life", 0, 0, 1, 1);
+            View.Fill(prompt, "Dim map", new Color(0.005f, 0.02f, 0.035f, 0.96f),
+                0, 0, 1, 1, true);
+            View.Label(prompt, "Question", "这段人生，你想怎样命名？", 37, Palette.Text,
+                TextAnchor.MiddleCenter, 0.08f, 0.59f, 0.92f, 0.68f);
+            RectTransform field = View.Rect(prompt, "Title field", 0.12f, 0.45f, 0.88f, 0.54f);
+            Image background = field.gameObject.AddComponent<Image>();
+            background.color = Palette.Panel;
+            var input = field.gameObject.AddComponent<InputField>();
+            input.targetGraphic = background;
+            input.textComponent = View.Label(field, "Edited title", "", 32, Palette.Text,
+                TextAnchor.MiddleLeft, 0.05f, 0.06f, 0.95f, 0.94f);
+            input.characterLimit = 28;
+            input.lineType = InputField.LineType.SingleLine;
+            input.text = run.title;
+            View.Label(prompt, "Hint", "只改变档案里的名字，不改写已经发生的事。", 25,
+                Palette.Muted, TextAnchor.MiddleCenter, 0.11f, 0.37f, 0.89f, 0.43f);
+            View.Button(prompt, "Cancel", "取消", () => Destroy(prompt.gameObject),
+                0.12f, 0.25f, 0.47f, 0.32f, Palette.Panel, Palette.Text);
+            View.Button(prompt, "Save title", "保存", () =>
+            {
+                string title = input.text.Trim();
+                if (title.Length == 0) return;
+                run.title = title;
+                Save();
+                RenderMap(false);
+            }, 0.53f, 0.25f, 0.88f, 0.32f, Palette.Mint, Palette.Ink);
+            input.ActivateInputField();
         }
 
         private void ShowEchoArchive()
