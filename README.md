@@ -9,6 +9,7 @@ Unity 竖屏游戏原型，取自《HORIZON / 远见》v0.3 的第一阶段。�
 3. 第一次进入点击「看看」；之后每天**向上拖动**一张牌越过屏幕中部。点牌可以短暂查看资源数字。长按未来区域 0.65 秒可每天凝视一次；右上角可查看时间地图。
 4. 第 4 天先在三条轨道上上下拖动，预测第 7 天的精力、心情和洞察，再封存预测。当天选牌后向上滑动三次靠近未来的自己；第 7 天回声兑现后，对照预测与真实结果。
 5. 第 12 天自动播放截止日与可能分支，然后直接进入下一局。重启应用会在简洁首页继续保存的局或查看过往记录。
+6. 第三局开始注意连续透支：如果延迟回声让精力见底，后续一次邀约可能缺席，手牌变为「独处休息」。可以在 FOCUS MODE 和时间地图中追踪这条二阶因果链。
 
 Android/iOS 目标为竖屏、单指操作。运行时请求竖屏并根据 `Screen.safeArea` 布局；中文字体从系统已安装字体中选择。制作正式包时应加入已授权的内置字体，并在 Player Settings 中固定默认方向。界面用 uGUI 程序化绘制，背景使用 `Assets/Resources/HorizonSky.jpg`。
 
@@ -19,13 +20,14 @@ Android/iOS 目标为竖屏、单指操作。运行时请求竖屏并根据 `Scr
 - 未来队列、长线收益、即时快感的隐藏代价；首次 TIME ECHO 放慢播放，之后加速。
 - Day 4 轨道绘制预测，Day 7 将预测与实际状态叠合；接近时解锁未来方向信息，不发放数值奖励。Day 4 打牌后进入可滑动的局内未来站。
 - 每日一次 FOCUS MODE；第二局解锁 Horizon II 的节点类型提示。
-- 12 天三门结算、可能分支提示、自动重开；当前与已完成的时间地图包含行动到回声的因果线与资源变化，连同预测与未来站进度保存在本地。
+- 第三局开始，低精力的透支回声可能造成一次后续邀约缺席，触发三节点的 CASCADE ×3；恢复手牌仍可打出。这是改变可选行动的二阶后果，不是额外的纯数值惩罚。
+- 12 天三门结算、可能分支提示、自动重开；当前与已完成的时间地图包含行动、回声、二阶后果之间的因果线与资源变化，连同预测与未来站进度保存在本地。
 
-未来站已经进入第 4 天的主循环，但仍是三段短互动；方案中 40～60 秒的完整演出、二阶因果、CASCADE、分享动画、长期内容和商业化尚未实现。
+未来站已经进入第 4 天的主循环，但仍是三段短互动；目前只有一种二阶因果链和三节点 CASCADE。方案中 40～60 秒的完整未来站演出、更复杂的因果网络、分享动画、长期内容和商业化尚未实现。
 
 ## 检查
 
-Unity 内打开 **Window → General → Test Runner → EditMode**，运行 `GameSessionTests`。测试覆盖首日手牌、延迟回声、即时成本、零精力恢复、预测兑现、未来站与 12 天结算。也可以在具有 Unity Editor 的机器上运行：
+Unity 内打开 **Window → General → Test Runner → EditMode**，运行 `GameSessionTests`。测试覆盖首日手牌、延迟回声、即时成本、零精力恢复、预测兑现、未来站、二阶选择损失与 12 天结算。也可以在具有 Unity Editor 的机器上运行：
 
 ```bash
 Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults TestResults.xml -quit
@@ -41,4 +43,4 @@ Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -te
 
 ## 下一阶段
 
-先用 9:16 设备试玩记录拖动成功率、TIME ECHO 识别率、预测绘制手感与一局完成时间；再扩展未来站演出、二阶因果和 CASCADE。保持规则逻辑在 `Assets/Scripts/Game`，把表现与存储放在 `HorizonApp` 和 `Assets/Scripts/UI`，便于以后用正式视觉与音效替换。
+先用 9:16 设备试玩记录拖动成功率、TIME ECHO 与 CASCADE 识别率、预测绘制手感与一局完成时间；再扩展未来站演出、更多二阶因果与因果网络。保持规则逻辑在 `Assets/Scripts/Game`，把表现与存储放在 `HorizonApp` 和 `Assets/Scripts/UI`，便于以后用正式视觉与音效替换。

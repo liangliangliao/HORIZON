@@ -65,6 +65,10 @@ namespace Horizon.Game
     // One of each intent every day. All recovery choices restore energy, so no run can deadlock.
     public static class CardCatalog
     {
+        // A missed invitation changes the choice, not merely its resource reward.
+        public static readonly CardSpec SoloRecovery = new CardSpec("solo", "独处休息", CardKind.Recovery,
+            new ResourceDelta(2), new ResourceDelta(), 0, "先照顾好此刻的自己", "");
+
         private static readonly CardSpec[] Temptations =
         {
             new CardSpec("scroll", "刷到凌晨", CardKind.Temptation,

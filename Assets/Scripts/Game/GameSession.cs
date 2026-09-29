@@ -16,6 +16,10 @@ namespace Horizon.Game
         public bool givesSupport;
         public ResourceDelta now;
         public ResourceDelta later;
+        public int secondaryDay;
+        public string secondaryName;
+        public ResourceDelta secondary;
+        public bool secondaryResolved;
     }
 
     [Serializable]
@@ -28,6 +32,8 @@ namespace Horizon.Game
         public string echoName;
         public ResourceDelta delta;
         public CardKind kind;
+        public int depth;
+        public int parentDay;
     }
 
     [Serializable]
@@ -84,6 +90,7 @@ namespace Horizon.Game
         public int focusUses;
         public bool hasChosen;
         public bool stationVisited;
+        public bool socialUnavailableToday;
         public PredictionRecord prediction;
         public List<ActionRecord> actions = new List<ActionRecord>();
         public List<PendingEcho> pending = new List<PendingEcho>();
@@ -115,6 +122,7 @@ namespace Horizon.Game
         public int FocusUses { get; private set; }
         public bool HasChosen { get; private set; }
         public bool StationVisited { get; private set; }
+        public bool SocialUnavailableToday { get; private set; }
         public PredictionRecord Prediction { get; private set; }
         public bool CanPredict { get { return Day == 4 && !HasChosen && Prediction == null; } }
         public bool HasPredictionReview { get { return Prediction != null && Prediction.evaluated && !Prediction.reviewed; } }
@@ -123,7 +131,16 @@ namespace Horizon.Game
         public readonly List<PendingEcho> Pending = new List<PendingEcho>();
 
         public int HorizonLevel { get { return Math.Min(3, RunNumber); } }
-        public CardSpec[] Hand { get { return CardCatalog.ForDay(Day, RunNumber); } }
+        public CardSpec[] Hand
+        {
+            get
+            {
+                CardSpec[] hand = CardCatalog.ForDay(Day, RunNumber);
+                if (SocialUnavailableToday && hand[2].GivesSupport)
+                    hand[2] = CardCatalog.SoloRecovery;
+                return hand;
+            }
+        }
 
         public GameSession(int runNumber)
         {
@@ -146,7 +163,8 @@ namespace Horizon.Game
                 Day = saved.day, Energy = saved.energy, Mood = saved.mood,
                 Insight = saved.insight, SupportActions = saved.supportActions,
                 FocusUses = saved.focusUses, HasChosen = saved.hasChosen,
-                StationVisited = saved.stationVisited, Prediction = saved.prediction
+                StationVisited = saved.stationVisited, SocialUnavailableToday = saved.socialUnavailableToday,
+                Prediction = saved.prediction
             };
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
@@ -160,6 +178,7 @@ namespace Horizon.Game
                 day = Day, runNumber = RunNumber, energy = Energy, mood = Mood,
                 insight = Insight, supportActions = SupportActions, focusUses = FocusUses,
                 hasChosen = HasChosen, stationVisited = StationVisited,
+                socialUnavailableToday = SocialUnavailableToday,
                 prediction = Prediction, actions = new List<ActionRecord>(Actions),
                 pending = new List<PendingEcho>(Pending)
             };
@@ -193,7 +212,8 @@ namespace Horizon.Game
 
         public bool CanPlay(CardSpec card)
         {
-            return !CanPredict && !HasPredictionReview && !HasChosen && CompletedRun == null &&
+            return card != null && Array.Exists(Hand, candidate => candidate.Id == card.Id) &&
+                !CanPredict && !HasPredictionReview && !HasChosen && CompletedRun == null &&
                 Energy + card.Now.energy >= 0 && Mood + card.Now.mood >= 0 &&
                 Insight + card.Now.insight >= 0;
         }
@@ -230,7 +250,7 @@ namespace Horizon.Game
                 {
                     sourceDay = Day, dueDay = action.echoDay, cardId = card.Id,
                     cardName = card.Name, echoName = card.EchoName,
-                    delta = card.Later, kind = card.Kind
+                    delta = card.Later, kind = card.Kind, depth = 1
                 });
             }
             HasChosen = true;
@@ -246,6 +266,7 @@ namespace Horizon.Game
             Day++;
             HasChosen = false;
             FocusUses = 0;
+            SocialUnavailableToday = false;
             var due = new List<PendingEcho>();
             for (int i = Pending.Count - 1; i >= 0; i--)
             {
@@ -253,12 +274,24 @@ namespace Horizon.Game
                 due.Add(Pending[i]);
                 Pending.RemoveAt(i);
             }
-            due.Sort((a, b) => a.sourceDay.CompareTo(b.sourceDay));
+            due.Sort((a, b) => a.depth != b.depth ? a.depth.CompareTo(b.depth) :
+                a.sourceDay.CompareTo(b.sourceDay));
             foreach (PendingEcho echo in due)
             {
                 Apply(echo.delta);
                 ActionRecord source = Actions.Find(a => a.day == echo.sourceDay);
-                if (source != null) source.echoed = true;
+                if (echo.depth >= 2)
+                {
+                    SocialUnavailableToday = true;
+                    if (source != null) source.secondaryResolved = true;
+                }
+                else
+                {
+                    if (source != null) source.echoed = true;
+                    if (RunNumber >= 3 && echo.kind == CardKind.Temptation &&
+                        echo.delta != null && echo.delta.energy < 0 && Energy <= 2)
+                        ScheduleMissedInvitation(echo, source);
+                }
             }
             if (Prediction != null && !Prediction.evaluated && Day >= Prediction.dueDay)
             {
@@ -272,6 +305,29 @@ namespace Horizon.Game
                 Prediction.evaluated = true;
             }
             return new DayTransition(Day, due);
+        }
+
+        private void ScheduleMissedInvitation(PendingEcho cause, ActionRecord source)
+        {
+            if (source == null || source.secondaryDay > 0) return;
+            for (int day = Day + 1; day <= LastDay; day++)
+            {
+                if (!CardCatalog.ForDay(day, RunNumber)[2].GivesSupport) continue;
+                // A day can lose its social invitation only once, even if several echoes arrive together.
+                if (Pending.Exists(e => e.depth >= 2 && e.dueDay == day)) continue;
+                var loss = new ResourceDelta(0, -1);
+                source.secondaryDay = day;
+                source.secondaryName = "错过了一次邀约";
+                source.secondary = loss;
+                Pending.Add(new PendingEcho
+                {
+                    sourceDay = cause.sourceDay, parentDay = Day, dueDay = day,
+                    cardId = cause.cardId, cardName = cause.cardName,
+                    echoName = source.secondaryName, delta = loss,
+                    kind = CardKind.Temptation, depth = 2
+                });
+                return;
+            }
         }
 
         private void Apply(ResourceDelta delta)

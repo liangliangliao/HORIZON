@@ -400,7 +400,8 @@ namespace Horizon
         {
             View.Label(root, "Now", "现在 / 夜", 22, Palette.Mint, TextAnchor.MiddleLeft,
                 0.08f, 0.682f, 0.48f, 0.717f);
-            View.Label(root, "Scene line", session.Day == 4 && session.Prediction != null ?
+            View.Label(root, "Scene line", session.SocialUnavailableToday ?
+                "那次疲惫，今天让你错过了邀约。" : session.Day == 4 && session.Prediction != null ?
                 "你已画下未来，今天会走向哪里？" : session.Day == 1 ? "今天的你，会留给未来什么？" :
                 session.Pending.Count > 0 ? "你留下的选择，正在路上。" : "今晚，你想把什么送向明天？", 37,
                 Palette.Text, TextAnchor.MiddleLeft, 0.08f, 0.565f, 0.83f, 0.639f);
@@ -659,7 +660,10 @@ namespace Horizon
             archive.active = session.Snapshot();
             Save();
             foreach (PendingEcho echo in transition.Echos)
-                yield return EchoSequence(echo);
+            {
+                if (echo.depth >= 2) yield return CascadeSequence(echo);
+                else yield return EchoSequence(echo);
+            }
             if (session.HasPredictionReview) ShowPredictionReview();
             else BuildBoard();
         }
@@ -778,6 +782,47 @@ namespace Horizon
             Save();
         }
 
+        private IEnumerator CascadeSequence(PendingEcho echo)
+        {
+            Clear();
+            View.Fill(root, "Chain darkness", new Color(0.009f, 0.026f, 0.045f, 0.96f),
+                0, 0, 1, 1);
+            View.Label(root, "Chain title", "C H A I N   F O U N D", 45, Palette.Gold,
+                TextAnchor.MiddleCenter, 0.05f, 0.76f, 0.95f, 0.85f);
+            View.Label(root, "Chain clue", "后果，又改变了一个选择。", 30, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.08f, 0.68f, 0.92f, 0.75f);
+            View.Fill(root, "Causal rail", new Color(0.91f, 0.63f, 0.42f, 0.25f),
+                0.17f, 0.521f, 0.83f, 0.523f);
+            yield return new WaitForSeconds(0.18f);
+            View.Panel(root, "Origin pulse", Palette.Coral, 0.145f, 0.502f, 0.195f, 0.542f, 29);
+            View.Label(root, "Origin day", "DAY " + echo.sourceDay, 26, Palette.Coral,
+                TextAnchor.MiddleCenter, 0.045f, 0.565f, 0.295f, 0.615f);
+            View.Label(root, "Origin action", echo.cardName, 27, Palette.Text,
+                TextAnchor.MiddleCenter, 0.035f, 0.44f, 0.305f, 0.5f);
+            yield return new WaitForSeconds(0.25f);
+            View.Fill(root, "First link", Palette.Coral, 0.19f, 0.518f, 0.5f, 0.526f);
+            View.Panel(root, "First echo pulse", Palette.Coral, 0.475f, 0.502f, 0.525f, 0.542f, 29);
+            View.Label(root, "First echo day", "DAY " + echo.parentDay, 26, Palette.Coral,
+                TextAnchor.MiddleCenter, 0.37f, 0.565f, 0.63f, 0.615f);
+            View.Label(root, "First echo", "精力见底", 27, Palette.Text,
+                TextAnchor.MiddleCenter, 0.35f, 0.44f, 0.65f, 0.5f);
+            yield return new WaitForSeconds(0.18f);
+            View.Fill(root, "Second link", Palette.Gold, 0.5f, 0.518f, 0.81f, 0.526f);
+            View.Panel(root, "Second echo pulse", Palette.Gold, 0.805f, 0.502f, 0.855f, 0.542f, 29);
+            View.Label(root, "Second echo day", "DAY " + echo.dueDay, 26, Palette.Gold,
+                TextAnchor.MiddleCenter, 0.695f, 0.565f, 0.955f, 0.615f);
+            View.Label(root, "Second echo", "错过邀约", 27, Palette.Text,
+                TextAnchor.MiddleCenter, 0.685f, 0.44f, 0.965f, 0.5f);
+            yield return new WaitForSeconds(0.13f);
+            View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1);
+            View.Label(root, "Cascade", "C A S C A D E  × 3", 51, Palette.Gold,
+                TextAnchor.MiddleCenter, 0.06f, 0.28f, 0.94f, 0.37f);
+            View.Label(root, "Changed hand", "邀约没有到来。今天你仍可以选择独处休息。", 27,
+                Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.2f, 0.93f, 0.28f);
+            Handheld.Vibrate();
+            yield return new WaitForSeconds(0.66f);
+        }
+
         private static float EchoX(int day, int source, int due)
         {
             return Mathf.Lerp(0.12f, 0.88f, (day - source) / (float)Mathf.Max(1, due - source));
@@ -806,7 +851,8 @@ namespace Horizon
                         (echo.kind == CardKind.Temptation ? "状态可能下降" :
                             echo.kind == CardKind.Growth ? "洞察可能上升" : "有人可能回应") :
                     echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
-                View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " + detail, 29,
+                View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " +
+                    (echo.depth >= 2 ? "连锁 · " : "") + detail, 29,
                     echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
                     TextAnchor.MiddleLeft, 0.16f, y + 0.01f, 0.84f, y + 0.072f);
             }
@@ -901,6 +947,18 @@ namespace Horizon
                 View.Fill(overlay, "Causal start", thread, 0.73f, from, x, from + 0.002f);
                 View.Panel(overlay, "Causal arrival", thread,
                     x - 0.007f, to - 0.005f, x + 0.011f, to + 0.006f, 9);
+                if (action.secondaryDay > action.echoDay)
+                {
+                    float second = 0.788f - (action.secondaryDay - 1) * 0.055f + 0.007f;
+                    Color next = new Color(Palette.Gold.r, Palette.Gold.g, Palette.Gold.b,
+                        action.secondaryResolved ? 0.85f : 0.38f);
+                    View.Fill(overlay, "Second-order thread", next,
+                        x + 0.013f, second, x + 0.016f, to);
+                    View.Fill(overlay, "Chain turn", next,
+                        x, to, x + 0.016f, to + 0.003f);
+                    View.Panel(overlay, "Lost possibility", next,
+                        x + 0.006f, second - 0.005f, x + 0.023f, second + 0.007f, 9);
+                }
             }
             for (int day = 1; day <= GameSession.LastDay; day++)
             {
@@ -920,6 +978,8 @@ namespace Horizon
                     string immediate = action.now == null ? "" : "当下 " + action.now.ShortLabel();
                     string future = action.echoDay > 0 ? "D" + action.echoDay + " " +
                         (action.later == null ? action.echoName : action.later.ShortLabel()) : "";
+                    if (action.secondaryDay > 0)
+                        future += "  →  D" + action.secondaryDay + " 邀约缺席";
                     View.Label(overlay, "Why", immediate + (future.Length > 0 ? "   → " + future : ""),
                         19, action.echoed ? Palette.Mint : Palette.Muted,
                         TextAnchor.MiddleLeft, 0.25f, y - 0.017f, 0.73f, y + 0.009f);

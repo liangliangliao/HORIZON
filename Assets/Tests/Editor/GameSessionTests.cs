@@ -1,6 +1,7 @@
 using System;
 using Horizon.Game;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace Horizon.Tests
 {
@@ -154,6 +155,72 @@ namespace Horizon.Tests
             }
             Assert.IsFalse(session.Prediction.accurate);
             Assert.IsTrue(session.HasPredictionReview);
+        }
+
+        [Test]
+        public void ThirdRunEchoCanRemoveAnInvitationWithoutRemovingRecovery()
+        {
+            var session = new GameSession(3);
+            session.Choose("episode");
+            session.Advance();
+            session.Choose("avoid");
+            DayTransition firstEcho = session.Advance();
+            Assert.AreEqual(3, firstEcho.Day);
+            Assert.AreEqual(2, session.Energy);
+            Assert.AreEqual(1, firstEcho.Echos[0].depth);
+            Assert.AreEqual(6, session.Actions[0].secondaryDay);
+            Assert.AreEqual(3, session.Pending.Find(e => e.depth == 2).parentDay);
+
+            session.Choose(session.Hand[2].Id);
+            session.Advance();
+            session.LockPrediction(0, 0, 0);
+            session.Choose(session.Hand[2].Id);
+            session.VisitStation();
+            session.Advance();
+            session.Choose(session.Hand[2].Id);
+            int moodBefore = session.Mood;
+            DayTransition cascade = session.Advance();
+
+            Assert.AreEqual(6, cascade.Day);
+            Assert.AreEqual(2, cascade.Echos.Find(e => e.depth == 2).depth);
+            Assert.AreEqual(moodBefore - 1, session.Mood);
+            Assert.IsTrue(session.SocialUnavailableToday);
+            Assert.IsTrue(session.Actions[0].secondaryResolved);
+            Assert.AreEqual("solo", session.Hand[2].Id);
+            Assert.IsFalse(session.Hand[2].GivesSupport);
+            Assert.IsFalse(session.CanPlay(CardCatalog.ForDay(6, 3)[2]));
+            Assert.IsTrue(session.CanPlay(session.Hand[2]));
+
+            GameSession restored = GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(
+                JsonUtility.ToJson(session.Snapshot())));
+            Assert.IsTrue(restored.SocialUnavailableToday);
+            Assert.AreEqual("solo", restored.Hand[2].Id);
+            int supportBefore = restored.SupportActions;
+            Assert.Throws<ArgumentException>(() => restored.Choose("friend"));
+            restored.Choose("solo");
+            Assert.AreEqual(supportBefore, restored.SupportActions);
+            restored.Advance();
+            Assert.IsFalse(restored.SocialUnavailableToday);
+        }
+
+        [Test]
+        public void ALowEnergyEchoDoesNotLockFirstRunOrARecoveredThirdRun()
+        {
+            var first = new GameSession(1);
+            first.Choose("scroll");
+            first.Advance();
+            first.Choose("impulse");
+            first.Advance();
+            Assert.AreEqual(1, first.Energy);
+            Assert.IsFalse(first.Pending.Exists(e => e.depth >= 2));
+
+            var recovered = new GameSession(3);
+            recovered.Choose("episode");
+            recovered.Advance();
+            recovered.Choose(recovered.Hand[2].Id);
+            recovered.Advance();
+            Assert.Greater(recovered.Energy, 2);
+            Assert.IsFalse(recovered.Pending.Exists(e => e.depth >= 2));
         }
     }
 }
