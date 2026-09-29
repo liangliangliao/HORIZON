@@ -4,14 +4,16 @@ on:
   push:
     branches:
       - main
-      - codex/unity-prototype-v0-3
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: android-apk-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -71,4 +73,3 @@ jobs:
           path: build/**/*.apk
           if-no-files-found: error
           retention-days: 14
-

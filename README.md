@@ -33,7 +33,7 @@ Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -te
 
 ## Android APK 工作流
 
-`.github/workflows/android-apk.yml` 在原型分支或 `main` 收到提交时运行，也可在工作流进入默认分支后从 Actions 页面手动启动。它使用 Unity 2022.3.22f1 构建 Android APK，并将结果保存为 `HORIZON-Android-APK` 工作流产物（保留 14 天）。这是用于试玩的 APK；上架前需要另配正式签名与发布配置。
+`.github/workflows/android-apk.yml` 在指向 `main` 的 PR 更新或 `main` 收到提交时运行，也可在工作流进入默认分支后从 Actions 页面手动启动。它使用 Unity 2022.3.22f1 构建 Android APK，并将结果保存为 `HORIZON-Android-APK` 工作流产物（保留 14 天）。这是用于试玩的 APK；上架前需要另配正式签名与发布配置。
 
 首次构建前，在仓库 **Settings → Secrets and variables → Actions** 设置 Unity 授权：个人版使用 `UNITY_LICENSE`（`.ulf` 文件完整内容）、`UNITY_EMAIL`、`UNITY_PASSWORD`；Pro 使用 `UNITY_SERIAL`、`UNITY_EMAIL`、`UNITY_PASSWORD`。不要把授权文件或密码提交到仓库。缺少密钥时工作流会在授权检查步骤明确报错。
 
