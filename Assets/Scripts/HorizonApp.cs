@@ -16,6 +16,7 @@ namespace Horizon
         public RunSnapshot active;
         public bool seenFirstEcho;
         public int calibrations;
+        public string preferredIntent;
     }
 
     public sealed class HorizonApp : MonoBehaviour
@@ -675,20 +676,25 @@ namespace Horizon
             stationStage = stage;
             Clear();
             View.Fill(root, "Station veil", new Color(0.005f, 0.02f, 0.035f, 0.45f), 0, 0, 1, 1);
-            Image touch = View.Fill(root, "Walk forward", new Color(0, 0, 0, 0), 0, 0, 1, 1, true);
-            StationSwipe swipe = touch.gameObject.AddComponent<StationSwipe>();
-            swipe.ReadyAt = Time.unscaledTime + 1.1f;
-            swipe.Advanced = () =>
+            bool question = session.RunNumber == 3 && stage == 3;
+            if (!question)
             {
-                Handheld.Vibrate();
-                if (stationStage < 2) ShowInRunStation(stationStage + 1);
-                else FinishStation();
-            };
+                Image touch = View.Fill(root, "Walk forward", new Color(0, 0, 0, 0), 0, 0, 1, 1, true);
+                StationSwipe swipe = touch.gameObject.AddComponent<StationSwipe>();
+                swipe.ReadyAt = Time.unscaledTime + 1.1f;
+                swipe.Advanced = () =>
+                {
+                    Handheld.Vibrate();
+                    if (stationStage < 2) ShowInRunStation(stationStage + 1);
+                    else if (session.RunNumber == 3) ShowInRunStation(3);
+                    else FinishStation();
+                };
+            }
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 35, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.05f, 0.87f, 0.95f, 0.95f);
             View.Label(root, "Station day", "DAY 04  /  在地平线的另一边", 26, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.78f, 0.92f, 0.85f);
-            bool reveal = session.RunNumber == 3 && stage == 2;
+            bool reveal = session.RunNumber == 3 && stage >= 2;
             View.Panel(root, "Distant glow", new Color(0.43f, 0.84f, 0.79f, reveal ? 0.24f : 0.09f),
                 0.37f, 0.51f, 0.63f, 0.72f, 90);
             View.Panel(root, "Future silhouette", new Color(0.04f, 0.11f, 0.16f, 0.96f),
@@ -697,9 +703,10 @@ namespace Horizon
                 0.466f, 0.62f, 0.534f, 0.674f, 35);
             View.Panel(root, "Station bench", new Color(0.24f, 0.43f, 0.45f, 0.55f),
                 0.27f, 0.505f, 0.73f, 0.516f, 8);
-            string voice = stage == 0 ? "「你终于来了。」" :
+            string voice = question ? "「你还想继续这样走吗？」" : stage == 0 ? "「你终于来了。」" :
                 stage == 1 ? "「你最近留下了很多东西。」" :
-                reveal ? "「现在你终于看见我了。」" : "「它们还会继续生长。」";
+                reveal ? "「现在你终于看见我了。」" : session.RunNumber == 2 ?
+                "「你已经知道，一些东西会回来。」" : "「它们还会继续生长。」";
             View.Label(root, "Future voice", voice, 42, Palette.Text,
                 TextAnchor.MiddleCenter, 0.07f, 0.39f, 0.93f, 0.49f);
             if (stage == 1)
@@ -715,6 +722,25 @@ namespace Horizon
                         27, action.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
                         TextAnchor.MiddleCenter, 0.18f, y + 0.004f, 0.82f, y + 0.053f);
                     shown++;
+                }
+            }
+            else if (question)
+            {
+                View.Label(root, "Choose concern", "现在，我更想保护这个。", 31, Palette.Muted,
+                    TextAnchor.MiddleCenter, 0.1f, 0.315f, 0.9f, 0.38f);
+                CardKind[] intentions = { CardKind.Temptation, CardKind.Growth, CardKind.Recovery };
+                for (int i = 0; i < intentions.Length; i++)
+                {
+                    CardKind intent = intentions[i];
+                    float y = 0.245f - i * 0.08f;
+                    string name = RecentBehavior(intent);
+                    View.Button(root, "Protect " + intent, "保护 · " + name, () =>
+                    {
+                        archive.preferredIntent = intent.ToString();
+                        FinishStation();
+                    }, 0.15f, y, 0.85f, y + 0.065f,
+                    intent == CardKind.Growth ? Palette.Mint : Palette.Panel,
+                    intent == CardKind.Growth ? Palette.Ink : Palette.Text, 27);
                 }
             }
             else if (stage == 2)
@@ -740,8 +766,19 @@ namespace Horizon
                     }
                 }
             }
-            View.Label(root, "Walk hint", stage == 2 ? "向前滑动，回到现在" : "向前滑动，靠近未来的自己",
+            View.Label(root, "Walk hint", question ? "这会改变你关注的未来，不会改变资源。" :
+                stage == 2 && session.RunNumber != 3 ? "向前滑动，回到现在" :
+                "向前滑动，靠近未来的自己",
                 26, Palette.Muted, TextAnchor.MiddleCenter, 0.1f, 0.045f, 0.9f, 0.11f);
+        }
+
+        private string RecentBehavior(CardKind kind)
+        {
+            int first = Mathf.Max(0, session.Actions.Count - 4);
+            for (int i = session.Actions.Count - 1; i >= first; i--)
+                if (session.Actions[i].kind == kind) return session.Actions[i].cardName;
+            return kind == CardKind.Temptation ? "给自己一点快乐" :
+                kind == CardKind.Growth ? "继续练习" : "照顾自己";
         }
 
         private void FinishStation()
@@ -866,7 +903,9 @@ namespace Horizon
             View.Label(overlay, "Title", compare ? "T W O   F U T U R E S" : "F O C U S   M O D E",
                 44, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.05f, 0.78f, 0.95f, 0.89f);
-            View.Label(overlay, "Subtitle", compare ? "同一个今天，可以走向不同方向。" : "你在未来留下的微光",
+            View.Label(overlay, "Subtitle", compare ? "同一个今天，可以走向不同方向。" :
+                string.IsNullOrEmpty(archive.preferredIntent) ? "你在未来留下的微光" :
+                "你更想保护：" + IntentName(archive.preferredIntent),
                 32, Palette.Text,
                 TextAnchor.MiddleCenter, 0.1f, 0.69f, 0.9f, 0.77f);
             if (compare)
@@ -885,7 +924,9 @@ namespace Horizon
             else
             {
                 List<PendingEcho> echoes = new List<PendingEcho>(session.Pending);
-                echoes.Sort((a, b) => a.dueDay.CompareTo(b.dueDay));
+                echoes.Sort((a, b) => a.dueDay != b.dueDay ? a.dueDay.CompareTo(b.dueDay) :
+                    (a.kind.ToString() == archive.preferredIntent ? 0 : 1).CompareTo(
+                        b.kind.ToString() == archive.preferredIntent ? 0 : 1));
                 int limit = session.HorizonLevel >= 3 ? 3 : 5;
                 for (int i = 0; i < Mathf.Min(limit, echoes.Count); i++)
                 {
@@ -899,6 +940,7 @@ namespace Horizon
                             (echo.kind == CardKind.Temptation ? "状态可能下降" :
                                 echo.kind == CardKind.Growth ? "洞察可能上升" : "有人可能回应") :
                         echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
+                    if (echo.kind.ToString() == archive.preferredIntent) detail = "关注 · " + detail;
                     View.Label(overlay, "Forecast", "DAY " + echo.dueDay + "     " +
                         (echo.depth >= 2 ? "连锁 · " : "") + detail, 29,
                         echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
@@ -916,6 +958,12 @@ namespace Horizon
             }
             View.Button(overlay, "Close", "回到现在", () => BuildBoard(),
                 0.19f, 0.055f, 0.81f, 0.12f, Palette.Mint, Palette.Ink);
+        }
+
+        private static string IntentName(string intent)
+        {
+            return intent == CardKind.Temptation.ToString() ? "留给自己的快乐" :
+                intent == CardKind.Growth.ToString() ? "长期成长" : "休息与关系";
         }
 
         private void DrawFutureBranch(CardSpec card, float y, string title)
@@ -1181,6 +1229,9 @@ namespace Horizon
                 "「你最近留下了很多光。」" : "「你终于来了。」";
             View.Label(root, "Voice", voice, 42, Palette.Text, TextAnchor.MiddleCenter,
                 0.1f, 0.22f, 0.9f, 0.32f);
+            if (!string.IsNullOrEmpty(archive.preferredIntent))
+                View.Label(root, "Concern", "你说过，更想保护：" + IntentName(archive.preferredIntent),
+                    29, Palette.Mint, TextAnchor.MiddleCenter, 0.12f, 0.15f, 0.88f, 0.21f);
             View.Button(root, "Home", "回到地平线", ShowHome, 0.19f, 0.065f, 0.81f, 0.13f,
                 Palette.Mint, Palette.Ink);
         }
