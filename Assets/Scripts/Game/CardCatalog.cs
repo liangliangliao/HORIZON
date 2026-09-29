@@ -21,15 +21,17 @@ namespace Horizon.Game
         public string ShortLabel()
         {
             string label = "";
-            Append(ref label, "⚡", energy);
-            Append(ref label, "☀", mood);
-            Append(ref label, "▲", insight);
-            return label.Trim();
+            Append(ref label, "精", energy);
+            Append(ref label, "心", mood);
+            Append(ref label, "识", insight);
+            return label;
         }
 
         private static void Append(ref string label, string icon, int value)
         {
-            if (value != 0) label += icon + " " + (value > 0 ? "+" : "") + value + "  ";
+            if (value == 0) return;
+            if (label.Length > 0) label += " · ";
+            label += icon + " " + (value > 0 ? "+" : "") + value;
         }
     }
 
@@ -106,4 +108,3 @@ namespace Horizon.Game
         }
     }
 }
-

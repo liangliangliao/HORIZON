@@ -7,14 +7,14 @@ namespace Horizon.UI
 {
     public static class Palette
     {
-        public static readonly Color Ink = new Color(0.025f, 0.045f, 0.075f);
-        public static readonly Color Deep = new Color(0.045f, 0.09f, 0.13f);
-        public static readonly Color Panel = new Color(0.075f, 0.14f, 0.19f, 0.94f);
-        public static readonly Color Mint = new Color(0.45f, 0.88f, 0.77f);
+        public static readonly Color Ink = new Color(0.009f, 0.022f, 0.041f);
+        public static readonly Color Deep = new Color(0.035f, 0.075f, 0.11f);
+        public static readonly Color Panel = new Color(0.055f, 0.11f, 0.155f, 0.97f);
+        public static readonly Color Mint = new Color(0.52f, 0.95f, 0.80f);
         public static readonly Color Gold = new Color(1f, 0.76f, 0.49f);
         public static readonly Color Coral = new Color(1f, 0.43f, 0.39f);
         public static readonly Color Text = new Color(0.94f, 0.96f, 0.94f);
-        public static readonly Color Muted = new Color(0.52f, 0.64f, 0.67f);
+        public static readonly Color Muted = new Color(0.60f, 0.73f, 0.75f);
     }
 
     public sealed class RoundedGraphic : MaskableGraphic
@@ -149,6 +149,7 @@ namespace Horizon.UI
         {
             if (!Available) return;
             rect.position = origin + (Vector3)(eventData.position - down);
+            rect.localScale = Vector3.one * 1.04f;
             Dragged?.Invoke(this, eventData.position);
         }
 
@@ -158,6 +159,7 @@ namespace Horizon.UI
             bool reached = eventData.position.y > Screen.height * 0.46f &&
                 eventData.position.y - down.y > Screen.height * 0.11f;
             Dragged?.Invoke(this, Vector2.zero);
+            rect.localScale = Vector3.one;
             if (reached) Played?.Invoke(this);
             else rect.position = origin;
         }
@@ -196,4 +198,3 @@ namespace Horizon.UI
         }
     }
 }
-
