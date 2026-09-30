@@ -75,6 +75,28 @@ namespace Horizon.Game
     // One of each intent every day. All recovery choices restore energy, so no run can deadlock.
     public static class CardCatalog
     {
+        public static readonly CardSpec BalancedPlay = new CardSpec("play", "玩一局", CardKind.Temptation,
+            new ResourceDelta(-1, 3), new ResourceDelta(0, 1), 1, "明天  ·  余兴", "快乐留下了一点余温");
+        private static readonly CardSpec[] OutlookActions = {
+            new CardSpec("project", "推进长期项目", CardKind.Growth, new ResourceDelta(-2),
+                new ResourceDelta(0, 0, 1, 0, 1, 2), 4, "4日后 · 成果", "项目向前走了一步"),
+            new CardSpec("collaborate", "一起完成项目", CardKind.Growth, new ResourceDelta(-2, 0, 0, 1),
+                new ResourceDelta(0, 1, 0, 1, 1, 1), 3, "3日后 · 合作", "一起完成的东西留下了信任", true),
+            new CardSpec("publish", "分享我的成果", CardKind.Growth, new ResourceDelta(-2, 0, 1),
+                new ResourceDelta(0, 1, 0, 1, 2, 1), 2, "2日后 · 回应", "成果找到了回应", true),
+            new CardSpec("weekend", "留一个安静周末", CardKind.Recovery, new ResourceDelta(3, 2),
+                new ResourceDelta(1), 2, "2日后 · 余力", "休息为后来留出了空间"),
+            new CardSpec("reconnect", "与老朋友重聚", CardKind.Recovery, new ResourceDelta(2, 2, 0, 2),
+                new ResourceDelta(0, 1, 0, 1), 3, "3日后 · 惦念", "你们又靠近了一点", true),
+            new CardSpec("celebrate", "庆祝一个小进展", CardKind.Temptation, new ResourceDelta(-1, 3),
+                new ResourceDelta(0, 1, 0, 1), 2, "2日后 · 余温", "快乐也留下了连接")
+        };
+        public static CardSpec[] ForOutlookDay(int day)
+        {
+            if (day < 13 || day > 30) throw new ArgumentOutOfRangeException("day");
+            return new[] { OutlookActions[5], OutlookActions[day < 21 ? 0 : day < 28 ? 1 : 2],
+                OutlookActions[day % 2 == 0 ? 3 : 4] };
+        }
         // A missed invitation changes the choice, not merely its resource reward.
         public static readonly CardSpec SoloRecovery = new CardSpec("solo", "独处休息", CardKind.Recovery,
             new ResourceDelta(2), new ResourceDelta(), 0, "先照顾好此刻的自己", "");
@@ -172,11 +194,14 @@ namespace Horizon.Game
                 if (day == 10) hand[0] = NewActions[0];
                 if (day == 11) hand[2] = NewActions[2];
             }
+            if (catalogVersion >= 3 && hand[0].Id == "play") hand[0] = BalancedPlay;
             return hand;
         }
 
         public static CardSpec FindById(string id)
         {
+            CardSpec outlook = Array.Find(OutlookActions, candidate => candidate.Id == id);
+            if (outlook != null) return outlook;
             if (id == SoloRecovery.Id) return SoloRecovery;
             if (id == Opportunity.Id) return Opportunity;
             if (id == Together.Id) return Together;

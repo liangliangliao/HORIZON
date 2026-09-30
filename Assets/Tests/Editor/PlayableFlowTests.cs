@@ -17,6 +17,120 @@ namespace Horizon.Tests
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
 
         [UnityTest]
+        public IEnumerator ObservationViewsExplainResultsAndKeepTheLiveLifeIntact()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test observation").AddComponent<HorizonApp>();
+            yield return null;
+            var session = new GameSession(3, 41);
+            while (session.Day < 4) { session.Choose(session.Hand[2].Id); session.Advance(); }
+            session.LockPrediction(0, 0, 0);
+            while (session.Day < 7) { session.Choose(session.Hand[2].Id);
+                if (session.Day == 4) session.VisitStation(); session.Advance(); }
+            var archive = new ArchiveData { active = session.Snapshot(), nextRareRun = 99 };
+            for (int day = 1; day <= 7; day++) archive.journey.Visit("2026-09-" + day.ToString("00"));
+            Set(app, "session", session); Set(app, "archive", archive);
+            Call(app, "ShowPredictionReview");
+            yield return new WaitForSecondsRealtime(1.1f);
+            ButtonNamed(app, "Why").onClick.Invoke();
+            yield return null;
+            yield return Capture(app, "15-prediction-why");
+            string explanations = "";
+            foreach (Text text in Get<RectTransform>(app, "overlay").GetComponentsInChildren<Text>()) explanations += text.text;
+            Assert.That(explanations, Does.Contain("合计实际变化"));
+            ButtonNamed(app, "Close prediction why").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Continue").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.35f);
+            Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<ResourceOrbitGraphic>().Length);
+            int wallet = archive.wallet.stardust;
+            Call(app, "ShowFocus"); yield return null;
+            yield return Capture(app, "16-probability-focus");
+            string frozen = JsonUtility.ToJson(session.Snapshot());
+            Assert.AreEqual(1, session.FocusUses);
+            ButtonNamed(app, "Close").onClick.Invoke(); yield return null;
+            Call(app, "ShowJourney"); yield return null;
+            ButtonNamed(app, "Chapter 4").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Exercise choice portfolio").onClick.Invoke(); yield return null;
+            yield return Capture(app, "18-chapter-lesson");
+            ButtonNamed(app, "Close exercise").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Thirty day view").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Meet thirty day self").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.7f);
+            yield return Capture(app, "17-thirty-day-self");
+            ButtonNamed(app, "Other thirty day self").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Back to thirty day range").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Close future range").onClick.Invoke(); yield return null;
+            Assert.AreEqual(frozen, JsonUtility.ToJson(session.Snapshot()));
+            Assert.AreEqual(wallet, archive.wallet.stardust);
+            for (int run = 1; run <= 2; run++)
+            {
+                var past = new GameSession(run, 15);
+                while (true) { if (past.CanPredict) past.SkipPrediction(); past.Choose(past.Hand[2].Id);
+                    if (past.Day == 4) past.VisitStation(); if (past.Day == 12) break; past.Advance(); }
+                archive.runs.Add(past.CompletedRun);
+            }
+            Call(app, "ShowEchoArchive"); yield return null;
+            yield return Capture(app, "19-cross-life-echoes");
+            Assert.IsTrue(System.Array.Exists(Get<RectTransform>(app, "overlay").GetComponentsInChildren<Button>(),
+                b => b.name.StartsWith("Archived echo 1 ")));
+            Assert.IsTrue(System.Array.Exists(Get<RectTransform>(app, "overlay").GetComponentsInChildren<Button>(),
+                b => b.name.StartsWith("Archived echo 2 ")));
+            app.StartCoroutine((IEnumerator)typeof(HorizonApp).GetMethod("BossSequence", Private)
+                .Invoke(app, new object[] { archive.runs[0] }));
+            yield return new WaitForSecondsRealtime(0.3f);
+            yield return Capture(app, "20-boss-constellation");
+            int stars = 0;
+            foreach (RoundedGraphic star in Get<RectTransform>(app, "root").GetComponentsInChildren<RoundedGraphic>())
+                if (star.name.StartsWith("Boss day ")) stars++;
+            Assert.AreEqual(12, stars);
+            yield return new WaitForSecondsRealtime(3);
+            Assert.AreEqual(wallet, archive.wallet.stardust);
+            Assert.AreEqual(frozen, JsonUtility.ToJson(session.Snapshot()));
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator MysteryRemembersItsRealCauseAcrossResumeAndRevealsOnce()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test memory").AddComponent<HorizonApp>();
+            yield return null;
+            var session = new GameSession(3, 15);
+            while (session.Day < 6) { if (session.CanPredict) session.SkipPrediction();
+                session.Choose(session.Day == 1 ? "portfolio" : session.Hand[2].Id);
+                if (session.Day == 4) session.VisitStation(); session.Advance(); }
+            RareMoment memory = ExperienceContent.Moment(3, 6, new System.Collections.Generic.List<RunRecord>());
+            memory.type = 3; memory.title = "尚未找到的因";
+            ExperienceContent.AttachMystery(memory, session);
+            Assert.IsNotEmpty(memory.causeNodeId); Assert.IsNotEmpty(memory.consequenceNodeId);
+            var archive = new ArchiveData { active = session.Snapshot(), pendingMoment = memory, nextRareRun = 99 };
+            archive.moments.Add(memory); archive.wallet.stardust = 17;
+            Set(app, "archive", archive); Set(app, "session", session); Call(app, "Save"); Call(app, "BuildBoard");
+            yield return null; yield return Capture(app, "21-mystery-first");
+            archive = JsonUtility.FromJson<ArchiveData>(PlayerPrefs.GetString("HORIZON.PROTOTYPE.V1")); archive.Repair();
+            Set(app, "archive", archive); Call(app, "ContinueRun"); yield return null;
+            Assert.AreEqual(memory.causeNodeId, archive.pendingMoment.causeNodeId);
+            ButtonNamed(app, "Continue rare moment").onClick.Invoke(); yield return null;
+            session = Get<GameSession>(app, "session");
+            while (session.Day < 9) { session.Choose(session.Hand[2].Id); session.Advance(); }
+            Call(app, "BuildBoard"); yield return null;
+            Assert.AreEqual(5, archive.pendingMoment.type);
+            Assert.AreEqual(memory.consequenceNodeId, archive.pendingMoment.consequenceNodeId);
+            yield return Capture(app, "22-mystery-reveal");
+            yield return new WaitForSecondsRealtime(1);
+            Assert.IsNotNull(archive.pendingMoment);
+            ButtonNamed(app, "Continue rare moment").onClick.Invoke(); yield return null;
+            Call(app, "BuildBoard"); yield return null;
+            Assert.IsNull(archive.pendingMoment); Assert.AreEqual(1, archive.moments.Count);
+            Assert.AreEqual(17, archive.wallet.stardust);
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator FutureStationCanPlayItsFullDefaultSequenceWithoutInput()
         {
             yield return new EnterPlayMode();
@@ -47,7 +161,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test future self").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             while (session.Day < 4)
             { session.Choose(session.Hand[2].Id); session.Advance(); }
             session.SkipPrediction(); session.Choose(session.Hand[2].Id);
@@ -161,7 +275,7 @@ namespace Horizon.Tests
             ButtonNamed(app, "Use card").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1);
             ButtonNamed(app, "Continue result").onClick.Invoke();
-            yield return new WaitForSecondsRealtime(0.4f);
+            yield return new WaitForSecondsRealtime(1.2f);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.4f);
             archive = JsonUtility.FromJson<ArchiveData>(PlayerPrefs.GetString("HORIZON.PROTOTYPE.V1"));
@@ -271,7 +385,7 @@ namespace Horizon.Tests
             ButtonNamed(app, "Begin second life").onClick.Invoke();
             yield return null;
 
-            var third = new GameSession(3);
+            var third = new GameSession(3, 15);
             PendingEcho combined = null;
             while (third.Day < 6)
             {

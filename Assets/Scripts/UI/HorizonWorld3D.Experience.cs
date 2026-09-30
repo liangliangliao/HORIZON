@@ -74,6 +74,75 @@ namespace Horizon.UI
             cameraLook = Vector3.Lerp(Avatar.position + Vector3.up, DayPoint(echo.sourceDay) + Vector3.up, 0.3f);
         }
 
+        public void ReactToEcho(PendingEcho echo)
+        {
+            ResourceDelta delta = echo.actualDelta ?? echo.delta;
+            if (delta != null && (delta.energy < 0 || delta.mood < 0 || delta.relation < 0 || delta.money < 0))
+            {
+                Avatar.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + 1.3f;
+                shake = 0.11f; Play(2);
+            }
+            else Reward(3);
+        }
+
+        public void PowerGate(List<int> days, int gate)
+        {
+            if (days == null) return;
+            StartCoroutine(GateHistory(days, gate));
+        }
+        private IEnumerator GateHistory(List<int> days, int gate)
+        {
+            foreach (int day in days)
+            {
+                StartCoroutine(GateRay(day, gate));
+                yield return new WaitForSecondsRealtime(0.025f);
+            }
+        }
+        private IEnumerator GateRay(int day, int gate)
+        {
+            Transform orb = Shape(transform, "Past day powering a door", PrimitiveType.Sphere,
+                DayPoint(day) + Vector3.up * 0.2f, Vector3.one * 0.16f, gold);
+            Vector3 start = orb.position, end = new Vector3((gate - 1) * 2.7f, 1.8f, 4);
+            for (float age = 0; age < 0.42f; age += Time.unscaledDeltaTime)
+            {
+                if (orb == null) yield break;
+                float t = age / 0.42f;
+                orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI);
+                yield return null;
+            }
+            if (orb != null) Dispose(orb.gameObject);
+        }
+
+        public void ShowGhost(int day)
+        {
+            ShowDeadline();
+            futureSelf.gameObject.SetActive(true);
+            futureSelf.position = DayPoint(day) + new Vector3(0.5f, -0.09f, 0.3f);
+            futureSelf.rotation = Quaternion.Euler(0, 170, 0);
+            futureSelf.GetComponent<HorizonActor>().SetNeutral();
+            futureSelf.GetComponent<HorizonActor>().Pointing = true;
+            WorldCamera.rect = new Rect(0, 0.58f, 1, 0.33f);
+            cameraPosition = futureSelf.position + new Vector3(3, 2.8f, -5.3f);
+            cameraLook = futureSelf.position + Vector3.up * 1.1f;
+        }
+
+        public void ShowOutlook(List<ActionRecord> actions)
+        {
+            ShowStation(2, true);
+            ShowMemories(actions.FindAll(a => a.day == 14 || a.day == 21 || a.day == 28));
+            WorldCamera.rect = new Rect(0, 0.43f, 1, 0.49f);
+            if (timelineGroup != null) Dispose(timelineGroup.gameObject);
+            timelineGroup = Group("Thirty possible days");
+            for (int day = 1; day <= 30; day++)
+            {
+                float a = Mathf.Lerp(-150, 150, (day - 1) / 29f) * Mathf.Deg2Rad;
+                ActionRecord action = actions.Find(item => item.day == day);
+                Vector3 point = new Vector3(Mathf.Sin(a) * 3.7f, 0.08f, 4.2f - Mathf.Cos(a) * 3.7f);
+                Shape(timelineGroup, "Possible day " + day, PrimitiveType.Sphere, point, Vector3.one * 0.12f,
+                    action == null ? dark : action.kind == CardKind.Growth ? teal : action.kind == CardKind.Recovery ? gold : pink);
+            }
+        }
+
         public void ArriveEcho(PendingEcho echo)
         {
             if (ambientFilter != null) ambientFilter.cutoffFrequency = 18000;
@@ -196,7 +265,7 @@ namespace Horizon.UI
         public Transform Head, LeftArm, RightArm, LeftLeg, RightLeg, LeftEye, RightEye;
         public GameObject Phone, Book;
         public bool Walking, Pointing;
-        public float MotionRate = 1, FreezeUntil;
+        public float MotionRate = 1, FreezeUntil, TiredUntil;
         private int intent = -1;
         private float phase, cheer;
         public void SetNeutral() { intent = -1; if (Phone != null) Phone.SetActive(false); if (Book != null) Book.SetActive(false); }
@@ -214,7 +283,8 @@ namespace Horizon.UI
             RightArm.localRotation = Quaternion.Euler(Pointing ? 85 : arm - step + cheer * 55, 0, 5 + cheer * 20);
             LeftLeg.localRotation = Quaternion.Euler(Walking ? -step : 0, 0, 0);
             RightLeg.localRotation = Quaternion.Euler(Walking ? step : 0, 0, 0);
-            Head.localRotation = Quaternion.Euler(intent == 0 ? 12 : Mathf.Sin(phase * 0.8f) * 3, Mathf.Sin(phase * 0.55f) * 5, 0);
+            Head.localRotation = Quaternion.Euler(Time.unscaledTime < TiredUntil ? 24 :
+                intent == 0 ? 12 : Mathf.Sin(phase * 0.8f) * 3, Mathf.Sin(phase * 0.55f) * 5, 0);
             float blink = Mathf.Repeat(phase, 4.7f) > 4.56f ? 0.1f : 1;
             LeftEye.localScale = new Vector3(0.052f, 0.061f * blink, 0.042f);
             RightEye.localScale = LeftEye.localScale;

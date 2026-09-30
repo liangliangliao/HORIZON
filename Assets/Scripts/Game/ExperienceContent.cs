@@ -90,10 +90,41 @@ namespace Horizon.Game
         public string memory;
         public string title;
         public string description;
+        public string causeNodeId;
+        public string consequenceNodeId;
+        public int revealDay;
+        public bool revealed;
     }
 
     public static class ExperienceContent
     {
+        public static void AttachMystery(RareMoment moment, GameSession session)
+        {
+            if (moment == null || moment.type != 3) return;
+            CausalNode effect = session.CausalNodes.FindLast(n => n.type == CausalNodeKind.Echo && n.resolved &&
+                !string.IsNullOrEmpty(n.parentId));
+            if (effect == null) return;
+            CausalNode cause = session.CausalNodes.Find(n => n.id == effect.parentId);
+            if (cause == null) return;
+            moment.causeNodeId = cause.id; moment.consequenceNodeId = effect.id; moment.revealDay = 9;
+            moment.description = "一道熟悉的光先抵达了。你还没认出，它来自哪次选择。\nD9，再回头看看这段记忆。";
+        }
+
+        public static RareMoment RevealMystery(RareMoment original, GameSession session)
+        {
+            if (original == null || original.revealed || original.runNumber != session.RunNumber ||
+                original.revealDay < 1 || session.Day < original.revealDay) return null;
+            CausalNode cause = session.CausalNodes.Find(n => n.id == original.causeNodeId);
+            CausalNode effect = session.CausalNodes.Find(n => n.id == original.consequenceNodeId);
+            if (cause == null || effect == null || !effect.resolved) return null;
+            original.revealed = true;
+            return new RareMoment { runNumber = session.RunNumber, day = session.Day, type = 5,
+                causeNodeId = cause.id, consequenceNodeId = effect.id, revealed = true,
+                title = "你终于认出了这道光", description = "D" + cause.day + " · " + cause.label +
+                    "\n↓\nD" + effect.day + " · " + effect.label +
+                    "\n\n那天先看见的，是这次选择留下的记忆。\n它没有改变过去，只是现在才被你认出来。" };
+        }
+
         public static string NextStep(GameSession session)
         {
             if (session.Actions.Count == 0) return "今天先选一张，看看它会去哪一天";
@@ -114,6 +145,7 @@ namespace Horizon.Game
             if (card.GivesSupport) return "这条路会留下支援；朋友与成长可以产生新的连接。";
             if (card.Kind == CardKind.Growth) return "今天投入精力，等回声回来，为能力门留下成长。";
             if (card.Kind == CardKind.Recovery) return "先恢复状态，给下一次选择留出空间。";
+            if (card.Later.energy >= 0 && card.Later.mood >= 0) return "快乐也能留下连接。留意它在未来怎样回来。";
             return "先得到快乐，也给之后的自己留下一点负担。";
         }
 

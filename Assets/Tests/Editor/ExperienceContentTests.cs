@@ -71,7 +71,7 @@ namespace Horizon.Tests
         [Test]
         public void ACollaborativeOpportunityMergesTwoActualHistoriesAndSurvivesSave()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             Complete(session, s => s.Day == 1 ? "portfolio" : s.Hand[2].Id);
             CausalNode collaboration = session.CausalNodes.Find(n => n.type == CausalNodeKind.Choice && n.replacementId == "together");
             Assert.IsNotNull(collaboration);
@@ -135,7 +135,7 @@ namespace Horizon.Tests
         [Test]
         public void ForecastsReuseRulesAndNeverMutateLiveEchoesOrResources()
         {
-            var session = new GameSession(3); session.Choose("portfolio"); session.Advance();
+            var session = new GameSession(3, 15); session.Choose("portfolio"); session.Advance();
             string frozen = JsonUtility.ToJson(session.Snapshot());
             ForecastRange first = ForecastSimulator.Sample(session, null, 12, 12);
             ForecastRange again = ForecastSimulator.Sample(session, null, 12, 12);

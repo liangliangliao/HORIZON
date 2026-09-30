@@ -74,6 +74,14 @@ jobs:
           test -s artifacts/visuals/12-range-forecast.png
           test -s artifacts/visuals/13-cascade-merge.png
           test -s artifacts/visuals/14-future-self-reveal.png
+          test -s artifacts/visuals/15-prediction-why.png
+          test -s artifacts/visuals/16-probability-focus.png
+          test -s artifacts/visuals/17-thirty-day-self.png
+          test -s artifacts/visuals/18-chapter-lesson.png
+          test -s artifacts/visuals/19-cross-life-echoes.png
+          test -s artifacts/visuals/20-boss-constellation.png
+          test -s artifacts/visuals/21-mystery-first.png
+          test -s artifacts/visuals/22-mystery-reveal.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -81,6 +89,7 @@ jobs:
           python -m venv /tmp/horizon-gif-verification
           /tmp/horizon-gif-verification/bin/python -m pip install pillow==12.3.0
           /tmp/horizon-gif-verification/bin/python tools/verify_timeline_exports.py
+          /tmp/horizon-gif-verification/bin/python tools/verify_v03_previews.py
 
       - name: Upload Unity portrait previews
         if: always()

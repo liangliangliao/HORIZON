@@ -48,7 +48,7 @@ namespace Horizon.Game
         public CardKind replacementSlot;
     }
 
-    public enum CausalNodeKind { Action, Echo, Choice, Gate, Situation }
+    public enum CausalNodeKind { Action, Echo, Choice, Gate, Situation, World }
 
     [Serializable]
     public sealed class CausalNode
@@ -132,6 +132,7 @@ namespace Horizon.Game
     public sealed class RunRecord
     {
         public int catalogVersion;
+        public int worldSeed;
         public int number;
         public string title;
         public BossResult boss;
@@ -151,6 +152,7 @@ namespace Horizon.Game
     {
         public int rulesVersion;
         public int catalogVersion;
+        public int worldSeed;
         public int deadline;
         public int day;
         public int runNumber;
@@ -226,9 +228,9 @@ namespace Horizon.Game
                 calibrations >= 10 ? echo.echoName + " · 源自 D" + echo.sourceDay :
                 horizonLevel >= 2 ? "一次选择可能改变" : "一处尚未看清的回声" :
                 horizonLevel >= 3 ? echo.echoName :
-                horizonLevel >= 2 ? echo.kind == CardKind.Temptation ? "火种" :
+                horizonLevel >= 2 ? echo.kind == CardKind.Temptation ? ObservationDesign.EchoType(echo) :
                     echo.kind == CardKind.Growth ? "芽" : "回应" :
-                echo.kind == CardKind.Temptation ? "一处微弱的火种" : "一颗尚未发芽的种子";
+                echo.kind == CardKind.Temptation ? "一处微弱的" + ObservationDesign.EchoType(echo) : "一颗尚未发芽的种子";
             if (calibrations == 0 || echo.delta == null) return clue;
             int[] effects = { echo.delta.energy, echo.delta.mood, echo.delta.insight,
                 echo.delta.relation, echo.delta.money, echo.delta.ability };
@@ -255,7 +257,7 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 4;
+        public const int RulesVersion = 5;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -263,6 +265,7 @@ namespace Horizon.Game
         public int Day { get; private set; }
         public int Deadline { get; private set; }
         public int CatalogVersion { get; private set; }
+        public int WorldSeed { get; private set; }
         public int RunNumber { get; private set; }
         public int Energy { get; private set; }
         public int Mood { get; private set; }
@@ -275,7 +278,8 @@ namespace Horizon.Game
         public bool HasChosen { get; private set; }
         public bool StationVisited { get; private set; }
         public bool SocialUnavailableToday { get; private set; }
-        public string Situation { get { return CausalNodes.Find(n => n.type == CausalNodeKind.Situation && n.day == Day)?.label; } }
+        public string Situation { get { return CausalNodes.FindLast(n => n.type == CausalNodeKind.World && n.day == Day)?.label ??
+            CausalNodes.FindLast(n => n.type == CausalNodeKind.Situation && n.day == Day)?.label; } }
         public PredictionRecord Prediction { get; private set; }
         public bool PredictionSkipped { get; private set; }
         public bool CanPredict { get { return Day == 4 && !HasChosen && Prediction == null && !PredictionSkipped; } }
@@ -331,11 +335,13 @@ namespace Horizon.Game
         {
             get
             {
-                CardSpec[] hand = CardCatalog.ForDay((Day - 1) % LastDay + 1, RunNumber, CatalogVersion);
+                CardSpec[] hand = Day > LastDay && CatalogVersion >= 3 ? CardCatalog.ForOutlookDay(Day) :
+                    CardCatalog.ForDay((Day - 1) % LastDay + 1, RunNumber, CatalogVersion);
                 foreach (CausalNode node in CausalNodes)
-                    if (node.type == CausalNodeKind.Situation && node.day == Day && node.resolved)
+                    if ((node.type == CausalNodeKind.Situation || node.type == CausalNodeKind.World) && node.day == Day && node.resolved)
                     {
-                        CardSpec replacement = CardCatalog.FindById(node.replacementId);
+                        CardSpec replacement = node.replacementId == "play" && CatalogVersion >= 3 ?
+                            CardCatalog.BalancedPlay : CardCatalog.FindById(node.replacementId);
                         if (replacement != null) hand[(int)node.replacementSlot] = replacement;
                     }
                 foreach (CausalNode node in CausalNodes)
@@ -350,14 +356,16 @@ namespace Horizon.Game
             }
         }
 
-        public GameSession(int runNumber) : this(runNumber, false) { }
+        public GameSession(int runNumber) : this(runNumber, false, 3, Guid.NewGuid().GetHashCode()) { }
+        public GameSession(int runNumber, int worldSeed) : this(runNumber, false, 3, worldSeed) { }
 
-        private GameSession(int runNumber, bool replaying, int catalogVersion = 2)
+        private GameSession(int runNumber, bool replaying, int catalogVersion = 3, int worldSeed = 0)
         {
             if (runNumber < 1) throw new ArgumentOutOfRangeException("runNumber");
             RunNumber = runNumber;
             Deadline = LastDay;
             CatalogVersion = catalogVersion;
+            WorldSeed = worldSeed;
             this.replaying = replaying;
             Day = 1;
             Energy = 6;
@@ -384,9 +392,9 @@ namespace Horizon.Game
             if (saved == null || saved.runNumber < 1 || saved.day < 1 || saved.day > deadline ||
                 saved.energy < 0 || saved.energy > ResourceCap || saved.mood < 0 ||
                 saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap ||
-                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > 2 || saved.catalogVersion < 0)
+                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > 3 || saved.catalogVersion < 0)
                 throw new ArgumentException("Invalid run snapshot.", "saved");
-            int catalogVersion = saved.catalogVersion > 0 ? saved.catalogVersion : saved.rulesVersion < 4 ? 1 : 2;
+            int catalogVersion = saved.catalogVersion > 0 ? saved.catalogVersion : saved.rulesVersion < 4 ? 1 : saved.rulesVersion < 5 ? 2 : 3;
             if (saved.rulesVersion < 2) MigrateLegacyResources(saved);
             if (saved.rulesVersion < 3 || saved.causalNodes == null ||
                 (saved.causalNodes.Count == 0 && saved.actions != null && saved.actions.Count > 0))
@@ -398,7 +406,7 @@ namespace Horizon.Game
                 saved.money < 0 || saved.money > ResourceCap ||
                 saved.ability < 0 || saved.ability > ResourceCap)
                 throw new ArgumentException("Invalid extended resources.", "saved");
-            var session = new GameSession(saved.runNumber, simulation, catalogVersion)
+            var session = new GameSession(saved.runNumber, simulation, catalogVersion, saved.worldSeed)
             {
                 Deadline = deadline,
                 Day = saved.day, Energy = saved.energy, Mood = saved.mood,
@@ -414,6 +422,19 @@ namespace Horizon.Game
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
             session.CausalNodes.AddRange(saved.causalNodes);
+            if (simulation && deadline > (saved.deadline > 0 ? saved.deadline : LastDay))
+                foreach (ActionRecord action in session.Actions)
+                    if (!action.echoed && action.echoDay > (saved.deadline > 0 ? saved.deadline : LastDay) &&
+                        action.echoDay > session.Day && action.echoDay <= deadline &&
+                        !session.Pending.Exists(e => e.sourceDay == action.day && e.depth == 1))
+                    {
+                        CausalNode node = AddNode(session.CausalNodes, action.nodeId, CausalNodeKind.Echo,
+                            action.echoDay, action.echoName, action.cardId, false);
+                        session.Pending.Add(new PendingEcho { sourceDay = action.day, dueDay = action.echoDay,
+                            cardId = action.cardId, cardName = action.cardName, echoName = action.echoName,
+                            delta = action.later, kind = action.kind, depth = 1,
+                            nodeId = node.id, parentNodeId = action.nodeId });
+                    }
             session.EnsureSituation();
             return session;
         }
@@ -479,7 +500,7 @@ namespace Horizon.Game
         {
             return new RunSnapshot
             {
-                rulesVersion = RulesVersion, catalogVersion = CatalogVersion, deadline = Deadline,
+                rulesVersion = RulesVersion, catalogVersion = CatalogVersion, worldSeed = WorldSeed, deadline = Deadline,
                 day = Day, runNumber = RunNumber,
                 energy = Energy, mood = Mood, insight = Insight,
                 relation = Relation, money = Money, ability = Ability,
@@ -628,9 +649,9 @@ namespace Horizon.Game
         }
 
         // A conditional view, not a promise: future choices and newly formed chains are unknown.
-        public FutureProjection ProjectFuture(string cardId)
+        public FutureProjection ProjectFuture(string cardId, bool observationUnlocked = false)
         {
-            if (HorizonLevel < 3 || HasChosen || CanPredict || HasPredictionReview || CompletedRun != null)
+            if ((!observationUnlocked && HorizonLevel < 3) || HasChosen || CanPredict || HasPredictionReview || CompletedRun != null)
                 throw new InvalidOperationException("Two futures unlock after the third station.");
             CardSpec card = Array.Find(Hand, c => c.Id == cardId);
             if (card == null) throw new ArgumentException("Card not in today's hand.", "cardId");
@@ -680,7 +701,8 @@ namespace Horizon.Game
             ResourceDelta before = Values();
             Apply(card.Now);
             if (card.GivesSupport) SupportActions++;
-            CausalNode changedChoice = CausalNodes.Find(n => (n.type == CausalNodeKind.Choice || n.type == CausalNodeKind.Situation) &&
+            CausalNode changedChoice = CausalNodes.FindLast(n => (n.type == CausalNodeKind.Choice ||
+                n.type == CausalNodeKind.Situation || n.type == CausalNodeKind.World) &&
                 n.resolved && n.day == Day && n.replacementId == card.Id);
             CausalNode origin = AddNode(CausalNodes, changedChoice == null ? null : changedChoice.id,
                 CausalNodeKind.Action, Day, card.Name, card.Id, true);
@@ -754,6 +776,7 @@ namespace Horizon.Game
                     if (RunNumber >= 3) ScheduleConsequences(echo, source);
                 }
             }
+            ResolveWorldEvent();
             if (Prediction != null && !Prediction.evaluated && Day >= Prediction.dueDay)
             {
                 Prediction.actualEnergy = Energy - Prediction.baseEnergy;
@@ -772,6 +795,17 @@ namespace Horizon.Game
         private void EnsureSituation()
         {
             if (RunNumber < 2 || CatalogVersion < 2 || CausalNodes.Exists(n => n.type == CausalNodeKind.Situation && n.day == Day)) return;
+            if (Day > LastDay && CatalogVersion >= 3)
+            {
+                string milestone = Day == 14 ? "project" : Day == 21 ? "collaborate" : Day == 28 ? "publish" : null;
+                if (milestone != null)
+                {
+                    CardSpec next = CardCatalog.FindById(milestone);
+                    CausalNode n = AddNode(CausalNodes, null, CausalNodeKind.Situation, Day, next.Name + "的机会到了", next.Id, true);
+                    n.replacementId = next.Id; n.replacementSlot = next.Kind;
+                }
+                return;
+            }
             int day = (Day - 1) % LastDay + 1;
             string card = day == 7 ? "shortstudy" : day == 9 ? "smalljob" : day == 10 ? "play" : day == 12 ? "friend" : null;
             if (card == null) return;
@@ -782,10 +816,22 @@ namespace Horizon.Game
             situation.replacementSlot = day == 10 ? CardKind.Temptation : day == 12 ? CardKind.Recovery : CardKind.Growth;
         }
 
+        private void ResolveWorldEvent()
+        {
+            if (CatalogVersion < 3 || RunNumber < 3 || CausalNodes.Exists(n => n.type == CausalNodeKind.World && n.day == Day)) return;
+            WorldEventSpec spec = Array.Find(WorldEvents.All, e => e.Day == Day);
+            if (spec == null || !WorldEvents.Occurs(WorldSeed, Day, spec.Chance)) return;
+            ResourceDelta before = Values(); Apply(spec.Delta);
+            CausalNode world = AddNode(CausalNodes, null, CausalNodeKind.World, Day, spec.Name, spec.ReplacementId, true);
+            world.replacementId = spec.ReplacementId; world.replacementSlot = spec.Slot;
+            world.effect = Difference(before); world.effectRecorded = true;
+        }
+
         private int NextSupportDay()
         {
             for (int day = Day + 1; day <= Deadline; day++)
-                if ((CardCatalog.ForDay((day - 1) % LastDay + 1, RunNumber, CatalogVersion)[2].GivesSupport ||
+                if (((day > LastDay && CatalogVersion >= 3 ? CardCatalog.ForOutlookDay(day) :
+                        CardCatalog.ForDay((day - 1) % LastDay + 1, RunNumber, CatalogVersion))[2].GivesSupport ||
                     CatalogVersion >= 2 && RunNumber >= 2 && (day - 1) % LastDay + 1 == 12) &&
                     !Pending.Exists(e => e.depth >= 2 && e.dueDay == day &&
                         e.replacementSlot == CardKind.Recovery)) return day;
@@ -884,7 +930,7 @@ namespace Horizon.Game
 
         private static GameSession ReplayPrefix(RunRecord original, Dictionary<int, string> changes, int stopDay, bool chooseLast)
         {
-            var replay = new GameSession(original.number, true, original.catalogVersion > 0 ? original.catalogVersion : 1);
+            var replay = new GameSession(original.number, true, original.catalogVersion > 0 ? original.catalogVersion : 1, original.worldSeed);
             int firstChange = LastDay + 1;
             foreach (int day in changes.Keys) firstChange = Math.Min(firstChange, day);
             for (int day = 1; day <= stopDay; day++)
@@ -1041,7 +1087,7 @@ namespace Horizon.Game
             }
             CompletedRun = new RunRecord
             {
-                catalogVersion = CatalogVersion,
+                catalogVersion = CatalogVersion, worldSeed = WorldSeed,
                 number = RunNumber,
                 title = boss.passed == 3 ? "我把未来接住了" :
                     boss.passed == 0 ? "这一次，我看见了另一条路" : "从「" + definingAction + "」开始的日子",

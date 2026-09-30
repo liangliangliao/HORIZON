@@ -143,9 +143,17 @@ namespace Horizon
         private bool TryRareMoment()
         {
             if (session == null || session.HasChosen) return false;
+            if (archive.pendingMoment == null)
+                foreach (RareMoment memory in archive.moments)
+                {
+                    RareMoment reveal = ExperienceContent.RevealMystery(memory, session);
+                    if (reveal == null) continue;
+                    archive.pendingMoment = reveal; Save(); break;
+                }
             if (archive.pendingMoment == null && session.RunNumber >= archive.nextRareRun && session.Day == 6)
             {
                 archive.pendingMoment = ExperienceContent.Moment(session.RunNumber, session.Day, archive.runs);
+                ExperienceContent.AttachMystery(archive.pendingMoment, session);
                 archive.nextRareRun = session.RunNumber + ExperienceContent.RareGap(session.RunNumber);
                 archive.moments.Add(archive.pendingMoment);
                 Save();
@@ -183,9 +191,10 @@ namespace Horizon
             {
                 float y = 0.669f - (i - 1) * 0.077f;
                 bool reached = i <= archive.journey.Chapter;
-                View.Panel(overlay, "Chapter " + i, Palette.Panel, 0.08f, y, 0.92f, y + 0.065f, 18);
-                View.Label(overlay, "Chapter name", i + "  /  " + JourneyProgress.Name(i) + (reached ? " · 已留下" : " · 尚未到来"),
-                    29, reached ? Palette.Mint : Palette.Muted, TextAnchor.MiddleLeft, 0.12f, y + 0.006f, 0.88f, y + 0.059f);
+                int chapter = i;
+                View.Button(overlay, "Chapter " + i, i + "  /  " + JourneyProgress.Name(i) + (reached ? " · 点开观察" : " · 尚未到来"),
+                    () => ShowObservationChapter(chapter), 0.08f, y, 0.92f, y + 0.065f,
+                    Palette.Panel, reached ? Palette.Mint : Palette.Muted, 29).interactable = reached;
             }
             Button longView = View.Button(overlay, "Thirty day view", "看看三十天后的自己", ShowThirtyDays,
                 0.13f, 0.105f, 0.87f, 0.169f, Palette.Panel, Palette.Gold, 29);
@@ -197,7 +206,7 @@ namespace Horizon
 
         private void ShowThirtyDays()
         {
-            GameSession beginning = new GameSession(Mathf.Max(4, archive.runs.Count + 1));
+            GameSession beginning = session ?? new GameSession(Mathf.Max(4, archive.runs.Count + 1));
             ShowForecastRange(ForecastSimulator.Sample(beginning, null, 30), true);
         }
 
@@ -234,6 +243,8 @@ namespace Horizon
                 29, Palette.Gold, TextAnchor.MiddleCenter, 0.08f, 0.223f, 0.92f, 0.334f);
             View.Label(overlay, "Range meaning", "它们取决于之后怎样选择。你还可以改变这条路。", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.07f, 0.156f, 0.93f, 0.219f);
+            if (longView) View.Button(overlay, "Meet thirty day self", "走近三十天后的自己", () => ShowThirtyDaySelf(range, false),
+                0.12f, 0.15f, 0.88f, 0.219f, Palette.Panel, Palette.Gold, 27);
             View.Button(overlay, "Close future range", "回到此刻", () =>
             {
                 Destroy(overlay.gameObject); overlay = null;

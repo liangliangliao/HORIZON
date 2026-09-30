@@ -98,6 +98,7 @@ namespace Horizon.Game
             if (card.Kind == CardKind.Growth) return card.Later.ability > 0 ? "能力会成长" : "带来新的机会";
             if (card.GivesSupport) return "朋友会带来回应";
             if (card.Kind == CardKind.Recovery) return "心情会慢慢回暖";
+            if (card.Later.energy >= 0 && card.Later.mood >= 0) return "快乐也会留下余温";
             return card.Later.energy < 0 ? "之后可能疲惫" : "快乐会慢慢褪去";
         }
 

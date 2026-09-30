@@ -166,7 +166,7 @@ namespace Horizon.Tests
         [Test]
         public void ThirdRunEchoCanRemoveAnInvitationWithoutRemovingRecovery()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             session.Choose("episode");
             session.Advance();
             session.Choose("avoid");
@@ -220,7 +220,7 @@ namespace Horizon.Tests
             Assert.AreEqual(1, first.Energy);
             Assert.IsFalse(first.Pending.Exists(e => e.depth >= 2));
 
-            var recovered = new GameSession(3);
+            var recovered = new GameSession(3, 15);
             recovered.Choose("episode");
             recovered.Advance();
             recovered.Choose(recovered.Hand[2].Id);
@@ -232,7 +232,7 @@ namespace Horizon.Tests
         [Test]
         public void HorizonThreeUnlocksOnlyAfterTheThirdFutureStation()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             Assert.AreEqual(2, session.HorizonLevel);
             Assert.Throws<InvalidOperationException>(() => session.ProjectFuture(session.Hand[0].Id));
             for (int day = 1; day <= 3; day++)
@@ -256,7 +256,7 @@ namespace Horizon.Tests
         [Test]
         public void TwoFutureProjectionsAreConditionalAndDoNotPlayCards()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             for (int day = 1; day <= 3; day++)
             {
                 session.Choose(session.Hand[2].Id);
@@ -462,7 +462,7 @@ namespace Horizon.Tests
         [Test]
         public void GrowthEchoChangesAChoiceAndThatChoiceBuildsALongerSavedChain()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             session.Choose("portfolio");
             session.Advance();
             session.Choose("review");
@@ -533,7 +533,7 @@ namespace Horizon.Tests
         [Test]
         public void SupportResponseOpensARecoverySafeCollaborativeChoice()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             session.Choose(session.Hand[2].Id);
             session.Advance();
             session.Choose(session.Hand[2].Id);
@@ -564,7 +564,7 @@ namespace Horizon.Tests
         [Test]
         public void VersionTwoSaveRebuildsPendingAndResolvedCausalLinksWithoutChangingResources()
         {
-            var session = new GameSession(3);
+            var session = new GameSession(3, 15);
             session.Choose("episode");
             session.Advance();
             session.Choose("avoid");

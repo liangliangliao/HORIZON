@@ -184,15 +184,15 @@ namespace Horizon.UI
             if (passed) Burst(new Vector3((gate - 1) * 2.7f, 1.8f, 4), Palette.Gold, 24);
         }
 
-        public void Accept(CardKind kind, bool support = false)
+        public void Accept(CardKind kind, bool support = false, int dueDay = 0)
         {
             audioSource.pitch = 1;
             Preview(kind, support);
-            pulse = 1;
-            Avatar.GetComponent<HorizonActor>().Celebrate();
-            shake = kind == CardKind.Temptation ? 0.18f : 0.07f;
-            Play(kind == CardKind.Temptation ? 2 : 0);
-            StartCoroutine(SendSymbol(kind));
+            pulse = kind == CardKind.Growth ? 0.12f : 1;
+            if (kind != CardKind.Growth) Avatar.GetComponent<HorizonActor>().Celebrate();
+            shake = kind == CardKind.Growth ? 0 : kind == CardKind.Temptation ? 0.18f : 0.07f;
+            if (kind != CardKind.Growth) Play(kind == CardKind.Temptation ? 2 : 0);
+            StartCoroutine(SendSymbol(kind, dueDay));
         }
 
         public void Reward(int amount, bool cascade = false)
@@ -231,13 +231,14 @@ namespace Horizon.UI
                 props[i].localRotation = Quaternion.Euler(0, Mathf.Sin(Time.unscaledTime * 0.7f + i) * 4, 0);
         }
 
-        private IEnumerator SendSymbol(CardKind kind)
+        private IEnumerator SendSymbol(CardKind kind, int dueDay)
         {
             Transform symbol = Shape(transform, "Sent intention", kind == CardKind.Growth ? PrimitiveType.Cube :
                 PrimitiveType.Sphere, Avatar.position + Vector3.up * 1.8f,
                 Vector3.one * 0.25f, kind == CardKind.Temptation ? pink : kind == CardKind.Growth ? teal : gold);
             Vector3 from = symbol.position;
-            Vector3 to = kind == CardKind.Temptation ? new Vector3(0, 0.3f, -1) : new Vector3(0, 2.3f, 6);
+            Vector3 to = kind == CardKind.Temptation ? new Vector3(0, 0.3f, -1) :
+                dueDay > 0 && dueDay <= 12 ? DayPoint(dueDay) + Vector3.up * 0.25f : new Vector3(0, 2.3f, 6);
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.65f)
             {
                 symbol.position = Vector3.Lerp(from, to, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.2f;
