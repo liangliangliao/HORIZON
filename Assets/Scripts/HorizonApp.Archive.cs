@@ -194,7 +194,7 @@ namespace Horizon
         private static string NodeList(List<CausalNode> nodes)
         {
             return string.Join("\n", nodes.Select(n => "D" + n.day + " · " +
-                (n.resolved ? n.label : "尚未回来的回声"))));
+                (n.resolved ? n.label : "尚未回来的回声")));
         }
 
         private void ShowArchiveDetail(string title, string description, Action explore = null)
