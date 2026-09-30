@@ -223,6 +223,7 @@ namespace Horizon
         private void StartNewRun()
         {
             archive.pendingFeedback = null;
+            archive.pendingMoment = null;
             session = new GameSession(archive.runs.Count + 1);
             archive.stationRun = archive.stationBeat = 0;
             archive.active = session.Snapshot();
@@ -1075,33 +1076,41 @@ namespace Horizon
             View.Label(root, "Chain title", "C H A I N   F O U N D", 45, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.05f, 0.82f, 0.95f, 0.91f);
             bool network = path.Count >= 7;
+            bool vertical = path.Count >= 5;
             View.Label(root, "Chain clue", network ? "这一刻，只剩下你走出的因果网络。" :
                 "一个选择，正在改变后来的选择。", 30, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.74f, 0.92f, 0.81f);
+            var positions = new Dictionary<string, Vector2>();
+            for (int i = 0; i < path.Count; i++)
+                positions[path[i].id] = vertical ? new Vector2(0.145f + i % 3 * 0.055f,
+                    0.706f - i * (0.49f / Mathf.Max(1, path.Count - 1))) :
+                    new Vector2(0.15f + i * (0.7f / (path.Count - 1)), 0.522f);
             for (int i = 0; i < path.Count; i++)
             {
                 CausalNode node = path[i];
                 world.Tick(i);
-                Color color = node.type == CausalNodeKind.Choice ? Palette.Gold :
-                    node.type == CausalNodeKind.Action ? Palette.Coral : Palette.Mint;
-                if (network)
+                Color color = NodeColor(node);
+                foreach (string parent in CausalGraph.Parents(node))
+                {
+                    if (!positions.ContainsKey(parent)) continue;
+                    TimeThreadGraphic edge = View.Rect(root, "True chain connection", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
+                    edge.From = positions[parent]; edge.To = positions[node.id];
+                    edge.color = new Color(color.r, color.g, color.b, 0.62f);
+                    edge.Thickness = 4; edge.raycastTarget = false;
+                }
+                if (vertical)
                 {
                     float y = 0.69f - i * (0.49f / Mathf.Max(1, path.Count - 1));
-                    if (i > 0) View.Fill(root, "Causal link", new Color(0.8f, 0.76f, 0.61f, 0.65f),
-                        0.202f, y + 0.025f, 0.206f,
-                        0.69f - (i - 1) * (0.49f / (path.Count - 1)) + 0.017f);
-                    View.Panel(root, "Causal node", color, 0.186f, y, 0.22f, y + 0.032f, 18);
+                    float x = positions[node.id].x;
+                    View.Panel(root, "Causal node", color, x - 0.014f, y, x + 0.014f, y + 0.032f, 18);
                     View.Label(root, "Causal day", "D" + node.day, 24, color,
-                        TextAnchor.MiddleLeft, 0.27f, y - 0.005f, 0.39f, y + 0.038f);
+                        TextAnchor.MiddleLeft, 0.32f, y - 0.005f, 0.41f, y + 0.038f);
                     View.Label(root, "Causal event", node.label, 26, Palette.Text,
-                        TextAnchor.MiddleLeft, 0.4f, y - 0.005f, 0.89f, y + 0.038f);
+                        TextAnchor.MiddleLeft, 0.43f, y - 0.005f, 0.91f, y + 0.038f);
                 }
                 else
                 {
                     float x = 0.15f + i * (0.7f / (path.Count - 1));
-                    if (i > 0) View.Fill(root, "Causal link", color,
-                        0.15f + (i - 1) * (0.7f / (path.Count - 1)) + 0.018f,
-                        0.519f, x, 0.526f);
                     View.Panel(root, "Causal node", color, x - 0.018f, 0.502f, x + 0.018f, 0.542f, 22);
                     View.Label(root, "Causal day", "DAY " + node.day, 25, color,
                         TextAnchor.MiddleCenter, x - 0.11f, 0.555f, x + 0.11f, 0.61f);
@@ -1112,9 +1121,9 @@ namespace Horizon
             }
             View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1);
             View.Label(root, "Cascade", "C A S C A D E  × " + path.Count, 51, Palette.Gold,
-                TextAnchor.MiddleCenter, 0.06f, network ? 0.08f : 0.28f,
-                0.94f, network ? 0.16f : 0.37f);
-            if (!network)
+                TextAnchor.MiddleCenter, 0.06f, vertical ? 0.08f : 0.28f,
+                0.94f, vertical ? 0.16f : 0.37f);
+            if (!vertical)
             {
                 CardSpec replacement = CardCatalog.FindById(echo.replacementId);
                 View.Label(root, "Changed hand", echo.echoName + (replacement == null ? "" :

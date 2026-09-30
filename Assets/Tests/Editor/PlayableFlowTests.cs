@@ -40,6 +40,37 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
 
+        [UnityTest]
+        public IEnumerator ThirdStationRevealsTheFutureSelfAndKeepsPlayersConcern()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test future self").AddComponent<HorizonApp>();
+            yield return null;
+            var session = new GameSession(3);
+            while (session.Day < 4)
+            { session.Choose(session.Hand[2].Id); session.Advance(); }
+            session.SkipPrediction(); session.Choose(session.Hand[2].Id);
+            var archive = new ArchiveData { active = session.Snapshot() };
+            Set(app, "archive", archive); Set(app, "session", session);
+            Call(app, "RenderStationBeat", 0);
+            yield return null;
+            ButtonNamed(app, "Next station beat").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Next station beat").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(1.8f);
+            yield return Capture(app, "14-future-self-reveal");
+            Assert.AreEqual(2, session.HorizonLevel);
+            ButtonNamed(app, "Next station beat").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Protect Growth").onClick.Invoke();
+            Assert.AreEqual("Growth", archive.preferredIntent);
+            Assert.AreEqual(3, session.HorizonLevel);
+            yield return new WaitForSecondsRealtime(4);
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
         // Runs the actual MonoBehaviours, uGUI buttons, card drag handlers and save
         // path. Screenshots are rendered by Unity, not reconstructed from HTML.
         [UnityTest]
@@ -141,7 +172,7 @@ namespace Horizon.Tests
             session = Get<GameSession>(app, "session");
             Assert.AreEqual(1, archive.stationBeat, "Interrupted station playback must resume its saved beat.");
             ButtonNamed(app, "Next station beat").onClick.Invoke();
-            yield return new WaitForSecondsRealtime(0.5f);
+            yield return new WaitForSecondsRealtime(1.8f);
             yield return Capture(app, "04-future-station");
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return new WaitForSecondsRealtime(5);
@@ -241,12 +272,14 @@ namespace Horizon.Tests
             yield return null;
 
             var third = new GameSession(3);
+            PendingEcho combined = null;
             while (third.Day < 6)
             {
                 if (third.CanPredict) third.SkipPrediction();
-                third.Choose(third.Hand[2].Id);
+                third.Choose(third.Day == 1 ? "portfolio" : third.Hand[2].Id);
                 if (third.Day == 4) third.VisitStation();
-                third.Advance();
+                DayTransition transition = third.Advance();
+                if (transition.Day == 6) combined = transition.Echos.Find(e => e.replacementId == "together");
             }
             Set(app, "session", third);
             archive.active = third.Snapshot();
@@ -268,6 +301,16 @@ namespace Horizon.Tests
             yield return Capture(app, "12-range-forecast");
             ButtonNamed(app, "Close future range").onClick.Invoke();
             yield return null;
+            third = Get<GameSession>(app, "session");
+            Assert.IsNotNull(combined);
+            app.StartCoroutine((IEnumerator)typeof(HorizonApp).GetMethod("CascadeSequence", Private).Invoke(app, new object[] { combined }));
+            yield return new WaitForSecondsRealtime(1.1f);
+            yield return Capture(app, "13-cascade-merge");
+            int renderedConnections = 0;
+            foreach (TimeThreadGraphic line in Get<RectTransform>(app, "root").GetComponentsInChildren<TimeThreadGraphic>())
+                if (line.name == "True chain connection") renderedConnections++;
+            Assert.GreaterOrEqual(renderedConnections, 4, "The combined effect must show both actual source histories.");
+            yield return new WaitForSecondsRealtime(1.5f);
             PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
             yield return new ExitPlayMode();
         }

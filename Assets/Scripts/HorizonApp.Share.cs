@@ -57,8 +57,9 @@ namespace Horizon
                 Vector2 pos = positions[node.id]; Color color = NodeColor(node);
                 RectTransform dot = View.Rect(shareScene, "Share node " + node.id, pos.x - 0.027f, pos.y - 0.015f, pos.x + 0.027f, pos.y + 0.015f);
                 CanvasGroup group = dot.gameObject.AddComponent<CanvasGroup>(); group.alpha = 0;
-                View.Panel(dot, "Star glow", new Color(color.r, color.g, color.b, 0.13f), -0.5f, -0.5f, 1.5f, 1.5f, 40);
-                View.Panel(dot, "Star halo", new Color(color.r, color.g, color.b, 0.33f), 0, 0, 1, 1, 25);
+                SoftGlowGraphic glow = View.Rect(dot, "Star glow", -0.7f, -0.7f, 1.7f, 1.7f).gameObject.AddComponent<SoftGlowGraphic>();
+                glow.color = new Color(color.r, color.g, color.b, 0.38f); glow.raycastTarget = false;
+                View.Panel(dot, "Star halo", new Color(color.r, color.g, color.b, 0.23f), 0, 0, 1, 1, 60);
                 View.Panel(dot, "Star core", color, 0.34f, 0.34f, 0.66f, 0.66f, 10);
                 shareNodes.Add(group);
             }

@@ -72,6 +72,8 @@ jobs:
           test -s artifacts/visuals/10-share-story.png
           test -s artifacts/visuals/11-rare-moment.png
           test -s artifacts/visuals/12-range-forecast.png
+          test -s artifacts/visuals/13-cascade-merge.png
+          test -s artifacts/visuals/14-future-self-reveal.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash

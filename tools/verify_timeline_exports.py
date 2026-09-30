@@ -19,7 +19,7 @@ def verify(directory: Path) -> None:
             index = state >> 24
             expected.append((shades[index >> 5], shades[(index >> 2) & 7], blues[index & 3]))
         expected = [pixel for y in range(95, -1, -1) for pixel in expected[y * 96:(y + 1) * 96]]
-        assert list(actual.getdata()) == expected, f"GIF LZW/palette/orientation mismatch in frame {frame_number}"
+        assert list(actual.get_flattened_data()) == expected, f"GIF LZW/palette/orientation mismatch in frame {frame_number}"
 
     story = Image.open(directory / "HORIZON-run-001.gif")
     assert story.size == (540, 960) and story.n_frames == 60

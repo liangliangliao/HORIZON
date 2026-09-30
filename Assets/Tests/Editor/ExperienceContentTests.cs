@@ -78,7 +78,8 @@ namespace Horizon.Tests
             Assert.GreaterOrEqual(CausalGraph.Parents(collaboration).Count, 2);
             List<CausalNode> ancestors = CausalGraph.Ancestors(session.CausalNodes, collaboration.id);
             Assert.IsTrue(ancestors.Exists(n => n.cardId == "portfolio"));
-            Assert.IsTrue(ancestors.Exists(n => n.cardId == "friend"));
+            Assert.IsTrue(ancestors.Exists(n => n.type == CausalNodeKind.Action &&
+                CardCatalog.FindById(n.cardId)?.GivesSupport == true));
             RunRecord saved = JsonUtility.FromJson<RunRecord>(JsonUtility.ToJson(session.CompletedRun));
             Assert.AreEqual(ancestors.Count, CausalGraph.Ancestors(saved.causalNodes, collaboration.id).Count);
             // Malformed imported cycles must remain finite when inspected.
