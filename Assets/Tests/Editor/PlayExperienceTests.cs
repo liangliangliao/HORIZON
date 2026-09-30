@@ -104,6 +104,9 @@ namespace Horizon.Tests
             Assert.That(PlayExperience.FutureLabel(practice, 11), Does.Contain("超过本局截止日"));
             Assert.That(PlayExperience.NowLabel(practice.Now), Does.Contain("精力 -2"));
             Assert.That(PlayExperience.NowLabel(new ResourceDelta()), Does.Contain("保持不变"));
+            CardSpec ask = CardCatalog.FindById("ask");
+            Assert.AreEqual(0, ask.Later.ability);
+            Assert.That(PlayExperience.FutureMeaning(ask), Does.Not.Contain("能力"));
         }
     }
 }

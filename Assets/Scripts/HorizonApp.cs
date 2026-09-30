@@ -384,6 +384,7 @@ namespace Horizon
                 world.Reward(feedback.stardust, feedback.kind == FeedbackKind.Echoes);
                 StarBurst(feedback.stardust, new Vector2(0.5f, 0.21f));
             }
+            View.RefreshText(root);
         }
 
         private void ContinueFeedback()
@@ -563,6 +564,8 @@ namespace Horizon
 
         private void FutureRegion()
         {
+            View.Panel(root, "Future readability", new Color(0.012f, 0.03f, 0.047f, 0.7f),
+                0.035f, 0.788f, 0.965f, 0.913f, 22);
             Image hit = View.Fill(root, "Hold future", new Color(0, 0, 0, 0), 0.01f, 0.81f, 0.99f, 0.925f, true);
             hit.gameObject.AddComponent<FutureHold>().Activated = ShowFocus;
             View.Label(root, "Day", string.Format("DAY {0:00} / 12", session.Day), 37, Palette.Text,
@@ -611,6 +614,8 @@ namespace Horizon
 
         private void PresentRegion()
         {
+            View.Panel(root, "Present caption plate", new Color(0.012f, 0.03f, 0.047f, 0.7f),
+                0.17f, 0.727f, 0.83f, 0.778f, 23);
             View.Label(root, "Scene line", session.SocialUnavailableToday ?
                 "疲惫让邀约改变了，今天还有其他选择。" : "今天，你想做什么？", 30,
                 Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.727f, 0.93f, 0.778f);
@@ -960,6 +965,8 @@ namespace Horizon
                 stage == 1 ? "「你最近留下了很多东西。」" :
                 reveal ? "「现在你终于看见我了。」" : session.RunNumber == 2 ?
                 "「你已经知道，一些东西会回来。」" : "「它们还会继续生长。」";
+            View.Panel(root, "Station dialogue plate", new Color(0.014f, 0.035f, 0.056f, 0.88f),
+                0.055f, 0.382f, 0.945f, 0.503f, 32);
             View.Label(root, "Future voice", voice, 42, Palette.Text,
                 TextAnchor.MiddleCenter, 0.07f, 0.39f, 0.93f, 0.49f);
             if (stage == 1)
@@ -998,6 +1005,8 @@ namespace Horizon
             }
             else if (stage == 2)
             {
+                View.Panel(root, "Station memory plate", new Color(0.014f, 0.035f, 0.056f, 0.8f),
+                    0.08f, 0.152f, 0.92f, 0.353f, 27);
                 if (reveal)
                 {
                     View.Label(root, "Revelation", "那个人，就是未来的你。", 32, Palette.Text,
@@ -1026,6 +1035,7 @@ namespace Horizon
             View.Label(root, "Walk hint", question ? "这会改变你关注的未来，不会改变资源。" :
                 "点击继续，或向前滑动。", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.1f, 0.022f, 0.9f, 0.059f);
+            View.RefreshText(root);
         }
 
         private void NextStationStage()
@@ -1348,6 +1358,7 @@ namespace Horizon
                 if (!busy) StartCoroutine(RestartSequence());
             }, 0.065f, 0.035f, 0.935f, 0.148f, Palette.Mint, Palette.Ink, 31);
             if (stars > 0) { world.Reward(stars, run.boss.passed == 3); StarBurst(stars, new Vector2(0.5f, 0.21f)); }
+            View.RefreshText(root);
         }
 
         private void ShowGhostResult(RunRecord run)

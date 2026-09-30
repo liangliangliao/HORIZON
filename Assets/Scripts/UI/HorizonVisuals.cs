@@ -137,6 +137,16 @@ namespace Horizon.UI
         {
             Fill(parent, "Line", color, x0, y0, x1, y1 + thickness);
         }
+
+        public static void RefreshText(Transform parent)
+        {
+            Canvas.ForceUpdateCanvases();
+            Text[] labels = parent.GetComponentsInChildren<Text>();
+            foreach (Text label in labels)
+                if (label.font != null) label.font.RequestCharactersInTexture(label.text, label.fontSize, label.fontStyle);
+            foreach (Text label in labels) label.SetAllDirty();
+            Canvas.ForceUpdateCanvases();
+        }
     }
 
     public sealed class HorizonCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler,

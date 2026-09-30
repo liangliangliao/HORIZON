@@ -95,7 +95,7 @@ namespace Horizon.Game
         public static string FutureMeaning(CardSpec card)
         {
             if (card.Delay == 0) return "今天立即恢复";
-            if (card.Kind == CardKind.Growth) return "能力与机会会成长";
+            if (card.Kind == CardKind.Growth) return card.Later.ability > 0 ? "能力会成长" : "带来新的机会";
             if (card.GivesSupport) return "朋友会带来回应";
             if (card.Kind == CardKind.Recovery) return "心情会慢慢回暖";
             return card.Later.energy < 0 ? "之后可能疲惫" : "快乐会慢慢褪去";

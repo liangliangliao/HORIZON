@@ -182,6 +182,10 @@ namespace Horizon.Tests
             yield return null;
             yield return null;
             Canvas.ForceUpdateCanvases();
+            // Moving the canvas to a portrait render target can resize the
+            // dynamic font atlas. Rebuild all active text meshes after every
+            // character request, before reading the rendered pixels.
+            View.RefreshText(canvas.transform);
             world.WorldCamera.Render();
             ui.Render();
             RenderTexture old = RenderTexture.active;
