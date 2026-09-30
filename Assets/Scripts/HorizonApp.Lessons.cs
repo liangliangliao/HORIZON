@@ -30,8 +30,10 @@ namespace Horizon
             if (chapter == 7) { ShowThirtyDays(); return; }
             if (chapter == 6)
             {
-                GameSession beginning = archive.ObservationSource(session);
-                ShowForecastRange(ForecastSimulator.Sample(beginning, null, Math.Min(30, beginning.Day + 3)), false, true);
+                var beginning = new GameSession(3, 15);
+                ForecastRange exercise = ForecastSimulator.Sample(beginning, null, 4);
+                exercise.assumption = "独立练习：从同一个起点比较两种选择；不读取或改变正在发生的人生。";
+                ShowForecastRange(exercise, false, true);
                 return;
             }
             LessonSurface(JourneyProgress.Name(chapter), chapter == 5 ?

@@ -859,6 +859,9 @@ namespace Horizon.Game
                     CausalNodeKind.Choice, day, rule.Label, cause.cardId, false);
                 eventNode.replacementId = rule.Replacement.Id;
                 eventNode.replacementSlot = rule.Slot;
+                if (CatalogVersion >= 4 && rule.Replacement.Id == CardCatalog.Opportunity.Id)
+                    foreach (CausalNode hidden in CausalNodes.FindAll(n => n.type == CausalNodeKind.Mystery && n.resolved &&
+                        n.day <= Day && n.effectRecorded && n.effect?.insight > 0)) CausalGraph.Link(eventNode, hidden.id);
                 if (CatalogVersion >= 2 && rule.Replacement.Id == CardCatalog.Together.Id)
                 {
                     CausalNode growth = CausalNodes.FindLast(n => n.type == CausalNodeKind.Echo && n.resolved &&
@@ -1075,7 +1078,6 @@ namespace Horizon.Game
                     (later != null && (later.relation > 0 || later.money > 0)))
                     boss.supportDays.Add(action.day);
             }
-            string definingAction = Actions.FindLast(a => a.kind == CardKind.Growth)?.cardName ?? Actions[0].cardName;
             if (CatalogVersion >= 2)
             {
                 List<int>[] evidence = { boss.abilityDays, boss.stateDays, boss.supportDays };
@@ -1100,8 +1102,6 @@ namespace Horizon.Game
             {
                 catalogVersion = CatalogVersion, worldSeed = WorldSeed,
                 number = RunNumber,
-                title = boss.passed == 3 ? "我把未来接住了" :
-                    boss.passed == 0 ? "这一次，我看见了另一条路" : "从「" + definingAction + "」开始的日子",
                 boss = boss,
                 actions = new List<ActionRecord>(Actions),
                 finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,

@@ -118,13 +118,21 @@ namespace Horizon.Tests
             ButtonNamed(app, "Exercise choice portfolio").onClick.Invoke(); yield return null;
             yield return Capture(app, "18-chapter-lesson");
             ButtonNamed(app, "Close exercise").onClick.Invoke(); yield return null;
+            // A new in-game day restores its single observation. Lessons are
+            // independent practice; the actual thirty-day view shares FOCUS's limit.
+            session.Choose(session.Hand[2].Id); session.Advance();
+            archive.active = session.Snapshot();
+            RunSnapshot beforeLongView = JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(session.Snapshot()));
             ButtonNamed(app, "Thirty day view").onClick.Invoke(); yield return null;
+            Assert.AreEqual(1, session.FocusUses);
             ButtonNamed(app, "Meet thirty day self").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.7f);
             yield return Capture(app, "17-thirty-day-self");
             ButtonNamed(app, "Other thirty day self").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Back to thirty day range").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Close future range").onClick.Invoke(); yield return null;
+            beforeLongView.focusUses = 1;
+            frozen = JsonUtility.ToJson(beforeLongView);
             Assert.AreEqual(frozen, JsonUtility.ToJson(session.Snapshot()));
             Assert.AreEqual(wallet, archive.wallet.stardust);
             for (int run = 1; run <= 2; run++)

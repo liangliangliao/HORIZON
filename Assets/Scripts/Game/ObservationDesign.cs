@@ -45,6 +45,11 @@ namespace Horizon.Game
         public static string EchoType(PendingEcho echo)
         { return echo.kind == CardKind.Growth ? "芽" : echo.kind == CardKind.Recovery ? "回应" :
                 echo.delta != null && echo.delta.energy >= 0 && echo.delta.mood >= 0 ? "余兴" : "火种"; }
+        public static string FocusClue(PendingEcho echo, int level, int calibrations)
+        {
+            return level < 2 && echo.kind != CardKind.Temptation && calibrations == 0 ?
+                "尚未看清的回声" : ForecastKnowledge.Clue(echo, level, calibrations);
+        }
         public static List<CausalNode> PredictionCauses(GameSession session)
         {
             PredictionRecord p = session.Prediction;

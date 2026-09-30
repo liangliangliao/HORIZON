@@ -137,8 +137,7 @@ namespace Horizon
                 int index = focusPage * 3 + row; PendingEcho echo = echoes[index]; float y = 0.605f - row * 0.10f;
                 View.Panel(overlay, "Future event", Palette.Panel, 0.08f, y, 0.92f, y + 0.083f, 22);
                 int level = index < visible ? session.HorizonLevel >= 3 ? 3 : 2 : 1;
-                string detail = ForecastKnowledge.Clue(echo, level, archive.calibrations);
-                if (level < 2 && echo.kind != CardKind.Temptation) detail = "尚未看清的回声";
+                string detail = ObservationDesign.FocusClue(echo, level, archive.calibrations);
                 View.Label(overlay, "Forecast", "D" + echo.dueDay + " · " + detail, 28,
                     ObservationDesign.EchoType(echo) == "火种" ? Palette.Coral : Palette.Mint,
                     TextAnchor.MiddleLeft, 0.12f, y + 0.006f, 0.88f, y + 0.077f);

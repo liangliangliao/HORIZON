@@ -27,7 +27,7 @@ namespace Horizon
 
         public Game.GameSession ObservationSource(Game.GameSession live = null)
         {
-            if (live != null) return Game.GameSession.ForkForSimulation(
+            if (live != null && (active == null || active.runNumber == live.RunNumber)) return Game.GameSession.ForkForSimulation(
                 JsonUtility.FromJson<Game.RunSnapshot>(JsonUtility.ToJson(live.Snapshot())), 30);
             if (active != null) return Game.GameSession.ForkForSimulation(
                 JsonUtility.FromJson<Game.RunSnapshot>(JsonUtility.ToJson(active)), 30);
@@ -36,6 +36,19 @@ namespace Horizon
             if (latest != null) return Game.GameSession.FromRunForObservation(latest);
             // A fresh observation has an explicit, stable seed; it is never a save.
             return new Game.GameSession(NextRunNumber, 15);
+        }
+
+        public bool TryThirtyDayObservation(Game.GameSession live, out Game.GameSession source)
+        {
+            source = null;
+            if (journey.Chapter < 7) return false;
+            if (active == null) { source = ObservationSource(live); return true; }
+            Game.GameSession current = live != null && live.RunNumber == active.runNumber ? live :
+                Game.GameSession.Restore(JsonUtility.FromJson<Game.RunSnapshot>(JsonUtility.ToJson(active)));
+            if (!current.TryFocus()) return false;
+            active = current.Snapshot();
+            source = ObservationSource(current);
+            return true;
         }
 
         public void ProtectBehavior(Game.ActionRecord action)

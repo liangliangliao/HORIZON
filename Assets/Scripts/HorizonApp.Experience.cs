@@ -211,7 +211,12 @@ namespace Horizon
         private void ShowThirtyDays()
         {
             if (archive.journey.Chapter < 7) return;
-            GameSession beginning = archive.ObservationSource(session);
+            if (!archive.TryThirtyDayObservation(session, out GameSession beginning))
+            {
+                LessonSurface("先回到今天", "这段人生每天只能凝视未来一次。\n用过的观察会随新一天恢复；先处理当天结果，再继续前行。");
+                return;
+            }
+            Save();
             ShowForecastRange(ForecastSimulator.Sample(beginning, null, 30), true);
         }
 
@@ -255,7 +260,12 @@ namespace Horizon
             View.Button(overlay, "Close future range", "回到此刻", () =>
             {
                 Destroy(overlay.gameObject); overlay = null;
-                if (longView || returnToJourney) ShowJourney(); else RenderFocus(false);
+                if (longView)
+                {
+                    if (session != null && session.CompletedRun == null) BuildBoard(); else ShowHome();
+                    ShowJourney();
+                }
+                else if (returnToJourney) ShowJourney(); else RenderFocus(false);
             }, 0.15f, 0.06f, 0.85f, 0.13f, Palette.Mint, Palette.Ink, 30);
             View.RefreshText(overlay);
         }

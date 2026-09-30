@@ -65,8 +65,8 @@ namespace Horizon.Tests
         [Test]
         public void ObservationAfterDeadlineUsesLatestActualLifeIncludingMystery()
         {
-            var s = new GameSession(7, 15); Step(s, "portfolio");
-            while (s.Day < 6) Step(s); s.ApplyMystery(1, "portfolio"); Complete(s);
+            var s = new GameSession(7, 15); string origin = s.Hand[1].Id; Step(s, origin);
+            while (s.Day < 6) Step(s); s.ApplyMystery(1, origin); Complete(s);
             var earlier = new GameSession(2, 15); Complete(earlier);
             var data = new ArchiveData(); data.runs.Add(s.CompletedRun); data.runs.Add(earlier.CompletedRun);
             string frozen = JsonUtility.ToJson(data);
@@ -185,6 +185,31 @@ namespace Horizon.Tests
             var data = new ArchiveData(); data.runs.Add(s.CompletedRun);
             ArchiveData restored = JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(data)); restored.Repair();
             Assert.AreEqual("我的纪念", restored.runs[0].title);
+        }
+
+        [Test]
+        public void CalibratedDirectionIsVisibleEvenBeforeHorizonTwo()
+        {
+            var echo = new PendingEcho { kind = CardKind.Growth, depth = 1, delta = new ResourceDelta(ability: 2) };
+            Assert.AreEqual("尚未看清的回声", ObservationDesign.FocusClue(echo, 1, 0));
+            Assert.That(ObservationDesign.FocusClue(echo, 1, 1), Does.Contain("能力↑"));
+            Assert.That(ObservationDesign.FocusClue(echo, 1, 3), Does.Contain("能力明显↑"));
+        }
+
+        [Test]
+        public void ThirtyDayUnlockAndObservationBudgetCannotBeBypassedFromHome()
+        {
+            var s = new GameSession(3, 15); var data = new ArchiveData { active = s.Snapshot() };
+            for (int day = 1; day <= 6; day++) data.journey.Visit("2026-09-" + day.ToString("00"));
+            Assert.IsFalse(data.TryThirtyDayObservation(null, out GameSession blocked)); Assert.IsNull(blocked);
+            data.journey.Visit("2026-09-07");
+            Assert.IsTrue(data.TryThirtyDayObservation(null, out GameSession view)); Assert.AreEqual(1, data.active.focusUses);
+            Assert.AreEqual(s.Energy, view.Energy); Assert.AreEqual(s.WorldSeed, view.WorldSeed);
+            Assert.IsFalse(data.TryThirtyDayObservation(null, out blocked));
+            GameSession resumed = GameSession.Restore(data.active); Assert.IsFalse(resumed.TryFocus());
+            Step(resumed); data.active = resumed.Snapshot();
+            Assert.IsTrue(data.TryThirtyDayObservation(resumed, out view));
+            Assert.AreEqual(1, resumed.FocusUses); Assert.AreEqual(2, view.Day);
         }
     }
 }
