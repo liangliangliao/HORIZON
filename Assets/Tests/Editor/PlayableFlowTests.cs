@@ -178,6 +178,8 @@ namespace Horizon.Tests
             memory.type = 3; memory.title = "尚未找到的因";
             ExperienceContent.AttachMystery(memory, session);
             Assert.IsNotEmpty(memory.causeNodeId); Assert.IsNotEmpty(memory.consequenceNodeId);
+            ResourceDelta result = session.CausalNodes.Find(n => n.id == memory.consequenceNodeId).effect;
+            Assert.Greater(result.energy + result.mood + result.insight + result.ability, 0);
             var archive = new ArchiveData { active = session.Snapshot(), pendingMoment = memory, nextRareRun = 99 };
             archive.moments.Add(memory); archive.wallet.stardust = 17;
             Set(app, "archive", archive); Set(app, "session", session); Call(app, "Save"); Call(app, "BuildBoard");

@@ -948,7 +948,8 @@ namespace Horizon.Game
             {
                 if (original.mysteries != null)
                     foreach (MysteryRecord mystery in original.mysteries)
-                        if (mystery.day == day) replay.ApplyMystery(mystery.sourceDay, mystery.sourceCardId);
+                        if (mystery.day == day) replay.ApplyMystery(mystery.sourceDay, mystery.sourceCardId,
+                            mystery.delta, mystery.delta == null);
                 if (replay.HasPredictionReview) replay.MarkPredictionReviewed();
                 if (replay.CanPredict)
                 {
@@ -1096,6 +1097,10 @@ namespace Horizon.Game
                             n.type == CausalNodeKind.Echo && n.resolved);
                         CausalGraph.Link(node, echo != null ? echo.id : source.nodeId);
                     }
+                    foreach (CausalNode mystery in CausalNodes.FindAll(n => n.type == CausalNodeKind.Mystery &&
+                        n.resolved && n.effectRecorded && n.effect != null))
+                        if (gate == 0 && mystery.effect.ability > 0 || gate == 1 &&
+                            (mystery.effect.energy > 0 || mystery.effect.mood > 0)) CausalGraph.Link(node, mystery.id);
                 }
             }
             CompletedRun = new RunRecord

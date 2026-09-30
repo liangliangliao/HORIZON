@@ -123,6 +123,26 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void MysteryAtRecoveryCapsHasAVisibleResultAndPreservesLegacyReceipts()
+        {
+            var s = new GameSession(3, 15); while (s.Day < 6) Step(s);
+            Assert.AreEqual(10, s.Energy); Assert.AreEqual(10, s.Mood);
+            int insight = s.Insight; CausalNode result = s.ApplyMystery();
+            Assert.AreEqual(1, result.effect.insight); Assert.AreEqual(insight + 1, s.Insight);
+            Complete(s); RunRecord replay = GameSession.ReplayChoices(s.CompletedRun, new Dictionary<int, string>());
+            Assert.AreEqual(s.Insight, replay.finalInsight); Assert.AreEqual(1, replay.mysteries[0].delta.insight);
+            // Early version-6 receipts did not store a delta. Preserve their
+            // original clamped result instead of retroactively granting the fix.
+            var old = new GameSession(3, 15); while (old.Day < 6) Step(old);
+            int oldInsight = old.Insight;
+            result = old.ApplyMystery(0, null, null, true); old.Mysteries[0].delta = null;
+            Assert.AreEqual(0, result.effect.energy + result.effect.mood + result.effect.insight);
+            Assert.AreEqual(oldInsight, old.Insight);
+            Complete(old); replay = GameSession.ReplayChoices(old.CompletedRun, new Dictionary<int, string>());
+            Assert.AreEqual(old.Insight, replay.finalInsight); Assert.AreEqual(old.Energy, replay.finalEnergy);
+        }
+
+        [Test]
         public void MysteryReplayReproducesTheActualLifeAndDropsWhenItsCauseChanges()
         {
             var s = new GameSession(3, 15); Step(s, "portfolio");
