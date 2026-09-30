@@ -118,6 +118,7 @@ jobs:
         with:
           unityVersion: 2022.3.22f1
           targetPlatform: Android
+          buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage
 
       - name: Verify APK output
@@ -125,6 +126,19 @@ jobs:
         run: |
           find build -type f -name '*.apk' -printf '%p (%s bytes)\n' | tee /tmp/horizon-apks.txt
           test -s /tmp/horizon-apks.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          apks = list(Path('build').rglob('*.apk'))
+          assert apks, 'No APK produced'
+          for apk in apks:
+              with zipfile.ZipFile(apk) as archive:
+                  entries = set(archive.namelist())
+                  for abi in ('armeabi-v7a', 'arm64-v8a'):
+                      for library in ('libunity.so', 'libil2cpp.so'):
+                          assert f'lib/{abi}/{library}' in entries, f'{apk}: missing {abi}/{library}'
+              print(f'{apk}: ARMv7 and ARM64 verified')
+          PY
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

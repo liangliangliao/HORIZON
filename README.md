@@ -45,7 +45,7 @@ Linux 无显示器时需 Xvfb 和图形设备，渲染测试不能使用 `-nogra
 Unity -batchmode -force-glcore -projectPath . -runTests -testPlatform EditMode -testResults TestResults.xml
 ```
 
-`.github/workflows/android-apk.yml` 在 PR 更新时先执行上述测试与截图，再构建 Android APK。产物 `HORIZON-EditMode-Results`、`HORIZON-Unity-Portrait-Previews`、`HORIZON-Android-APK` 保留 14 天。试玩 APK 使用开发签名；正式发布需另配签名。
+`.github/workflows/android-apk.yml` 在 PR 更新时先执行上述测试与截图，再通过 `Horizon.Editor.AndroidBuild.Build` 构建 IL2CPP Android APK，包含 ARMv7 与 ARM64，并校验两种架构的原生库。产物 `HORIZON-EditMode-Results`、`HORIZON-Unity-Portrait-Previews`、`HORIZON-Android-APK` 保留 14 天。试玩 APK 使用开发签名；正式发布需另配签名。
 
 工作流使用仓库已有 Unity 授权密钥。首次配置时 Personal 需要 UNITY_LICENSE、UNITY_EMAIL、UNITY_PASSWORD；Pro 需要 UNITY_SERIAL、UNITY_EMAIL、UNITY_PASSWORD。
 
