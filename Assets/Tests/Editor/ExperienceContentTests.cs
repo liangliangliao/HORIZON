@@ -140,7 +140,13 @@ namespace Horizon.Tests
             ForecastRange first = ForecastSimulator.Sample(session, null, 12, 12);
             ForecastRange again = ForecastSimulator.Sample(session, null, 12, 12);
             Assert.AreEqual(first.energyMin, again.energyMin); Assert.AreEqual(first.abilityPass, again.abilityPass);
+            Assert.AreEqual(first.insightMin, again.insightMin); Assert.AreEqual(first.relationMax, again.relationMax);
+            Assert.AreEqual(first.moneyMin, again.moneyMin);
             Assert.LessOrEqual(first.energyMin, first.energyMax); Assert.LessOrEqual(first.abilityMin, first.abilityMax);
+            Assert.LessOrEqual(first.insightMin, first.insightMax); Assert.LessOrEqual(first.relationMin, first.relationMax);
+            Assert.LessOrEqual(first.moneyMin, first.moneyMax);
+            Assert.That(first.insightMin, Is.InRange(0, 10)); Assert.That(first.relationMax, Is.InRange(0, 10));
+            Assert.That(first.moneyMax, Is.InRange(0, 10));
             Assert.That(first.supportPass, Is.InRange(0, 12));
             Assert.AreEqual(frozen, JsonUtility.ToJson(session.Snapshot()));
             Assert.IsFalse(session.Actions[0].echoed);
@@ -154,6 +160,8 @@ namespace Horizon.Tests
             ForecastRange outlook = ForecastSimulator.Sample(source, null, 30, 6);
             Assert.AreEqual(30, outlook.targetDay); Assert.AreEqual(6, outlook.samples);
             Assert.That(outlook.energyMin, Is.InRange(0, 10)); Assert.That(outlook.abilityMax, Is.InRange(0, 10));
+            Assert.That(outlook.insightMin, Is.InRange(0, 10)); Assert.That(outlook.relationMax, Is.InRange(0, 10));
+            Assert.That(outlook.moneyMin, Is.InRange(0, 10));
             Assert.AreEqual(1, source.Day); Assert.IsEmpty(source.Actions);
         }
 
