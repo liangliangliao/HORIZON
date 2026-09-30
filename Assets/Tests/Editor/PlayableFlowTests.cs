@@ -298,6 +298,13 @@ namespace Horizon.Tests
             Assert.AreEqual(balance, archive.wallet.stardust);
             Call(app, "ShowRangeForecast");
             yield return null;
+            string visibleResources = "";
+            int rangeRows = 0;
+            foreach (Text label in Get<RectTransform>(app, "root").GetComponentsInChildren<Text>())
+                if (label.name == "Range value") { rangeRows++; visibleResources += label.text; }
+            Assert.AreEqual(6, rangeRows, "The future range must show every resource.");
+            foreach (string name in new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" })
+                Assert.That(visibleResources, Does.Contain(name));
             yield return Capture(app, "12-range-forecast");
             ButtonNamed(app, "Close future range").onClick.Invoke();
             yield return null;
