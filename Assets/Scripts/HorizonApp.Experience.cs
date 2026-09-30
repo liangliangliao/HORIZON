@@ -215,15 +215,19 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.06f, 0.835f, 0.94f, 0.925f);
             View.Label(overlay, "Range assumption", "DAY " + range.targetDay + " · " + range.samples + " 条不同的后续选择\n" + range.assumption,
                 28, Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.716f, 0.93f, 0.829f);
-            string[] rows = { "精力   " + range.energyMin + " 至 " + range.energyMax,
-                "心情   " + range.moodMin + " 至 " + range.moodMax,
-                "能力   " + range.abilityMin + " 至 " + range.abilityMax };
+            string[] rows = { "精力  " + range.energyMin + "–" + range.energyMax,
+                "心情  " + range.moodMin + "–" + range.moodMax,
+                "洞察  " + range.insightMin + "–" + range.insightMax,
+                "关系  " + range.relationMin + "–" + range.relationMax,
+                "金钱  " + range.moneyMin + "–" + range.moneyMax,
+                "能力  " + range.abilityMin + "–" + range.abilityMax };
             for (int i = 0; i < rows.Length; i++)
             {
-                float y = 0.577f - i * 0.115f;
-                View.Panel(overlay, "Range state", Palette.Panel, 0.1f, y, 0.9f, y + 0.09f, 23);
-                View.Label(overlay, "Range value", rows[i], 37, Palette.Mint,
-                    TextAnchor.MiddleCenter, 0.13f, y + 0.01f, 0.87f, y + 0.08f);
+                float y = 0.578f - (i / 2) * 0.115f;
+                float x = i % 2 == 0 ? 0.08f : 0.51f;
+                View.Panel(overlay, "Range state", Palette.Panel, x, y, x + 0.41f, y + 0.09f, 23);
+                View.Label(overlay, "Range value", rows[i], 30, Palette.Mint,
+                    TextAnchor.MiddleCenter, x + 0.015f, y + 0.01f, x + 0.395f, y + 0.08f);
             }
             View.Label(overlay, "Range doors", "这些模拟中，达到门的条件\n能力 " + range.abilityPass + "/" + range.samples +
                 "   状态 " + range.statePass + "/" + range.samples + "   支援 " + range.supportPass + "/" + range.samples,
