@@ -178,7 +178,11 @@ namespace Horizon.Tests
             memory.type = 3; memory.title = "尚未找到的因";
             ExperienceContent.AttachMystery(memory, session);
             Assert.IsNotEmpty(memory.causeNodeId); Assert.IsNotEmpty(memory.consequenceNodeId);
-            ResourceDelta result = session.CausalNodes.Find(n => n.id == memory.consequenceNodeId).effect;
+            // Captured iterator locals live in a compiler closure which Unity's
+            // EnterPlayMode reload cannot restore. Keep this predicate stateless.
+            CausalNode consequence = session.CausalNodes.Find(n => n.type == CausalNodeKind.Mystery);
+            Assert.IsNotNull(consequence); Assert.AreEqual(memory.consequenceNodeId, consequence.id);
+            ResourceDelta result = consequence.effect;
             Assert.Greater(result.energy + result.mood + result.insight + result.ability, 0);
             var archive = new ArchiveData { active = session.Snapshot(), pendingMoment = memory, nextRareRun = 99 };
             archive.moments.Add(memory); archive.wallet.stardust = 17;
