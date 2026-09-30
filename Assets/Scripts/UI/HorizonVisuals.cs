@@ -5,6 +5,21 @@ using UnityEngine.UI;
 
 namespace Horizon.UI
 {
+    public static class DropTarget
+    {
+        public static bool Contains(RectTransform target, Vector2 screenPoint)
+        {
+            if (target == null || !target.gameObject.activeInHierarchy) return false;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(target, screenPoint, null, out Vector2 local);
+            Rect bounds = target.rect;
+            if (bounds.width <= 0 || bounds.height <= 0) return false;
+            Vector2 offset = local - bounds.center;
+            float x = offset.x / (bounds.width * 0.5f);
+            float y = offset.y / (bounds.height * 0.5f);
+            return x * x + y * y <= 1f;
+        }
+    }
+
     public static class Palette
     {
         public static readonly Color Ink = new Color(0.009f, 0.022f, 0.041f);
@@ -125,23 +140,31 @@ namespace Horizon.UI
     }
 
     public sealed class HorizonCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler,
-        IEndDragHandler, IPointerClickHandler
+        IEndDragHandler, IPointerClickHandler, IPointerDownHandler
     {
         public Action<HorizonCardDrag, Vector2> Dragged;
         public Action<HorizonCardDrag> Played;
         public Action<HorizonCardDrag> Tapped;
+        public Action<HorizonCardDrag> Rejected;
+        public Func<Vector2, bool> IsOverTarget;
         public bool Available = true;
         private RectTransform rect;
         private Vector3 origin;
         private Vector2 down;
+        private bool dragged;
+        private Coroutine returning;
 
         private void Awake() { rect = (RectTransform)transform; }
+
+        public void OnPointerDown(PointerEventData eventData) { dragged = false; }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (!Available) return;
+            if (returning != null) StopCoroutine(returning);
             origin = rect.position;
-            down = eventData.position;
+            down = eventData.pressPosition;
+            dragged = true;
             rect.SetAsLastSibling();
         }
 
@@ -156,17 +179,120 @@ namespace Horizon.UI
         public void OnEndDrag(PointerEventData eventData)
         {
             if (!Available) return;
-            bool reached = eventData.position.y > Screen.height * 0.46f &&
-                eventData.position.y - down.y > Screen.height * 0.11f;
+            bool reached = IsOverTarget != null && IsOverTarget(eventData.position);
             Dragged?.Invoke(this, Vector2.zero);
             rect.localScale = Vector3.one;
-            if (reached) Played?.Invoke(this);
-            else rect.position = origin;
+            if (reached)
+            {
+                Available = false;
+                Played?.Invoke(this);
+            }
+            else
+            {
+                returning = StartCoroutine(ReturnCard());
+                Rejected?.Invoke(this);
+            }
         }
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (Available) Tapped?.Invoke(this);
+            if (!dragged) Tapped?.Invoke(this);
+        }
+
+        private System.Collections.IEnumerator ReturnCard()
+        {
+            Vector3 from = rect.position;
+            for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.2f)
+            {
+                rect.position = Vector3.Lerp(from, origin, Mathf.SmoothStep(0, 1, t));
+                yield return null;
+            }
+            rect.position = origin;
+            returning = null;
+        }
+    }
+
+    public sealed class RewardFlight : MonoBehaviour
+    {
+        public Vector2 StartPoint;
+        public int Index;
+        private float age;
+        private void Update()
+        {
+            age += Time.unscaledDeltaTime;
+            float delay = Index * 0.025f;
+            float t = Mathf.Clamp01((age - delay) / 0.9f);
+            float angle = Index * 2.399f;
+            Vector2 scatter = new Vector2(Mathf.Cos(angle) * 0.08f, Mathf.Sin(angle) * 0.045f + 0.07f);
+            Vector2 point = Vector2.Lerp(StartPoint, new Vector2(0.82f, 0.967f), t * t) + scatter * Mathf.Sin(t * Mathf.PI);
+            RectTransform rect = (RectTransform)transform;
+            rect.anchorMin = point - new Vector2(0.009f, 0.005f);
+            rect.anchorMax = point + new Vector2(0.009f, 0.005f);
+            rect.localScale = Vector3.one * (1 + Mathf.Sin(t * Mathf.PI) * 0.65f);
+            if (t >= 1) Destroy(gameObject);
+        }
+    }
+
+    public sealed class DropRingGraphic : MaskableGraphic
+    {
+        protected override void OnPopulateMesh(VertexHelper vh)
+        {
+            vh.Clear();
+            Rect r = rectTransform.rect;
+            for (int i = 0; i < 80; i++)
+            {
+                float a = i * Mathf.PI * 2 / 80, b = (i + 1) * Mathf.PI * 2 / 80;
+                Vector2 outerA = new Vector2(Mathf.Cos(a) * r.width * 0.5f, Mathf.Sin(a) * r.height * 0.5f);
+                Vector2 outerB = new Vector2(Mathf.Cos(b) * r.width * 0.5f, Mathf.Sin(b) * r.height * 0.5f);
+                int start = vh.currentVertCount;
+                vh.AddVert(outerA + r.center, color, Vector2.zero);
+                vh.AddVert(outerB + r.center, color, Vector2.zero);
+                vh.AddVert(outerB * 0.94f + r.center, color, Vector2.zero);
+                vh.AddVert(outerA * 0.94f + r.center, color, Vector2.zero);
+                vh.AddTriangle(start, start + 1, start + 2);
+                vh.AddTriangle(start, start + 2, start + 3);
+            }
+        }
+    }
+
+    public sealed class GuidePulse : MonoBehaviour
+    {
+        public bool Active = true;
+        private void Update()
+        {
+            transform.localScale = Vector3.one * (Active ? 1 + Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 1);
+        }
+    }
+
+    public sealed class PanelEntrance : MonoBehaviour
+    {
+        private float age;
+        private CanvasGroup group;
+        private void Awake()
+        {
+            group = gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0;
+            transform.localScale = Vector3.one * 0.91f;
+        }
+        private void Update()
+        {
+            age += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(age / 0.28f);
+            group.alpha = t;
+            transform.localScale = Vector3.one * Mathf.Lerp(0.91f, 1, Mathf.SmoothStep(0, 1, t));
+            if (t >= 1) enabled = false;
+        }
+    }
+
+    public sealed class TutorialHand : MonoBehaviour
+    {
+        public RectTransform Hand;
+        private void Update()
+        {
+            float t = Mathf.Repeat(Time.unscaledTime * 0.45f, 1);
+            float y = Mathf.Lerp(0.29f, 0.535f, Mathf.SmoothStep(0, 1, Mathf.Clamp01(t / 0.7f)));
+            Hand.anchorMin = new Vector2(0.49f, y);
+            Hand.anchorMax = new Vector2(0.535f, y + 0.028f);
         }
     }
 

@@ -149,6 +149,7 @@ namespace Horizon.Game
         public bool hasChosen;
         public bool stationVisited;
         public bool socialUnavailableToday;
+        public bool predictionSkipped;
         public PredictionRecord prediction;
         public List<ActionRecord> actions = new List<ActionRecord>();
         public List<PendingEcho> pending = new List<PendingEcho>();
@@ -257,7 +258,8 @@ namespace Horizon.Game
         public bool StationVisited { get; private set; }
         public bool SocialUnavailableToday { get; private set; }
         public PredictionRecord Prediction { get; private set; }
-        public bool CanPredict { get { return Day == 4 && !HasChosen && Prediction == null; } }
+        public bool PredictionSkipped { get; private set; }
+        public bool CanPredict { get { return Day == 4 && !HasChosen && Prediction == null && !PredictionSkipped; } }
         public bool HasPredictionReview { get { return Prediction != null && Prediction.evaluated && !Prediction.reviewed; } }
         public RunRecord CompletedRun { get; private set; }
         public readonly List<ActionRecord> Actions = new List<ActionRecord>();
@@ -365,7 +367,7 @@ namespace Horizon.Game
                 SupportActions = saved.supportActions,
                 FocusUses = saved.focusUses, HasChosen = saved.hasChosen,
                 StationVisited = saved.stationVisited, SocialUnavailableToday = saved.socialUnavailableToday,
-                Prediction = saved.prediction
+                Prediction = saved.prediction, PredictionSkipped = saved.predictionSkipped
             };
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
@@ -440,7 +442,8 @@ namespace Horizon.Game
                 supportActions = SupportActions, focusUses = FocusUses,
                 hasChosen = HasChosen, stationVisited = StationVisited,
                 socialUnavailableToday = SocialUnavailableToday,
-                prediction = Prediction, actions = new List<ActionRecord>(Actions),
+                prediction = Prediction, predictionSkipped = PredictionSkipped,
+                actions = new List<ActionRecord>(Actions),
                 pending = new List<PendingEcho>(Pending),
                 causalNodes = new List<CausalNode>(CausalNodes)
             };
@@ -543,6 +546,12 @@ namespace Horizon.Game
                 baseEnergy = Energy, baseMood = Mood, baseInsight = Insight,
                 energy = energy, mood = mood, insight = insight
             };
+        }
+
+        public void SkipPrediction()
+        {
+            if (!CanPredict) throw new InvalidOperationException("No prediction is offered now.");
+            PredictionSkipped = true;
         }
 
         public void VisitStation()
@@ -774,9 +783,9 @@ namespace Horizon.Game
                 if (day == 4)
                 {
                     PredictionRecord prediction = original.prediction;
-                    replay.LockPrediction(prediction == null ? 0 : ClampForecast(prediction.energy),
-                        prediction == null ? 0 : ClampForecast(prediction.mood),
-                        prediction == null ? 0 : ClampForecast(prediction.insight));
+                    if (prediction == null) replay.SkipPrediction();
+                    else replay.LockPrediction(ClampForecast(prediction.energy),
+                        ClampForecast(prediction.mood), ClampForecast(prediction.insight));
                 }
                 ActionRecord recorded = original.actions[day - 1];
                 if (recorded == null) return null;

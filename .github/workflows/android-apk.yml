@@ -36,7 +36,7 @@ jobs:
           docker-images: false
           swap-storage: true
 
-      - name: Run EditMode rules tests
+      - name: Run rules and playable UX tests with visual capture
         id: tests
         uses: game-ci/unity-test-runner@v4
         env:
@@ -47,6 +47,7 @@ jobs:
           unityVersion: 2022.3.22f1
           testMode: EditMode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
+          customParameters: -force-glcore
 
       - name: Upload EditMode results
         if: always()
@@ -54,6 +55,24 @@ jobs:
         with:
           name: HORIZON-EditMode-Results
           path: ${{ steps.tests.outputs.artifactsPath }}
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Verify Unity portrait previews
+        shell: bash
+        run: |
+          test -s artifacts/visuals/01-board.png
+          test -s artifacts/visuals/02-action-result.png
+          test -s artifacts/visuals/03-echo-result.png
+          test -s artifacts/visuals/04-future-station.png
+          test -s artifacts/visuals/05-deadline.png
+
+      - name: Upload Unity portrait previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Unity-Portrait-Previews
+          path: artifacts/visuals/*.png
           if-no-files-found: ignore
           retention-days: 14
 
