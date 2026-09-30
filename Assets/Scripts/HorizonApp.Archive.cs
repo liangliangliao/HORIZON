@@ -251,7 +251,13 @@ namespace Horizon
                 {
                     if (!positions.ContainsKey(id)) continue;
                     TimeThreadGraphic line = View.Rect(content, "Network edge", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
-                    line.From = positions[id]; line.To = positions[node.id]; line.color = NodeColor(node); line.Thickness = 3;
+                    Vector2 parent = positions[id], child = positions[node.id];
+                    bool sameColumn = Mathf.Abs(parent.x - child.x) < 0.001f;
+                    float direction = child.x >= parent.x ? 1 : -1;
+                    line.RightLane = sameColumn;
+                    line.From = parent + Vector2.right * (105 / width) * (sameColumn ? 1 : direction);
+                    line.To = child + Vector2.right * (105 / width) * (sameColumn ? 1 : -direction);
+                    line.color = NodeColor(node); line.Thickness = 3;
                     line.raycastTarget = false;
                 }
             }

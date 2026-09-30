@@ -7,19 +7,22 @@ namespace Horizon.UI
     {
         public Vector2 From, To;
         public float Thickness = 3;
+        public bool RightLane;
         protected override void OnPopulateMesh(VertexHelper helper)
         {
             helper.Clear();
             Rect rect = rectTransform.rect;
             Vector2 from = new Vector2(rect.xMin + From.x * rect.width, rect.yMin + From.y * rect.height);
             Vector2 to = new Vector2(rect.xMin + To.x * rect.width, rect.yMin + To.y * rect.height);
-            Vector2 bend = new Vector2(Mathf.Max(24, Mathf.Abs(to.x - from.x) * 0.55f), 0);
+            Vector2 bend = new Vector2(Mathf.Max(24, Mathf.Abs(to.x - from.x) * 0.55f) *
+                (RightLane || to.x >= from.x ? 1 : -1), 0);
+            Vector2 endControl = RightLane ? to + bend : to - bend;
             Vector2 previous = from;
             for (int i = 1; i <= 18; i++)
             {
                 float t = i / 18f, u = 1 - t;
                 Vector2 next = u * u * u * from + 3 * u * u * t * (from + bend) +
-                    3 * u * t * t * (to - bend) + t * t * t * to;
+                    3 * u * t * t * endControl + t * t * t * to;
                 Vector2 normal = new Vector2(-(next - previous).y, (next - previous).x).normalized * Thickness * 0.5f;
                 int first = helper.currentVertCount;
                 UIVertex vertex = UIVertex.simpleVert; vertex.color = color;

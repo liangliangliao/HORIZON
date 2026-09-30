@@ -130,9 +130,10 @@ namespace Horizon
                 "「下一次选择，仍然在你手里。」";
             while (age < duration && generation == viewGeneration && voice != null)
             {
-                age += Time.unscaledDeltaTime;
+                // A frame after returning from the background must not skip a whole beat.
+                age += Mathf.Min(Time.unscaledDeltaTime, 0.25f);
                 if (age < 1.6f) voice.text = first.Substring(0, Mathf.Clamp(Mathf.CeilToInt(age / 1.6f * first.Length), 0, first.Length));
-                else if (age > duration * 0.55f) voice.text = second;
+                else voice.text = age > duration * 0.55f ? second : first;
                 if (stage == 1 && age > 4 && age < 4 + Time.unscaledDeltaTime) world.TouchMemory(0);
                 yield return null;
             }
