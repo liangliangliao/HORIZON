@@ -8,7 +8,8 @@ namespace Horizon.Game
     {
         public int targetDay;
         public int samples;
-        public int energyMin, energyMax, moodMin, moodMax, abilityMin, abilityMax;
+        public int energyMin, energyMax, moodMin, moodMax, insightMin, insightMax;
+        public int relationMin, relationMax, moneyMin, moneyMax, abilityMin, abilityMax;
         public int abilityPass, statePass, supportPass;
         public string assumption;
     }
@@ -24,7 +25,8 @@ namespace Horizon.Game
                 throw new ArgumentException("An unplayed day and a future horizon up to thirty days are required.");
             string frozen = JsonUtility.ToJson(source.Snapshot());
             var result = new ForecastRange { targetDay = targetDay, samples = samples,
-                energyMin = 10, moodMin = 10, abilityMin = 10,
+                energyMin = 10, moodMin = 10, insightMin = 10,
+                relationMin = 10, moneyMin = 10, abilityMin = 10,
                 assumption = "比较多种后续选择；已埋下的回声按原规则兑现。" };
             for (int sample = 0; sample < samples; sample++)
             {
@@ -52,6 +54,9 @@ namespace Horizon.Game
                 }
                 result.energyMin = Math.Min(result.energyMin, fork.Energy); result.energyMax = Math.Max(result.energyMax, fork.Energy);
                 result.moodMin = Math.Min(result.moodMin, fork.Mood); result.moodMax = Math.Max(result.moodMax, fork.Mood);
+                result.insightMin = Math.Min(result.insightMin, fork.Insight); result.insightMax = Math.Max(result.insightMax, fork.Insight);
+                result.relationMin = Math.Min(result.relationMin, fork.Relation); result.relationMax = Math.Max(result.relationMax, fork.Relation);
+                result.moneyMin = Math.Min(result.moneyMin, fork.Money); result.moneyMax = Math.Max(result.moneyMax, fork.Money);
                 result.abilityMin = Math.Min(result.abilityMin, fork.Ability); result.abilityMax = Math.Max(result.abilityMax, fork.Ability);
                 if (fork.Ability >= 6 && (fork.CatalogVersion < 2 || fork.Actions.Count(a => a.echoed && a.later?.ability > 0) >= 2)) result.abilityPass++;
                 if (fork.Energy >= 4 && fork.Mood >= 4 && (fork.CatalogVersion < 2 || fork.Actions.Count(a => a.kind == CardKind.Recovery) >= 2)) result.statePass++;
