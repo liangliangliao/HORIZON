@@ -8,6 +8,19 @@ namespace Horizon.Tests
     public sealed class PlayExperienceTests
     {
         [Test]
+        public void EmptyOptionalSaveObjectsDoNotBecomePhantomResults()
+        {
+            var archive = JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(new ArchiveData()));
+            archive.Repair();
+            Assert.IsNull(archive.active);
+            Assert.IsNull(archive.pendingFeedback);
+            Assert.AreEqual(0, archive.wallet.stardust);
+            var session = GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(
+                JsonUtility.ToJson(new GameSession(1).Snapshot())));
+            Assert.IsNull(session.Prediction);
+        }
+
+        [Test]
         public void RewardReceiptsSurviveSaveAndCannotBeCollectedTwice()
         {
             var archive = new ArchiveData();

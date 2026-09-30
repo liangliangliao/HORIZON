@@ -72,7 +72,7 @@ namespace Horizon.UI
 
         public static RectTransform Rect(Transform parent, string name, float x0, float y0, float x1, float y1)
         {
-            var go = new GameObject(name, typeof(RectTransform));
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
             go.transform.SetParent(parent, false);
             var rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(x0, y0);

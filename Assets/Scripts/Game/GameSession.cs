@@ -367,7 +367,9 @@ namespace Horizon.Game
                 SupportActions = saved.supportActions,
                 FocusUses = saved.focusUses, HasChosen = saved.hasChosen,
                 StationVisited = saved.stationVisited, SocialUnavailableToday = saved.socialUnavailableToday,
-                Prediction = saved.prediction, PredictionSkipped = saved.predictionSkipped
+                Prediction = !saved.predictionSkipped && saved.prediction != null &&
+                    saved.prediction.sourceDay == 4 && saved.prediction.dueDay == 7 ? saved.prediction : null,
+                PredictionSkipped = saved.predictionSkipped
             };
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);

@@ -17,7 +17,7 @@ Shader "HORIZON/LitColor"
             #include "AutoLight.cginc"
             fixed4 _Color, _Emission;
             struct v2f { float4 pos:SV_POSITION; float3 normal:TEXCOORD0; float3 world:TEXCOORD1; SHADOW_COORDS(2) UNITY_FOG_COORDS(3) };
-            v2f vert(appdata_base v)
+            v2f vert(appdata_full v)
             {
                 v2f o; o.pos=UnityObjectToClipPos(v.vertex); o.normal=UnityObjectToWorldNormal(v.normal);
                 o.world=mul(unity_ObjectToWorld,v.vertex).xyz; TRANSFER_SHADOW(o); UNITY_TRANSFER_FOG(o,o.pos); return o;

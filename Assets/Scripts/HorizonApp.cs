@@ -19,6 +19,24 @@ namespace Horizon
         public string preferredIntent;
         public RewardWallet wallet = new RewardWallet();
         public FeedbackRecord pendingFeedback;
+
+        public void Repair()
+        {
+            if (runs == null) runs = new List<RunRecord>();
+            if (wallet == null) wallet = new RewardWallet();
+            wallet.Repair();
+            // Unity can deserialize a null nested class as an empty instance.
+            if (active != null && active.runNumber < 1) active = null;
+            if (pendingFeedback != null && (pendingFeedback.runNumber < 1 ||
+                (pendingFeedback.kind == FeedbackKind.Deadline ? runs.Count == 0 : active == null)))
+                pendingFeedback = null;
+            foreach (RunRecord run in runs)
+            {
+                if (run.prediction != null && run.prediction.dueDay != 7) run.prediction = null;
+                if (run.boss != null && run.boss.ghostTimeline != null && run.boss.ghostTimeline.sourceDay < 1)
+                    run.boss.ghostTimeline = null;
+            }
+        }
     }
 
     public sealed class HorizonApp : MonoBehaviour
@@ -120,9 +138,7 @@ namespace Horizon
                 ArchiveData data = string.IsNullOrEmpty(json) ? new ArchiveData() : JsonUtility.FromJson<ArchiveData>(json);
                 if (data != null)
                 {
-                    if (data.runs == null) data.runs = new List<RunRecord>();
-                    if (data.wallet == null) data.wallet = new RewardWallet();
-                    data.wallet.Repair();
+                    data.Repair();
                     return data;
                 }
             }
@@ -144,7 +160,7 @@ namespace Horizon
             root.anchorMax = new Vector2(safe.xMax / Screen.width, safe.yMax / Screen.height);
         }
 
-        private void Clear()
+        private void Clear(bool immersive = false)
         {
             for (int i = root.childCount - 1; i >= 0; i--) Destroy(root.GetChild(i).gameObject);
             cards.Clear();
@@ -157,7 +173,7 @@ namespace Horizon
             boardHint = null;
             handGuide = null;
             busy = false;
-            Backdrop();
+            if (!immersive) Backdrop();
         }
 
         private void Backdrop()
@@ -353,8 +369,7 @@ namespace Horizon
             panel.gameObject.AddComponent<PanelEntrance>();
             View.Label(panel, "Result title", feedback.title, 40, Palette.Text,
                 TextAnchor.MiddleLeft, 0.065f, 0.79f, 0.935f, 0.955f);
-            View.Label(panel, "Result explanation", feedback.description, 30, Palette.Mint,
-                TextAnchor.UpperLeft, 0.065f, 0.32f, 0.935f, 0.78f);
+            ResultText(panel, feedback.description);
             View.Label(panel, "Reward", "+" + feedback.stardust + " 星尘 · 已收集", 34, Palette.Gold,
                 TextAnchor.MiddleLeft, 0.065f, 0.225f, 0.935f, 0.315f);
             View.Label(panel, "Hold result", "看完再继续。你可以按自己的节奏玩。", 23, Palette.Muted,
@@ -384,6 +399,30 @@ namespace Horizon
             }
             else if (session.HasPredictionReview) ShowPredictionReview();
             else BuildBoard();
+        }
+
+        private void ResultText(Transform parent, string description)
+        {
+            RectTransform viewport = View.Rect(parent, "Readable explanation", 0.065f, 0.33f, 0.935f, 0.78f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            Image hit = viewport.gameObject.AddComponent<Image>();
+            hit.color = new Color(0, 0, 0, 0);
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            RectTransform content = View.Rect(viewport, "Result content", 0, 1, 1, 1);
+            content.pivot = new Vector2(0.5f, 1);
+            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandHeight = false;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            Text text = View.Label(content, "Result explanation", description, 30, Palette.Mint,
+                TextAnchor.UpperLeft, 0, 0, 1, 1);
+            text.resizeTextForBestFit = false;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            scroll.content = content;
+            scroll.verticalNormalizedPosition = 1;
         }
 
         private void StarBurst(int amount, Vector2 start)
@@ -896,10 +935,10 @@ namespace Horizon
         private void ShowInRunStation(int stage)
         {
             stationStage = stage;
-            Clear();
+            Clear(true);
             bool reveal = session.RunNumber == 3 && stage >= 2;
             world.ShowStation(stage, reveal);
-            View.Fill(root, "Station veil", new Color(0.005f, 0.02f, 0.035f, 0.45f), 0, 0, 1, 1);
+            View.Fill(root, "Station veil", new Color(0.005f, 0.02f, 0.035f, 0.14f), 0, 0, 1, 1);
             bool question = session.RunNumber == 3 && stage == 3;
             if (!question)
             {
@@ -1512,7 +1551,7 @@ namespace Horizon
 
         private void ShowStation()
         {
-            Clear();
+            Clear(true);
             world.ShowStation(2, archive.runs.Count >= 3);
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 35, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.06f, 0.83f, 0.94f, 0.91f);

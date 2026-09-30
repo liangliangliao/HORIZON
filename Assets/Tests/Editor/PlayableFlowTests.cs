@@ -69,6 +69,7 @@ namespace Horizon.Tests
 
             // Reopen from the persisted save while this result is pending.
             archive = JsonUtility.FromJson<ArchiveData>(PlayerPrefs.GetString("HORIZON.PROTOTYPE.V1"));
+            archive.Repair();
             Set(app, "archive", archive);
             Call(app, "ContinueRun");
             yield return new WaitForSeconds(0.35f);
