@@ -17,6 +17,18 @@ namespace Horizon.Game
             return result;
         }
 
+        public static List<string> ObservedParents(CausalNode node)
+        { return node != null && node.originHidden ? new List<string>() : Parents(node); }
+
+        public static List<CausalNode> ObservedGraph(List<CausalNode> graph)
+        {
+            if (graph == null) return new List<CausalNode>();
+            // Only detach hidden provenance in the view; the simulation keeps it.
+            return graph.Select(n => n.originHidden ? new CausalNode { id = n.id, type = n.type, day = n.day,
+                depth = n.depth, label = n.label, resolved = n.resolved, effect = n.effect,
+                effectRecorded = n.effectRecorded, originHidden = true } : n).ToList();
+        }
+
         public static void Link(CausalNode node, string parent)
         {
             if (node == null || string.IsNullOrEmpty(parent) || node.id == parent) return;
@@ -100,7 +112,18 @@ namespace Horizon.Game
     {
         public static void AttachMystery(RareMoment moment, GameSession session)
         {
-            if (moment == null || moment.type != 3) return;
+            if (moment == null || moment.type != 3 || session == null) return;
+            if (session.CatalogVersion >= 4)
+            {
+                CausalNode result = session.ApplyMystery();
+                if (result == null) return;
+                MysteryRecord provenance = session.Mysteries.Find(m => m.consequenceNodeId == result.id);
+                moment.causeNodeId = provenance.causeNodeId;
+                moment.consequenceNodeId = result.id; moment.revealDay = provenance.revealDay;
+                moment.description = "一份余力先抵达了，来源还没看清。\n" + PlayExperience.NowLabel(result.effect) +
+                    "\nD9，回头看看它来自哪次选择。";
+                return;
+            }
             CausalNode effect = session.CausalNodes.FindLast(n => n.type == CausalNodeKind.Echo && n.resolved &&
                 !string.IsNullOrEmpty(n.parentId));
             if (effect == null) return;
@@ -118,15 +141,20 @@ namespace Horizon.Game
             CausalNode effect = session.CausalNodes.Find(n => n.id == original.consequenceNodeId);
             if (cause == null || effect == null || !effect.resolved) return null;
             original.revealed = true;
+            effect.originHidden = false;
             return new RareMoment { runNumber = session.RunNumber, day = session.Day, type = 5,
                 causeNodeId = cause.id, consequenceNodeId = effect.id, revealed = true,
                 title = "你终于认出了这道光", description = "D" + cause.day + " · " + cause.label +
                     "\n↓\nD" + effect.day + " · " + effect.label +
-                    "\n\n那天先看见的，是这次选择留下的记忆。\n它没有改变过去，只是现在才被你认出来。" };
+                    (effect.type == CausalNodeKind.Mystery ? "\n" + PlayExperience.NowLabel(effect.effect) +
+                        "\n\nD6 先收到的余力，来自这次选择。\n现在只揭示来路，不会再次发放。" :
+                        "\n\n那天先看见的，是这次选择留下的记忆。\n它没有改变过去，只是现在才被你认出来。") };
         }
 
         public static string NextStep(GameSession session)
         {
+            if (session.Energy == 0 && !session.HasChosen)
+                return "精力用尽了。选恢复牌，为下一次行动留出空间";
             if (session.Actions.Count == 0) return "今天先选一张，看看它会去哪一天";
             if (!session.Actions.Exists(a => a.echoed))
             {
@@ -162,14 +190,32 @@ namespace Horizon.Game
 
         public static List<ActionRecord> StationMemories(GameSession session)
         {
-            var result = new List<ActionRecord>();
-            foreach (CardKind kind in new[] { CardKind.Growth, CardKind.Recovery, CardKind.Temptation })
-            {
-                ActionRecord best = session.Actions.Where(a => a.kind == kind).OrderByDescending(a =>
-                    CausalGraph.Descendants(session.CausalNodes, a.nodeId).Count).ThenByDescending(a => a.day).FirstOrDefault();
-                if (best != null) result.Add(best);
-            }
-            return result;
+            // Rank actual causal roots, rather than fabricating one memory per category.
+            return session.Actions.Where(a => !CausalGraph.Ancestors(session.CausalNodes, a.nodeId)
+                    .Exists(n => n.type == CausalNodeKind.Action && n.id != a.nodeId))
+                .OrderByDescending(a => CausalGraph.Descendants(session.CausalNodes, a.nodeId).Count)
+                .ThenByDescending(a => a.day).Take(3).ToList();
+        }
+
+        public static List<ActionRecord> CommonBehaviors(GameSession session, int recentActions = 6)
+        {
+            return session.Actions.Skip(Math.Max(0, session.Actions.Count - recentActions))
+                .GroupBy(a => a.cardId).OrderByDescending(g => g.Count())
+                .ThenByDescending(g => g.Max(a => a.day)).Take(3)
+                .Select(g => g.OrderByDescending(a => a.day).First()).ToList();
+        }
+
+        public static string LifeTitle(RunRecord run)
+        {
+            if (run.actions == null || run.actions.Count == 0) return "还没走完的日子";
+            if (run.boss?.passed == 3) return "我把未来接住了";
+            if (run.actions.All(a => a.kind == CardKind.Recovery)) return "这一次，我给自己留出了空间";
+            if (run.actions.All(a => a.later == null || a.later.energy >= 0 && a.later.mood >= 0))
+                return "这一次，我没有埋下疲惫";
+            if (run.boss?.support == true && run.actions.Count(a => a.givesSupport) >= 3)
+                return "我留下的支援，连接到了截止日";
+            ActionRecord defining = run.actions.FindLast(a => a.kind == CardKind.Growth) ?? run.actions[0];
+            return "从「" + defining.cardName + "」开始的日子";
         }
 
         public static RareMoment Moment(int run, int day, List<RunRecord> runs)

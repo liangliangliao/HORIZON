@@ -17,6 +17,70 @@ namespace Horizon.Tests
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
 
         [UnityTest]
+        public IEnumerator ObservationChapterSixCannotUnlockThirtyDaysAndStateHoldWorks()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test chapter boundary").AddComponent<HorizonApp>();
+            yield return null;
+            var session = new GameSession(3, 15);
+            var archive = new ArchiveData { active = session.Snapshot(), nextRareRun = 99 };
+            for (int day = 1; day <= 6; day++) archive.journey.Visit("2026-09-" + day.ToString("00"));
+            Set(app, "session", session); Set(app, "archive", archive); Call(app, "BuildBoard");
+            yield return null;
+            RectTransform root = Get<RectTransform>(app, "root");
+            FutureHold state = System.Array.Find(root.GetComponentsInChildren<FutureHold>(), h => h.name == "Hold current state");
+            Assert.IsNotNull(state);
+            var pointer = new PointerEventData(EventSystem.current);
+            state.OnPointerDown(pointer); yield return new WaitForSecondsRealtime(0.8f);
+            Assert.AreEqual(6, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
+                t => t.name == "Resource number" && !string.IsNullOrEmpty(t.text)).Length);
+            state.OnPointerUp(pointer); yield return null;
+            Assert.AreEqual(2, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
+                t => t.name == "Resource number" && !string.IsNullOrEmpty(t.text)).Length);
+            string frozen = JsonUtility.ToJson(session.Snapshot());
+            Call(app, "ShowJourney"); yield return null;
+            ButtonNamed(app, "Chapter 6").onClick.Invoke(); yield return null;
+            Assert.IsFalse(System.Array.Exists(root.GetComponentsInChildren<Button>(), b => b.name == "Meet thirty day self"));
+            string text = string.Join(" ", System.Array.ConvertAll(root.GetComponentsInChildren<Text>(), t => t.text));
+            Assert.That(text, Does.Contain("→ D4 夜"));
+            ButtonNamed(app, "Close future range").onClick.Invoke(); yield return null;
+            Assert.IsTrue(System.Array.Exists(root.GetComponentsInChildren<Button>(),
+                b => b.name == "Thirty day view" && !b.interactable));
+            Call(app, "ShowThirtyDays"); yield return null;
+            Assert.AreEqual("Journey chapters", Get<RectTransform>(app, "overlay").name);
+            Assert.AreEqual(frozen, JsonUtility.ToJson(session.Snapshot()));
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator PredictionButtonCanBeConfirmedTwiceInOneFrameSafely()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test prediction receipt").AddComponent<HorizonApp>();
+            yield return null;
+            var session = new GameSession(1, 15);
+            while (session.Day < 4) { session.Choose(session.Hand[2].Id); session.Advance(); }
+            session.LockPrediction(0, 0, 0);
+            while (session.Day < 7) { session.Choose(session.Hand[2].Id);
+                if (session.Day == 4) session.VisitStation(); session.Advance(); }
+            Assert.IsTrue(session.Prediction.accurate);
+            var archive = new ArchiveData { active = session.Snapshot(), calibrations = 2, nextRareRun = 99 };
+            Set(app, "session", session); Set(app, "archive", archive); Call(app, "ShowPredictionReview");
+            yield return null;
+            Button button = ButtonNamed(app, "Continue"); button.onClick.Invoke(); button.onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(3, archive.calibrations); Assert.IsTrue(session.Prediction.reviewed);
+            var saved = JsonUtility.FromJson<ArchiveData>(PlayerPrefs.GetString("HORIZON.PROTOTYPE.V1")); saved.Repair();
+            Assert.AreEqual(3, saved.calibrations); Assert.IsTrue(saved.active.prediction.reviewed);
+            Assert.AreEqual(0, saved.wallet.stardust);
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator ObservationViewsExplainResultsAndKeepTheLiveLifeIntact()
         {
             yield return new EnterPlayMode();
@@ -177,8 +241,12 @@ namespace Horizon.Tests
             Assert.AreEqual(2, session.HorizonLevel);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return null;
-            ButtonNamed(app, "Protect Growth").onClick.Invoke();
-            Assert.AreEqual("Growth", archive.preferredIntent);
+            ActionRecord concern = ExperienceContent.CommonBehaviors(session)[0];
+            Assert.IsFalse(System.Array.Exists(Get<RectTransform>(app, "root").GetComponentsInChildren<Button>(),
+                b => b.name == "Protect Growth"));
+            ButtonNamed(app, "Protect " + concern.cardId).onClick.Invoke();
+            Assert.AreEqual("Recovery", archive.preferredIntent);
+            Assert.AreEqual(concern.cardId, archive.preferredCardId);
             Assert.AreEqual(3, session.HorizonLevel);
             yield return new WaitForSecondsRealtime(4);
             PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");

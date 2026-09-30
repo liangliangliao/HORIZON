@@ -48,7 +48,7 @@ namespace Horizon.Game
         public CardKind replacementSlot;
     }
 
-    public enum CausalNodeKind { Action, Echo, Choice, Gate, Situation, World }
+    public enum CausalNodeKind { Action, Echo, Choice, Gate, Situation, World, Mystery }
 
     [Serializable]
     public sealed class CausalNode
@@ -67,6 +67,7 @@ namespace Horizon.Game
         public bool gatePassed;
         public ResourceDelta effect;
         public bool effectRecorded;
+        public bool originHidden;
     }
 
     [Serializable]
@@ -145,6 +146,7 @@ namespace Horizon.Game
         public int finalAbility;
         public PredictionRecord prediction;
         public List<CausalNode> causalNodes = new List<CausalNode>();
+        public List<MysteryRecord> mysteries = new List<MysteryRecord>();
     }
 
     [Serializable]
@@ -172,6 +174,7 @@ namespace Horizon.Game
         public List<ActionRecord> actions = new List<ActionRecord>();
         public List<PendingEcho> pending = new List<PendingEcho>();
         public List<CausalNode> causalNodes = new List<CausalNode>();
+        public List<MysteryRecord> mysteries = new List<MysteryRecord>();
     }
 
     public sealed class DayTransition
@@ -253,11 +256,11 @@ namespace Horizon.Game
         }
     }
 
-    public sealed class GameSession
+    public sealed partial class GameSession
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 5;
+        public const int RulesVersion = 6;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -288,6 +291,7 @@ namespace Horizon.Game
         public readonly List<ActionRecord> Actions = new List<ActionRecord>();
         public readonly List<PendingEcho> Pending = new List<PendingEcho>();
         public readonly List<CausalNode> CausalNodes = new List<CausalNode>();
+        public readonly List<MysteryRecord> Mysteries = new List<MysteryRecord>();
         private readonly bool replaying;
 
         private sealed class CausalRule
@@ -356,10 +360,10 @@ namespace Horizon.Game
             }
         }
 
-        public GameSession(int runNumber) : this(runNumber, false, 3, Guid.NewGuid().GetHashCode()) { }
-        public GameSession(int runNumber, int worldSeed) : this(runNumber, false, 3, worldSeed) { }
+        public GameSession(int runNumber) : this(runNumber, false, 4, Guid.NewGuid().GetHashCode()) { }
+        public GameSession(int runNumber, int worldSeed) : this(runNumber, false, 4, worldSeed) { }
 
-        private GameSession(int runNumber, bool replaying, int catalogVersion = 3, int worldSeed = 0)
+        private GameSession(int runNumber, bool replaying, int catalogVersion = 4, int worldSeed = 0)
         {
             if (runNumber < 1) throw new ArgumentOutOfRangeException("runNumber");
             RunNumber = runNumber;
@@ -392,9 +396,10 @@ namespace Horizon.Game
             if (saved == null || saved.runNumber < 1 || saved.day < 1 || saved.day > deadline ||
                 saved.energy < 0 || saved.energy > ResourceCap || saved.mood < 0 ||
                 saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap ||
-                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > 3 || saved.catalogVersion < 0)
+                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > 4 || saved.catalogVersion < 0)
                 throw new ArgumentException("Invalid run snapshot.", "saved");
-            int catalogVersion = saved.catalogVersion > 0 ? saved.catalogVersion : saved.rulesVersion < 4 ? 1 : saved.rulesVersion < 5 ? 2 : 3;
+            int catalogVersion = saved.catalogVersion > 0 ? saved.catalogVersion : saved.rulesVersion < 4 ? 1 :
+                saved.rulesVersion < 5 ? 2 : saved.rulesVersion < 6 ? 3 : 4;
             if (saved.rulesVersion < 2) MigrateLegacyResources(saved);
             if (saved.rulesVersion < 3 || saved.causalNodes == null ||
                 (saved.causalNodes.Count == 0 && saved.actions != null && saved.actions.Count > 0))
@@ -422,6 +427,7 @@ namespace Horizon.Game
             if (saved.actions != null) session.Actions.AddRange(saved.actions);
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
             session.CausalNodes.AddRange(saved.causalNodes);
+            if (saved.mysteries != null) session.Mysteries.AddRange(saved.mysteries);
             if (simulation && deadline > (saved.deadline > 0 ? saved.deadline : LastDay))
                 foreach (ActionRecord action in session.Actions)
                     if (!action.echoed && action.echoDay > (saved.deadline > 0 ? saved.deadline : LastDay) &&
@@ -510,7 +516,8 @@ namespace Horizon.Game
                 prediction = Prediction, predictionSkipped = PredictionSkipped,
                 actions = new List<ActionRecord>(Actions),
                 pending = new List<PendingEcho>(Pending),
-                causalNodes = new List<CausalNode>(CausalNodes)
+                causalNodes = new List<CausalNode>(CausalNodes),
+                mysteries = new List<MysteryRecord>(Mysteries)
             };
         }
 
@@ -741,6 +748,7 @@ namespace Horizon.Game
             if (Day == 4 && !StationVisited)
                 throw new InvalidOperationException("Visit the future station before advancing.");
             Day++;
+            RevealMysteryOrigins();
             HasChosen = false;
             FocusUses = 0;
             SocialUnavailableToday = false;
@@ -935,6 +943,9 @@ namespace Horizon.Game
             foreach (int day in changes.Keys) firstChange = Math.Min(firstChange, day);
             for (int day = 1; day <= stopDay; day++)
             {
+                if (original.mysteries != null)
+                    foreach (MysteryRecord mystery in original.mysteries)
+                        if (mystery.day == day) replay.ApplyMystery(mystery.sourceDay, mystery.sourceCardId);
                 if (replay.HasPredictionReview) replay.MarkPredictionReviewed();
                 if (replay.CanPredict)
                 {
@@ -1095,8 +1106,10 @@ namespace Horizon.Game
                 actions = new List<ActionRecord>(Actions),
                 finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
                 finalRelation = Relation, finalMoney = Money, finalAbility = Ability,
-                prediction = Prediction, causalNodes = new List<CausalNode>(CausalNodes)
+                prediction = Prediction, causalNodes = new List<CausalNode>(CausalNodes),
+                mysteries = new List<MysteryRecord>(Mysteries)
             };
+            CompletedRun.title = ExperienceContent.LifeTitle(CompletedRun);
             if (boss.passed < 3 && !replaying) boss.ghostTimeline = BuildGhost(CompletedRun);
             boss.ghost = boss.passed == 3 ? "你留下的路，已经连成了星图。" :
                 boss.ghostTimeline == null ? "没有一个单点改变能保证通过，下一条路还要继续探索。" :

@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace Horizon
 {
     [Serializable]
-    public sealed class ArchiveData
+    public sealed partial class ArchiveData
     {
         public List<RunRecord> runs = new List<RunRecord>();
         public RunSnapshot active;
@@ -18,6 +18,7 @@ namespace Horizon
         public bool seenSecondLife;
         public int calibrations;
         public string preferredIntent;
+        public string preferredCardId;
         public RewardWallet wallet = new RewardWallet();
         public FeedbackRecord pendingFeedback;
         public JourneyProgress journey = new JourneyProgress();
@@ -226,7 +227,7 @@ namespace Horizon
         {
             archive.pendingFeedback = null;
             archive.pendingMoment = null;
-            session = new GameSession(archive.runs.Count + 1);
+            session = new GameSession(archive.NextRunNumber);
             archive.stationRun = archive.stationBeat = 0;
             archive.active = session.Snapshot();
             Save();
@@ -586,9 +587,7 @@ namespace Horizon
                 0.13f, 0.16f, 0.87f, 0.225f, Palette.Panel, Palette.Text, 26);
             View.Button(root, "Continue", "继续前行", () =>
             {
-                if (prediction.accurate) archive.calibrations++;
-                session.MarkPredictionReviewed();
-                archive.active = session.Snapshot();
+                if (!archive.ReviewPrediction(session)) return;
                 Save();
                 BuildBoard();
             }, 0.17f, 0.06f, 0.83f, 0.13f, Palette.Mint, Palette.Ink);
@@ -960,15 +959,6 @@ namespace Horizon
             else FinishStation();
         }
 
-        private string RecentBehavior(CardKind kind)
-        {
-            int first = Mathf.Max(0, session.Actions.Count - 4);
-            for (int i = session.Actions.Count - 1; i >= first; i--)
-                if (session.Actions[i].kind == kind) return session.Actions[i].cardName;
-            return kind == CardKind.Temptation ? "给自己一点快乐" :
-                kind == CardKind.Growth ? "继续练习" : "照顾自己";
-        }
-
         private void FinishStation()
         {
             if (session.StationVisited) return;
@@ -1136,7 +1126,7 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.05f, 0.78f, 0.95f, 0.89f);
             View.Label(overlay, "Subtitle", compare ? "同一个今天，可以走向不同方向。" :
                 string.IsNullOrEmpty(archive.preferredIntent) ? "你在未来留下的微光" :
-                "你更想保护：" + IntentName(archive.preferredIntent),
+                "你更想保护：" + archive.ConcernName,
                 32, Palette.Text,
                 TextAnchor.MiddleCenter, 0.1f, 0.69f, 0.9f, 0.77f);
             if (compare)
@@ -1283,9 +1273,13 @@ namespace Horizon
             string explanation = ghost == null ? run.boss.ghost :
                 "第 " + ghost.sourceDay + " 天\n「" + ghost.originalName + "」改为「" + ghost.alternativeName + "」\n\n" +
                 (ghost.echoDay > 0 ? "第 " + ghost.echoDay + " 天\n" + ghost.echoName + "\n\n" : "") +
+                (ghost.changedChoiceDay > 0 ? "D" + ghost.changedChoiceDay + " · 后来的选择变为「" +
+                    ghost.changedChoiceName + "」\n\n" : "") +
                 "第 12 天\n" + ghost.gateName + (ghost.gateOpens ? "门打开了" : "门仍未打开") +
+                "\n精力 " + run.finalEnergy + "→" + ghost.finalEnergy + " · 心情 " + run.finalMood + "→" + ghost.finalMood +
+                " · 能力 " + run.finalAbility + "→" + ghost.finalAbility +
                 "\n\n" + ghost.beforePassed + " 道门 → " + ghost.afterPassed + " 道门";
-            View.Label(overlay, "Possible chain", explanation, 35, Palette.Mint,
+            View.Label(overlay, "Possible chain", explanation, 28, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.1f, 0.275f, 0.9f, 0.575f);
             View.Label(overlay, "Conditional branch", "这是一条按现有规则重演的可能时间线。", 26, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.15f, 0.92f, 0.22f);
@@ -1400,7 +1394,7 @@ namespace Horizon
             View.Label(root, "Voice", voice, 42, Palette.Text, TextAnchor.MiddleCenter,
                 0.1f, 0.22f, 0.9f, 0.32f);
             if (!string.IsNullOrEmpty(archive.preferredIntent))
-                View.Label(root, "Concern", "你说过，更想保护：" + IntentName(archive.preferredIntent),
+                View.Label(root, "Concern", "你说过，更想保护：" + archive.ConcernName,
                     29, Palette.Mint, TextAnchor.MiddleCenter, 0.12f, 0.15f, 0.88f, 0.21f);
             View.Button(root, "Home", "回到地平线", ShowHome, 0.19f, 0.065f, 0.81f, 0.13f,
                 Palette.Mint, Palette.Ink);

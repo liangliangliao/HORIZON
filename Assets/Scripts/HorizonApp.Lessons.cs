@@ -30,8 +30,8 @@ namespace Horizon
             if (chapter == 7) { ShowThirtyDays(); return; }
             if (chapter == 6)
             {
-                GameSession beginning = session ?? new GameSession(Mathf.Max(4, archive.runs.Count + 1), 15);
-                ShowForecastRange(ForecastSimulator.Sample(beginning, null, 30), true);
+                GameSession beginning = archive.ObservationSource(session);
+                ShowForecastRange(ForecastSimulator.Sample(beginning, null, Math.Min(30, beginning.Day + 3)), false, true);
                 return;
             }
             LessonSurface(JourneyProgress.Name(chapter), chapter == 5 ?
@@ -113,7 +113,7 @@ namespace Horizon
             var rows = new List<Tuple<RunRecord, CausalNode>>();
             foreach (RunRecord run in archive.runs.OrderByDescending(r => r.number))
                 foreach (CausalNode node in GameSession.GraphForRun(run).Where(n => n.resolved &&
-                    (n.type == CausalNodeKind.Echo || n.type == CausalNodeKind.Choice)).OrderByDescending(n => n.day))
+                    (n.type == CausalNodeKind.Echo || n.type == CausalNodeKind.Choice || n.type == CausalNodeKind.Mystery)).OrderByDescending(n => n.day))
                     rows.Add(Tuple.Create(run, node));
             RectTransform viewport = View.Rect(overlay, "Echo archive window", 0.045f, 0.16f, 0.955f, 0.762f);
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -142,6 +142,7 @@ namespace Horizon
 
         private void ShowThirtyDaySelf(ForecastRange range, bool other)
         {
+            if (range.targetDay != 30 || archive.journey.Chapter < 7) return;
             if (overlay != null) Destroy(overlay.gameObject); overlay = null;
             Clear(true);
             List<ActionRecord> path = other ? range.otherExample : range.example;

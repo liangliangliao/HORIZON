@@ -8,6 +8,7 @@ namespace Horizon.Game
     public sealed class ForecastRange
     {
         public int targetDay;
+        public int sourceRun, sourceDay;
         public int samples;
         public int energyMin, energyMax, moodMin, moodMax, insightMin, insightMax;
         public int relationMin, relationMax, moneyMin, moneyMax, abilityMin, abilityMax;
@@ -28,6 +29,7 @@ namespace Horizon.Game
                 throw new ArgumentException("A future horizon up to thirty days is required.");
             string frozen = JsonUtility.ToJson(source.Snapshot());
             var result = new ForecastRange { targetDay = targetDay, samples = samples,
+                sourceRun = source.RunNumber, sourceDay = source.Day,
                 energyMin = 10, moodMin = 10, insightMin = 10,
                 relationMin = 10, moneyMin = 10, abilityMin = 10,
                 assumption = source.CatalogVersion >= 3 && source.RunNumber >= 3 ?
@@ -56,8 +58,10 @@ namespace Horizon.Game
                         throw new ArgumentException("The first card is not playable.");
                     if (choice == null)
                     {
+                        if (fork.Day == firstDay && sample == 1) choice = available[0];
+                        if (fork.Day == firstDay && sample == 2) choice = available[available.Length - 1];
                         CardKind preference = (CardKind)(sample % 3);
-                        choice = random.Next(100) < 65 ? available.FirstOrDefault(c => c.Kind == preference) : null;
+                        if (choice == null) choice = random.Next(100) < 65 ? available.FirstOrDefault(c => c.Kind == preference) : null;
                         choice = choice ?? available[random.Next(available.Length)];
                     }
                     fork.Choose(choice.Id);

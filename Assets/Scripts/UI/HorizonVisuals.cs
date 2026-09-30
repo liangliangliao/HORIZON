@@ -314,7 +314,9 @@ namespace Horizon.UI
     public sealed class FutureHold : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
     {
         public Action Activated;
+        public Action Released;
         private Coroutine pending;
+        private bool active;
 
         public void OnPointerDown(PointerEventData eventData)
         {
@@ -329,6 +331,7 @@ namespace Horizon.UI
         {
             yield return new WaitForSecondsRealtime(0.65f);
             pending = null;
+            active = true;
             Activated?.Invoke();
         }
 
@@ -336,7 +339,10 @@ namespace Horizon.UI
         {
             if (pending != null) StopCoroutine(pending);
             pending = null;
+            if (active) { active = false; Released?.Invoke(); }
         }
+
+        private void OnDisable() { StopPending(); }
     }
 
     public sealed class PredictionAxisDrag : MonoBehaviour, IPointerDownHandler, IDragHandler

@@ -80,13 +80,16 @@ namespace Horizon
             {
                 View.Label(root, "Choose concern", "现在，我更想保护这个。", 31, Palette.Muted,
                     TextAnchor.MiddleCenter, 0.1f, 0.298f, 0.9f, 0.352f);
-                for (int i = 0; i < 3; i++)
+                List<ActionRecord> behaviors = ExperienceContent.CommonBehaviors(session);
+                for (int i = 0; i < behaviors.Count; i++)
                 {
-                    CardKind intent = (CardKind)i;
+                    ActionRecord behavior = behaviors[i];
+                    CardKind intent = behavior.kind;
                     float y = 0.217f - i * 0.068f;
-                    View.Button(root, "Protect " + intent, "保护 · " + RecentBehavior(intent), () =>
+                    View.Button(root, "Protect " + behavior.cardId, "保护 · " + behavior.cardName, () =>
                     {
-                        archive.preferredIntent = intent.ToString();
+                        if (session.StationVisited) return;
+                        archive.ProtectBehavior(behavior);
                         FinishStation();
                     }, 0.14f, y, 0.86f, y + 0.058f, intent == CardKind.Growth ? Palette.Mint : Palette.Panel,
                     intent == CardKind.Growth ? Palette.Ink : Palette.Text, 28);
@@ -148,12 +151,13 @@ namespace Horizon
                 {
                     RareMoment reveal = ExperienceContent.RevealMystery(memory, session);
                     if (reveal == null) continue;
-                    archive.pendingMoment = reveal; Save(); break;
+                    archive.pendingMoment = reveal; archive.active = session.Snapshot(); Save(); break;
                 }
             if (archive.pendingMoment == null && session.RunNumber >= archive.nextRareRun && session.Day == 6)
             {
                 archive.pendingMoment = ExperienceContent.Moment(session.RunNumber, session.Day, archive.runs);
                 ExperienceContent.AttachMystery(archive.pendingMoment, session);
+                archive.active = session.Snapshot();
                 archive.nextRareRun = session.RunNumber + ExperienceContent.RareGap(session.RunNumber);
                 archive.moments.Add(archive.pendingMoment);
                 Save();
@@ -206,7 +210,8 @@ namespace Horizon
 
         private void ShowThirtyDays()
         {
-            GameSession beginning = session ?? new GameSession(Mathf.Max(4, archive.runs.Count + 1));
+            if (archive.journey.Chapter < 7) return;
+            GameSession beginning = archive.ObservationSource(session);
             ShowForecastRange(ForecastSimulator.Sample(beginning, null, 30), true);
         }
 
@@ -215,14 +220,15 @@ namespace Horizon
             ShowForecastRange(ForecastSimulator.Sample(session, null, 12), false);
         }
 
-        private void ShowForecastRange(ForecastRange range, bool longView)
+        private void ShowForecastRange(ForecastRange range, bool longView, bool returnToJourney = false)
         {
             if (overlay != null) Destroy(overlay.gameObject);
             overlay = View.Rect(root, "Possible future range", 0, 0, 1, 1);
             View.Fill(overlay, "Range background", Palette.Ink, 0, 0, 1, 1, true);
             View.Label(overlay, "Range title", longView ? "三十天后的自己" : "未来有一个范围", 47, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.835f, 0.94f, 0.925f);
-            View.Label(overlay, "Range assumption", "DAY " + range.targetDay + " · " + range.samples + " 条不同的后续选择\n" + range.assumption,
+            View.Label(overlay, "Range assumption", "RUN " + range.sourceRun.ToString("000") + " / D" + range.sourceDay +
+                " → D" + range.targetDay + " 夜 · " + range.samples + " 条模拟\n" + range.assumption,
                 28, Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.716f, 0.93f, 0.829f);
             string[] rows = { "精力  " + range.energyMin + "–" + range.energyMax,
                 "心情  " + range.moodMin + "–" + range.moodMax,
@@ -243,12 +249,13 @@ namespace Horizon
                 29, Palette.Gold, TextAnchor.MiddleCenter, 0.08f, 0.223f, 0.92f, 0.334f);
             View.Label(overlay, "Range meaning", "它们取决于之后怎样选择。你还可以改变这条路。", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.07f, 0.156f, 0.93f, 0.219f);
-            if (longView) View.Button(overlay, "Meet thirty day self", "走近三十天后的自己", () => ShowThirtyDaySelf(range, false),
+            if (longView && range.targetDay == 30 && archive.journey.Chapter >= 7)
+                View.Button(overlay, "Meet thirty day self", "走近三十天后的自己", () => ShowThirtyDaySelf(range, false),
                 0.12f, 0.15f, 0.88f, 0.219f, Palette.Panel, Palette.Gold, 27);
             View.Button(overlay, "Close future range", "回到此刻", () =>
             {
                 Destroy(overlay.gameObject); overlay = null;
-                if (longView) ShowJourney(); else RenderFocus(false);
+                if (longView || returnToJourney) ShowJourney(); else RenderFocus(false);
             }, 0.15f, 0.06f, 0.85f, 0.13f, Palette.Mint, Palette.Ink, 30);
             View.RefreshText(overlay);
         }

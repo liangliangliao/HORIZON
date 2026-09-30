@@ -59,6 +59,10 @@ namespace Horizon
                 0.06f, 0.416f, 0.5f, 0.443f);
             View.Button(root, "All resources", "全部状态", ShowGoal, 0.73f, 0.417f, 0.94f, 0.442f,
                 Palette.Panel, Palette.Muted, 20);
+            Image stateHit = View.Fill(root, "Hold current state", Color.clear, 0.05f, 0.354f, 0.95f, 0.413f, true);
+            FutureHold hold = stateHit.gameObject.AddComponent<FutureHold>();
+            hold.Activated = () => RevealResourceNumbers(true);
+            hold.Released = () => RevealResourceNumbers(false);
             for (int i = 0; i < values.Length; i++)
             {
                 float width = 0.88f / values.Length, x = 0.06f + i * width;
@@ -124,7 +128,8 @@ namespace Horizon
         private void DrawFocusEchoes()
         {
             List<PendingEcho> echoes = session.Pending.OrderBy(e => e.dueDay)
-                .ThenBy(e => e.kind.ToString() == archive.preferredIntent ? 0 : 1).ToList();
+                .ThenBy(e => e.cardId == archive.preferredCardId ? 0 :
+                    string.IsNullOrEmpty(archive.preferredCardId) && e.kind.ToString() == archive.preferredIntent ? 0 : 1).ToList();
             int pages = Mathf.Max(1, Mathf.CeilToInt(echoes.Count / 3f)); focusPage = Mathf.Clamp(focusPage, 0, pages - 1);
             int visible = ObservationDesign.VisibleTypes(session, archive.journey.Chapter);
             for (int row = 0; row < 3 && focusPage * 3 + row < echoes.Count; row++)

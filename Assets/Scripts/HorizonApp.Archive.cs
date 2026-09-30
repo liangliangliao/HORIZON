@@ -103,7 +103,7 @@ namespace Horizon
             ArchiveSurface("Time map");
             RunRecord run = MapRecord(duringRun);
             List<ActionRecord> actions = run?.actions ?? new List<ActionRecord>();
-            List<CausalNode> graph = GameSession.GraphForRun(run);
+            List<CausalNode> graph = CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
             View.Label(overlay, "Map title", "时 间 地 图", 43, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.915f, 0.94f, 0.975f);
             View.Label(overlay, "Run title", run == null ? "还没有走过的时间线" :
@@ -219,7 +219,7 @@ namespace Horizon
         private void ShowCausalNetwork(RunRecord run, bool duringRun)
         {
             ArchiveSurface("Causal network");
-            List<CausalNode> graph = GameSession.GraphForRun(run);
+            List<CausalNode> graph = CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
             View.Label(overlay, "Network title", "你留下的因果网络", 43, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.865f, 0.94f, 0.955f);
             View.Label(overlay, "Network guide", "拖动查看，点一个节点追溯来路。", 25, Palette.Muted,
@@ -269,7 +269,8 @@ namespace Horizon
                 {
                     ActionRecord action = run.actions.Find(a => a.nodeId == node.id);
                     if (action != null) ShowActionDetail(action, graph, run.actions);
-                    else ShowArchiveDetail(node.label, "它的来路\n" + NodeList(CausalGraph.Ancestors(graph, node.id)) +
+                    else ShowArchiveDetail(node.label, "它的来路\n" + (node.originHidden ? "还没看清，D9 再回来看看。" :
+                        NodeList(CausalGraph.Ancestors(graph, node.id))) +
                         (node.effectRecorded ? "\n\n抵达时的实际变化\n" + PlayExperience.NowLabel(node.effect) : "") +
                         "\n\n接下来的连接\n" + NodeList(CausalGraph.Descendants(graph, node.id)));
                 }, pos.x - 105 / width, pos.y - 40 / height, pos.x + 105 / width, pos.y + 40 / height,
