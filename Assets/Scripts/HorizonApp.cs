@@ -618,9 +618,9 @@ namespace Horizon
             View.Panel(destinationBeacon, "Drop interior", new Color(0.012f, 0.08f, 0.11f, 0.76f),
                 0.02f, 0.07f, 0.98f, 0.93f, 75);
             dropRing = destinationBeacon.gameObject.AddComponent<DropRingGraphic>();
-            dropRing.color = Palette.Mint;
+            dropRing.color = Palette.Gold;
             dropRing.raycastTarget = false;
-            dropTitle = View.Label(destinationBeacon, "Drop title", "把卡牌拖进这个光圈", 31,
+            dropTitle = View.Label(destinationBeacon, "Drop title", "拖进金色投放圈", 31,
                 Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.49f, 0.92f, 0.82f);
             dragHint = View.Label(destinationBeacon, "Destination", "在圈内松手即可使用", 24,
                 Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.13f, 0.94f, 0.48f);
@@ -733,8 +733,10 @@ namespace Horizon
             if (session.RunNumber == 1 && session.Day == 1)
             {
                 handGuide = View.Rect(root, "First action guide", 0, 0, 1, 1);
-                RectTransform handMark = View.Panel(handGuide, "Guiding finger", new Color(1, 0.84f, 0.61f, 0.65f),
+                RectTransform handMark = View.Panel(handGuide, "Guiding palm", new Color(0.95f, 0.97f, 0.94f, 0.65f),
                     0.49f, 0.29f, 0.535f, 0.318f, 24).rectTransform;
+                View.Panel(handMark, "Index finger", new Color(0.95f, 0.97f, 0.94f, 0.8f),
+                    0.17f, 0.6f, 0.48f, 1.5f, 8);
                 handGuide.gameObject.AddComponent<TutorialHand>().Hand = handMark;
             }
         }
@@ -766,8 +768,8 @@ namespace Horizon
             trail.gameObject.SetActive(visible);
             if (handGuide != null) handGuide.gameObject.SetActive(!visible);
             bool ready = visible && IsInsideDropZone(pointer);
-            dropRing.color = ready ? Palette.Gold : Palette.Mint;
-            dropTitle.text = ready ? "松手确认 · 使用这张牌" : "把卡牌拖进这个光圈";
+            dropRing.color = ready ? Palette.Mint : Palette.Gold;
+            dropTitle.text = ready ? "松手确认 · 使用这张牌" : "拖进金色投放圈";
             destinationBeacon.GetComponent<GuidePulse>().Active = !visible;
             if (!visible) { dragHint.text = "在圈内松手即可使用"; return; }
             CardSpec card = cards[drag];

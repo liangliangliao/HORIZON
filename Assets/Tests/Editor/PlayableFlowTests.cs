@@ -27,11 +27,12 @@ namespace Horizon.Tests
             yield return null;
             Set(app, "archive", new ArchiveData());
             Call(app, "StartNewRun");
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSecondsRealtime(0.5f);
 
             Assert.AreNotEqual(UnityEngine.Rendering.GraphicsDeviceType.Null, SystemInfo.graphicsDeviceType,
                 "Visual previews require a graphics device; run Unity under Xvfb without -nographics.");
             yield return Capture(app, "01-board");
+            yield return new WaitForSecondsRealtime(0.3f);
             GameSession session = Get<GameSession>(app, "session");
             HorizonCardDrag growth = FindCard(app, session.Hand[1].Id);
             var pointer = new PointerEventData(EventSystem.current);
@@ -43,7 +44,8 @@ namespace Horizon.Tests
             pointer.position = new Vector2(0, 0);
             growth.OnDrag(pointer);
             growth.OnEndDrag(pointer);
-            yield return new WaitForSeconds(0.3f);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return null;
             Assert.IsFalse(session.HasChosen, "Releasing outside the ring must not use a card.");
             Assert.Less(Vector2.Distance(cardOrigin, growth.transform.position), 1);
             Assert.AreEqual(6, session.Energy);
@@ -56,13 +58,13 @@ namespace Horizon.Tests
             pointer.position = target.TransformPoint(target.rect.center);
             growth.OnDrag(pointer);
             growth.OnEndDrag(pointer);
-            yield return new WaitForSeconds(1);
+            yield return new WaitForSecondsRealtime(1);
             ArchiveData archive = Get<ArchiveData>(app, "archive");
             Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
             Assert.AreEqual(1, session.Day);
             Assert.IsTrue(session.HasChosen);
             int balance = archive.wallet.stardust;
-            yield return new WaitForSeconds(1);
+            yield return new WaitForSecondsRealtime(1);
             Assert.IsNotNull(archive.pendingFeedback, "Results must wait for the player.");
             Assert.AreEqual(1, session.Day);
             yield return Capture(app, "02-action-result");
@@ -72,11 +74,11 @@ namespace Horizon.Tests
             archive.Repair();
             Set(app, "archive", archive);
             Call(app, "ContinueRun");
-            yield return new WaitForSeconds(0.35f);
+            yield return new WaitForSecondsRealtime(0.35f);
             Assert.AreEqual(balance, archive.wallet.stardust);
             Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
             ButtonNamed(app, "Continue result").onClick.Invoke();
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             session = Get<GameSession>(app, "session");
             Assert.AreEqual(2, session.Day);
 
@@ -85,35 +87,35 @@ namespace Horizon.Tests
                 FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
                 Assert.IsNotNull(Get<RectTransform>(app, "overlay"));
                 ButtonNamed(app, "Use card").onClick.Invoke();
-                yield return new WaitForSeconds(1);
+                yield return new WaitForSecondsRealtime(1);
                 Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
                 ButtonNamed(app, "Continue result").onClick.Invoke();
-                yield return new WaitForSeconds(day == 3 ? 5 : 0.4f);
+                yield return new WaitForSecondsRealtime(day == 3 ? 5 : 0.4f);
             }
             Assert.AreEqual(4, session.Day);
             Assert.AreEqual(FeedbackKind.Echoes, archive.pendingFeedback.kind);
             Assert.That(archive.pendingFeedback.description, Does.Contain("D1"));
             yield return Capture(app, "03-echo-result");
             ButtonNamed(app, "Continue result").onClick.Invoke();
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             Assert.IsTrue(session.CanPredict);
             ButtonNamed(app, "Skip prediction").onClick.Invoke();
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             Assert.IsFalse(session.CanPredict);
             FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
             ButtonNamed(app, "Use card").onClick.Invoke();
-            yield return new WaitForSeconds(1);
+            yield return new WaitForSecondsRealtime(1);
             ButtonNamed(app, "Continue result").onClick.Invoke();
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSecondsRealtime(0.5f);
             yield return Capture(app, "04-future-station");
             ButtonNamed(app, "Next station beat").onClick.Invoke();
-            yield return new WaitForSeconds(5);
+            yield return new WaitForSecondsRealtime(5);
             if (archive.pendingFeedback != null) ButtonNamed(app, "Continue result").onClick.Invoke();
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             Assert.AreEqual(5, session.Day);
             Assert.IsTrue(session.StationVisited);
 
@@ -126,21 +128,21 @@ namespace Horizon.Tests
                 session.Advance();
             }
             Call(app, "BuildBoard");
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSecondsRealtime(0.5f);
             FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
             ButtonNamed(app, "Use card").onClick.Invoke();
-            yield return new WaitForSeconds(3);
+            yield return new WaitForSecondsRealtime(3);
             Assert.AreEqual(1, archive.runs.Count);
             Assert.IsNull(archive.active);
             Assert.AreEqual(FeedbackKind.Deadline, archive.pendingFeedback.kind);
             balance = archive.wallet.stardust;
             yield return Capture(app, "05-deadline");
             Call(app, "ContinueRun");
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSecondsRealtime(0.4f);
             Assert.AreEqual(balance, archive.wallet.stardust);
             Assert.IsNotNull(archive.pendingFeedback);
             ButtonNamed(app, "Inspect timeline").onClick.Invoke();
-            yield return new WaitForSeconds(0.35f);
+            yield return new WaitForSecondsRealtime(0.35f);
             if (session.CompletedRun.boss.passed < 3)
             {
                 yield return Capture(app, "06-possible-branch");
@@ -148,7 +150,7 @@ namespace Horizon.Tests
             }
             else ButtonNamed(app, "Close map").onClick.Invoke();
             ButtonNamed(app, "Try another timeline").onClick.Invoke();
-            yield return new WaitForSeconds(1.5f);
+            yield return new WaitForSecondsRealtime(1.5f);
             Assert.IsNull(archive.pendingFeedback);
             Assert.AreEqual(2, Get<GameSession>(app, "session").RunNumber);
             Assert.AreEqual(1, Get<GameSession>(app, "session").Day);
@@ -198,6 +200,7 @@ namespace Horizon.Tests
             Object.Destroy(pixels);
             image.Release();
             Object.Destroy(image);
+            yield return null;
             yield return null;
         }
 

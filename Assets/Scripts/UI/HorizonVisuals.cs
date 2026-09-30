@@ -161,7 +161,12 @@ namespace Horizon.UI
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (!Available) return;
-            if (returning != null) StopCoroutine(returning);
+            if (returning != null)
+            {
+                StopCoroutine(returning);
+                returning = null;
+                rect.position = origin;
+            }
             origin = rect.position;
             down = eventData.pressPosition;
             dragged = true;
