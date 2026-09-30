@@ -1031,18 +1031,20 @@ namespace Horizon
 
         private IEnumerator CascadeSequence(PendingEcho echo)
         {
-            List<CausalNode> path = CausalGraph.Ancestors(session.CausalNodes, echo.nodeId);
+            int chainSize = CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count;
+            List<CausalNode> path = CausalGraph.Ancestors(CausalGraph.ObservedGraph(session.CausalNodes), echo.nodeId);
             if (path.Count < 3) yield break;
             Clear();
             busy = true;
             world.ShowBoard();
-            View.Fill(root, "Chain darkness", new Color(0.009f, 0.026f, 0.045f, path.Count >= 7 ? 1 : 0.7f),
+            View.Fill(root, "Chain darkness", new Color(0.009f, 0.026f, 0.045f, chainSize >= 7 ? 1 : 0.7f),
                 0, 0, 1, 1);
             View.Label(root, "Chain title", "C H A I N   F O U N D", 45, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.05f, 0.82f, 0.95f, 0.91f);
-            bool network = path.Count >= 7;
+            bool network = chainSize >= 7;
             bool vertical = path.Count >= 5;
-            View.Label(root, "Chain clue", network ? "这一刻，只剩下你走出的因果网络。" :
+            View.Label(root, "Chain clue", path.Count < chainSize ? "有些来路，还在雾中。D9 再回头看看。" :
+                network ? "这一刻，只剩下你走出的因果网络。" :
                 "一个选择，正在改变后来的选择。", 30, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.74f, 0.92f, 0.81f);
             var positions = new Dictionary<string, Vector2>();
@@ -1085,7 +1087,7 @@ namespace Horizon
                 yield return new WaitForSeconds(i == 0 ? 0.25f : 0.25f / i);
             }
             View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1);
-            View.Label(root, "Cascade", "C A S C A D E  × " + path.Count, 51, Palette.Gold,
+            View.Label(root, "Cascade", "C A S C A D E  × " + chainSize, 51, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.06f, vertical ? 0.08f : 0.28f,
                 0.94f, vertical ? 0.16f : 0.37f);
             if (!vertical)
@@ -1096,7 +1098,7 @@ namespace Horizon
                     Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.2f, 0.93f, 0.28f);
             }
             Handheld.Vibrate();
-            world.Reward(path.Count, true);
+            world.Reward(chainSize, true);
             StarBurst(path.Count, new Vector2(0.5f, 0.48f));
             yield return new WaitForSeconds(network ? 0.95f : 0.66f);
         }

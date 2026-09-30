@@ -113,6 +113,8 @@ namespace Horizon.Tests
             Assert.AreEqual(1, s.Insight - insight); Assert.AreEqual(1, result.effect.insight);
             Assert.IsTrue(result.originHidden); Assert.AreEqual(0, CausalGraph.ObservedParents(result).Count);
             Assert.AreEqual(1, CausalGraph.Parents(result).Count);
+            Assert.AreEqual(1, CausalGraph.Ancestors(CausalGraph.ObservedGraph(s.CausalNodes), result.id).Count);
+            Assert.AreEqual(2, CausalGraph.Ancestors(s.CausalNodes, result.id).Count);
             Assert.AreEqual(result.id, s.ApplyMystery().id); Assert.AreEqual(insight + 1, s.Insight);
             s = Copy(s); Assert.AreEqual(result.id, s.ApplyMystery().id);
             Assert.AreEqual(insight + 1, s.Insight);
@@ -120,6 +122,7 @@ namespace Horizon.Tests
             result = s.CausalNodes.Find(n => n.id == result.id);
             Assert.IsFalse(result.originHidden); Assert.IsTrue(s.Mysteries[0].revealed);
             Assert.AreEqual(1, CausalGraph.ObservedParents(result).Count);
+            Assert.AreEqual(2, CausalGraph.Ancestors(CausalGraph.ObservedGraph(s.CausalNodes), result.id).Count);
         }
 
         [Test]
