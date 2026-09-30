@@ -85,7 +85,26 @@ namespace Horizon.Game
             "2日后  ·  机会", "机会变成了作品");
         public static readonly CardSpec Together = new CardSpec("together", "并肩准备", CardKind.Growth,
             new ResourceDelta(-1, 0, 0, 1), new ResourceDelta(0, 1, 0, 0, 1, 1), 2,
-            "2日后  ·  同行", "有人一起走到了这里", true);
+                "2日后  ·  同行", "有人一起走到了这里", true);
+
+        private static readonly CardSpec[] NewActions =
+        {
+            new CardSpec("play", "玩一局", CardKind.Temptation,
+                new ResourceDelta(-1, 3), new ResourceDelta(0, -1), 1,
+                "明天  ·  余兴", "快乐留下了一点余温"),
+            new CardSpec("mentor", "请教前辈", CardKind.Growth,
+                new ResourceDelta(-2, 0, 1, 0, -1), new ResourceDelta(0, 0, 1, 1, 0, 2), 2,
+                "2日后  ·  指引", "一个建议打开了方向", true),
+            new CardSpec("nightwalk", "夜里散步", CardKind.Recovery,
+                new ResourceDelta(2, 2), new ResourceDelta(1, 0, 1), 1,
+                "明天  ·  呼吸", "夜风让思绪清楚了一点"),
+            new CardSpec("shortstudy", "利用半小时", CardKind.Growth,
+                new ResourceDelta(-1), new ResourceDelta(0, 0, 1, 0, 0, 1), 1,
+                "明天  ·  小芽", "短短的投入也留下了成长"),
+            new CardSpec("smalljob", "短时帮忙", CardKind.Growth,
+                new ResourceDelta(-2, 0, 0, 1, 2), new ResourceDelta(0, 0, 1, 0, 0, 1), 1,
+                "明天  ·  合作", "一次合作留下了经验", true)
+        };
 
         private static readonly CardSpec[] Temptations =
         {
@@ -138,7 +157,7 @@ namespace Horizon.Game
                 "明天  ·  回声", "身体记住了呼吸")
         };
 
-        public static CardSpec[] ForDay(int day, int runNumber)
+        public static CardSpec[] ForDay(int day, int runNumber, int catalogVersion = 2)
         {
             if (day < 1 || day > 12) throw new ArgumentOutOfRangeException("day");
             if (runNumber < 1) throw new ArgumentOutOfRangeException("runNumber");
@@ -146,7 +165,14 @@ namespace Horizon.Game
                 return new[] { Temptations[0], Growth[0], Recovery[0] };
 
             int index = (day - 1 + runNumber - 1) % Temptations.Length;
-            return new[] { Temptations[index], Growth[index], Recovery[index] };
+            CardSpec[] hand = new[] { Temptations[index], Growth[index], Recovery[index] };
+            if (catalogVersion >= 2 && runNumber >= 2)
+            {
+                if (day == 8) hand[1] = NewActions[1];
+                if (day == 10) hand[0] = NewActions[0];
+                if (day == 11) hand[2] = NewActions[2];
+            }
+            return hand;
         }
 
         public static CardSpec FindById(string id)
@@ -154,6 +180,8 @@ namespace Horizon.Game
             if (id == SoloRecovery.Id) return SoloRecovery;
             if (id == Opportunity.Id) return Opportunity;
             if (id == Together.Id) return Together;
+            CardSpec extra = Array.Find(NewActions, candidate => candidate.Id == id);
+            if (extra != null) return extra;
             CardSpec card = Array.Find(Temptations, candidate => candidate.Id == id);
             if (card != null) return card;
             card = Array.Find(Growth, candidate => candidate.Id == id);

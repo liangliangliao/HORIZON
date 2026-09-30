@@ -66,13 +66,25 @@ jobs:
           test -s artifacts/visuals/03-echo-result.png
           test -s artifacts/visuals/04-future-station.png
           test -s artifacts/visuals/05-deadline.png
+          test -s artifacts/visuals/07-archive-detail.png
+          test -s artifacts/visuals/08-branch-planner.png
+          test -s artifacts/visuals/09-causal-network.png
+          test -s artifacts/visuals/10-share-story.png
+          test -s artifacts/visuals/11-rare-moment.png
+          test -s artifacts/visuals/12-range-forecast.png
+
+      - name: Decode and verify actual Unity GIF exports
+        shell: bash
+        run: |
+          python -m pip install pillow==12.3.0
+          python tools/verify_timeline_exports.py
 
       - name: Upload Unity portrait previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Unity-Portrait-Previews
-          path: artifacts/visuals/*.png
+          path: artifacts/visuals/
           if-no-files-found: ignore
           retention-days: 14
 

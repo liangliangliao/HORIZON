@@ -25,9 +25,15 @@ Shader "HORIZON/LitColor"
             fixed4 frag(v2f i):SV_Target
             {
                 half3 n=normalize(i.normal);
-                half diffuse=max(0,dot(n,normalize(_WorldSpaceLightPos0.xyz)));
-                half3 rim=pow(1-saturate(dot(n,normalize(_WorldSpaceCameraPos-i.world))),3)*half3(0.08,0.22,0.24);
-                fixed4 c=fixed4(_Color.rgb*(ShadeSH9(half4(n,1))+_LightColor0.rgb*diffuse*SHADOW_ATTENUATION(i))+_Emission.rgb+rim,1);
+                half3 light=normalize(_WorldSpaceLightPos0.xyz);
+                half3 view=normalize(_WorldSpaceCameraPos-i.world);
+                half diffuse=saturate(dot(n,light)*0.65+0.35);
+                half shadow=lerp(0.38,1,SHADOW_ATTENUATION(i));
+                half spec=pow(saturate(dot(n,normalize(light+view))),24)*0.14;
+                half3 rim=pow(1-saturate(dot(n,view)),3)*half3(0.05,0.15,0.17);
+                half3 rgb=_Color.rgb*(ShadeSH9(half4(n,1))*0.75+_LightColor0.rgb*diffuse*shadow*0.8)+_Emission.rgb+rim+spec*_LightColor0.rgb;
+                rgb=rgb/(1+rgb*0.35);
+                fixed4 c=fixed4(rgb,1);
                 UNITY_APPLY_FOG(i.fogCoord,c); return c;
             }
             ENDCG

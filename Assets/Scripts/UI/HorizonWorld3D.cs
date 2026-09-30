@@ -8,7 +8,7 @@ namespace Horizon.UI
 {
     // A real, lit 3D diorama. Geometry and sound are authored here so the Android
     // build has no missing asset downloads, font-dependent symbols or paid packs.
-    public sealed class HorizonWorld3D : MonoBehaviour
+    public sealed partial class HorizonWorld3D : MonoBehaviour
     {
         public Camera WorldCamera { get; private set; }
         public Transform Avatar { get; private set; }
@@ -51,12 +51,14 @@ namespace Horizon.UI
             key.transform.SetParent(transform, false);
             key.type = LightType.Directional;
             key.transform.rotation = Quaternion.Euler(38, -28, 0);
-            key.intensity = 1.3f;
+            key.intensity = 1.1f;
             key.shadows = LightShadows.Soft;
+            key.shadowStrength = 0.6f;
             QualitySettings.shadowDistance = 22;
             QualitySettings.shadows = ShadowQuality.All;
             QualitySettings.antiAliasing = 2;
-            RenderSettings.ambientLight = new Color(0.28f, 0.38f, 0.52f);
+            RenderSettings.ambientLight = new Color(0.23f, 0.29f, 0.39f);
+            RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = 0.025f;
@@ -94,6 +96,7 @@ namespace Horizon.UI
             sounds.Add(Tone("Echo reward", new[] { 330f, 440f, 660f, 880f, 1100f }, 0.7f));
             sounds.Add(Tone("Impact", new[] { 160f, 110f, 70f }, 0.25f));
             sounds.Add(Tone("Cascade", new[] { 440f, 554f, 660f, 880f, 1108f, 1320f }, 0.7f));
+            InitializeAtmosphere();
             SetTheme(0);
             ShowBoard();
             SnapCamera();
@@ -111,12 +114,17 @@ namespace Horizon.UI
 
         public void ShowBoard()
         {
+            rareActive = false;
+            Focus(false);
+            if (memoryGroup != null) memoryGroup.gameObject.SetActive(false);
+            if (rareGroup != null) rareGroup.gameObject.SetActive(false);
             station = false;
             WorldCamera.rect = new Rect(0, 0.43f, 1, 0.48f);
             cameraPosition = new Vector3(5.8f, 4.8f, -8.7f);
             cameraLook = new Vector3(0, 1, 1.2f);
             Avatar.gameObject.SetActive(true);
             Avatar.localPosition = avatarHome;
+            Avatar.GetComponent<HorizonActor>().Walking = false;
             futureSelf.gameObject.SetActive(false);
             bench.gameObject.SetActive(false);
             gates.gameObject.SetActive(false);
@@ -128,11 +136,16 @@ namespace Horizon.UI
             activeKind = (int)kind;
             for (int i = 0; i < props.Length; i++) props[i].gameObject.SetActive(i == activeKind);
             companions.gameObject.SetActive(support);
+            Avatar.GetComponent<HorizonActor>().SetIntent(kind);
+            Avatar.localRotation = Quaternion.Euler(0, kind == CardKind.Growth ? -38 : kind == CardKind.Temptation ? 30 : -8, 0);
         }
 
         public void ShowStation(int stage, bool reveal)
         {
             station = true;
+            rareActive = false;
+            if (rareGroup != null) rareGroup.gameObject.SetActive(false);
+            Focus(false);
             WorldCamera.rect = new Rect(0, 0, 1, 1);
             cameraPosition = new Vector3(2.5f - stage * 0.55f, 2.8f, -6 + stage * 1.6f);
             cameraLook = new Vector3(0, 1.35f, 4.2f);
@@ -140,6 +153,9 @@ namespace Horizon.UI
             companions.gameObject.SetActive(false);
             futureSelf.gameObject.SetActive(true);
             futureSelf.localRotation = Quaternion.Euler(0, reveal ? 0 : 145, 0);
+            futureSelf.localPosition = new Vector3(0, 0, 4.2f);
+            futureSelf.GetComponent<HorizonActor>().Pointing = false;
+            futureSelf.GetComponent<HorizonActor>().Walking = false;
             bench.gameObject.SetActive(true);
             gates.gameObject.SetActive(false);
             foreach (Transform prop in props) prop.gameObject.SetActive(false);
@@ -152,6 +168,7 @@ namespace Horizon.UI
             cameraPosition = new Vector3(4.5f, 3.8f, -9.5f);
             cameraLook = new Vector3(0, 1.2f, 3);
             gates.gameObject.SetActive(true);
+            if (memoryGroup != null) memoryGroup.gameObject.SetActive(false);
             Avatar.gameObject.SetActive(true);
             companions.gameObject.SetActive(false);
             futureSelf.gameObject.SetActive(false);
@@ -172,6 +189,7 @@ namespace Horizon.UI
             audioSource.pitch = 1;
             Preview(kind, support);
             pulse = 1;
+            Avatar.GetComponent<HorizonActor>().Celebrate();
             shake = kind == CardKind.Temptation ? 0.18f : 0.07f;
             Play(kind == CardKind.Temptation ? 2 : 0);
             StartCoroutine(SendSymbol(kind));
@@ -180,6 +198,7 @@ namespace Horizon.UI
         public void Reward(int amount, bool cascade = false)
         {
             audioSource.pitch = 1;
+            Avatar.GetComponent<HorizonActor>().Celebrate();
             Burst(Avatar.position + Vector3.up * 1.4f, Palette.Gold, Mathf.Clamp(amount * 4, 12, 48));
             pulse = 1;
             shake = cascade ? 0.14f : 0.05f;
@@ -292,18 +311,47 @@ namespace Horizon.UI
         {
             Transform person = Group(name, parent);
             person.localPosition = position;
-            Shape(person, "Coat", PrimitiveType.Capsule, new Vector3(0, 1, 0), new Vector3(0.64f, 0.53f, 0.4f), coat);
-            Shape(person, "Head", PrimitiveType.Sphere, new Vector3(0, 1.68f, 0), Vector3.one * 0.46f, skin);
-            Shape(person, "Hair", PrimitiveType.Sphere, new Vector3(0, 1.8f, 0.04f), new Vector3(0.49f, 0.3f, 0.46f), hair);
+            var actor = person.gameObject.AddComponent<HorizonActor>();
+            Shape(person, "Jacket", PrimitiveType.Capsule, new Vector3(0, 1, 0), new Vector3(0.61f, 0.5f, 0.42f), coat);
+            Box(person, "Jacket seam", new Vector3(0, 1.05f, -0.218f), new Vector3(0.02f, 0.58f, 0.02f), dark);
+            for (int button = 0; button < 3; button++)
+                Shape(person, "Jacket button", PrimitiveType.Sphere, new Vector3(0.035f, 0.86f + button * 0.16f, -0.226f), Vector3.one * 0.035f, gold);
+            Transform head = Group("Head pivot", person);
+            head.localPosition = new Vector3(0, 1.66f, 0);
+            actor.Head = head;
+            Shape(head, "Face", PrimitiveType.Sphere, Vector3.zero, new Vector3(0.47f, 0.48f, 0.44f), skin);
+            Shape(head, "Hair crown", PrimitiveType.Sphere, new Vector3(0, 0.15f, 0.025f), new Vector3(0.49f, 0.3f, 0.46f), hair);
+            Shape(head, "Hair fringe", PrimitiveType.Sphere, new Vector3(-0.09f, 0.12f, -0.13f), new Vector3(0.27f, 0.17f, 0.24f), hair);
+            Shape(head, "Nose", PrimitiveType.Sphere, new Vector3(0, 0.015f, -0.232f), new Vector3(0.067f, 0.06f, 0.085f), skin);
+            Box(head, "Smile", new Vector3(0, -0.073f, -0.218f), new Vector3(0.07f, 0.018f, 0.014f), hair);
             for (int i = -1; i <= 1; i += 2)
             {
-                Shape(person, "Leg", PrimitiveType.Capsule, new Vector3(i * 0.16f, 0.34f, 0), new Vector3(0.18f, 0.32f, 0.2f), dark);
-                Shape(person, "Arm", PrimitiveType.Capsule, new Vector3(i * 0.38f, 1, 0), new Vector3(0.18f, 0.35f, 0.18f), coat);
-                Shape(person, "Shoe", PrimitiveType.Cube, new Vector3(i * 0.16f, 0.09f, -0.08f), new Vector3(0.22f, 0.16f, 0.34f), dark);
-                Shape(person, "Eye", PrimitiveType.Sphere, new Vector3(i * 0.08f, 1.7f, -0.216f), Vector3.one * 0.04f, hair);
+                Transform leg = Group(i < 0 ? "Left hip" : "Right hip", person);
+                leg.localPosition = new Vector3(i * 0.16f, 0.63f, 0);
+                Shape(leg, "Trouser", PrimitiveType.Capsule, new Vector3(0, -0.28f, 0), new Vector3(0.19f, 0.29f, 0.21f), dark);
+                Shape(leg, "Shoe", PrimitiveType.Sphere, new Vector3(0, -0.54f, -0.08f), new Vector3(0.23f, 0.16f, 0.36f), dark);
+                Transform arm = Group(i < 0 ? "Left shoulder" : "Right shoulder", person);
+                arm.localPosition = new Vector3(i * 0.33f, 1.3f, 0);
+                Shape(arm, "Sleeve", PrimitiveType.Capsule, new Vector3(i * 0.04f, -0.22f, 0), new Vector3(0.19f, 0.24f, 0.2f), coat);
+                Transform hand = Shape(arm, "Hand", PrimitiveType.Sphere, new Vector3(i * 0.04f, -0.47f, 0), Vector3.one * 0.17f, skin);
+                Transform eye = Shape(head, "Eye", PrimitiveType.Sphere, new Vector3(i * 0.086f, 0.045f, -0.208f), new Vector3(0.052f, 0.061f, 0.042f), hair);
+                Shape(eye, "Eye light", PrimitiveType.Sphere, new Vector3(-0.19f, 0.21f, -0.43f), Vector3.one * 0.24f, gold);
+                Shape(head, "Ear", PrimitiveType.Sphere, new Vector3(i * 0.232f, 0, 0), new Vector3(0.08f, 0.12f, 0.07f), skin);
+                if (i < 0)
+                {
+                    actor.LeftArm = arm; actor.LeftLeg = leg; actor.LeftEye = eye;
+                    actor.Book = Box(hand, "Held book", new Vector3(0, -0.1f, -0.065f), new Vector3(1.15f, 0.22f, 0.8f), teal).gameObject;
+                }
+                else
+                {
+                    actor.RightArm = arm; actor.RightLeg = leg; actor.RightEye = eye;
+                    actor.Phone = Box(hand, "Held phone", new Vector3(0, -0.1f, -0.05f), new Vector3(0.6f, 1.1f, 0.12f), pink).gameObject;
+                }
             }
             Box(person, "Scarf", new Vector3(0, 1.46f, -0.13f), new Vector3(0.44f, 0.1f, 0.32f), gold);
+            Box(person, "Scarf tail", new Vector3(0.19f, 1.24f, -0.23f), new Vector3(0.1f, 0.38f, 0.045f), gold);
             Box(person, "Backpack", new Vector3(0, 1.1f, 0.28f), new Vector3(0.44f, 0.55f, 0.2f), teal);
+            actor.SetNeutral();
             return person;
         }
 
@@ -334,6 +382,7 @@ namespace Horizon.UI
                     new Vector3(0.12f, 0.018f, 0.12f), color == Palette.Coral ? pink :
                         color == Palette.Mint ? teal : gold);
                 var motion = spark.gameObject.AddComponent<WorldSpark>();
+                spark.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
                 float angle = i * 2.399f;
                 motion.Velocity = new Vector3(Mathf.Cos(angle), 1.5f + (i % 5) * 0.22f, Mathf.Sin(angle)) * 2;
             }
@@ -360,7 +409,8 @@ namespace Horizon.UI
             Dispose(go.GetComponent<Collider>());
             Renderer renderer = go.GetComponent<Renderer>();
             renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = type == PrimitiveType.Capsule ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            renderer.shadowCastingMode = material.shader.name == "HORIZON/LitColor" ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            renderer.receiveShadows = true;
             return go.transform;
         }
 

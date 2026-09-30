@@ -16,6 +16,30 @@ namespace Horizon.Tests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
 
+        [UnityTest]
+        public IEnumerator FutureStationCanPlayItsFullDefaultSequenceWithoutInput()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test station").AddComponent<HorizonApp>();
+            yield return null;
+            var session = new GameSession(1);
+            while (session.Day < 4)
+            { session.Choose(session.Hand[2].Id); session.Advance(); }
+            session.SkipPrediction(); session.Choose(session.Hand[2].Id);
+            var archive = new ArchiveData { active = session.Snapshot() };
+            Set(app, "archive", archive); Set(app, "session", session);
+            float start = Time.realtimeSinceStartup;
+            Call(app, "RenderStationBeat", 0);
+            while (!session.StationVisited && Time.realtimeSinceStartup - start < 60) yield return null;
+            Assert.IsTrue(session.StationVisited, "The default station sequence should finish without a hidden confirmation.");
+            Assert.That(Time.realtimeSinceStartup - start, Is.InRange(45f, 60f));
+            Assert.AreEqual(5, session.Day);
+            Assert.AreEqual(0, archive.wallet.stardust, "Station playback must not add power or currency.");
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
         // Runs the actual MonoBehaviours, uGUI buttons, card drag handlers and save
         // path. Screenshots are rendered by Unity, not reconstructed from HTML.
         [UnityTest]
@@ -109,6 +133,13 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(0.4f);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.4f);
+            archive = JsonUtility.FromJson<ArchiveData>(PlayerPrefs.GetString("HORIZON.PROTOTYPE.V1"));
+            archive.Repair();
+            Set(app, "archive", archive);
+            Call(app, "ContinueRun");
+            yield return new WaitForSecondsRealtime(0.4f);
+            session = Get<GameSession>(app, "session");
+            Assert.AreEqual(1, archive.stationBeat, "Interrupted station playback must resume its saved beat.");
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.5f);
             yield return Capture(app, "04-future-station");
@@ -149,12 +180,94 @@ namespace Horizon.Tests
                 ButtonNamed(app, "Close ghost").onClick.Invoke();
             }
             else ButtonNamed(app, "Close map").onClick.Invoke();
+
+            string savedLife = JsonUtility.ToJson(archive.runs[0]);
+            Call(app, "RenderMap", false);
+            yield return null;
+            ButtonNamed(app, "Inspect day 1").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.3f);
+            yield return Capture(app, "07-archive-detail");
+            ButtonNamed(app, "Explore another choice").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Next branch day").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Next branch day").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Branch choice portfolio").onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(1, Get<System.Collections.Generic.Dictionary<int, string>>(app, "branchChoices").Count);
+            yield return Capture(app, "08-branch-planner");
+            ButtonNamed(app, "Close branch planner").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Causal network").onClick.Invoke();
+            yield return null;
+            yield return Capture(app, "09-causal-network");
+            ButtonNamed(app, "Close causal network").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Browse lives").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Filter lives 2").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Open life 1").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Share life").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.3f);
+            ButtonNamed(app, "Save share animation").onClick.Invoke();
+            float exportDeadline = Time.realtimeSinceStartup + 45;
+            while (string.IsNullOrEmpty(Get<string>(app, "lastSharePath")) && Time.realtimeSinceStartup < exportDeadline)
+                yield return null;
+            string exported = Get<string>(app, "lastSharePath");
+            Assert.IsNotEmpty(exported, "The real canvas recording must produce a playable GIF.");
+            Assert.IsTrue(File.Exists(exported));
+            Assert.IsFalse(File.Exists(exported + ".tmp"));
+            File.Copy(exported, Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals", "HORIZON-run-001.gif"), true);
+            yield return Capture(app, "10-share-story");
+            ButtonNamed(app, "Save share animation").onClick.Invoke();
+            yield return null;
+            ButtonNamed(app, "Close share").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.IsFalse(File.Exists(exported + ".tmp"), "Leaving an export must clear the partial file.");
+            Assert.AreEqual(savedLife, JsonUtility.ToJson(archive.runs[0]));
+            Assert.AreEqual(balance, archive.wallet.stardust, "Archive exploration and sharing must not mint rewards.");
+            ButtonNamed(app, "Close map").onClick.Invoke();
+            yield return null;
             ButtonNamed(app, "Try another timeline").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1.5f);
             Assert.IsNull(archive.pendingFeedback);
             Assert.AreEqual(2, Get<GameSession>(app, "session").RunNumber);
             Assert.AreEqual(1, Get<GameSession>(app, "session").Day);
             Assert.AreEqual(balance, archive.wallet.stardust);
+            ButtonNamed(app, "Begin second life").onClick.Invoke();
+            yield return null;
+
+            var third = new GameSession(3);
+            while (third.Day < 6)
+            {
+                if (third.CanPredict) third.SkipPrediction();
+                third.Choose(third.Hand[2].Id);
+                if (third.Day == 4) third.VisitStation();
+                third.Advance();
+            }
+            Set(app, "session", third);
+            archive.active = third.Snapshot();
+            Call(app, "BuildBoard");
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsNotNull(archive.pendingMoment);
+            yield return Capture(app, "11-rare-moment");
+            RareMoment moment = archive.pendingMoment;
+            Call(app, "ContinueRun");
+            yield return null;
+            Assert.AreEqual(moment.title, archive.pendingMoment.title);
+            ButtonNamed(app, "Continue rare moment").onClick.Invoke();
+            yield return null;
+            Assert.IsNull(archive.pendingMoment);
+            Assert.AreEqual(1, archive.moments.Count);
+            Assert.AreEqual(balance, archive.wallet.stardust);
+            Call(app, "ShowRangeForecast");
+            yield return null;
+            yield return Capture(app, "12-range-forecast");
+            ButtonNamed(app, "Close future range").onClick.Invoke();
+            yield return null;
             PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
             yield return new ExitPlayMode();
         }
@@ -224,6 +337,7 @@ namespace Horizon.Tests
         }
         private static T Get<T>(HorizonApp app, string field) { return (T)typeof(HorizonApp).GetField(field, Private).GetValue(app); }
         private static void Set(HorizonApp app, string field, object value) { typeof(HorizonApp).GetField(field, Private).SetValue(app, value); }
-        private static void Call(HorizonApp app, string method) { typeof(HorizonApp).GetMethod(method, Private).Invoke(app, null); }
+        private static void Call(HorizonApp app, string method, params object[] arguments)
+        { typeof(HorizonApp).GetMethod(method, Private).Invoke(app, arguments); }
     }
 }

@@ -110,9 +110,12 @@ namespace Horizon.Game
 
         public static string GateReason(GameSession session, int gate)
         {
-            if (gate == 0) return "能力 " + session.Ability + "/6 · 成长牌的回声会提高能力。";
+            if (gate == 0) return "能力 " + session.Ability + "/6 · " +
+                (session.CatalogVersion >= 2 ? "成长回声 " + session.Actions.FindAll(a => a.echoed && a.later != null && a.later.ability > 0).Count +
+                    "/2，练习和作品会帮你。" : "成长牌的回声会提高能力。");
             if (gate == 1) return "精力 " + session.Energy + "、心情 " + session.Mood +
-                " · 截止日各需至少 4，恢复牌可以帮助你。";
+                " · 截止日各需至少 4" + (session.CatalogVersion >= 2 ? "；恢复 " +
+                    session.Actions.FindAll(a => a.kind == CardKind.Recovery).Count + "/2。" : "，恢复牌可以帮助你。");
             return "支援行动 " + session.SupportActions + "/2 · 关系 " + session.Relation +
                 "/6 · 金钱 " + session.Money + "/2，朋友与合作会留下支援。";
         }
