@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Horizon.Game
 {
-    [Serializable]
     public sealed partial class RareMoment
     {
         public int futureDay;
