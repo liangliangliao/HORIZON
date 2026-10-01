@@ -64,12 +64,14 @@ namespace Horizon.UI
                 if (action != null && action.echoed)
                     Ring(timelineGroup, "Returned day " + day, DayPoint(day) + Vector3.up * 0.05f, 0.2f, glass, false);
             }
+            BuildTimelineLinks(actions);
         }
 
         public void BeginEcho(PendingEcho echo)
         {
             Avatar.GetComponent<HorizonActor>().FreezeUntil = Time.unscaledTime + 0.15f;
             if (ambientFilter != null) ambientFilter.cutoffFrequency = 500;
+            if (bloom != null) bloom.Echo = 0.55f;
             cameraPosition = new Vector3(2.2f, 3.3f, -6.3f);
             cameraLook = Vector3.Lerp(Avatar.position + Vector3.up, DayPoint(echo.sourceDay) + Vector3.up, 0.3f);
         }
@@ -153,6 +155,7 @@ namespace Horizon.UI
         {
             Transform orb = Shape(transform, "A past choice arriving", PrimitiveType.Sphere,
                 DayPoint(echo.sourceDay) + Vector3.up * 0.2f, Vector3.one * 0.23f, echo.kind == CardKind.Temptation ? pink : teal);
+            Trail(orb, echo.kind == CardKind.Temptation ? warmLight : portalLight);
             Vector3 start = orb.position;
             Vector3 end = Avatar.position + Vector3.up * 1.3f;
             for (float age = 0; age < 0.46f; age += Time.unscaledDeltaTime)

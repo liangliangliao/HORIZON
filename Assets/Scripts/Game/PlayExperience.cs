@@ -6,6 +6,19 @@ namespace Horizon.Game
     public enum FeedbackKind { Choice, Echoes, Deadline }
 
     [Serializable]
+    public sealed class FeedbackBeat
+    {
+        public string title;
+        public string source;
+        public int sourceDay;
+        public int destinationDay;
+        public CardKind intent;
+        public bool support;
+        public ResourceDelta delta;
+        public string meaning;
+    }
+
+    [Serializable]
     public sealed class FeedbackRecord
     {
         public FeedbackKind kind;
@@ -14,6 +27,9 @@ namespace Horizon.Game
         public string title;
         public string description;
         public int stardust;
+        public List<FeedbackBeat> beats = new List<FeedbackBeat>();
+        public int page;
+        public bool presented;
     }
 
     [Serializable]
@@ -64,6 +80,23 @@ namespace Horizon.Game
 
     public static class PlayExperience
     {
+        public static string DestinationLabel(CardSpec card, int day)
+        {
+            if (card.Delay == 0) return "今天 · 立即恢复";
+            int due = day + card.Delay;
+            return "D" + due.ToString("00") + (due > GameSession.LastDay ? " · 截止日之后" : " · " + card.Delay + " 天后回来");
+        }
+
+        public static string LandingLabel(CardSpec card)
+        {
+            return card.Delay == 0 ? "松手 · 现在恢复" : "松手 · 送入未来";
+        }
+
+        public static bool IsDifficult(ResourceDelta delta)
+        {
+            return delta != null && (delta.energy < 0 || delta.mood < 0 || delta.relation < 0 || delta.money < 0);
+        }
+
         public static string NowLabel(ResourceDelta delta)
         {
             if (delta == null) return "状态没有变化";

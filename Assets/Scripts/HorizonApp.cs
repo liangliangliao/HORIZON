@@ -189,6 +189,8 @@ namespace Horizon
             dropTitle = null;
             boardHint = null;
             handGuide = null;
+            activeDrag = null;
+            dropReady = false;
             busy = false;
             if (!immersive) Backdrop();
         }
@@ -381,48 +383,21 @@ namespace Horizon
 
         private void ShowFeedback()
         {
-            FeedbackRecord feedback = archive.pendingFeedback;
-            if (feedback == null) { BuildBoard(); return; }
-            if (feedback.kind == FeedbackKind.Deadline)
-            { ShowDeadlineResult(archive.runs[archive.runs.Count - 1]); return; }
-            Clear();
-            world.ShowBoard();
-            View.Label(root, "Result day", "DAY " + feedback.day.ToString("00") + " / 12", 32,
-                Palette.Text, TextAnchor.MiddleLeft, 0.06f, 0.95f, 0.55f, 0.985f);
-            View.Label(root, "Wallet", "星尘 " + archive.wallet.stardust, 28, Palette.Gold,
-                TextAnchor.MiddleRight, 0.61f, 0.95f, 0.94f, 0.985f);
-            RectTransform panel = View.Panel(root, "Readable result", Palette.Panel,
-                0.05f, 0.055f, 0.95f, 0.57f, 40).rectTransform;
-            panel.gameObject.AddComponent<PanelEntrance>();
-            View.Label(panel, "Result title", feedback.title, 40, Palette.Text,
-                TextAnchor.MiddleLeft, 0.065f, 0.79f, 0.935f, 0.955f);
-            ResultText(panel, feedback.description);
-            View.Label(panel, "Reward", "+" + feedback.stardust + " 星尘 · 已收集", 34, Palette.Gold,
-                TextAnchor.MiddleLeft, 0.065f, 0.225f, 0.935f, 0.315f);
-            View.Label(panel, "Hold result", "看完再继续。你可以按自己的节奏玩。", 23, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.065f, 0.158f, 0.935f, 0.217f);
-            string next = feedback.kind == FeedbackKind.Choice ?
-                feedback.day == 4 && !session.StationVisited ? "走进未来站" : "前往第 " + (feedback.day + 1) + " 天" :
-                session.CanPredict ? "试着预测三天后" : "回到今天，选一张牌";
-            View.Button(panel, "Continue result", next, ContinueFeedback,
-                0.065f, 0.035f, 0.935f, 0.153f, Palette.Mint, Palette.Ink, 31);
-            if (feedback.stardust > 0)
-            {
-                bool quiet = feedback.kind == FeedbackKind.Choice && session.Actions.Count > 0 &&
-                    session.Actions[session.Actions.Count - 1].kind == CardKind.Growth;
-                bool difficult = feedback.kind == FeedbackKind.Echoes && session.CausalNodes.Exists(n =>
-                    n.type == CausalNodeKind.Echo && n.day == session.Day && n.effectRecorded && n.effect != null &&
-                    (n.effect.energy < 0 || n.effect.mood < 0 || n.effect.relation < 0 || n.effect.money < 0));
-                if (!quiet && !difficult) world.Reward(feedback.stardust, feedback.kind == FeedbackKind.Echoes);
-                if (!quiet) StarBurst(feedback.stardust, new Vector2(0.5f, 0.21f));
-            }
-            View.RefreshText(root);
+            RenderFeedbackReceipt();
         }
 
         private void ContinueFeedback()
         {
             if (busy || archive.pendingFeedback == null) return;
-            FeedbackKind kind = archive.pendingFeedback.kind;
+            FeedbackRecord receipt = archive.pendingFeedback;
+            if (receipt.beats != null && receipt.page < receipt.beats.Count - 1)
+            {
+                receipt.page++;
+                Save();
+                ShowFeedback();
+                return;
+            }
+            FeedbackKind kind = receipt.kind;
             archive.pendingFeedback = null;
             Save();
             if (kind == FeedbackKind.Choice)
@@ -460,10 +435,13 @@ namespace Horizon
 
         private void StarBurst(int amount, Vector2 start)
         {
+            ReceiptPulse(root, start, Palette.Gold);
             for (int i = 0; i < Mathf.Clamp(amount * 3, 6, 20); i++)
             {
-                RectTransform coin = View.Panel(root, "Collected stardust", Palette.Gold,
-                    start.x - 0.009f, start.y - 0.005f, start.x + 0.009f, start.y + 0.005f, 15).rectTransform;
+                RectTransform coin = View.Rect(root, "Collected stardust",
+                    start.x - 0.009f, start.y - 0.005f, start.x + 0.009f, start.y + 0.005f);
+                var star = coin.gameObject.AddComponent<StardustGraphic>();
+                star.color = Palette.Gold; star.raycastTarget = false;
                 var flight = coin.gameObject.AddComponent<RewardFlight>();
                 flight.StartPoint = start;
                 flight.Index = i;
@@ -629,21 +607,21 @@ namespace Horizon
             ActionRecord recent = session.Actions.FindLast(a => a.day < session.Day);
             View.Label(root, "Scene time", weekdays[(session.Day - 1) % 7] + " · " +
                 (recent?.kind == CardKind.Temptation ? "夜" : recent?.kind == CardKind.Growth ? "午后" : "清晨"),
-                23, Palette.Muted, TextAnchor.MiddleCenter, 0.12f, 0.689f, 0.88f, 0.723f);
+                23, Palette.Muted, TextAnchor.MiddleCenter, 0.12f, 0.754f, 0.88f, 0.778f);
             View.Panel(root, "Present caption plate", new Color(0.012f, 0.03f, 0.047f, 0.7f),
-                0.17f, 0.727f, 0.83f, 0.778f, 23);
+                0.08f, 0.455f, 0.92f, 0.49f, 23);
             View.Label(root, "Scene line", session.SocialUnavailableToday ?
                 "疲惫让邀约改变了，今天还有其他选择。" : session.Situation ?? "今天，你想做什么？", 30,
-                Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.727f, 0.93f, 0.778f);
-            destinationBeacon = View.Rect(root, "Play destination", 0.16f, 0.472f, 0.84f, 0.605f);
-            View.Panel(destinationBeacon, "Drop interior", new Color(0.012f, 0.08f, 0.11f, 0.76f),
+                Palette.Text, TextAnchor.MiddleCenter, 0.1f, 0.455f, 0.9f, 0.49f);
+            destinationBeacon = View.Rect(root, "Play destination", 0.075f, 0.665f, 0.925f, 0.75f);
+            View.Panel(destinationBeacon, "Drop interior", new Color(0.012f, 0.08f, 0.11f, 0.16f),
                 0.02f, 0.07f, 0.98f, 0.93f, 75);
             dropRing = destinationBeacon.gameObject.AddComponent<DropRingGraphic>();
             dropRing.color = Palette.Gold;
             dropRing.raycastTarget = false;
-            dropTitle = View.Label(destinationBeacon, "Drop title", "拖进金色投放圈", 31,
-                Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.49f, 0.92f, 0.82f);
-            dragHint = View.Label(destinationBeacon, "Destination", "在圈内松手即可使用", 24,
+            dropTitle = View.Label(destinationBeacon, "Drop title", "把卡牌拖到这里", 32,
+                Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.46f, 0.92f, 0.87f);
+            dragHint = View.Label(destinationBeacon, "Destination", "圈变亮 → 松手 → 行动生效", 24,
                 Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.13f, 0.94f, 0.48f);
             destinationBeacon.gameObject.AddComponent<GuidePulse>();
         }
@@ -676,7 +654,7 @@ namespace Horizon
 
         private void HandRegion()
         {
-            boardHint = View.Label(root, "Drag hint", "拖进光圈松手 · 或点卡牌查看并使用", 23, Palette.Muted,
+            boardHint = View.Label(root, "Drag hint", session.Day == 1 ? "每天选 1 张 · 拖向上方金色圈，变亮后松手" : "每天选 1 张 · 拖进金色圈 / 点牌也能使用", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.05f, 0.025f, 0.95f, 0.063f);
             trail = View.Fill(root, "Causal light", new Color(0.53f, 1f, 0.83f, 0.76f),
                 0.5f, 0.5f, 0.5f, 0.5f).rectTransform;
@@ -696,9 +674,10 @@ namespace Horizon
                 Color accent = card.Kind == CardKind.Growth ? Palette.Mint :
                     card.Kind == CardKind.Temptation ? Palette.Coral : Palette.Gold;
                 View.Fill(rect, "Card accent", accent, 0.095f, 0.92f, 0.55f, 0.926f);
-                View.Panel(rect, "Quiet symbol", new Color(accent.r, accent.g, accent.b, 0.14f),
-                    0.73f, 0.78f, 0.91f, 0.88f, 26);
-                View.Panel(rect, "Symbol core", accent, 0.795f, 0.815f, 0.845f, 0.844f, 13);
+                ActionIconGraphic icon = View.Rect(rect, "Action symbol", 0.68f, 0.76f, 0.91f, 0.9f)
+                    .gameObject.AddComponent<ActionIconGraphic>();
+                icon.Kind = card.Kind; icon.Support = card.GivesSupport;
+                icon.color = accent; icon.raycastTarget = false;
                 View.Label(rect, "Type", card.Kind == CardKind.Growth ? "长 线" :
                     card.Kind == CardKind.Temptation ? "即 时" : "恢 复", 23, accent,
                     TextAnchor.MiddleLeft, 0.105f, 0.75f, 0.7f, 0.89f);
@@ -720,7 +699,13 @@ namespace Horizon
                 drag.Played = CardPlayed;
                 drag.Tapped = CardTapped;
                 drag.IsOverTarget = IsInsideDropZone;
-                drag.Rejected = item => { if (boardHint != null) boardHint.text = "没有用掉卡牌，再拖进发光圈内松手。"; };
+                drag.CanBegin = item => !busy && overlay == null && (activeDrag == null || activeDrag == item);
+                drag.Began = item => activeDrag = item;
+                drag.Rejected = item =>
+                {
+                    activeDrag = null;
+                    if (boardHint != null) boardHint.text = "卡牌已归位 · 拖到上方金色圈，圈变亮后松手";
+                };
                 cards.Add(drag, card);
                 CanvasGroup group = rect.gameObject.AddComponent<CanvasGroup>();
                 StartCoroutine(RiseCard(rect, group, i * 0.08f));
@@ -758,17 +743,29 @@ namespace Horizon
 
         private void CardDragged(HorizonCardDrag drag, Vector2 pointer)
         {
-            if (busy || trail == null) return;
+            if (busy || overlay != null || trail == null || !cards.TryGetValue(drag, out CardSpec card)) return;
             bool visible = pointer != Vector2.zero;
             RevealResourceNumbers(visible);
             trail.gameObject.SetActive(visible);
             if (handGuide != null) handGuide.gameObject.SetActive(!visible);
             bool ready = visible && IsInsideDropZone(pointer);
+            if (ready && !dropReady) world.TargetReady();
+            dropReady = ready;
             dropRing.color = ready ? Palette.Mint : Palette.Gold;
-            dropTitle.text = ready ? "松手确认 · 使用这张牌" : "拖进金色投放圈";
+            dropRing.Thickness = ready ? 8 : 4;
+            dropRing.SetVerticesDirty();
+            dropTitle.text = ready ? PlayExperience.LandingLabel(card) : visible ? "再向上 · 进入金色圈" : "把卡牌拖到这里";
             destinationBeacon.GetComponent<GuidePulse>().Active = !visible;
-            if (!visible) { dragHint.text = "在圈内松手即可使用"; return; }
-            CardSpec card = cards[drag];
+            destinationBeacon.localScale = Vector3.one * (ready ? 1.035f : 1);
+            // The receiving label stays in front of the carried card and never captures input.
+            destinationBeacon.SetAsLastSibling();
+            world.Aim(visible, ready, card.Kind);
+            if (!visible)
+            {
+                dragHint.text = "圈变亮 → 松手 → 行动生效";
+                activeDrag = null;
+                return;
+            }
             world.Preview(card.Kind, card.GivesSupport);
             Vector2 from = new Vector2(pointer.x, Screen.height * 0.31f);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(root, from, null, out Vector2 localFrom);
@@ -776,10 +773,11 @@ namespace Horizon
             Vector2 vector = localTo - localFrom;
             trail.pivot = new Vector2(0, 0.5f);
             trail.anchoredPosition = localFrom;
-            trail.sizeDelta = new Vector2(vector.magnitude, 5);
+            trail.sizeDelta = new Vector2(vector.magnitude, ready ? 8 : 4);
             trail.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(vector.y, vector.x) * Mathf.Rad2Deg);
-            dragHint.text = card.Delay == 0 ? "今天立即恢复" :
-                "今天行动 → 第 " + (session.Day + card.Delay) + " 天收到回声";
+            dragHint.text = PlayExperience.DestinationLabel(card, session.Day);
+            if (boardHint != null) boardHint.text = ready ? "已接住「" + card.Name + "」 · 松手即可" :
+                "今天：" + PlayExperience.NowLabel(card.Now);
         }
 
         private bool IsInsideDropZone(Vector2 pointer)
@@ -835,7 +833,11 @@ namespace Horizon
                 kind = FeedbackKind.Choice, runNumber = session.RunNumber, day = session.Day,
                 title = "今天选择了「" + card.Name + "」",
                 description = "今天实际变化\n" + PlayExperience.NowLabel(change) + "\n\n" +
-                    PlayExperience.FutureLabel(card, session.Day), stardust = stars
+                    PlayExperience.FutureLabel(card, session.Day), stardust = stars,
+                beats = new List<FeedbackBeat> { new FeedbackBeat {
+                    title = card.Name, source = card.Name, sourceDay = session.Day,
+                    destinationDay = action.echoDay, intent = card.Kind, delta = change, support = card.GivesSupport,
+                    meaning = PlayExperience.FutureLabel(card, session.Day) } }
             };
             if (session.CompletedRun == null) archive.active = session.Snapshot();
             else
@@ -852,8 +854,11 @@ namespace Horizon
         {
             trail.gameObject.SetActive(false);
             if (handGuide != null) handGuide.gameObject.SetActive(false);
-            dropTitle.text = "投放成功";
-            dropRing.color = Palette.Gold;
+            dropTitle.text = "已接住 · " + card.Name;
+            dragHint.text = PlayExperience.DestinationLabel(card, session.Day);
+            dropRing.color = Palette.Mint;
+            world.Aim(false, false, card.Kind);
+            ReceiptPulse(root, new Vector2(0.5f, 0.7075f), Palette.Mint);
             world.Accept(card.Kind, card.GivesSupport, session.Day + card.Delay);
             RectTransform selected = (RectTransform)drag.transform;
             Vector3 start = selected.position;
@@ -874,7 +879,7 @@ namespace Horizon
             selected.gameObject.SetActive(false);
             if (card.Kind == CardKind.Temptation)
             {
-                View.Fill(root, "Brief impact", new Color(1f, 0.32f, 0.28f, 0.12f), 0, 0, 1, 1);
+                View.Fill(root, "Brief impact", new Color(1f, 0.32f, 0.28f, 0.12f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
                 if (card.Delay > 0 && session.Day + card.Delay <= 12)
                 {
                     float x = FutureX(session.Day + card.Delay);
@@ -893,7 +898,7 @@ namespace Horizon
             {
                 Handheld.Vibrate();
             }
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(0.35f);
             if (session.CompletedRun != null)
             {
                 yield return BossSequence(session.CompletedRun);
@@ -917,11 +922,16 @@ namespace Horizon
             if (transition.Echos.Count > 0)
             {
                 string description = "";
+                var beats = new List<FeedbackBeat>();
                 int stars = 0;
                 foreach (PendingEcho echo in transition.Echos)
                 {
                     int amount = echo.depth >= 2 ? CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count : 3;
                     stars += archive.wallet.Claim("run:" + session.RunNumber + ":echo:" + echo.nodeId, amount);
+                    beats.Add(new FeedbackBeat { title = echo.echoName, source = echo.cardName,
+                        sourceDay = echo.sourceDay, destinationDay = session.Day, intent = echo.kind,
+                        delta = echo.actualDelta ?? echo.delta, support = CardCatalog.FindById(echo.cardId)?.GivesSupport ?? false,
+                        meaning = "D" + echo.sourceDay + " 的「" + echo.cardName + "」，在今天留下了这些变化。" });
                     description += (description.Length == 0 ? "" : "\n\n") +
                         "D" + echo.sourceDay + "「" + echo.cardName + "」 → 今天\n" +
                         echo.echoName + " · " + PlayExperience.NowLabel(echo.actualDelta ?? echo.delta);
@@ -930,7 +940,7 @@ namespace Horizon
                 {
                     kind = FeedbackKind.Echoes, runNumber = session.RunNumber, day = session.Day,
                     title = transition.Echos.Count > 1 ? "过去的选择，一起回来了" : "你的选择回来了",
-                    description = description, stardust = stars
+                    description = description, stardust = stars, beats = beats
                 };
             }
             Save();
@@ -1016,7 +1026,7 @@ namespace Horizon
             View.Label(root, "How long ago", (echo.dueDay - echo.sourceDay) + "天前，种下的因。", 27,
                 Palette.Muted, TextAnchor.MiddleCenter, 0.1f, 0.33f, 0.9f, 0.395f);
             yield return new WaitForSeconds(total * 0.25f);
-            View.Fill(root, "Consequence flash", new Color(0.39f, 0.99f, 0.83f, 0.11f), 0, 0, 1, 1);
+            View.Fill(root, "Consequence flash", new Color(0.39f, 0.99f, 0.83f, 0.11f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
             View.Label(root, "Consequence", echo.echoName + "   " + PlayExperience.NowLabel(echo.actualDelta ?? echo.delta), 42,
                 echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
                 TextAnchor.MiddleCenter, 0.06f, 0.18f, 0.94f, 0.31f);
@@ -1086,7 +1096,7 @@ namespace Horizon
                 }
                 yield return new WaitForSeconds(i == 0 ? 0.25f : 0.25f / i);
             }
-            View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1);
+            View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
             View.Label(root, "Cascade", "C A S C A D E  × " + chainSize, 51, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.06f, vertical ? 0.08f : 0.28f,
                 0.94f, vertical ? 0.16f : 0.37f);
