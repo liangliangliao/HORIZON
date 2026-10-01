@@ -46,10 +46,9 @@ namespace Horizon.Game
     public static class ObservationDesign
     {
         public static int VisibleTypes(GameSession session, int chapter)
-        { return session.HorizonLevel >= 3 || chapter >= 6 ? int.MaxValue :
-                session.HorizonLevel >= 2 || chapter >= 2 ? 1 : 0; }
+        { return new HorizonProgress(Math.Max(HorizonProgress.LifeStage(session), chapter), 0).VisibleTypes; }
         public static bool CanCompare(GameSession session, int chapter)
-        { return session.HorizonLevel >= 3 || chapter >= 6; }
+        { return new HorizonProgress(Math.Max(HorizonProgress.LifeStage(session), chapter), 0).Compare; }
         public static string EchoType(PendingEcho echo)
         { return echo.kind == CardKind.Growth ? "芽" : echo.kind == CardKind.Recovery ? "回应" :
                 echo.delta != null && echo.delta.energy >= 0 && echo.delta.mood >= 0 ? "余兴" : "火种"; }

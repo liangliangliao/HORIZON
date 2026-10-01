@@ -80,6 +80,19 @@ namespace Horizon.Game
         public List<string> activeDates = new List<string>();
         public List<int> readChapters = new List<int>();
         public int storyChapter, storyBeat;
+        public int learnedStage = 1;
+        public int lessonBits;
+        public void Observe(GameSession life)
+        { learnedStage = Math.Max(learnedStage, HorizonProgress.LifeStage(life)); }
+        public bool Knows(LifeLesson lesson) { return (lessonBits & (int)lesson) != 0; }
+        public void Remember(LifeLesson lesson) { lessonBits |= (int)lesson; }
+        public void Repair()
+        {
+            learnedStage = Math.Max(1, Math.Min(7, learnedStage)); lessonBits &= 31;
+            if (activeDates == null) activeDates = new List<string>();
+            activeDates = activeDates.Where(d => !string.IsNullOrEmpty(d)).Distinct().ToList();
+            if (readChapters == null) readChapters = new List<int>();
+        }
         public int Chapter { get { return Math.Min(7, activeDates?.Count ?? 0); } }
         public bool Visit(string localDate)
         {

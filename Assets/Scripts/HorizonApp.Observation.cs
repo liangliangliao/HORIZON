@@ -30,7 +30,10 @@ namespace Horizon
         private List<int> ObservedFutureDays()
         {
             var days = new List<int> { session.Day };
-            foreach (int day in session.Pending.Select(e => e.dueDay).Where(d => d > session.Day && d < session.Deadline).Distinct().OrderBy(d => d).Take(2))
+            IEnumerable<int> candidates = session.Pending.Select(e => e.dueDay);
+            if (Vision.Probability && session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+                candidates = candidates.Concat(WorldEvents.ForCatalog(session.CatalogVersion).Select(e => e.Day));
+            foreach (int day in candidates.Where(d => d > session.Day && d < session.Deadline).Distinct().OrderBy(d => d).Take(2))
                 days.Add(day);
             for (int day = session.Day + 2; days.Count < 3 && day < session.Deadline; day += 2)
                 if (!days.Contains(day)) days.Add(day);
@@ -42,15 +45,22 @@ namespace Horizon
         private void DrawObservedFuture()
         {
             List<int> days = ObservedFutureDays();
-            int seen = 0, visible = ObservationDesign.VisibleTypes(session, archive.journey.Chapter);
+            int seen = 0;
+            HorizonProgress vision = Vision;
             foreach (int day in days)
             {
                 float x = FutureX(day);
                 PendingEcho echo = session.Pending.Find(e => e.dueDay == day);
-                bool known = echo != null && seen++ < visible;
+                bool known = echo != null && vision.Sees(echo, seen++, session.Day);
                 bool strain = echo != null && ObservationDesign.EchoType(echo) == "火种";
                 string mark = day == session.Day ? "今天" : day == session.Deadline ? "截止日" : "D" + day;
                 string type = known || strain ? ObservationDesign.EchoType(echo) : day == session.Day ? "" : "?";
+                if (echo == null && vision.Probability && day > session.Day && day <= session.Day + vision.Days &&
+                    session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+                {
+                    WorldEventSpec potential = WorldEvents.ForCatalog(session.CatalogVersion).FirstOrDefault(e => e.Day == day);
+                    if (potential != null) type = "变动 " + potential.Chance + "%";
+                }
                 Color color = strain ? Palette.Coral : day == session.Day || known ? Palette.Mint : Palette.Muted;
                 View.Panel(root, "Future halo", new Color(color.r, color.g, color.b, 0.16f),
                     x - 0.024f, 0.831f, x + 0.024f, 0.857f, 24);
@@ -149,13 +159,12 @@ namespace Horizon
                 .ThenBy(e => e.cardId == archive.preferredCardId ? 0 :
                     string.IsNullOrEmpty(archive.preferredCardId) && e.kind.ToString() == archive.preferredIntent ? 0 : 1).ToList();
             int pages = Mathf.Max(1, Mathf.CeilToInt(echoes.Count / 3f)); focusPage = Mathf.Clamp(focusPage, 0, pages - 1);
-            int visible = ObservationDesign.VisibleTypes(session, archive.journey.Chapter);
+            HorizonProgress vision = Vision;
             for (int row = 0; row < 3 && focusPage * 3 + row < echoes.Count; row++)
             {
                 int index = focusPage * 3 + row; PendingEcho echo = echoes[index]; float y = 0.605f - row * 0.10f;
                 View.Panel(overlay, "Future event", Palette.Panel, 0.08f, y, 0.92f, y + 0.083f, 22);
-                int level = index < visible ? session.HorizonLevel >= 3 ? 3 : 2 : 1;
-                string detail = ObservationDesign.FocusClue(echo, level, archive.calibrations);
+                string detail = vision.Clue(echo, index, session.Day);
                 View.Label(overlay, "Forecast", "D" + echo.dueDay + " · " + detail, 28,
                     ObservationDesign.EchoType(echo) == "火种" ? Palette.Coral : Palette.Mint,
                     TextAnchor.MiddleLeft, 0.12f, y + 0.006f, 0.88f, y + 0.077f);
@@ -174,15 +183,15 @@ namespace Horizon
             if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
             {
                 WorldEventSpec next = Array.Find(WorldEvents.ForCatalog(session.CatalogVersion), spec => spec.Day > session.Day);
-                if (next != null) View.Label(overlay, "World chance", archive.journey.Chapter >= 5 ?
+                if (next != null) View.Label(overlay, "World chance", vision.Probability ?
                     "D" + next.Day + " · " + next.Chance + "% " + next.Name + "\n这是环境事件的概率，已种回声仍会按时回来。" :
                     "D" + next.Day + " · 环境可能改变当天的选择", 23, Palette.Gold,
                     TextAnchor.MiddleCenter, 0.08f, 0.30f, 0.92f, 0.347f);
             }
-            if (ObservationDesign.CanCompare(session, archive.journey.Chapter))
+            if (vision.Compare)
                 View.Button(overlay, "Two futures", "查看两条可能未来", () => RenderFocus(true),
                     0.16f, 0.145f, 0.84f, 0.205f, Palette.Panel, Palette.Mint, 27);
-            if (archive.journey.Chapter >= 5 && session.Day < session.Deadline)
+            if (vision.Probability && session.Day < session.Deadline)
                 View.Button(overlay, "Forecast range", "看看未来的范围", ShowRangeForecast,
                     0.16f, 0.218f, 0.84f, 0.278f, Palette.Panel, Palette.Gold, 27);
         }

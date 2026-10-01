@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 
 namespace Horizon.Tests
 {
-    public sealed class PlayableFlowTests
+    public sealed partial class PlayableFlowTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
 

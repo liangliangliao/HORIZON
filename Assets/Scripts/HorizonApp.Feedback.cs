@@ -80,6 +80,8 @@ namespace Horizon
                 session.CanPredict ? "试着预测三天后" : "回到今天，选一张牌";
             View.Label(panel, "Hold result", receipt.preparedGates != 0 ? PreparedGateText(receipt.preparedGates) : hasBeats && beats.Count > 1 ?
                 "回声 " + (receipt.page + 1) + " / " + beats.Count + " · 看完这一条再继续" :
+                !action && beat != null && beat.sourceDay > 0 && !archive.journey.Knows(LifeLesson.Returns) ?
+                "行为会回来。这次变化，来自你之前亲手选的牌。" :
                 difficult ? "未来还没写完。下一张牌，仍然由你决定。" : "这份变化会留下。看完，再继续。", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.065f, 0.145f, 0.935f, 0.205f);
             Button nextButton = View.Button(panel, "Continue result", next, ContinueFeedback,

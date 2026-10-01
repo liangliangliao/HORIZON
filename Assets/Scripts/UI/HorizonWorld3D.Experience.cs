@@ -218,6 +218,13 @@ namespace Horizon.UI
             HorizonActor actor = futureSelf.GetComponent<HorizonActor>();
             Vector3 start = futureSelf.position;
             Vector3 end = new Vector3(Mathf.Clamp(target.x, -1.7f, 1.7f), 0, 4.4f);
+            if (preferences.reducedMotion)
+            {
+                futureSelf.position = end; actor.Walking = false; actor.Pointing = true;
+                cameraPosition = futureSelf.position + stationCameraOffset;
+                cameraLook = futureSelf.position + Vector3.up * 1.35f;
+                yield break;
+            }
             actor.Walking = true;
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 2.2f)
             {

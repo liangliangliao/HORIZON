@@ -94,6 +94,12 @@ jobs:
           test -s artifacts/visuals/31-long-life-map.png
           test -s artifacts/visuals/32-long-life-network.png
           test -s artifacts/visuals/33-long-life-share.png
+          test -s artifacts/visuals/34-unified-time-vision.png
+          test -s artifacts/visuals/35-personal-causal-memory.png
+          test -s artifacts/visuals/36-memory-resumed.png
+          test -s artifacts/visuals/37-ghost-original-choice.png
+          test -s artifacts/visuals/38-ghost-returning-consequence.png
+          test -s artifacts/visuals/39-ghost-deadline.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -156,7 +162,7 @@ jobs:
           targetPlatform: Android
           buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage
-          customParameters: -horizonChannel preview -horizonVersion 0.5.0 -horizonBuildNumber ${{ github.run_number }}
+          customParameters: -horizonChannel preview -horizonVersion 0.6.0 -horizonBuildNumber ${{ github.run_number }}
 
       - name: Verify APK output
         shell: bash

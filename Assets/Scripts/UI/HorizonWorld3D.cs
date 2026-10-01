@@ -124,6 +124,7 @@ namespace Horizon.UI
 
         public void ShowBoard()
         {
+            EndCausalPresentation();
             rareActive = false;
             Focus(false);
             if (memoryGroup != null) memoryGroup.gameObject.SetActive(false);
@@ -154,6 +155,7 @@ namespace Horizon.UI
 
         public void ShowStation(int stage, bool reveal)
         {
+            EndCausalPresentation();
             station = true;
             Aim(false,false,CardKind.Growth);
             rareActive = false;

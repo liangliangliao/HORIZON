@@ -21,7 +21,7 @@ namespace Horizon
             DismissStoryPage();
             overlay = View.Rect(root, "Journey story", 0, 0, 1, 1);
             RectTransform page = overlay;
-            world.ShowStation(beat, chapter == 7 || session?.HorizonLevel >= 3);
+            world.ShowStation(beat, chapter == 7 || Vision.Compare);
             View.Fill(overlay, "Story atmosphere", new Color(0.008f, 0.023f, 0.042f, 0.43f), 0, 0, 1, 1, true);
             View.Fill(overlay, "Story header shade", Palette.Ink, 0, 0.755f, 1, 1, true);
             View.Fill(overlay, "Story footer shade", Palette.Ink, 0, 0, 1, 0.445f, true);

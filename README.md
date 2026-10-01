@@ -2,7 +2,7 @@
 
 Unity 竖屏人生卡牌游戏，基于《HORIZON / 远见》v0.3。每天选一张行动牌，今天的变化立即发生，延迟回声在卡牌标记的日期回来。短局第 12 天、长局第 30 天，过去的选择共同回答能力、状态与支援三道门。
 
-当前 v0.5 补齐多次关键决策预测、六资源与 1/3/7 天对照、七章个人回望剧情及真正可玩的 30 天人生。牌池版本 6、规则版本 8，保留旧人生的规则；原 12 天短局和可解锁长局都能存档、重演、结算与分享。实现契约和验收边界见 [v0.5 完整玩法升级](docs/COMPLETE_GAME_V05.md)。此前 v0.4 为 83 项检查，本轮新增规则与实际操作回归；最终通过状态以当前提交的 CI 为准。
+v0.5 补齐多次关键决策预测、六资源与 1/3/7 天对照、七章个人回望剧情及真正可玩的 30 天人生。牌池版本 6、规则版本 8，保留旧人生的规则；原 12 天短局和可解锁长局都能存档、重演、结算与分享。实现契约和验收边界见 [v0.5 完整玩法升级](docs/COMPLETE_GAME_V05.md)。当前 v0.6 统一观察层级与预测清晰度，未来站展示真实多来源因果链，失败分支按实际日期与变化逐段演出，支持中断恢复。详见 [v0.6 体验升级](docs/EXPERIENCE_V06.md)。最终通过状态以当前提交的 CI 为准。
 
 ## 怎么玩
 
@@ -59,7 +59,7 @@ Linux 无显示器时需 Xvfb 和图形设备，渲染测试不能使用 `-nogra
 Unity -batchmode -force-glcore -projectPath . -runTests -testPlatform EditMode -testResults TestResults.xml
 ```
 
-`.github/workflows/android-apk.yml` 在 PR 更新时先执行上述测试与 33 张竖屏画面，再通过 `Horizon.Editor.AndroidBuild.Build` 构建 IL2CPP Android APK，包含 ARMv7 与 ARM64，并校验两种架构的原生库。产物 `HORIZON-EditMode-Results`、`HORIZON-Unity-Portrait-Previews`、`HORIZON-Android-APK` 保留 14 天。试玩 APK 使用固定 QA 签名，可覆盖升级同签名试玩版；正式发布使用独立签名。
+`.github/workflows/android-apk.yml` 在 PR 更新时先执行上述测试与 39 张竖屏画面，再通过 `Horizon.Editor.AndroidBuild.Build` 构建 IL2CPP Android APK，包含 ARMv7 与 ARM64，并校验两种架构的原生库。产物 `HORIZON-EditMode-Results`、`HORIZON-Unity-Portrait-Previews`、`HORIZON-Android-APK` 保留 14 天。试玩 APK 使用固定 QA 签名，可覆盖升级同签名试玩版；正式发布使用独立签名。
 
 工作流使用仓库已有 Unity 授权密钥。首次配置时 Personal 需要 UNITY_LICENSE、UNITY_EMAIL、UNITY_PASSWORD；Pro 需要 UNITY_SERIAL、UNITY_EMAIL、UNITY_PASSWORD。
 

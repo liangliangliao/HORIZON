@@ -21,6 +21,9 @@ namespace Horizon
             bool accurate = life.Prediction.accurate;
             life.MarkPredictionReviewed();
             if (accurate) calibrations++;
+            journey.Remember(Game.LifeLesson.Prediction);
+            if (!accurate) journey.Remember(Game.LifeLesson.Uncertainty);
+            journey.Observe(life);
             active = life.Snapshot();
             return true;
         }
