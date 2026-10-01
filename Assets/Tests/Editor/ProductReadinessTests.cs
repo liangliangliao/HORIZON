@@ -106,7 +106,7 @@ namespace Horizon.Tests
             var patterns = new HashSet<string>();
             for (int seed = 0; seed < 64; seed++)
             {
-                var s = new GameSession(2, seed);
+                var s = new GameSession(2, seed, 5);
                 string pattern = string.Join("/", Enumerable.Range(1, 12).Select(day =>
                     string.Join(",", CardCatalog.ForDay(day, 2, 5, seed).Select(c => c.Id))));
                 patterns.Add(pattern);

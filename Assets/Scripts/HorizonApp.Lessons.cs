@@ -12,7 +12,7 @@ namespace Horizon
     {
         private void LessonSurface(string title, string introduction)
         {
-            if (overlay != null) Destroy(overlay.gameObject);
+            DismissStoryPage();
             overlay = View.Rect(root, "Observation exercise", 0, 0, 1, 1);
             View.Fill(overlay, "Exercise shade", Palette.Ink, 0, 0, 1, 1, true);
             View.Label(overlay, "Exercise title", title, 43, Palette.Text, TextAnchor.MiddleCenter,

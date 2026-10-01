@@ -39,7 +39,7 @@ namespace Horizon.Game
             {
                 RunSnapshot snapshot = JsonUtility.FromJson<RunSnapshot>(frozen);
                 snapshot.worldSeed = unchecked(source.WorldSeed + (sample + 1) * 104729);
-                GameSession fork = GameSession.ForkForSimulation(snapshot, Math.Max(12, targetDay));
+                GameSession fork = GameSession.ForkForSimulation(snapshot, Math.Max(source.Deadline, targetDay));
                 if (fork.HasChosen)
                 {
                     if (fork.NeedsStation) fork.VisitStation();

@@ -51,9 +51,9 @@ namespace Horizon
         private void DrawResourceOrbits()
         {
             resourceNumbers.Clear(); resourceValues.Clear();
-            int[] values = session.RunNumber == 1 ? new[] { session.Energy, session.Mood, session.Ability } :
+            int[] values = session.RunNumber == 1 && session.Deadline == 12 ? new[] { session.Energy, session.Mood, session.Ability } :
                 new[] { session.Energy, session.Mood, session.Insight, session.Relation, session.Money, session.Ability };
-            string[] names = session.RunNumber == 1 ? new[] { "精力", "心情", "能力" } :
+            string[] names = session.RunNumber == 1 && session.Deadline == 12 ? new[] { "精力", "心情", "能力" } :
                 new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" };
             View.Label(root, "State heading", "此刻的你", 22, Palette.Muted, TextAnchor.MiddleLeft,
                 0.06f, 0.416f, 0.5f, 0.443f);
@@ -91,7 +91,7 @@ namespace Horizon
             overlay = View.Rect(root, "Prediction explanation", 0, 0, 1, 1);
             View.Fill(overlay, "Why veil", new Color(0.006f, 0.02f, 0.04f, 0.95f), 0, 0, 1, 1, true);
             RectTransform panel = View.Panel(overlay, "Why sheet", Palette.Panel, 0.05f, 0.08f, 0.95f, 0.91f, 35).rectTransform;
-            View.Label(panel, "Why title", "这三天，发生了什么？", 38, Palette.Text, TextAnchor.MiddleLeft,
+            View.Label(panel, "Why title", "这段时间，发生了什么？", 38, Palette.Text, TextAnchor.MiddleLeft,
                 0.065f, 0.8f, 0.935f, 0.95f);
             List<CausalNode> causes = ObservationDesign.PredictionCauses(session);
             PredictionRecord p = session.Prediction;
@@ -156,7 +156,7 @@ namespace Horizon
                 View.Button(overlay, "Next focus page", ">", () => { focusPage++; RenderFocus(false); },
                     0.73f, 0.342f, 0.92f, 0.398f, Palette.Panel, Palette.Text, 27).interactable = focusPage < pages - 1;
             }
-            if (session.CatalogVersion >= 3 && session.RunNumber >= 3)
+            if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
             {
                 WorldEventSpec next = Array.Find(WorldEvents.ForCatalog(session.CatalogVersion), spec => spec.Day > session.Day);
                 if (next != null) View.Label(overlay, "World chance", archive.journey.Chapter >= 5 ?

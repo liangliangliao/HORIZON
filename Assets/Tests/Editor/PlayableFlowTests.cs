@@ -113,6 +113,9 @@ namespace Horizon.Tests
             string frozen = JsonUtility.ToJson(session.Snapshot());
             Call(app, "ShowJourney"); yield return null;
             ButtonNamed(app, "Chapter 6").onClick.Invoke(); yield return null;
+            for (int beat = 0; beat < 3; beat++) {
+                ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            }
             Assert.IsFalse(System.Array.Exists(root.GetComponentsInChildren<Button>(), b => b.name == "Meet thirty day self"));
             string text = string.Join(" ", System.Array.ConvertAll(root.GetComponentsInChildren<Text>(), t => t.text));
             Assert.That(text, Does.Contain("→ D4 夜"));
@@ -187,6 +190,9 @@ namespace Horizon.Tests
             ButtonNamed(app, "Close").onClick.Invoke(); yield return null;
             Call(app, "ShowJourney"); yield return null;
             ButtonNamed(app, "Chapter 4").onClick.Invoke(); yield return null;
+            for (int beat = 0; beat < 3; beat++) {
+                ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            }
             ButtonNamed(app, "Exercise choice portfolio").onClick.Invoke(); yield return null;
             yield return Capture(app, "18-chapter-lesson");
             ButtonNamed(app, "Close exercise").onClick.Invoke(); yield return null;
@@ -659,17 +665,19 @@ namespace Horizon.Tests
             yield return new EnterPlayMode();
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Thirty day playable flow").AddComponent<HorizonApp>();
+            yield return null;
             var a = new ArchiveData { nextRareRun = 99, seenSecondLife = true };
             for (int i = 1; i <= 7; i++) a.journey.Visit("2026-09-" + i.ToString("00"));
             Set(app, "archive", a); Set(app, "session", null); Call(app, "ShowHome");
             Call(app, "ShowObservationChapter", 7); yield return null;
-            ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            Button next = ButtonNamed(app, "Next story beat"); next.onClick.Invoke(); next.onClick.Invoke(); yield return null;
             Assert.AreEqual(1, a.journey.storyBeat);
             ButtonNamed(app, "Leave story").onClick.Invoke(); yield return null;
             Call(app, "ShowObservationChapter", 7); yield return null;
             Assert.AreEqual(1, a.journey.storyBeat);
             yield return Capture(app, "28-seventh-story");
             ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            Assert.AreEqual(2, a.journey.storyBeat);
             ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
             Assert.Contains(7, a.journey.readChapters);
             ButtonNamed(app, "Thirty day game").onClick.Invoke(); yield return null;

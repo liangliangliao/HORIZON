@@ -652,7 +652,12 @@ namespace Horizon.Game
         }
 
         public void LockPrediction(int energy, int mood, int insight)
-        { LockPrediction(new ResourceDelta(energy, mood, insight), 3); }
+        {
+            if (!CanPredict) throw new InvalidOperationException("No prediction is offered now.");
+            if (Math.Abs(energy) > 3 || Math.Abs(mood) > 3 || Math.Abs(insight) > 3)
+                throw new ArgumentOutOfRangeException("Prediction offsets must be between -3 and 3.");
+            LockPrediction(new ResourceDelta(energy, mood, insight), 3);
+        }
 
         public void SkipPrediction()
         {

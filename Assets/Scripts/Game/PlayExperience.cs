@@ -134,7 +134,8 @@ namespace Horizon.Game
             if (card.Delay == 0) return "今天立即恢复";
             if (card.Kind == CardKind.Growth) return card.Later.ability > 0 ? "能力会成长" : "带来新的机会";
             if (card.GivesSupport) return "朋友会带来回应";
-            if (card.Kind == CardKind.Recovery) return "心情会慢慢回暖";
+            if (card.Kind == CardKind.Recovery) return card.Later.energy > 0 ? "给后续留下余力" :
+                card.Later.mood > 0 ? "心情会慢慢回暖" : "理解会慢慢清晰";
             if (card.Later.energy >= 0 && card.Later.mood >= 0) return "快乐也会留下余温";
             return card.Later.energy < 0 ? "之后可能疲惫" : "快乐会慢慢褪去";
         }
