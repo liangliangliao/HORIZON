@@ -78,6 +78,8 @@ namespace Horizon.Game
     public sealed class JourneyProgress
     {
         public List<string> activeDates = new List<string>();
+        public List<int> readChapters = new List<int>();
+        public int storyChapter, storyBeat;
         public int Chapter { get { return Math.Min(7, activeDates?.Count ?? 0); } }
         public bool Visit(string localDate)
         {
@@ -166,9 +168,9 @@ namespace Horizon.Game
             return "成长、恢复、关系：今天想照顾哪一条路？";
         }
 
-        public static string CardPurpose(CardSpec card, int day)
+        public static string CardPurpose(CardSpec card, int day, int deadline = GameSession.LastDay)
         {
-            if (card.Delay > 0 && day + card.Delay > GameSession.LastDay)
+            if (card.Delay > 0 && day + card.Delay > deadline)
                 return "这次回声在截止日之后回来，今天的变化仍会发生。";
             if (card.GivesSupport) return "这条路会留下支援；朋友与成长可以产生新的连接。";
             if (card.Kind == CardKind.Growth) return "今天投入精力，等回声回来，为能力门留下成长。";
@@ -252,14 +254,14 @@ namespace Horizon.Game
 
         public static string ShareLine(RunRecord run)
         {
-            if (run?.boss != null && run.actions?.Count == 12)
+            if (run?.boss != null && run.actions?.Count == GameSession.RunLength(run))
                 foreach (ActionRecord source in run.actions)
                     foreach (CardSpec card in GameSession.AlternativesForDay(run, source.day))
                     {
                         RunRecord other = GameSession.ReplayAlternative(run, source.day, card.Id);
                         if (other != null && (other.boss.ability != run.boss.ability || other.boss.state != run.boss.state ||
                             other.boss.support != run.boss.support))
-                            return "Day " + source.day + " 的一个选择，改变了 Day 12。";
+                            return "Day " + source.day + " 的一个选择，改变了 Day " + GameSession.RunLength(run) + "。";
                     }
             return "这一次，我走出了自己的时间线。";
         }

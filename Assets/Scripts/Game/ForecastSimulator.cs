@@ -42,14 +42,14 @@ namespace Horizon.Game
                 GameSession fork = GameSession.ForkForSimulation(snapshot, Math.Max(12, targetDay));
                 if (fork.HasChosen)
                 {
-                    if (fork.Day == 4 && !fork.StationVisited) fork.VisitStation();
+                    if (fork.NeedsStation) fork.VisitStation();
                     fork.Advance();
                 }
                 int firstDay = fork.Day;
                 var random = new System.Random(source.RunNumber * 7919 + source.Day * 101 + sample * 17);
                 while (true)
                 {
-                    if (fork.HasPredictionReview) fork.MarkPredictionReviewed();
+                    while (fork.HasPredictionReview) fork.MarkPredictionReviewed();
                     if (fork.CanPredict) fork.SkipPrediction();
                     CardSpec[] available = fork.Hand.Where(fork.CanPlay).ToArray();
                     CardSpec choice = fork.Day == firstDay && !string.IsNullOrEmpty(firstCard) ?
@@ -65,7 +65,7 @@ namespace Horizon.Game
                         choice = choice ?? available[random.Next(available.Length)];
                     }
                     fork.Choose(choice.Id);
-                    if (fork.Day == 4 && !fork.StationVisited) fork.VisitStation();
+                    if (fork.NeedsStation) fork.VisitStation();
                     if (fork.Day >= targetDay) break;
                     fork.Advance();
                 }
@@ -75,9 +75,9 @@ namespace Horizon.Game
                 result.relationMin = Math.Min(result.relationMin, fork.Relation); result.relationMax = Math.Max(result.relationMax, fork.Relation);
                 result.moneyMin = Math.Min(result.moneyMin, fork.Money); result.moneyMax = Math.Max(result.moneyMax, fork.Money);
                 result.abilityMin = Math.Min(result.abilityMin, fork.Ability); result.abilityMax = Math.Max(result.abilityMax, fork.Ability);
-                if (fork.Ability >= 6 && (fork.CatalogVersion < 2 || fork.Actions.Count(a => a.echoed && a.later?.ability > 0) >= 2)) result.abilityPass++;
-                if (fork.Energy >= 4 && fork.Mood >= 4 && (fork.CatalogVersion < 2 || fork.Actions.Count(a => a.kind == CardKind.Recovery) >= 2)) result.statePass++;
-                if (fork.SupportActions >= 2 && fork.Relation >= 6 && fork.Money >= 2) result.supportPass++;
+                if (ProductExperience.GateReady(fork, 0)) result.abilityPass++;
+                if (ProductExperience.GateReady(fork, 1)) result.statePass++;
+                if (ProductExperience.GateReady(fork, 2)) result.supportPass++;
                 if (sample == 1) result.example = new List<ActionRecord>(fork.Actions);
                 if (sample == 2) result.otherExample = new List<ActionRecord>(fork.Actions);
             }

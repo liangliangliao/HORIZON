@@ -1,5 +1,7 @@
 # v0.4 playable product iteration
 
+Historical iteration. The current playable thirty-day campaign and expanded predictions are documented in [v0.5](COMPLETE_GAME_V05.md).
+
 This iteration keeps the v0.3 game loop and addresses repeat play, onboarding,
 readable reinforcement, storage reliability and continuous preview updates.
 

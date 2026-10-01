@@ -97,7 +97,7 @@ namespace Horizon
                 if (candidate.active != null) GameSession.Restore(candidate.active);
                 foreach (RunRecord run in candidate.runs)
                 {
-                    if (run == null || run.number < 1 || run.boss == null || run.actions == null || run.actions.Count != 12) return false;
+                    if (run == null || run.number < 1 || run.boss == null || run.actions == null || run.actions.Count != GameSession.RunLength(run)) return false;
                     if (run.catalogVersion > CardCatalog.CurrentVersion) { error = "newer"; return false; }
                 }
                 data = candidate; error = null; return true;

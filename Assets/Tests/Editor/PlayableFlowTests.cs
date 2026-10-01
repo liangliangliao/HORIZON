@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using System.IO;
 using System.Reflection;
 using Horizon.Game;
@@ -613,6 +614,107 @@ namespace Horizon.Tests
             Assert.GreaterOrEqual(renderedConnections, 4, "The combined effect must show both actual source histories.");
             yield return new WaitForSecondsRealtime(1.5f);
             PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator ExpandedPredictionUsesChosenHorizonAndKeepsSixResults()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Expanded prediction flow").AddComponent<HorizonApp>();
+            var s = new GameSession(3, 912);
+            while (s.Day < 4) { s.Choose(s.Hand[2].Id); s.Advance(); }
+            var a = new ArchiveData { active = s.Snapshot(), nextRareRun = 99, seenSecondLife = true };
+            Set(app, "session", s); Set(app, "archive", a); Call(app, "BuildBoard"); yield return null;
+            Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<PredictionAxisDrag>().Length);
+            ButtonNamed(app, "Prediction horizon 1").onClick.Invoke(); yield return null;
+            yield return Capture(app, "26-expanded-prediction");
+            ButtonNamed(app, "Lock prediction").onClick.Invoke(); yield return null;
+            Assert.AreEqual(5, s.Prediction.dueDay); Assert.IsTrue(s.Prediction.sixAxes);
+            s.Choose(s.Hand[2].Id); s.VisitStation(); s.Advance();
+            a.active = s.Snapshot(); Call(app, "Save"); Call(app, "BuildBoard"); yield return null;
+            Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Count(t => t.name == "Comparison text"));
+            yield return Capture(app, "27-six-axis-result");
+            ButtonNamed(app, "Why").onClick.Invoke(); yield return null;
+            string explanation = string.Join("\n", Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Select(t => t.text));
+            Assert.That(explanation, Does.Contain("D4").And.Contain("D5"));
+            ButtonNamed(app, "Close prediction why").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Continue").onClick.Invoke(); yield return null;
+            Assert.IsTrue(s.Predictions[0].reviewed);
+            while (s.Day < 8) {
+                while (s.HasPredictionReview) s.MarkPredictionReviewed(); if (s.CanPredict) s.SkipPrediction();
+                s.Choose(s.Hand[2].Id); if (s.NeedsStation) s.VisitStation(); s.Advance();
+            }
+            a.active = s.Snapshot(); Call(app, "BuildBoard"); yield return null;
+            Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<PredictionAxisDrag>().Length);
+            ButtonNamed(app, "Lock prediction").onClick.Invoke(); yield return null;
+            Assert.AreEqual(2, s.Predictions.Count); Assert.AreEqual(8, s.Prediction.sourceDay);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator SeventhStoryResumesAndRealLongLifeFinishesThroughTheUI()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Thirty day playable flow").AddComponent<HorizonApp>();
+            var a = new ArchiveData { nextRareRun = 99, seenSecondLife = true };
+            for (int i = 1; i <= 7; i++) a.journey.Visit("2026-09-" + i.ToString("00"));
+            Set(app, "archive", a); Set(app, "session", null); Call(app, "ShowHome");
+            Call(app, "ShowObservationChapter", 7); yield return null;
+            ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            Assert.AreEqual(1, a.journey.storyBeat);
+            ButtonNamed(app, "Leave story").onClick.Invoke(); yield return null;
+            Call(app, "ShowObservationChapter", 7); yield return null;
+            Assert.AreEqual(1, a.journey.storyBeat);
+            yield return Capture(app, "28-seventh-story");
+            ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Next story beat").onClick.Invoke(); yield return null;
+            Assert.Contains(7, a.journey.readChapters);
+            ButtonNamed(app, "Thirty day game").onClick.Invoke(); yield return null;
+            var s = Get<GameSession>(app, "session"); Assert.AreEqual(30, s.Deadline);
+            while (s.Day < 13) {
+                while (s.HasPredictionReview) s.MarkPredictionReviewed(); if (s.CanPredict) s.SkipPrediction();
+                s.Choose(s.Hand[2].Id); if (s.NeedsStation) s.VisitStation(); s.Advance();
+            }
+            a.active = s.Snapshot(); Call(app, "Save"); Call(app, "ContinueRun"); yield return null;
+            s = Get<GameSession>(app, "session");
+            Assert.AreEqual(13, s.Day); Assert.IsNull(s.CompletedRun);
+            yield return Capture(app, "29-long-life-board");
+            int guard = 0; float began = Time.realtimeSinceStartup;
+            while (s.CompletedRun == null || Get<bool>(app, "busy")) {
+                Assert.Less(Time.realtimeSinceStartup - began, 150, "Long UI flow stalled.");
+                if (Get<bool>(app, "busy")) { yield return null; continue; }
+                if (a.pendingFeedback != null) {
+                    if (a.pendingFeedback.kind == FeedbackKind.Deadline) break;
+                    ButtonNamed(app, "Continue result").onClick.Invoke(); yield return null; continue;
+                }
+                if (s.NeedsStation) {
+                    if (Get<int>(app, "stationStage") == 3) {
+                        Button protect = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().First(b => b.name.StartsWith("Protect "));
+                        protect.onClick.Invoke();
+                    } else ButtonNamed(app, "Next station beat").onClick.Invoke();
+                    yield return null; continue;
+                }
+                if (s.HasPredictionReview) { ButtonNamed(app, "Continue").onClick.Invoke(); yield return null; continue; }
+                if (s.CanPredict) { ButtonNamed(app, "Skip prediction").onClick.Invoke(); yield return null; continue; }
+                Assert.IsFalse(s.HasChosen); Assert.Less(guard++, 19);
+                Call(app, "CardTapped", FindCard(app, s.Hand[2].Id)); yield return null;
+                ButtonNamed(app, "Use card").onClick.Invoke(); yield return null;
+            }
+            Assert.AreEqual(30, s.CompletedRun.actions.Count); Assert.AreEqual(1, a.runs.Count); Assert.IsNull(a.active);
+            CollectionAssert.AreEqual(new[] { 4, 12, 14, 21, 28 }, s.StationDays);
+            yield return Capture(app, "30-long-life-deadline");
+            Call(app, "ShowMap", false); yield return null;
+            Assert.AreEqual(30, Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Count(b => b.name.StartsWith("Inspect day ")));
+            yield return Capture(app, "31-long-life-map");
+            ButtonNamed(app, "Causal network").onClick.Invoke(); yield return null;
+            yield return Capture(app, "32-long-life-network");
+            ButtonNamed(app, "Close causal network").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Share life").onClick.Invoke(); yield return null;
+            Assert.That(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().First(t => t.name == "Share run").text, Does.Contain("30 DAYS"));
+            yield return Capture(app, "33-long-life-share");
             yield return new ExitPlayMode();
         }
 

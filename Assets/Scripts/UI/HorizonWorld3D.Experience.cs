@@ -46,15 +46,17 @@ namespace Horizon.UI
 
         private Vector3 DayPoint(int day)
         {
-            float angle = Mathf.Lerp(-155, 155, Mathf.Clamp01((day - 1) / 11f)) * Mathf.Deg2Rad;
+            float angle = Mathf.Lerp(-155, 155, Mathf.Clamp01((day - 1) / (float)Mathf.Max(1, timelineLength - 1))) * Mathf.Deg2Rad;
             return new Vector3(Mathf.Sin(angle) * 3.8f, 0.09f, 1 - Mathf.Cos(angle) * 3.8f);
         }
 
-        public void SetTimeline(List<ActionRecord> actions)
+        private int timelineLength = 12;
+        public void SetTimeline(List<ActionRecord> actions, int length = 12)
         {
             if (timelineGroup != null) Dispose(timelineGroup.gameObject);
-            timelineGroup = Group("Twelve days left in the world");
-            for (int day = 1; day <= 12; day++)
+            timelineLength = length == 30 ? 30 : 12;
+            timelineGroup = Group("Days left in the world");
+            for (int day = 1; day <= timelineLength; day++)
             {
                 ActionRecord action = actions?.Find(a => a.day == day);
                 Material material = action == null ? dark : action.kind == CardKind.Growth ? teal :

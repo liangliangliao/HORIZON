@@ -19,7 +19,7 @@ namespace Horizon.Tests
         public void BackupRecoversTruncatedPrimaryAndPreservesUnreadableEvidence()
         {
             var store = new ArchiveStore(Path.Combine(folder, "life.json"));
-            var data = new ArchiveData { active = new GameSession(2, 891).Snapshot() };
+            var data = new ArchiveData { active = new GameSession(2, 891, 5).Snapshot() };
             data.wallet.Claim("first", 3); Assert.IsTrue(store.Save(data));
             data.wallet.Claim("second", 5); Assert.IsTrue(store.Save(data));
             File.WriteAllText(store.Path, "{\"format\":\"HORIZON-LIFE\"");
@@ -50,7 +50,7 @@ namespace Horizon.Tests
         [Test]
         public void ExportImportKeepsReadingPositionClaimsSeedAndPreferences()
         {
-            var life = new GameSession(2, 736); life.Choose(life.Hand[1].Id);
+            var life = new GameSession(2, 736, 5); life.Choose(life.Hand[1].Id);
             var data = new ArchiveData { active = life.Snapshot(), pendingFeedback = new FeedbackRecord {
                 kind = FeedbackKind.Choice, runNumber = 2, day = 1, page = 1, presented = true, presentedPages = 3 } };
             data.preferences.reducedMotion = true; data.preferences.sound = false;
@@ -117,13 +117,13 @@ namespace Horizon.Tests
                 Assert.AreEqual(5, s.CatalogVersion);
             }
             Assert.Greater(patterns.Count, 55);
-            CollectionAssert.AreEqual(new[] { "scroll", "practice", "rest" }, new GameSession(1, 992).Hand.Select(c => c.Id));
+            CollectionAssert.AreEqual(new[] { "scroll", "practice", "rest" }, new GameSession(1, 992, 5).Hand.Select(c => c.Id));
         }
 
         [Test]
         public void RangeForecastKeepsTheCurrentDeckWhileSamplingUncertainWorldEvents()
         {
-            var life = new GameSession(3, 773);
+            var life = new GameSession(3, 773, 5);
             string frozen = JsonUtility.ToJson(life.Snapshot());
             string selected = life.Hand[1].Id;
             ForecastRange range = ForecastSimulator.Sample(life, selected, 4, 9);
@@ -140,7 +140,7 @@ namespace Horizon.Tests
         {
             for (int seed = 0; seed < 96; seed++)
             {
-                GameSession s = GameSession.ForkForSimulation(new GameSession(3, seed).Snapshot(), 12);
+                GameSession s = GameSession.ForkForSimulation(new GameSession(3, seed, 5).Snapshot(), 12);
                 while (true)
                 {
                     Prepare(s);
@@ -172,7 +172,7 @@ namespace Horizon.Tests
             // and recovery. This checks reachable outcomes, not a fixed recipe.
             for (int seed = 0; seed < 12; seed++)
             {
-                var beam = new List<GameSession> { GameSession.ForkForSimulation(new GameSession(3, seed).Snapshot(), 12) };
+                var beam = new List<GameSession> { GameSession.ForkForSimulation(new GameSession(3, seed, 5).Snapshot(), 12) };
                 for (int day = 1; day <= 12; day++)
                 {
                     var next = new List<GameSession>();

@@ -24,7 +24,7 @@ namespace Horizon
                 0.15f, 0.047f, 0.85f, 0.12f, Palette.Mint, Palette.Ink, 30);
         }
 
-        private void ShowObservationChapter(int chapter)
+        private void ShowChapterExercise(int chapter)
         {
             if (chapter < 1 || chapter > archive.journey.Chapter) return;
             if (chapter == 7) { ShowThirtyDays(); return; }
@@ -99,7 +99,7 @@ namespace Horizon
             }
             result += "\n\n现在的精力 " + practice.Energy + " · 心情 " + practice.Mood + " · 能力 " + practice.Ability;
             ResultText(panel, result);
-            View.Button(overlay, "Repeat exercise", "试试另一张", () => ShowObservationChapter(chapter),
+            View.Button(overlay, "Repeat exercise", "试试另一张", () => ShowChapterExercise(chapter),
                 0.16f, 0.188f, 0.84f, 0.258f, Palette.Deep, Palette.Gold, 28);
             View.RefreshText(overlay);
         }

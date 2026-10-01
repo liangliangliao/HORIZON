@@ -31,6 +31,8 @@ namespace Horizon.Game
             All[0], All[1], All[2],
             new WorldEventSpec(11, 50, "朋友今天想找个人说说话", "listen", CardKind.Recovery)
         };
+        public static WorldEventSpec[] ForCatalog(int version)
+        { return version >= 6 ? CampaignContent.World : version >= 5 ? Season : All; }
         public static bool Occurs(int seed, int day, int chance)
         {
             unchecked {
@@ -64,7 +66,8 @@ namespace Horizon.Game
             return session.CausalNodes.Where(n => n.resolved && n.effectRecorded && n.effect != null &&
                 (n.type == CausalNodeKind.Action ? n.day >= p.sourceDay && n.day < p.dueDay :
                     n.day > p.sourceDay && n.day <= p.dueDay) &&
-                (n.effect.energy != 0 || n.effect.mood != 0 || n.effect.insight != 0))
+                (n.effect.energy != 0 || n.effect.mood != 0 || n.effect.insight != 0 ||
+                    p.sixAxes && (n.effect.relation != 0 || n.effect.money != 0 || n.effect.ability != 0)))
                 .OrderBy(n => n.day).ToList();
         }
     }

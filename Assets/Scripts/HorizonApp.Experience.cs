@@ -39,21 +39,19 @@ namespace Horizon
             archive.stationBeat = stationStage;
             archive.active = session.Snapshot();
             Save();
-            bool reveal = session.RunNumber >= 3 && stage >= 2;
-            bool question = session.RunNumber == 3 && stage == 3;
+            bool reveal = session.HorizonLevel >= 3 && stage >= 2;
+            bool question = (session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) && stage == 3;
             world.ShowStation(stage, reveal);
             List<ActionRecord> memories = ExperienceContent.StationMemories(session);
             world.ShowMemories(memories);
             View.Fill(root, "Station atmosphere", new Color(0.005f, 0.02f, 0.035f, 0.18f), 0, 0, 1, 1);
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 33, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.05f, 0.91f, 0.95f, 0.965f);
-            View.Label(root, "Station day", "DAY 04  /  在地平线的另一边", 25, Palette.Muted,
+            View.Label(root, "Station day", "DAY " + session.Day.ToString("00") + " / 在地平线的另一边", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.06f, 0.852f, 0.94f, 0.9f);
             View.Panel(root, "Station dialogue plate", new Color(0.013f, 0.034f, 0.055f, 0.9f),
                 0.045f, 0.365f, 0.955f, 0.51f, 35);
-            string voice = question ? "「你还想继续这样走吗？」" : stage == 0 ? "「你终于来了。」" :
-                stage == 1 ? "「你最近留下了很多东西。」" : reveal ? "「现在你终于看见我了。」" :
-                session.RunNumber == 2 ? "「你已经知道，一些东西会回来。」" : "「你留下的东西，还会继续生长。」";
+            string voice = CampaignContent.StationVoice(session, stage, question);
             Text dialogue = View.Label(root, "Future voice", voice, 39, Palette.Text,
                 TextAnchor.MiddleCenter, 0.075f, 0.405f, 0.925f, 0.495f);
             Text detail = View.Label(root, "Future reflection", stage == 0 ? "沿着光，走到长椅前。" :
@@ -88,7 +86,7 @@ namespace Horizon
                     float y = 0.217f - i * 0.068f;
                     View.Button(root, "Protect " + behavior.cardId, "保护 · " + behavior.cardName, () =>
                     {
-                        if (session.StationVisited) return;
+                        if (!session.NeedsStation) return;
                         archive.ProtectBehavior(behavior);
                         FinishStation();
                     }, 0.14f, y, 0.86f, y + 0.058f, intent == CardKind.Growth ? Palette.Mint : Palette.Panel,
@@ -98,7 +96,8 @@ namespace Horizon
             else if (stage == 2)
             {
                 View.Panel(root, "Future keepsake", Palette.Panel, 0.075f, 0.18f, 0.925f, 0.322f, 25);
-                View.Label(root, "Future keepsake text", reveal ? "那个人，就是未来的你。\nHORIZON III · 两条可能未来" :
+                View.Label(root, "Future keepsake text", session.Deadline == 30 && session.Day >= 12 ? "已走过 " + session.Day + " 天 · " + CampaignContent.ActName(session.Day) + "\n你留下的选择，还在继续相互连接。" :
+                    reveal ? "那个人，就是未来的你。\nHORIZON III · 两条可能未来" :
                     memories.Count == 0 ? "路还没有写完。明天，你仍然可以选择。" :
                     "D" + memories[0].day + "「" + memories[0].cardName + "」\n" +
                     (memories[0].echoDay > 0 ? "在 D" + memories[0].echoDay + " 留下「" + memories[0].echoName + "」" : "留下了照顾自己的片刻"),
@@ -107,7 +106,7 @@ namespace Horizon
             }
             if (!question)
             {
-                View.Button(root, "Next station beat", stage == 2 && session.RunNumber != 3 ? "回到第 5 天" :
+                View.Button(root, "Next station beat", stage == 2 && !(session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) ? "回到第 " + (session.Day + 1) + " 天" :
                     stage == 0 ? "走向长椅" : "继续靠近", () => { if (stationStage == stage) NextStationStage(); },
                     0.17f, 0.055f, 0.83f, 0.119f, Palette.Mint, Palette.Ink, 30);
                 View.Label(root, "Walk hint", "可以静静看完，也可以点击继续或向前滑动。", 22,
@@ -127,10 +126,7 @@ namespace Horizon
             float duration = stage == 0 ? 13 : stage == 1 ? 19 : 14;
             float age = 0;
             string first = voice.text;
-            string second = stage == 0 ? "「走近一点。这里没有标准答案。」" :
-                stage == 1 ? "「有些是种子，有些是负担。它们都来自你。」" :
-                session.RunNumber >= 3 ? "「你不必成为别人。继续创造你想看见的自己。」" :
-                "「下一次选择，仍然在你手里。」";
+            string second = CampaignContent.StationSecondVoice(session, stage);
             while (age < duration && generation == viewGeneration && voice != null)
             {
                 if (userPaused) { yield return null; continue; }
@@ -194,7 +190,7 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.08f, 0.746f, 0.92f, 0.849f);
             for (int i = 1; i <= 7; i++)
             {
-                float y = 0.669f - (i - 1) * 0.077f;
+                float y = 0.686f - (i - 1) * 0.073f;
                 bool reached = i <= archive.journey.Chapter;
                 int chapter = i;
                 View.Button(overlay, "Chapter " + i, i + "  /  " + JourneyProgress.Name(i) + (reached ? " · 点开观察" : " · 尚未到来"),
@@ -202,8 +198,10 @@ namespace Horizon
                     Palette.Panel, reached ? Palette.Mint : Palette.Muted, 29).interactable = reached;
             }
             Button longView = View.Button(overlay, "Thirty day view", "看看三十天后的自己", ShowThirtyDays,
-                0.13f, 0.105f, 0.87f, 0.169f, Palette.Panel, Palette.Gold, 29);
+                0.13f, 0.167f, 0.87f, 0.22f, Palette.Panel, Palette.Gold, 29);
             longView.interactable = archive.journey.Chapter >= 7;
+            View.Button(overlay, "Thirty day game", archive.active != null ? "继续当前人生，再开始长局" : "开始一段30天人生", BeginLongLife,
+                0.13f, 0.105f, 0.87f, 0.158f, Palette.Panel, Palette.Mint, 26).interactable = archive.journey.Chapter >= 7;
             View.Button(overlay, "Close journey", "回到地平线", () => { Destroy(overlay.gameObject); overlay = null; },
                 0.19f, 0.031f, 0.81f, 0.094f, Palette.Mint, Palette.Ink, 29);
             View.RefreshText(overlay);
@@ -218,12 +216,13 @@ namespace Horizon
                 return;
             }
             Save();
+            if (beginning.Day >= 30) { ShowMap(false); return; }
             ShowForecastRange(ForecastSimulator.Sample(beginning, null, 30), true);
         }
 
         private void ShowRangeForecast()
         {
-            ShowForecastRange(ForecastSimulator.Sample(session, null, 12), false);
+            ShowForecastRange(ForecastSimulator.Sample(session, null, session.Deadline), false);
         }
 
         private void ShowForecastRange(ForecastRange range, bool longView, bool returnToJourney = false)

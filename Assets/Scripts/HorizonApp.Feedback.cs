@@ -37,7 +37,7 @@ namespace Horizon
             Color accent = difficult ? Palette.Coral : chain ? Palette.Gold : action ? Palette.Gold : Palette.Mint;
             if (beat != null) world.Preview(beat.intent, beat.support);
 
-            View.Label(root, "Result day", "DAY " + receipt.day.ToString("00") + " / 12", 32,
+            View.Label(root, "Result day", "DAY " + receipt.day.ToString("00") + " / " + session.Deadline, 32,
                 Palette.Text, TextAnchor.MiddleLeft, 0.06f, 0.951f, 0.55f, 0.986f);
             Text wallet = View.Label(root, "Wallet", "星尘 " + archive.wallet.stardust, 28, Palette.Gold,
                 TextAnchor.MiddleRight, 0.6f, 0.951f, 0.94f, 0.986f);
@@ -76,7 +76,7 @@ namespace Horizon
                 TextAnchor.MiddleLeft, 0.065f, 0.207f, 0.935f, 0.283f);
             bool more = hasBeats && receipt.page < beats.Count - 1;
             string next = more ? "下一条回声  " + (receipt.page + 2) + " / " + beats.Count : action ?
-                receipt.day == 4 && !session.StationVisited ? "走进未来站" : "前往第 " + (receipt.day + 1) + " 天" :
+                session.NeedsStation ? "走进未来站" : "前往第 " + (receipt.day + 1) + " 天" :
                 session.CanPredict ? "试着预测三天后" : "回到今天，选一张牌";
             View.Label(panel, "Hold result", receipt.preparedGates != 0 ? PreparedGateText(receipt.preparedGates) : hasBeats && beats.Count > 1 ?
                 "回声 " + (receipt.page + 1) + " / " + beats.Count + " · 看完这一条再继续" :

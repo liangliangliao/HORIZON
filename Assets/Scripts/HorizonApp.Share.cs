@@ -27,16 +27,16 @@ namespace Horizon
             ArchiveSurface("Ten seconds of your life");
             shareScene = View.Rect(overlay, "Share picture", 0, 0, 1, 1);
             View.Fill(shareScene, "Share night", new Color(0.012f, 0.026f, 0.05f), 0, 0, 1, 1);
-            View.Label(shareScene, "Share run", "RUN " + run.number.ToString("000") + "  /  12 DAYS", 27, Palette.Muted,
+            View.Label(shareScene, "Share run", "RUN " + run.number.ToString("000") + " / " + GameSession.RunLength(run) + " DAYS", 27, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.05f, 0.897f, 0.95f, 0.946f);
             View.Label(shareScene, "Share name", run.title, 41, Palette.Text,
                 TextAnchor.MiddleCenter, 0.055f, 0.8f, 0.945f, 0.893f);
-            List<CausalNode> graph = GameSession.GraphForRun(run).Where(n => n.day <= 12).OrderBy(n => n.day).ToList();
+            List<CausalNode> graph = GameSession.GraphForRun(run).Where(n => n.day <= GameSession.RunLength(run)).OrderBy(n => n.day).ToList();
             var positions = new Dictionary<string, Vector2>();
             for (int i = 0; i < graph.Count; i++)
             {
                 CausalNode node = graph[i];
-                float angle = (node.day - 1) / 12f * Mathf.PI * 2 - Mathf.PI * 0.5f + (i % 3) * 0.14f;
+                float angle = (node.day - 1) / (float)GameSession.RunLength(run) * Mathf.PI * 2 - Mathf.PI * 0.5f + (i % 3) * 0.14f;
                 float radius = 0.24f + (i % 4) * 0.027f;
                 positions[node.id] = node.type == CausalNodeKind.Gate ?
                     new Vector2(0.3f + graph.FindAll(n => n.type == CausalNodeKind.Gate).IndexOf(node) * 0.2f, 0.324f) :

@@ -229,7 +229,7 @@ namespace Horizon.UI
             if (actions == null) return;
             foreach (ActionRecord action in actions)
             {
-                if (action.echoDay <= 0 || action.echoDay > 12) continue;
+                if (action.echoDay <= 0 || action.echoDay > timelineLength) continue;
                 var line = new GameObject("D" + action.day + " leaves a future at D" + action.echoDay, typeof(LineRenderer)).GetComponent<LineRenderer>();
                 line.transform.SetParent(timelineGroup, false); line.useWorldSpace = false;
                 line.sharedMaterial = action.kind == CardKind.Temptation ? pink : portalLight;

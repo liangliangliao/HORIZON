@@ -75,7 +75,7 @@ namespace Horizon.Game
     // One of each intent every day. All recovery choices restore energy, so no run can deadlock.
     public static class CardCatalog
     {
-        public const int CurrentVersion = 5;
+        public const int CurrentVersion = 6;
         private static readonly CardSpec[] SeasonActions = {
             new CardSpec("library", "借一本好书", CardKind.Growth, new ResourceDelta(-1),
                 new ResourceDelta(0, 0, 2, 0, 0, 1), 2, "2日后 · 灵感", "书里的一个想法成为了你的能力"),
@@ -106,9 +106,10 @@ namespace Horizon.Game
             new CardSpec("celebrate", "庆祝一个小进展", CardKind.Temptation, new ResourceDelta(-1, 3),
                 new ResourceDelta(0, 1, 0, 1), 2, "2日后 · 余温", "快乐也留下了连接")
         };
-        public static CardSpec[] ForOutlookDay(int day)
+        public static CardSpec[] ForOutlookDay(int day, int seed = 0, int catalogVersion = 3)
         {
             if (day < 13 || day > 30) throw new ArgumentOutOfRangeException("day");
+            if (catalogVersion >= 6) return CampaignContent.LongHand(day, seed);
             return new[] { OutlookActions[5], OutlookActions[day < 21 ? 0 : day < 28 ? 1 : 2],
                 OutlookActions[day % 2 == 0 ? 3 : 4] };
         }
@@ -248,6 +249,8 @@ namespace Horizon.Game
 
         public static CardSpec FindById(string id)
         {
+            CardSpec story = Array.Find(CampaignContent.Actions, candidate => candidate.Id == id);
+            if (story != null) return story;
             CardSpec seasonal = Array.Find(SeasonActions, candidate => candidate.Id == id);
             if (seasonal != null) return seasonal;
             CardSpec outlook = Array.Find(OutlookActions, candidate => candidate.Id == id);
