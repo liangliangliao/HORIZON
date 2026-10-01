@@ -109,8 +109,9 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(0.35f);
             Button next = ButtonNamed(app,"Continue result");
             Assert.That(next.GetComponentInChildren<Text>().text, Does.Contain("下一条回声"));
-            next.onClick.Invoke(); yield return null;
+            next.onClick.Invoke(); next.onClick.Invoke(); yield return null;
             Assert.AreEqual(1,archive.pendingFeedback.page);
+            Assert.IsNotNull(archive.pendingFeedback,"A double tap cannot skip the next receipt.");
             Assert.AreEqual(1,session.Day);
             Assert.AreEqual(6,archive.wallet.stardust);
             var restored = JsonUtility.FromJson<ArchiveData>(PlayerPrefs.GetString("HORIZON.PROTOTYPE.V1"));
@@ -121,6 +122,7 @@ namespace Horizon.Tests
                 "Resuming an already presented result does not replay collection.");
             string text = string.Join(" ",System.Array.ConvertAll(Get<RectTransform>(app,"root").GetComponentsInChildren<Text>(), t => t.text));
             Assert.That(text, Does.Contain("第二条"));
+            yield return new WaitForSecondsRealtime(0.3f);
             ButtonNamed(app,"Continue result").onClick.Invoke(); yield return null;
             Assert.IsNull(restored.pendingFeedback);
             Assert.AreEqual(1,Get<GameSession>(app,"session").Day);

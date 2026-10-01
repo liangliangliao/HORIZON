@@ -80,11 +80,11 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.065f, 0.145f, 0.935f, 0.205f);
             Button nextButton = View.Button(panel, "Continue result", next, ContinueFeedback,
                 0.065f, 0.032f, 0.935f, 0.142f, Palette.Mint, Palette.Ink, 31);
+            busy = true;
+            nextButton.interactable = false;
+            StartCoroutine(EnableReceipt(nextButton, viewGeneration));
             if (firstPresentation)
             {
-                busy = true;
-                nextButton.interactable = false;
-                StartCoroutine(EnableReceipt(nextButton, viewGeneration));
                 if (!quiet && receipt.stardust > 0)
                 {
                     StarBurst(receipt.stardust, new Vector2(0.5f, 0.173f));
@@ -99,7 +99,7 @@ namespace Horizon
 
         private IEnumerator EnableReceipt(Button button, int generation)
         {
-            // Blocks the release that completed the action from also dismissing its result.
+            // Also prevents a double tap on one receipt from skipping the next receipt.
             yield return new WaitForSecondsRealtime(0.24f);
             if (generation != viewGeneration || button == null) yield break;
             busy = false;

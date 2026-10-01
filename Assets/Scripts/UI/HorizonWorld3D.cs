@@ -20,7 +20,7 @@ namespace Horizon.UI
         private Material floor, dark, teal, gold, pink, glass, skin, cloth, hair;
         private Light key;
         private AudioSource audioSource;
-        private Vector3 cameraPosition, cameraLook, avatarHome;
+        private Vector3 cameraPosition, cameraLook, avatarHome, stationCameraOffset;
         private float shake, pulse;
         private bool station;
         private int activeKind = -1;
@@ -71,8 +71,8 @@ namespace Horizon.UI
             Avatar = Person("You", transform, new Vector3(-0.7f,0,0), cloth);
             avatarHome = Avatar.localPosition;
             companions = Group("Friends and collaborators");
-            Person("Friend", companions, new Vector3(-0.95f, 0, 0.5f), teal);
-            Person("Collaborator", companions, new Vector3(0.95f, 0, 0.6f), pink);
+            Person("Friend", companions, new Vector3(-1.8f, 0, 0.65f), teal);
+            Person("Collaborator", companions, new Vector3(0.5f, 0, 1.2f), pink);
             companions.gameObject.SetActive(false);
             futureSelf = Person("Future you", transform, new Vector3(0, 0, 4.2f), cloth);
             bench = Group("Future station bench");
@@ -167,6 +167,7 @@ namespace Horizon.UI
             futureSelf.gameObject.SetActive(true);
             futureSelf.localRotation = Quaternion.Euler(0, reveal ? 0 : 145, 0);
             futureSelf.localPosition = new Vector3(0, 0, 4.2f);
+            stationCameraOffset = cameraPosition - futureSelf.position;
             futureSelf.GetComponent<HorizonActor>().Pointing = false;
             futureSelf.GetComponent<HorizonActor>().Walking = false;
             bench.gameObject.SetActive(true);

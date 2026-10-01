@@ -154,15 +154,21 @@ namespace Horizon
             string temporary = final + ".tmp";
             bool completed = false;
             Canvas canvas = root.GetComponentInParent<Canvas>();
+            Camera sceneCamera = world.WorldCamera;
+            bool sceneWasEnabled = sceneCamera.enabled;
+            float start = Time.unscaledTime;
+            lastSharePath = null;
             foreach (Button button in shareControls.GetComponentsInChildren<Button>())
                 if (button.name != "Close share") button.interactable = false;
             try
             {
+                // The sharing canvas is opaque. Rendering its hidden world again
+                // adds shadows and post processing to every recorded frame.
+                sceneCamera.enabled = false;
                 using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write))
                 using (var gif = new TimelineGifWriter(stream, 540, 960))
                 using (var recorder = new SharePortraitRecorder())
                 {
-                    float start = Time.unscaledTime;
                     for (int frame = 0; frame < 60; frame++)
                     {
                         if (generation != shareGeneration || shareScene == null) yield break;
@@ -171,7 +177,7 @@ namespace Horizon
                         yield return null;
                         if (generation != shareGeneration || shareScene == null) yield break;
                         shareControls.alpha = 0;
-                        Color32[] pixels = recorder.Capture(canvas, world);
+                        Color32[] pixels = recorder.Capture(canvas);
                         shareControls.alpha = 1;
                         gif.Frame(pixels, frame % 3 == 0 ? 16 : 17);
                         while (Time.unscaledTime < start + (frame + 1) / 6f) yield return null;
@@ -181,11 +187,13 @@ namespace Horizon
                 File.Move(temporary, final);
                 completed = true;
                 lastSharePath = final;
+                Debug.Log("Timeline recording finished in " + (Time.unscaledTime - start).ToString("0.0") + " seconds.");
                 if (shareStatus != null) shareStatus.text = TimelineSharing.Publish(final);
                 DrawShare(10);
             }
             finally
             {
+                if (sceneCamera != null) sceneCamera.enabled = sceneWasEnabled;
                 if (!completed && File.Exists(temporary)) File.Delete(temporary);
                 if (generation == shareGeneration && shareControls != null)
                 {
@@ -204,29 +212,29 @@ namespace Horizon
             {
                 image = new RenderTexture(540, 960, 24); image.Create();
                 camera = new GameObject("Timeline recording camera", typeof(Camera)).GetComponent<Camera>();
-                camera.enabled = false; camera.clearFlags = CameraClearFlags.Depth; camera.cullingMask = 1 << 5;
+                camera.enabled = false; camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Palette.Ink; camera.cullingMask = 1 << 5;
                 camera.nearClipPlane = 0.1f; camera.farClipPlane = 20; camera.targetTexture = image;
                 pixels = new Texture2D(540, 960, TextureFormat.RGB24, false);
             }
-            public Color32[] Capture(Canvas canvas, HorizonWorld3D world)
+            public Color32[] Capture(Canvas canvas)
             {
                 RenderMode mode = canvas.renderMode; Camera oldCamera = canvas.worldCamera;
-                RenderTexture oldTarget = world.WorldCamera.targetTexture, oldActive = RenderTexture.active;
+                RenderTexture oldActive = RenderTexture.active;
                 float distance = canvas.planeDistance;
                 try
                 {
                     foreach (Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer = 5;
                     canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = camera; canvas.planeDistance = 5;
-                    world.WorldCamera.targetTexture = image;
                     View.RefreshText(canvas.transform);
-                    world.WorldCamera.Render(); camera.Render(); RenderTexture.active = image;
-                    pixels.ReadPixels(new Rect(0, 0, 540, 960), 0, 0); pixels.Apply();
+                    camera.Render(); RenderTexture.active = image;
+                    pixels.ReadPixels(new Rect(0, 0, 540, 960), 0, 0, false);
                     return pixels.GetPixels32();
                 }
                 finally
                 {
                     canvas.renderMode = mode; canvas.worldCamera = oldCamera; canvas.planeDistance = distance;
-                    world.WorldCamera.targetTexture = oldTarget; RenderTexture.active = oldActive;
+                    RenderTexture.active = oldActive;
                     View.RefreshText(canvas.transform);
                 }
             }

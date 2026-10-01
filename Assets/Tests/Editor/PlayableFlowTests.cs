@@ -252,6 +252,13 @@ namespace Horizon.Tests
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1.8f);
             yield return Capture(app, "14-future-self-reveal");
+            HorizonWorld3D world = Get<HorizonWorld3D>(app,"world");
+            Transform future = world.transform.Find("Future you");
+            world.WorldCamera.aspect = 9f / 16;
+            Vector3 face = world.WorldCamera.WorldToViewportPoint(future.position + Vector3.up * 1.66f);
+            world.WorldCamera.ResetAspect();
+            Assert.That(face.x,Is.InRange(0.2f,0.8f),"The revealed face remains inside the portrait frame while walking.");
+            Assert.That(face.y,Is.InRange(0.51f,0.85f),"Dialogue must not cover the revealed face.");
             Assert.AreEqual(2, session.HorizonLevel);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return null;
@@ -453,11 +460,16 @@ namespace Horizon.Tests
             ButtonNamed(app, "Share life").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.3f);
             ButtonNamed(app, "Save share animation").onClick.Invoke();
+            Assert.IsFalse(Get<HorizonWorld3D>(app,"world").WorldCamera.enabled,
+                "An opaque share story must not render its hidden 3D scene during export.");
             float exportDeadline = Time.realtimeSinceStartup + 45;
             while (string.IsNullOrEmpty(Get<string>(app, "lastSharePath")) && Time.realtimeSinceStartup < exportDeadline)
                 yield return null;
             string exported = Get<string>(app, "lastSharePath");
-            Assert.IsNotEmpty(exported, "The real canvas recording must produce a playable GIF.");
+            Assert.IsFalse(string.IsNullOrEmpty(exported), "The real canvas recording must finish within 45 seconds. " +
+                Get<Text>(app,"shareStatus").text);
+            Assert.IsTrue(Get<HorizonWorld3D>(app,"world").WorldCamera.enabled,
+                "The scene camera is restored after exporting.");
             Assert.IsTrue(File.Exists(exported));
             Assert.IsFalse(File.Exists(exported + ".tmp"));
             File.Copy(exported, Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals", "HORIZON-run-001.gif"), true);
@@ -467,6 +479,8 @@ namespace Horizon.Tests
             ButtonNamed(app, "Close share").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.4f);
             Assert.IsFalse(File.Exists(exported + ".tmp"), "Leaving an export must clear the partial file.");
+            Assert.IsTrue(Get<HorizonWorld3D>(app,"world").WorldCamera.enabled,
+                "Leaving an unfinished export also restores the scene camera.");
             Assert.AreEqual(savedLife, JsonUtility.ToJson(archive.runs[0]));
             Assert.AreEqual(balance, archive.wallet.stardust, "Archive exploration and sharing must not mint rewards.");
             ButtonNamed(app, "Close map").onClick.Invoke();

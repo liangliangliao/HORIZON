@@ -218,6 +218,8 @@ namespace Horizon.UI
             {
                 if (!station || generation != touchGeneration) yield break;
                 futureSelf.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0, 1, t));
+                cameraPosition = futureSelf.position + stationCameraOffset;
+                cameraLook = futureSelf.position + Vector3.up * 1.35f;
                 yield return null;
             }
             actor.Walking = false; actor.Pointing = true;

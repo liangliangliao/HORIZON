@@ -14,9 +14,11 @@ namespace Horizon.UI
         private Transform receivingHalo;
         private HorizonBloom bloom;
         private Color sceneAccent = Palette.Mint;
+        private MaterialPropertyBlock aimProperties;
 
         private void InitializeArt()
         {
+            aimProperties = new MaterialPropertyBlock();
             softBlock = Own(HorizonSculpt.SoftBlock());
             leafMesh = Own(HorizonSculpt.Leaf());
             coatMesh = Own(HorizonSculpt.Profile("Traveller tailored coat", new[] {
@@ -87,7 +89,7 @@ namespace Horizon.UI
                 new Vector2(5.25f,-0.035f), new Vector2(0,-0.035f) }, 64));
             Sculpt(environment, "Island bevel", pedestal, new Vector3(0,-0.06f,1), Vector3.one, floor);
             Transform rim = Sculpt(transform, "Solid horizon rim", Own(HorizonSculpt.Torus(2.05f, 0.075f)),
-                new Vector3(0,2.25f,6.02f), Vector3.one, gold);
+                new Vector3(0,2.25f,6.02f), Vector3.one, teal);
             rim.gameObject.AddComponent<PortalBreath>();
             Transform inner = Sculpt(transform, "Breathing future light", Own(HorizonSculpt.Torus(1.9f, 0.03f)),
                 new Vector3(0,2.25f,5.99f), Vector3.one, portalLight);
@@ -119,7 +121,6 @@ namespace Horizon.UI
         {
             props[0].localPosition = new Vector3(-2.25f,0,1.1f);
             Soft(props[0], "Phone pedestal", new Vector3(0,0.18f,0), new Vector3(1.3f,0.36f,1), floor);
-            Ring(props[0], "Instant pleasure orbit", new Vector3(0,1.2f,0.2f), 0.92f, warmLight, true);
             GroundContact(props[0], Vector3.zero, new Vector2(1.5f,1.2f));
             props[1].localPosition = new Vector3(1.35f,0,0.65f);
             Transform lamp = Group("Reading lamp", props[1]);
@@ -139,7 +140,6 @@ namespace Horizon.UI
             props[2].localPosition = new Vector3(1.6f,0,1.2f);
             Plant(props[2], new Vector3(-0.82f,0,0.1f), 0.75f);
             Soft(props[2], "Rest cushion", new Vector3(0,0.64f,-0.2f), new Vector3(1.2f,0.17f,0.55f), teal);
-            Ring(props[2], "Moon halo", new Vector3(0,1.7f,0.05f), 0.54f, warmLight, true);
             GroundContact(props[2], Vector3.zero, new Vector2(1.9f,1.4f));
             Soft(bench, "Long warm seat", new Vector3(0,0.66f,4.78f), new Vector3(2.95f,0.15f,0.58f), wood);
             for (int i = 0; i < 3; i++)
@@ -152,9 +152,8 @@ namespace Horizon.UI
             receivingHalo.gameObject.SetActive(enabled);
             receivingHalo.localScale = Vector3.one * (ready ? 1.12f : 1);
             sceneAccent = kind == CardKind.Temptation ? Palette.Coral : kind == CardKind.Growth ? Palette.Mint : Palette.Gold;
-            var properties = new MaterialPropertyBlock();
-            properties.SetColor("_Color",new Color(sceneAccent.r * 1.5f,sceneAccent.g * 1.5f,sceneAccent.b * 1.5f,0.68f));
-            receivingHalo.GetComponentInChildren<LineRenderer>(true).SetPropertyBlock(properties);
+            aimProperties.SetColor("_Color",new Color(sceneAccent.r * 1.5f,sceneAccent.g * 1.5f,sceneAccent.b * 1.5f,0.68f));
+            receivingHalo.GetComponentInChildren<LineRenderer>(true).SetPropertyBlock(aimProperties);
             if (bloom != null) bloom.Intensity = ready ? 0.75f : 0.42f;
         }
 
