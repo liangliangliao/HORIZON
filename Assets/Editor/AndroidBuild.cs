@@ -28,7 +28,7 @@ namespace Horizon.Editor
             PlayerSettings.bundleVersion = Argument("-horizonVersion") ?? "0.4.0";
             if (int.TryParse(Argument("-horizonBuildNumber") ?? Argument("-androidVersionCode"), out int versionCode))
                 PlayerSettings.Android.bundleVersionCode = versionCode;
-            else PlayerSettings.Android.bundleVersionCode = 400;
+            else PlayerSettings.Android.bundleVersionCode = 1;
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel23;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.Android, ManagedStrippingLevel.Low);
             ConfigureSigning(release);

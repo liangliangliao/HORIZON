@@ -40,6 +40,7 @@ namespace Horizon.Tests
             string frozen = JsonUtility.ToJson(life.Snapshot());
             ButtonNamed(app, "Settings").onClick.Invoke(); yield return null;
             Assert.IsTrue(VisualPreferences.Paused);
+            Assert.IsFalse(Get<HorizonWorld3D>(app, "world").WorldCamera.enabled);
             ButtonNamed(app, "Toggle 0").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Toggle 3").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Toggle 4").onClick.Invoke(); yield return null;
@@ -60,6 +61,7 @@ namespace Horizon.Tests
             Call(app, "HandleBack"); yield return null;
             Call(app, "HandleBack"); yield return null;
             Assert.IsFalse(VisualPreferences.Paused);
+            Assert.IsTrue(Get<HorizonWorld3D>(app, "world").WorldCamera.enabled);
             Assert.AreEqual(frozen, JsonUtility.ToJson(life.Snapshot()));
             // Restore also retains the receipt identity, seeded deck and settings.
             var store = new ArchiveStore(Path.Combine(Application.persistentDataPath, "HORIZON.life.json"));

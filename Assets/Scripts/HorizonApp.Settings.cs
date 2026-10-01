@@ -99,7 +99,8 @@ namespace Horizon
 
         private void RenderSettings()
         {
-            SettingsPanel("留一会儿，再继续", "人生已保存 · 当前游戏暂停");
+            SettingsPanel("留一会儿，再继续", saveStore.WriteBlocked ? "当前游戏暂停 · 新版本存档已保留" :
+                saveStore.Notice == null ? "人生已保存 · 当前游戏暂停" : "当前游戏暂停 · 存档情况见下方");
             PlayerPreferences p = archive.preferences;
             SettingRow(0, "声音", "行动与回声的提示音", p.sound, () => p.sound = !p.sound);
             SettingRow(1, "环境音乐", "安静的地平线与未来站", p.ambience, () => p.ambience = !p.ambience);
@@ -114,7 +115,9 @@ namespace Horizon
             View.Button(overlay, "Close settings", "继续这段人生", CloseSettings,
                 0.075f, 0.085f, 0.925f, 0.161f, Palette.Mint, Palette.Ink, 31);
             if (archive.runs.Count > 0) View.Button(overlay, "Home from settings", "回到地平线", () =>
-                { CloseSettings(); ShowHome(); }, 0.13f, 0.018f, 0.87f, 0.068f, Palette.Deep, Palette.Muted, 23);
+                { CloseSettings(); ShowHome(); }, 0.075f, 0.018f, 0.49f, 0.068f, Palette.Deep, Palette.Muted, 23);
+            if (archive.runs.Count > 0) View.Button(overlay, "Quit saved life", "保存并离开", () =>
+                { PersistLiveLife(); Application.Quit(); }, 0.51f, 0.018f, 0.925f, 0.068f, Palette.Deep, Palette.Muted, 23);
             else View.Button(overlay, "Quit saved life", "保存并离开", () => { PersistLiveLife(); Application.Quit(); },
                 0.13f, 0.018f, 0.87f, 0.068f, Palette.Deep, Palette.Muted, 23);
             View.RefreshText(overlay);

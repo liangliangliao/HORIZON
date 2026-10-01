@@ -33,6 +33,21 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void UnchangedPauseSavesKeepTheLastDistinctRollbackState()
+        {
+            var store = new ArchiveStore(Path.Combine(folder, "life.json"));
+            var data = new ArchiveData(); data.wallet.Claim("a", 3); store.Save(data);
+            data.wallet.Claim("b", 5); store.Save(data);
+            string backup = File.ReadAllText(store.BackupPath);
+            Assert.IsTrue(store.Save(data)); Assert.IsTrue(store.Save(data));
+            Assert.AreEqual(backup, File.ReadAllText(store.BackupPath));
+            var reopened = new ArchiveStore(store.Path); var current = reopened.Load();
+            Assert.IsTrue(reopened.Save(current));
+            Assert.AreEqual(backup, File.ReadAllText(store.BackupPath));
+            Assert.AreEqual(3, new ArchiveStore(store.BackupPath).Load().wallet.stardust);
+        }
+
+        [Test]
         public void ExportImportKeepsReadingPositionClaimsSeedAndPreferences()
         {
             var life = new GameSession(2, 736); life.Choose(life.Hand[1].Id);

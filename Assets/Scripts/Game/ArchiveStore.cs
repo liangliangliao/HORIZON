@@ -27,6 +27,7 @@ namespace Horizon
         public string Notice { get; private set; }
         public bool WriteBlocked { get; private set; }
         private readonly string legacyKey;
+        private string lastPayload;
 
         public ArchiveStore(string path, string legacyKey = null)
         { Path = path; this.legacyKey = legacyKey; }
@@ -36,7 +37,7 @@ namespace Horizon
             Notice = null;
             ArchiveData data;
             string error;
-            if (TryFile(Path, out data, out error)) return data;
+            if (TryFile(Path, out data, out error)) { lastPayload = JsonUtility.ToJson(data); return data; }
             if (error == "newer") WriteBlocked = true;
             bool broken = File.Exists(Path);
             if (TryFile(BackupPath, out data, out error))
@@ -122,6 +123,10 @@ namespace Horizon
             string temporary = Path + ".tmp";
             try
             {
+                string payload = JsonUtility.ToJson(data);
+                // Background/resume, settings and a reopened receipt frequently
+                // save the same state. Keep the last distinct rollback state.
+                if (payload == lastPayload && File.Exists(Path)) return true;
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path));
                 byte[] bytes = Encoding.UTF8.GetBytes(Encode(data));
                 if (bytes.Length > MaximumBytes) throw new IOException("Archive exceeds storage limit.");
@@ -139,6 +144,7 @@ namespace Horizon
                     else File.Move(Path, Path + ".unreadable." + DateTime.UtcNow.Ticks);
                 }
                 File.Move(temporary, Path);
+                lastPayload = payload;
                 if (!string.IsNullOrEmpty(legacyKey))
                 { PlayerPrefs.SetString(legacyKey, JsonUtility.ToJson(data)); PlayerPrefs.Save(); }
                 return true;

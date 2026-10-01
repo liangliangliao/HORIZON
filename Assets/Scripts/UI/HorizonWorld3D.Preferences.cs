@@ -13,6 +13,7 @@ namespace Horizon.UI
     {
         private PlayerPreferences preferences = new PlayerPreferences();
         private bool paused;
+        private bool pausedCameraWasEnabled;
 
         public void ApplyPreferences(PlayerPreferences value)
         {
@@ -23,6 +24,7 @@ namespace Horizon.UI
                 if (preferences.reducedMotion) bloom.Echo = 0;
             }
             WorldCamera.allowMSAA = !preferences.batterySaver;
+            WorldCamera.allowHDR = !preferences.batterySaver && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.DefaultHDR);
             QualitySettings.antiAliasing = preferences.batterySaver ? 0 : 2;
             QualitySettings.shadows = preferences.batterySaver ? ShadowQuality.Disable : ShadowQuality.All;
             UpdateAudio();
@@ -30,6 +32,12 @@ namespace Horizon.UI
 
         public void SetPaused(bool value)
         {
+            if (paused == value) return;
+            if (WorldCamera != null)
+            {
+                if (value) { pausedCameraWasEnabled = WorldCamera.enabled; WorldCamera.enabled = false; }
+                else WorldCamera.enabled = pausedCameraWasEnabled;
+            }
             paused = value;
             foreach (HorizonActor actor in GetComponentsInChildren<HorizonActor>(true))
                 actor.MotionRate = value ? 0 : 1;
