@@ -1,6 +1,6 @@
 # HORIZON v0.3 业务功能验收
 
-按最新要求，本轮先完成业务逻辑与可操作功能，3D 美术、UI 精修、核心动效调校暂缓。下面的 16 个功能组均有规则实现与入口；运行验收以对应提交的 Unity 工作流为准。
+原业务基线保留；本轮继续改进拖拽、逐条结果和三维呈现。下面的 16 个功能组均有规则实现与入口；运行验收以对应提交的 Unity 工作流为准。
 
 | 功能组 | 规则契约与可操作入口 | 检查 |
 | --- | --- | --- |
@@ -34,6 +34,6 @@
 
 完整 0–35 节映射见 [V03_ACCEPTANCE.md](V03_ACCEPTANCE.md)。固定回声日期、明确投放圈与首局三资源为清晰操作及渐进学习的具体取舍。新规则为版本 6、牌池 4，旧局保持旧牌池、门槛、资源效果和重演方式。
 
-共 68 项 Unity 检查：GameSession 21、PlayExperience 6、ExperienceContent 13、ObservationDesign 7、BusinessRule 14、PlayableFlow 7。工作流先验证规则与真实按钮/手势、22 张竖屏画面及十秒 GIF，全部通过后才构建 ARMv7 / ARM64 APK。通过状态以该提交的 CI 为准。
+共 73 项 Unity 检查：GameSession 21、PlayExperience 6、ExperienceContent 13、ObservationDesign 7、BusinessRule 14、PlayableFlow 7、FeedbackInteraction 5。工作流先验证规则与真实按钮/手势、22 张竖屏画面及十秒 GIF，全部通过后才构建 ARMv7 / ARM64 APK。通过状态以该提交的 CI 为准。
 
-暂缓：成熟 3D 资产、UI 精修、TIME ECHO / CASCADE 音画调校、剧情演出质量。另需设备或真人验收：触控/性能/原生分享、前一小时用时、乐趣与现实迁移。支付、Steam、完整三十天战役及后续大规模商城未列为 v0.3 强制功能。
+本轮已继续制作曲面网格、场景灯光、Bloom、回声轨迹及结果呈现；成熟美术、动画自然度与剧情演出质量仍需持续迭代。另需设备或真人验收：触控/性能/原生分享、前一小时用时、乐趣与现实迁移。支付、Steam、完整三十天战役及后续大规模商城未列为 v0.3 强制功能。

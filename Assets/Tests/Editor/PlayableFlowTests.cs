@@ -347,8 +347,17 @@ namespace Horizon.Tests
             Assert.AreEqual(FeedbackKind.Echoes, archive.pendingFeedback.kind);
             Assert.That(archive.pendingFeedback.description, Does.Contain("D1"));
             yield return Capture(app, "03-echo-result");
-            ButtonNamed(app, "Continue result").onClick.Invoke();
-            yield return new WaitForSecondsRealtime(0.4f);
+            int read = 0;
+            int receipts = archive.pendingFeedback.beats.Count;
+            while (archive.pendingFeedback != null)
+            {
+                Assert.AreEqual(4,session.Day,"Reading a receipt must not choose or advance a day.");
+                ButtonNamed(app, "Continue result").onClick.Invoke();
+                read++;
+                yield return new WaitForSecondsRealtime(0.4f);
+                Assert.LessOrEqual(read,receipts);
+            }
+            Assert.AreEqual(receipts,read,"Every echo is read before continuing.");
             Assert.IsTrue(session.CanPredict);
             ButtonNamed(app, "Skip prediction").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.4f);
@@ -372,7 +381,11 @@ namespace Horizon.Tests
             yield return Capture(app, "04-future-station");
             ButtonNamed(app, "Next station beat").onClick.Invoke();
             yield return new WaitForSecondsRealtime(5);
-            if (archive.pendingFeedback != null) ButtonNamed(app, "Continue result").onClick.Invoke();
+            while (archive.pendingFeedback != null)
+            {
+                ButtonNamed(app, "Continue result").onClick.Invoke();
+                yield return new WaitForSecondsRealtime(0.4f);
+            }
             yield return new WaitForSecondsRealtime(0.4f);
             Assert.AreEqual(5, session.Day);
             Assert.IsTrue(session.StationVisited);

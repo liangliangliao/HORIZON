@@ -37,6 +37,7 @@ namespace Horizon.UI
             skin = Lit(new Color(0.94f, 0.69f, 0.51f));
             cloth = Lit(new Color(0.15f, 0.37f, 0.53f));
             hair = Lit(new Color(0.06f, 0.04f, 0.07f));
+            foreach (AudioListener listener in FindObjectsOfType<AudioListener>()) listener.enabled = false;
             var cameraObject = new GameObject("HORIZON 3D Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             WorldCamera = cameraObject.GetComponent<Camera>();
@@ -248,9 +249,7 @@ namespace Horizon.UI
 
         private IEnumerator SendSymbol(CardKind kind, int dueDay)
         {
-            Transform symbol = Shape(transform, "Sent intention", kind == CardKind.Growth ? PrimitiveType.Cube :
-                PrimitiveType.Sphere, Avatar.position + Vector3.up * 1.8f,
-                Vector3.one * 0.25f, kind == CardKind.Temptation ? pink : kind == CardKind.Growth ? teal : gold);
+            Transform symbol = IntentionSymbol(kind, Avatar.position + Vector3.up * 1.8f);
             Trail(symbol, kind == CardKind.Temptation ? warmLight : portalLight);
             Vector3 from = symbol.position;
             Vector3 to = kind == CardKind.Temptation ? new Vector3(0, 0.3f, -1) :

@@ -153,8 +153,8 @@ namespace Horizon.UI
 
         private IEnumerator EchoLight(PendingEcho echo)
         {
-            Transform orb = Shape(transform, "A past choice arriving", PrimitiveType.Sphere,
-                DayPoint(echo.sourceDay) + Vector3.up * 0.2f, Vector3.one * 0.23f, echo.kind == CardKind.Temptation ? pink : teal);
+            Transform orb = IntentionSymbol(echo.kind, DayPoint(echo.sourceDay) + Vector3.up * 0.2f,
+                CardCatalog.FindById(echo.cardId)?.GivesSupport ?? false, true);
             Trail(orb, echo.kind == CardKind.Temptation ? warmLight : portalLight);
             Vector3 start = orb.position;
             Vector3 end = Avatar.position + Vector3.up * 1.3f;

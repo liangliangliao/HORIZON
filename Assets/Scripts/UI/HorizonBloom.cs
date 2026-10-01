@@ -8,11 +8,14 @@ namespace Horizon.UI
         public float Intensity = 0.42f;
         public float Echo;
         private Material material;
+        private Camera view;
 
         public void Initialize(Shader shader)
         {
+            view = GetComponent<Camera>();
             if (shader != null && shader.isSupported && SystemInfo.supportsImageEffects)
                 material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+            else enabled = false;
         }
 
         private void Update() { Echo = Mathf.MoveTowards(Echo, 0, Time.unscaledDeltaTime * 1.4f); }
@@ -34,9 +37,32 @@ namespace Horizon.UI
                 material.SetVector("_Direction", new Vector4(1,0,0,0)); Graphics.Blit(a,b,material,1);
                 material.SetVector("_Direction", new Vector4(0,1,0,0)); Graphics.Blit(b,a,material,1);
                 material.SetTexture("_BloomTex", a); material.SetFloat("_Intensity",Intensity);
-                material.SetFloat("_Echo",Echo); Graphics.Blit(source,destination,material,2);
+                material.SetFloat("_Echo",Echo);
+                DrawInViewport(source,destination);
             }
             finally { RenderTexture.ReleaseTemporary(a); RenderTexture.ReleaseTemporary(b); }
+        }
+
+        private void DrawInViewport(RenderTexture source, RenderTexture destination)
+        {
+            Rect bounds = view.rect;
+            if (bounds == new Rect(0,0,1,1))
+            { Graphics.Blit(source,destination,material,2); return; }
+            // A plain Blit covers the whole target and stretches a partial camera.
+            // Draw only in its viewport, both on the phone and in portrait captures.
+            int width = destination != null ? destination.width : view.targetTexture != null ?
+                view.targetTexture.width : Screen.width;
+            int height = destination != null ? destination.height : view.targetTexture != null ?
+                view.targetTexture.height : Screen.height;
+            Graphics.SetRenderTarget(destination);
+            GL.PushMatrix();
+            try
+            {
+                GL.LoadPixelMatrix(0,width,height,0);
+                Graphics.DrawTexture(new Rect(bounds.x * width,(1 - bounds.yMax) * height,
+                    bounds.width * width,bounds.height * height),source,material,2);
+            }
+            finally { GL.PopMatrix(); RenderTexture.active = destination; }
         }
 
         private void OnDestroy()

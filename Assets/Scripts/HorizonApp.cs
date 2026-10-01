@@ -678,8 +678,8 @@ namespace Horizon
                     .gameObject.AddComponent<ActionIconGraphic>();
                 icon.Kind = card.Kind; icon.Support = card.GivesSupport;
                 icon.color = accent; icon.raycastTarget = false;
-                View.Label(rect, "Type", card.Kind == CardKind.Growth ? "长 线" :
-                    card.Kind == CardKind.Temptation ? "即 时" : "恢 复", 23, accent,
+                View.Label(rect, "Type", card.Kind == CardKind.Growth ? "积累未来" :
+                    card.Kind == CardKind.Temptation ? "开心一下" : "照顾自己", 23, accent,
                     TextAnchor.MiddleLeft, 0.105f, 0.75f, 0.7f, 0.89f);
                 View.Label(rect, "Name", card.Name, 33, Palette.Text,
                     TextAnchor.MiddleLeft, 0.105f, 0.48f, 0.91f, 0.71f);
@@ -755,7 +755,9 @@ namespace Horizon
             dropRing.Thickness = ready ? 8 : 4;
             dropRing.SetVerticesDirty();
             dropTitle.text = ready ? PlayExperience.LandingLabel(card) : visible ? "再向上 · 进入金色圈" : "把卡牌拖到这里";
-            destinationBeacon.GetComponent<GuidePulse>().Active = !visible;
+            GuidePulse receiving = destinationBeacon.GetComponent<GuidePulse>();
+            receiving.Active = !visible;
+            receiving.BaseScale = ready ? 1.035f : 1;
             destinationBeacon.localScale = Vector3.one * (ready ? 1.035f : 1);
             // The receiving label stays in front of the carried card and never captures input.
             destinationBeacon.SetAsLastSibling();

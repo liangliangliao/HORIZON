@@ -175,6 +175,7 @@ namespace Horizon.UI
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (!Available || dragging || (CanBegin != null && !CanBegin(this))) return;
+            if (rect == null) rect = (RectTransform)transform;
             dragging = true;
             pointerId = eventData.pointerId;
             Began?.Invoke(this);
@@ -286,9 +287,10 @@ namespace Horizon.UI
     public sealed class GuidePulse : MonoBehaviour
     {
         public bool Active = true;
+        public float BaseScale = 1;
         private void Update()
         {
-            transform.localScale = Vector3.one * (Active ? 1 + Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 1);
+            transform.localScale = Vector3.one * (BaseScale + (Active ? Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 0));
         }
     }
 

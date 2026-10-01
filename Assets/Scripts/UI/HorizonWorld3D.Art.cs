@@ -152,6 +152,9 @@ namespace Horizon.UI
             receivingHalo.gameObject.SetActive(enabled);
             receivingHalo.localScale = Vector3.one * (ready ? 1.12f : 1);
             sceneAccent = kind == CardKind.Temptation ? Palette.Coral : kind == CardKind.Growth ? Palette.Mint : Palette.Gold;
+            var properties = new MaterialPropertyBlock();
+            properties.SetColor("_Color",new Color(sceneAccent.r * 1.5f,sceneAccent.g * 1.5f,sceneAccent.b * 1.5f,0.68f));
+            receivingHalo.GetComponentInChildren<LineRenderer>(true).SetPropertyBlock(properties);
             if (bloom != null) bloom.Intensity = ready ? 0.75f : 0.42f;
         }
 
@@ -166,6 +169,53 @@ namespace Horizon.UI
             trail.sharedMaterial = material; trail.time = 0.3f;
             trail.startWidth = 0.09f; trail.endWidth = 0;
             trail.minVertexDistance = 0.03f; trail.shadowCastingMode = ShadowCastingMode.Off;
+        }
+
+        private Transform IntentionSymbol(CardKind kind, Vector3 position, bool support = false, bool returned = false)
+        {
+            Transform token = Group("A choice with a recognizable shape");
+            token.position = position;
+            if (support)
+            {
+                for (int i = -1; i <= 1; i += 2)
+                {
+                    Shape(token, "Companion head", PrimitiveType.Sphere, new Vector3(i * 0.3f,0.3f,0),
+                        Vector3.one * 0.35f, gold);
+                    Shape(token, "Companion coat", PrimitiveType.Capsule, new Vector3(i * 0.3f,-0.15f,0),
+                        new Vector3(0.38f,0.28f,0.32f), teal);
+                }
+                Soft(token,"Connection",Vector3.zero,new Vector3(0.7f,0.06f,0.08f),gold);
+            }
+            else if (kind == CardKind.Growth && returned)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    Transform leaf = Sculpt(token,"Effort grown into a sprout",leafMesh,Vector3.zero,
+                        new Vector3(1,0.8f,1), i % 2 == 0 ? teal : gold);
+                    leaf.localRotation = Quaternion.Euler(20,i * 120,0);
+                }
+            }
+            else if (kind == CardKind.Growth)
+            {
+                Soft(token,"Book cover",Vector3.zero,new Vector3(0.95f,0.19f,0.63f),teal);
+                Soft(token,"Book pages",new Vector3(0,0.02f,-0.03f),new Vector3(0.85f,0.11f,0.6f),ivory);
+                token.rotation = Quaternion.Euler(-55,20,0);
+            }
+            else if (kind == CardKind.Temptation)
+            {
+                Soft(token,"Phone",Vector3.zero,new Vector3(0.58f,0.98f,0.13f),dark);
+                Soft(token,"Phone screen",new Vector3(0,0,-0.08f),new Vector3(0.46f,0.81f,0.03f),pink);
+                Soft(token,"Light in the feed",new Vector3(0,0.16f,-0.105f),new Vector3(0.28f,0.05f,0.015f),gold);
+            }
+            else
+            {
+                Shape(token,"Moon",PrimitiveType.Sphere,Vector3.zero,Vector3.one * 0.7f,gold);
+                Transform leaf = Sculpt(token,"A quiet breath",leafMesh,new Vector3(-0.2f,-0.3f,-0.2f),
+                    Vector3.one * 0.55f,teal);
+                leaf.localRotation = Quaternion.Euler(0,0,-35);
+            }
+            token.localScale = Vector3.one * 0.35f;
+            return token;
         }
 
         private void WorldRipple(Vector3 position, Material material, float size = 1)
