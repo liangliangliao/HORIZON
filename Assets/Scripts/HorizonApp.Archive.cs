@@ -27,7 +27,7 @@ namespace Horizon
             View.Label(overlay, "Branch day", "DAY " + day.ToString("00"), 34, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.23f, 0.713f, 0.77f, 0.782f);
             View.Button(overlay, "Next branch day", ">", () => ShowBranchPlanner(original, day + 1),
-                0.8f, 0.713f, 0.93f, 0.782f, Palette.Panel, Palette.Text, 38).interactable = day < 12;
+                0.8f, 0.713f, 0.93f, 0.782f, Palette.Panel, Palette.Text, 38).interactable = day < GameSession.RunLength(original);
             CardSpec[] choices = GameSession.AlternativesForDay(original, day, branchChoices);
             string selected = branchChoices.TryGetValue(day, out string changed) ? changed : original.actions[day - 1].cardId;
             for (int i = 0; i < choices.Length; i++)
@@ -82,10 +82,11 @@ namespace Horizon
         {
             if (duringRun && session != null) return new RunRecord
             {
-                number = session.RunNumber, title = "正在发生", actions = session.Actions,
+                number = session.RunNumber, deadline = session.Deadline, title = "正在发生", actions = session.Actions,
                 causalNodes = session.CausalNodes, catalogVersion = session.CatalogVersion,
+                worldSeed = session.WorldSeed, deckSeed = session.DeckSeed, deckSeedRecorded = true,
                 finalEnergy = session.Energy, finalMood = session.Mood, finalAbility = session.Ability,
-                prediction = session.Prediction
+                prediction = session.Prediction, predictions = new List<PredictionRecord>(session.Predictions)
             };
             return archive.runs.Count == 0 ? null : archive.runs[Mathf.Clamp(mapIndex, 0, archive.runs.Count - 1)];
         }
@@ -102,6 +103,7 @@ namespace Horizon
         {
             ArchiveSurface("Time map");
             RunRecord run = MapRecord(duringRun);
+            if (GameSession.RunLength(run) == 30) { RenderLongMap(run, duringRun); return; }
             List<ActionRecord> actions = run?.actions ?? new List<ActionRecord>();
             List<CausalNode> graph = CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
             View.Label(overlay, "Map title", "时 间 地 图", 43, Palette.Text,
@@ -178,7 +180,7 @@ namespace Horizon
             if (action.echoDay > 0)
                 description += "\n\nD" + action.echoDay + (action.echoed ? " · 回声已经回来\n" + action.echoName +
                     "\n" + PlayExperience.NowLabel(action.actualLaterRecorded ? action.actualLater : action.later) :
-                    action.echoDay > 12 ? " · 超过本局截止日，尚未兑现" : " · 回声还没有回来");
+                    action.echoDay > (archive.runs.Find(r => r.actions == actions)?.deadline == 30 || session?.Deadline == 30 && session.Actions == actions ? 30 : 12) ? " · 超过本局截止日，尚未兑现" : " · 回声还没有回来");
             if (node != null)
             {
                 List<CausalNode> parents = CausalGraph.Ancestors(graph, node.id).FindAll(n => n.id != node.id);
@@ -231,12 +233,12 @@ namespace Horizon
             scroll.viewport = viewport; scroll.horizontal = scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             int columns = Mathf.Max(3, graph.GroupBy(n => n.day).Select(g => g.Count()).DefaultIfEmpty(3).Max());
-            float width = columns * 260 + 100, height = 12 * 135 + 60;
+            float width = columns * 260 + 100, height = GameSession.RunLength(run) * 135 + 60;
             RectTransform content = View.Rect(viewport, "Network canvas", 0, 1, 0, 1);
             content.pivot = new Vector2(0, 1); content.sizeDelta = new Vector2(width, height);
             scroll.content = content;
             var positions = new Dictionary<string, Vector2>();
-            for (int day = 1; day <= 12; day++)
+            for (int day = 1; day <= GameSession.RunLength(run); day++)
             {
                 int col = 0;
                 foreach (CausalNode node in graph.FindAll(n => n.day == day))

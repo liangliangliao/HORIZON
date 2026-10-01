@@ -6,6 +6,21 @@ namespace Horizon.Game
     public enum FeedbackKind { Choice, Echoes, Deadline }
 
     [Serializable]
+    public sealed class FeedbackBeat
+    {
+        public string title;
+        public string source;
+        public int sourceDay;
+        public int destinationDay;
+        public CardKind intent;
+        public bool support;
+        public ResourceDelta delta;
+        public string meaning;
+        public int chainSize;
+        public int stardust;
+    }
+
+    [Serializable]
     public sealed class FeedbackRecord
     {
         public FeedbackKind kind;
@@ -14,6 +29,11 @@ namespace Horizon.Game
         public string title;
         public string description;
         public int stardust;
+        public List<FeedbackBeat> beats = new List<FeedbackBeat>();
+        public int page;
+        public bool presented;
+        public int presentedPages;
+        public int preparedGates;
     }
 
     [Serializable]
@@ -64,6 +84,23 @@ namespace Horizon.Game
 
     public static class PlayExperience
     {
+        public static string DestinationLabel(CardSpec card, int day, int deadline = GameSession.LastDay)
+        {
+            if (card.Delay == 0) return "今天 · 立即恢复";
+            int due = day + card.Delay;
+            return "D" + due.ToString("00") + (due > deadline ? " · 截止日之后" : " · " + card.Delay + " 天后回来");
+        }
+
+        public static string LandingLabel(CardSpec card)
+        {
+            return card.Delay == 0 ? "松手 · 现在恢复" : "松手 · 送入未来";
+        }
+
+        public static bool IsDifficult(ResourceDelta delta)
+        {
+            return delta != null && (delta.energy < 0 || delta.mood < 0 || delta.relation < 0 || delta.money < 0);
+        }
+
         public static string NowLabel(ResourceDelta delta)
         {
             if (delta == null) return "状态没有变化";
@@ -84,11 +121,11 @@ namespace Horizon.Game
             label += name + " " + (value > 0 ? "+" : "") + value;
         }
 
-        public static string FutureLabel(CardSpec card, int day)
+        public static string FutureLabel(CardSpec card, int day, int deadline = GameSession.LastDay)
         {
             if (card.Delay == 0) return "立即恢复。今天不再埋下额外回声。";
             int due = day + card.Delay;
-            return due > GameSession.LastDay ? "回声会在第 " + due + " 天回来，超过本局截止日。" :
+            return due > deadline ? "回声会在第 " + due + " 天回来，超过本局截止日。" :
                 "回声已送往第 " + due + " 天，" + card.Delay + " 天后会回来。";
         }
 
@@ -97,7 +134,8 @@ namespace Horizon.Game
             if (card.Delay == 0) return "今天立即恢复";
             if (card.Kind == CardKind.Growth) return card.Later.ability > 0 ? "能力会成长" : "带来新的机会";
             if (card.GivesSupport) return "朋友会带来回应";
-            if (card.Kind == CardKind.Recovery) return "心情会慢慢回暖";
+            if (card.Kind == CardKind.Recovery) return card.Later.energy > 0 ? "给后续留下余力" :
+                card.Later.mood > 0 ? "心情会慢慢回暖" : "理解会慢慢清晰";
             if (card.Later.energy >= 0 && card.Later.mood >= 0) return "快乐也会留下余温";
             return card.Later.energy < 0 ? "之后可能疲惫" : "快乐会慢慢褪去";
         }
@@ -112,12 +150,12 @@ namespace Horizon.Game
         public static string GateReason(GameSession session, int gate)
         {
             if (gate == 0) return "能力 " + session.Ability + "/6 · " +
-                (session.CatalogVersion >= 2 ? "成长回声 " + session.Actions.FindAll(a => a.echoed && a.later != null && a.later.ability > 0).Count +
-                    "/2，练习和作品会帮你。" : "成长牌的回声会提高能力。");
+                (session.CatalogVersion >= 2 ? "成长回声 " + ProductExperience.GrowthEvidence(session) +
+                    "/" + ProductExperience.EvidenceNeeded(session) + "，练习和作品会帮你。" : "成长牌的回声会提高能力。");
             if (gate == 1) return "精力 " + session.Energy + "、心情 " + session.Mood +
                 " · 截止日各需至少 4" + (session.CatalogVersion >= 2 ? "；恢复 " +
-                    session.Actions.FindAll(a => a.kind == CardKind.Recovery).Count + "/2。" : "，恢复牌可以帮助你。");
-            return "支援行动 " + session.SupportActions + "/2 · 关系 " + session.Relation +
+                    ProductExperience.RecoveryEvidence(session) + "/" + ProductExperience.EvidenceNeeded(session) + "。" : "，恢复牌可以帮助你。");
+            return "支援行动 " + ProductExperience.SupportEvidence(session) + "/" + ProductExperience.EvidenceNeeded(session) + " · 关系 " + session.Relation +
                 "/6 · 金钱 " + session.Money + "/2，朋友与合作会留下支援。";
         }
     }

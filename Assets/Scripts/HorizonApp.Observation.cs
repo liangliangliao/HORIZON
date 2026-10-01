@@ -16,26 +16,51 @@ namespace Horizon
         private int focusPage;
 
         private float FutureX(int day)
-        { return Mathf.Lerp(0.12f, 0.88f, Mathf.Clamp01((day - session.Day) / (float)Mathf.Max(1, 12 - session.Day))); }
+        {
+            if (session.Deadline != 30) return Mathf.Lerp(0.12f, 0.88f,
+                Mathf.Clamp01((day - session.Day) / (float)Mathf.Max(1, session.Deadline - session.Day)));
+            List<int> days = ObservedFutureDays();
+            if (days.Count < 2 || day <= days[0]) return 0.12f;
+            for (int i = 1; i < days.Count; i++)
+                if (day <= days[i]) return Mathf.Lerp(0.12f, 0.88f,
+                    (i - 1 + Mathf.InverseLerp(days[i - 1], days[i], day)) / (days.Count - 1));
+            return 0.88f;
+        }
+
+        private List<int> ObservedFutureDays()
+        {
+            var days = new List<int> { session.Day };
+            IEnumerable<int> candidates = session.Pending.Select(e => e.dueDay);
+            if (Vision.Probability && session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+                candidates = candidates.Concat(WorldEvents.ForCatalog(session.CatalogVersion).Select(e => e.Day));
+            foreach (int day in candidates.Where(d => d > session.Day && d < session.Deadline).Distinct().OrderBy(d => d).Take(2))
+                days.Add(day);
+            for (int day = session.Day + 2; days.Count < 3 && day < session.Deadline; day += 2)
+                if (!days.Contains(day)) days.Add(day);
+            if (!days.Contains(session.Deadline)) days.Add(session.Deadline);
+            days.Sort();
+            return days;
+        }
 
         private void DrawObservedFuture()
         {
-            var days = new List<int> { session.Day };
-            foreach (int day in session.Pending.Select(e => e.dueDay).Where(d => d > session.Day && d < 12).Distinct().OrderBy(d => d).Take(2))
-                days.Add(day);
-            for (int day = session.Day + 2; days.Count < 3 && day < 12; day += 2)
-                if (!days.Contains(day)) days.Add(day);
-            if (!days.Contains(12)) days.Add(12);
-            days.Sort();
-            int seen = 0, visible = ObservationDesign.VisibleTypes(session, archive.journey.Chapter);
+            List<int> days = ObservedFutureDays();
+            int seen = 0;
+            HorizonProgress vision = Vision;
             foreach (int day in days)
             {
                 float x = FutureX(day);
                 PendingEcho echo = session.Pending.Find(e => e.dueDay == day);
-                bool known = echo != null && seen++ < visible;
+                bool known = echo != null && vision.Sees(echo, seen++, session.Day);
                 bool strain = echo != null && ObservationDesign.EchoType(echo) == "火种";
-                string mark = day == session.Day ? "今天" : day == 12 ? "截止日" : "D" + day;
+                string mark = day == session.Day ? "今天" : day == session.Deadline ? "截止日" : "D" + day;
                 string type = known || strain ? ObservationDesign.EchoType(echo) : day == session.Day ? "" : "?";
+                if (echo == null && vision.Probability && day > session.Day && day <= session.Day + vision.Days &&
+                    session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+                {
+                    WorldEventSpec potential = WorldEvents.ForCatalog(session.CatalogVersion).FirstOrDefault(e => e.Day == day);
+                    if (potential != null) type = "变动 " + potential.Chance + "%";
+                }
                 Color color = strain ? Palette.Coral : day == session.Day || known ? Palette.Mint : Palette.Muted;
                 View.Panel(root, "Future halo", new Color(color.r, color.g, color.b, 0.16f),
                     x - 0.024f, 0.831f, x + 0.024f, 0.857f, 24);
@@ -51,9 +76,9 @@ namespace Horizon
         private void DrawResourceOrbits()
         {
             resourceNumbers.Clear(); resourceValues.Clear();
-            int[] values = session.RunNumber == 1 ? new[] { session.Energy, session.Mood, session.Ability } :
+            int[] values = session.RunNumber == 1 && session.Deadline == 12 ? new[] { session.Energy, session.Mood, session.Ability } :
                 new[] { session.Energy, session.Mood, session.Insight, session.Relation, session.Money, session.Ability };
-            string[] names = session.RunNumber == 1 ? new[] { "精力", "心情", "能力" } :
+            string[] names = session.RunNumber == 1 && session.Deadline == 12 ? new[] { "精力", "心情", "能力" } :
                 new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" };
             View.Label(root, "State heading", "此刻的你", 22, Palette.Muted, TextAnchor.MiddleLeft,
                 0.06f, 0.416f, 0.5f, 0.443f);
@@ -91,19 +116,22 @@ namespace Horizon
             overlay = View.Rect(root, "Prediction explanation", 0, 0, 1, 1);
             View.Fill(overlay, "Why veil", new Color(0.006f, 0.02f, 0.04f, 0.95f), 0, 0, 1, 1, true);
             RectTransform panel = View.Panel(overlay, "Why sheet", Palette.Panel, 0.05f, 0.08f, 0.95f, 0.91f, 35).rectTransform;
-            View.Label(panel, "Why title", "这三天，发生了什么？", 38, Palette.Text, TextAnchor.MiddleLeft,
+            View.Label(panel, "Why title", "这段时间，发生了什么？", 38, Palette.Text, TextAnchor.MiddleLeft,
                 0.065f, 0.8f, 0.935f, 0.95f);
             List<CausalNode> causes = ObservationDesign.PredictionCauses(session);
-            string explanation = "从 D4 锁定预测，到 D7 早上。以下是实际发生的变化（包含状态上限）：\n";
-            int e = 0, m = 0, i = 0;
+            PredictionRecord p = session.Prediction;
+            string explanation = "从 D" + p.sourceDay + " 锁定预测，到 D" + p.dueDay + " 早上。以下是实际发生的变化（包含状态上限）：\n";
+            int e = 0, m = 0, i = 0, r = 0, money = 0, ability = 0;
             foreach (CausalNode n in causes)
             { explanation += "\nD" + n.day + " · " + n.label + "\n" + PlayExperience.NowLabel(n.effect) + "\n";
-                e += n.effect.energy; m += n.effect.mood; i += n.effect.insight; }
-            PredictionRecord p = session.Prediction;
-            if (e != p.actualEnergy || m != p.actualMood || i != p.actualInsight)
+                e += n.effect.energy; m += n.effect.mood; i += n.effect.insight;
+                r += n.effect.relation; money += n.effect.money; ability += n.effect.ability; }
+            if (e != p.actualEnergy || m != p.actualMood || i != p.actualInsight ||
+                p.sixAxes && (r != p.actualRelation || money != p.actualMoney || ability != p.actualAbility))
                 explanation += "\n旧档案还有未逐项记录的变化：\n" + PlayExperience.NowLabel(new ResourceDelta(
-                    p.actualEnergy - e, p.actualMood - m, p.actualInsight - i)) + "\n";
-            explanation += "\n合计实际变化\n" + PlayExperience.NowLabel(new ResourceDelta(p.actualEnergy, p.actualMood, p.actualInsight)) +
+                    p.actualEnergy - e, p.actualMood - m, p.actualInsight - i, p.sixAxes ? p.actualRelation - r : 0,
+                    p.sixAxes ? p.actualMoney - money : 0, p.sixAxes ? p.actualAbility - ability : 0)) + "\n";
+            explanation += "\n合计实际变化\n" + PlayExperience.NowLabel(new ResourceDelta(p.actualEnergy, p.actualMood, p.actualInsight, p.sixAxes ? p.actualRelation : 0, p.sixAxes ? p.actualMoney : 0, p.sixAxes ? p.actualAbility : 0)) +
                 "\n\n预测是校准理解。它不会改变资源，也没有额外星尘奖励。";
             ResultText(panel, explanation);
             View.Button(panel, "Close prediction why", "回到预测对照", () => { Destroy(overlay.gameObject); overlay = null; },
@@ -131,13 +159,12 @@ namespace Horizon
                 .ThenBy(e => e.cardId == archive.preferredCardId ? 0 :
                     string.IsNullOrEmpty(archive.preferredCardId) && e.kind.ToString() == archive.preferredIntent ? 0 : 1).ToList();
             int pages = Mathf.Max(1, Mathf.CeilToInt(echoes.Count / 3f)); focusPage = Mathf.Clamp(focusPage, 0, pages - 1);
-            int visible = ObservationDesign.VisibleTypes(session, archive.journey.Chapter);
+            HorizonProgress vision = Vision;
             for (int row = 0; row < 3 && focusPage * 3 + row < echoes.Count; row++)
             {
                 int index = focusPage * 3 + row; PendingEcho echo = echoes[index]; float y = 0.605f - row * 0.10f;
                 View.Panel(overlay, "Future event", Palette.Panel, 0.08f, y, 0.92f, y + 0.083f, 22);
-                int level = index < visible ? session.HorizonLevel >= 3 ? 3 : 2 : 1;
-                string detail = ObservationDesign.FocusClue(echo, level, archive.calibrations);
+                string detail = vision.Clue(echo, index, session.Day);
                 View.Label(overlay, "Forecast", "D" + echo.dueDay + " · " + detail, 28,
                     ObservationDesign.EchoType(echo) == "火种" ? Palette.Coral : Palette.Mint,
                     TextAnchor.MiddleLeft, 0.12f, y + 0.006f, 0.88f, y + 0.077f);
@@ -153,18 +180,18 @@ namespace Horizon
                 View.Button(overlay, "Next focus page", ">", () => { focusPage++; RenderFocus(false); },
                     0.73f, 0.342f, 0.92f, 0.398f, Palette.Panel, Palette.Text, 27).interactable = focusPage < pages - 1;
             }
-            if (session.CatalogVersion >= 3 && session.RunNumber >= 3)
+            if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
             {
-                WorldEventSpec next = Array.Find(WorldEvents.All, spec => spec.Day > session.Day);
-                if (next != null) View.Label(overlay, "World chance", archive.journey.Chapter >= 5 ?
+                WorldEventSpec next = Array.Find(WorldEvents.ForCatalog(session.CatalogVersion), spec => spec.Day > session.Day);
+                if (next != null) View.Label(overlay, "World chance", vision.Probability ?
                     "D" + next.Day + " · " + next.Chance + "% " + next.Name + "\n这是环境事件的概率，已种回声仍会按时回来。" :
                     "D" + next.Day + " · 环境可能改变当天的选择", 23, Palette.Gold,
                     TextAnchor.MiddleCenter, 0.08f, 0.30f, 0.92f, 0.347f);
             }
-            if (ObservationDesign.CanCompare(session, archive.journey.Chapter))
+            if (vision.Compare)
                 View.Button(overlay, "Two futures", "查看两条可能未来", () => RenderFocus(true),
                     0.16f, 0.145f, 0.84f, 0.205f, Palette.Panel, Palette.Mint, 27);
-            if (archive.journey.Chapter >= 5 && session.Day < 12)
+            if (vision.Probability && session.Day < session.Deadline)
                 View.Button(overlay, "Forecast range", "看看未来的范围", ShowRangeForecast,
                     0.16f, 0.218f, 0.84f, 0.278f, Palette.Panel, Palette.Gold, 27);
         }
@@ -174,7 +201,7 @@ namespace Horizon
             View.Panel(root, "Constellation glass", new Color(0.012f, 0.035f, 0.055f, 0.89f),
                 0.035f, 0.35f, 0.965f, 0.766f, 28);
             var positions = new Dictionary<int, Vector2>();
-            for (int day = 1; day <= 12; day++) positions[day] = new Vector2(0.15f + (day - 1) % 4 * 0.233f, 0.709f - (day - 1) / 4 * 0.135f);
+            for (int day = 1; day <= GameSession.RunLength(run); day++) positions[day] = ConstellationPoint(day, GameSession.RunLength(run));
             foreach (CausalNode node in GameSession.GraphForRun(run))
                 foreach (string parent in CausalGraph.Parents(node))
                 {
@@ -189,17 +216,17 @@ namespace Horizon
             {
                 Vector2 p = positions[action.day]; Color c = action.kind == CardKind.Growth ? Palette.Mint : action.kind == CardKind.Recovery ? Palette.Gold : Palette.Coral;
                 View.Panel(root, "Boss day " + action.day, c, p.x - 0.012f, p.y - 0.007f, p.x + 0.012f, p.y + 0.007f, 14);
-                View.Label(root, "Boss action", "D" + action.day + "\n" + action.cardName, 24, Palette.Text,
+                View.Label(root, "Boss action", "D" + action.day + "\n" + action.cardName, GameSession.RunLength(run) == 30 ? 15 : 24, Palette.Text,
                     TextAnchor.MiddleCenter, p.x - 0.101f, p.y - 0.084f, p.x + 0.101f, p.y - 0.01f);
             }
         }
 
-        private IEnumerator IlluminateHistory(List<int> days, int gate)
+        private IEnumerator IlluminateHistory(List<int> days, int gate, int length = 12)
         {
             world.PowerGate(days, gate);
             foreach (int day in days)
             {
-                Vector2 p = new Vector2(0.15f + (day - 1) % 4 * 0.233f, 0.709f - (day - 1) / 4 * 0.135f);
+                Vector2 p = ConstellationPoint(day, length);
                 TimeThreadGraphic line = View.Rect(root, "History reaches gate", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
                 line.From = p; line.To = new Vector2(0.5f, 0.32f - gate * 0.08f); line.color = new Color(1, 0.76f, 0.49f, 0.38f); line.raycastTarget = false;
                 yield return new WaitForSeconds(0.022f);

@@ -14,9 +14,10 @@ namespace Horizon
         {
             overlay = View.Rect(root, "A wider horizon", 0, 0, 1, 1);
             View.Fill(overlay, "New life veil", new Color(0.01f, 0.03f, 0.05f, 0.94f), 0, 0, 1, 1, true);
-            View.Label(overlay, "New horizon", "HORIZON II", 54, Palette.Mint,
+            View.Label(overlay, "New horizon", "HORIZON " + Roman(Vision.Level), 54, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.06f, 0.73f, 0.94f, 0.84f);
-            View.Label(overlay, "New sight", "这次，你能先看见一个未来节点的类型。", 34, Palette.Text,
+            View.Label(overlay, "New sight", Vision.VisibleTypes == 1 ? "这次，你能先看见一个未来节点的类型。" :
+                "已经看懂的东西会保留。这次，带着更远的视野重新出发。", 34, Palette.Text,
                 TextAnchor.MiddleCenter, 0.08f, 0.61f, 0.92f, 0.71f);
             View.Label(overlay, "New actions", "新的行动正在靠近\n\n请教前辈 · 玩一局 · 夜里散步", 33, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.08f, 0.38f, 0.92f, 0.57f);
@@ -34,26 +35,25 @@ namespace Horizon
         private void RenderStationBeat(int stage)
         {
             stationStage = Mathf.Clamp(stage, 0, 3);
+            if (stationStage != 1) archive.stationMemoryOpen = false;
             Clear(true);
             archive.stationRun = session.RunNumber;
             archive.stationBeat = stationStage;
             archive.active = session.Snapshot();
             Save();
-            bool reveal = session.RunNumber >= 3 && stage >= 2;
-            bool question = session.RunNumber == 3 && stage == 3;
+            bool reveal = (Vision.Compare || session.RunNumber == 3) && stage >= 2;
+            bool question = (session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) && stage == 3;
             world.ShowStation(stage, reveal);
             List<ActionRecord> memories = ExperienceContent.StationMemories(session);
-            world.ShowMemories(memories);
+            world.ShowCausalMemories(CausalPresentation.Station(session));
             View.Fill(root, "Station atmosphere", new Color(0.005f, 0.02f, 0.035f, 0.18f), 0, 0, 1, 1);
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 33, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.05f, 0.91f, 0.95f, 0.965f);
-            View.Label(root, "Station day", "DAY 04  /  在地平线的另一边", 25, Palette.Muted,
+            View.Label(root, "Station day", "DAY " + session.Day.ToString("00") + " / 在地平线的另一边", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.06f, 0.852f, 0.94f, 0.9f);
             View.Panel(root, "Station dialogue plate", new Color(0.013f, 0.034f, 0.055f, 0.9f),
                 0.045f, 0.365f, 0.955f, 0.51f, 35);
-            string voice = question ? "「你还想继续这样走吗？」" : stage == 0 ? "「你终于来了。」" :
-                stage == 1 ? "「你最近留下了很多东西。」" : reveal ? "「现在你终于看见我了。」" :
-                session.RunNumber == 2 ? "「你已经知道，一些东西会回来。」" : "「你留下的东西，还会继续生长。」";
+            string voice = CampaignContent.StationVoice(session, stage, question);
             Text dialogue = View.Label(root, "Future voice", voice, 39, Palette.Text,
                 TextAnchor.MiddleCenter, 0.075f, 0.405f, 0.925f, 0.495f);
             Text detail = View.Label(root, "Future reflection", stage == 0 ? "沿着光，走到长椅前。" :
@@ -69,9 +69,7 @@ namespace Horizon
                     View.Button(root, "Touch memory " + i, "D" + action.day + "  " + action.cardName +
                         (action.echoDay > 0 ? "  →  D" + action.echoDay : "  →  此刻恢复"), () =>
                     {
-                        world.TouchMemory(selected);
-                        detail.text = action.echoDay > 0 ? "「" + action.cardName + "」留下的回声：" + action.echoName :
-                            "你给自己留了一次恢复，也给下一次选择留下空间。";
+                        ShowMemoryStory(selected);
                     }, 0.11f, y, 0.89f, y + 0.055f, Palette.Panel,
                     action.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint, 26);
                 }
@@ -88,7 +86,7 @@ namespace Horizon
                     float y = 0.217f - i * 0.068f;
                     View.Button(root, "Protect " + behavior.cardId, "保护 · " + behavior.cardName, () =>
                     {
-                        if (session.StationVisited) return;
+                        if (!session.NeedsStation) return;
                         archive.ProtectBehavior(behavior);
                         FinishStation();
                     }, 0.14f, y, 0.86f, y + 0.058f, intent == CardKind.Growth ? Palette.Mint : Palette.Panel,
@@ -98,7 +96,8 @@ namespace Horizon
             else if (stage == 2)
             {
                 View.Panel(root, "Future keepsake", Palette.Panel, 0.075f, 0.18f, 0.925f, 0.322f, 25);
-                View.Label(root, "Future keepsake text", reveal ? "那个人，就是未来的你。\nHORIZON III · 两条可能未来" :
+                View.Label(root, "Future keepsake text", session.Deadline == 30 && session.Day >= 12 ? "已走过 " + session.Day + " 天 · " + CampaignContent.ActName(session.Day) + "\n你留下的选择，还在继续相互连接。" :
+                    reveal ? "那个人，就是未来的你。\nHORIZON III · 两条可能未来" :
                     memories.Count == 0 ? "路还没有写完。明天，你仍然可以选择。" :
                     "D" + memories[0].day + "「" + memories[0].cardName + "」\n" +
                     (memories[0].echoDay > 0 ? "在 D" + memories[0].echoDay + " 留下「" + memories[0].echoName + "」" : "留下了照顾自己的片刻"),
@@ -107,7 +106,7 @@ namespace Horizon
             }
             if (!question)
             {
-                View.Button(root, "Next station beat", stage == 2 && session.RunNumber != 3 ? "回到第 5 天" :
+                View.Button(root, "Next station beat", stage == 2 && !(session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) ? "回到第 " + (session.Day + 1) + " 天" :
                     stage == 0 ? "走向长椅" : "继续靠近", () => { if (stationStage == stage) NextStationStage(); },
                     0.17f, 0.055f, 0.83f, 0.119f, Palette.Mint, Palette.Ink, 30);
                 View.Label(root, "Walk hint", "可以静静看完，也可以点击继续或向前滑动。", 22,
@@ -119,6 +118,8 @@ namespace Horizon
                 StartCoroutine(StationPlayback(viewGeneration, stage, dialogue, detail));
             }
             View.RefreshText(root);
+            if (stage == 1 && archive.stationMemoryOpen)
+                ShowMemoryStory(archive.stationMemoryIndex, archive.stationMemoryBeat);
         }
 
         private IEnumerator StationPlayback(int generation, int stage, Text voice, Text detail)
@@ -127,12 +128,10 @@ namespace Horizon
             float duration = stage == 0 ? 13 : stage == 1 ? 19 : 14;
             float age = 0;
             string first = voice.text;
-            string second = stage == 0 ? "「走近一点。这里没有标准答案。」" :
-                stage == 1 ? "「有些是种子，有些是负担。它们都来自你。」" :
-                session.RunNumber >= 3 ? "「你不必成为别人。继续创造你想看见的自己。」" :
-                "「下一次选择，仍然在你手里。」";
+            string second = CampaignContent.StationSecondVoice(session, stage);
             while (age < duration && generation == viewGeneration && voice != null)
             {
+                if (userPaused || archive.stationMemoryOpen) { yield return null; continue; }
                 // A frame after returning from the background must not skip a whole beat.
                 age += Mathf.Min(Time.unscaledDeltaTime, 0.25f);
                 if (age < 1.6f) voice.text = first.Substring(0, Mathf.Clamp(Mathf.CeilToInt(age / 1.6f * first.Length), 0, first.Length));
@@ -146,6 +145,9 @@ namespace Horizon
         private bool TryRareMoment()
         {
             if (session == null || session.HasChosen) return false;
+            bool verified = false;
+            foreach (RareMoment memory in archive.moments) verified |= ExperienceContent.VerifyRareFuture(memory, session);
+            if (verified) Save();
             if (archive.pendingMoment == null)
                 foreach (RareMoment memory in archive.moments)
                 {
@@ -157,6 +159,7 @@ namespace Horizon
             {
                 archive.pendingMoment = ExperienceContent.Moment(session.RunNumber, session.Day, archive.runs);
                 ExperienceContent.AttachMystery(archive.pendingMoment, session);
+                ExperienceContent.GroundRareMoment(archive.pendingMoment, session);
                 archive.active = session.Snapshot();
                 archive.nextRareRun = session.RunNumber + ExperienceContent.RareGap(session.RunNumber);
                 archive.moments.Add(archive.pendingMoment);
@@ -166,6 +169,7 @@ namespace Horizon
             RareMoment moment = archive.pendingMoment;
             Clear(true);
             world.ShowRare(moment.type);
+            world.ShowRareMeaning(moment);
             View.Fill(root, "Rare shade", new Color(0.01f, 0.025f, 0.045f, 0.45f), 0, 0, 1, 1, true);
             View.Label(root, "Rare title", moment.title, 54, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.06f, 0.76f, 0.94f, 0.87f);
@@ -175,6 +179,7 @@ namespace Horizon
             View.Button(root, "Continue rare moment", "记住这一瞬，回到今天", () =>
             {
                 archive.pendingMoment = null;
+                if (moment.type == 0 || moment.type == 1) archive.journey.Remember(LifeLesson.Uncertainty);
                 Save();
                 BuildBoard();
             }, 0.12f, 0.045f, 0.88f, 0.115f, Palette.Mint, Palette.Ink, 30);
@@ -189,11 +194,12 @@ namespace Horizon
             View.Fill(overlay, "Journey background", Palette.Ink, 0, 0, 1, 1, true);
             View.Label(overlay, "Journey title", "让时间视野慢慢展开", 43, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.855f, 0.94f, 0.945f);
-            View.Label(overlay, "Journey promise", "每个回来过的日子，都留下理解。\n隔多久回来，这些理解都会保留。", 28, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.08f, 0.746f, 0.92f, 0.849f);
+            View.Label(overlay, "Journey promise", "已看见：" + JourneyProgress.Name(Vision.Stage) + " · " + Vision.Clarity +
+                "\n" + Vision.Next + "\n预测接近真实 1 / 3 / 10 次：方向 → 强度 → 来路", 25, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.08f, 0.759f, 0.92f, 0.849f);
             for (int i = 1; i <= 7; i++)
             {
-                float y = 0.669f - (i - 1) * 0.077f;
+                float y = 0.686f - (i - 1) * 0.073f;
                 bool reached = i <= archive.journey.Chapter;
                 int chapter = i;
                 View.Button(overlay, "Chapter " + i, i + "  /  " + JourneyProgress.Name(i) + (reached ? " · 点开观察" : " · 尚未到来"),
@@ -201,8 +207,10 @@ namespace Horizon
                     Palette.Panel, reached ? Palette.Mint : Palette.Muted, 29).interactable = reached;
             }
             Button longView = View.Button(overlay, "Thirty day view", "看看三十天后的自己", ShowThirtyDays,
-                0.13f, 0.105f, 0.87f, 0.169f, Palette.Panel, Palette.Gold, 29);
+                0.13f, 0.167f, 0.87f, 0.22f, Palette.Panel, Palette.Gold, 29);
             longView.interactable = archive.journey.Chapter >= 7;
+            View.Button(overlay, "Thirty day game", archive.active != null ? "继续当前人生，再开始长局" : "开始一段30天人生", BeginLongLife,
+                0.13f, 0.105f, 0.87f, 0.158f, Palette.Panel, Palette.Mint, 26).interactable = archive.journey.Chapter >= 7;
             View.Button(overlay, "Close journey", "回到地平线", () => { Destroy(overlay.gameObject); overlay = null; },
                 0.19f, 0.031f, 0.81f, 0.094f, Palette.Mint, Palette.Ink, 29);
             View.RefreshText(overlay);
@@ -217,12 +225,14 @@ namespace Horizon
                 return;
             }
             Save();
+            if (beginning.Day >= 30) { ShowMap(false); return; }
             ShowForecastRange(ForecastSimulator.Sample(beginning, null, 30), true);
         }
 
         private void ShowRangeForecast()
         {
-            ShowForecastRange(ForecastSimulator.Sample(session, null, 12), false);
+            if (!Vision.Probability) return;
+            ShowForecastRange(ForecastSimulator.Sample(session, null, Mathf.Min(session.Deadline, session.Day + Vision.Days)), false);
         }
 
         private void ShowForecastRange(ForecastRange range, bool longView, bool returnToJourney = false)
@@ -259,6 +269,7 @@ namespace Horizon
                 0.12f, 0.15f, 0.88f, 0.219f, Palette.Panel, Palette.Gold, 27);
             View.Button(overlay, "Close future range", "回到此刻", () =>
             {
+                archive.journey.Remember(LifeLesson.Uncertainty); Save();
                 Destroy(overlay.gameObject); overlay = null;
                 if (longView)
                 {

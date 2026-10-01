@@ -158,6 +158,10 @@ namespace Horizon.UI
         public Action<HorizonCardDrag> Rejected;
         public Func<Vector2, bool> IsOverTarget;
         public bool Available = true;
+        public System.Func<HorizonCardDrag, bool> CanBegin;
+        public System.Action<HorizonCardDrag> Began;
+        private bool dragging;
+        private int pointerId;
         private RectTransform rect;
         private Vector3 origin;
         private Vector2 down;
@@ -170,7 +174,11 @@ namespace Horizon.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
-            if (!Available) return;
+            if (!Available || dragging || (CanBegin != null && !CanBegin(this))) return;
+            if (rect == null) rect = (RectTransform)transform;
+            dragging = true;
+            pointerId = eventData.pointerId;
+            Began?.Invoke(this);
             if (returning != null)
             {
                 StopCoroutine(returning);
@@ -185,18 +193,21 @@ namespace Horizon.UI
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (!Available) return;
+            if (!Available || !dragging || eventData.pointerId != pointerId) return;
             rect.position = origin + (Vector3)(eventData.position - down);
-            rect.localScale = Vector3.one * 1.04f;
+            rect.localScale = Vector3.one * 0.86f;
+            rect.localRotation = Quaternion.Euler(0, 0, -4);
             Dragged?.Invoke(this, eventData.position);
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            if (!Available) return;
+            if (!Available || !dragging || eventData.pointerId != pointerId) return;
+            dragging = false;
             bool reached = IsOverTarget != null && IsOverTarget(eventData.position);
             Dragged?.Invoke(this, Vector2.zero);
             rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
             if (reached)
             {
                 Available = false;
@@ -250,10 +261,13 @@ namespace Horizon.UI
 
     public sealed class DropRingGraphic : MaskableGraphic
     {
+        public float Thickness = 4;
         protected override void OnPopulateMesh(VertexHelper vh)
         {
             vh.Clear();
             Rect r = rectTransform.rect;
+            float innerX = Mathf.Max(0, 1 - Thickness / Mathf.Max(1, r.width * 0.5f));
+            float innerY = Mathf.Max(0, 1 - Thickness / Mathf.Max(1, r.height * 0.5f));
             for (int i = 0; i < 80; i++)
             {
                 float a = i * Mathf.PI * 2 / 80, b = (i + 1) * Mathf.PI * 2 / 80;
@@ -262,8 +276,8 @@ namespace Horizon.UI
                 int start = vh.currentVertCount;
                 vh.AddVert(outerA + r.center, color, Vector2.zero);
                 vh.AddVert(outerB + r.center, color, Vector2.zero);
-                vh.AddVert(outerB * 0.94f + r.center, color, Vector2.zero);
-                vh.AddVert(outerA * 0.94f + r.center, color, Vector2.zero);
+                vh.AddVert(Vector2.Scale(outerB, new Vector2(innerX, innerY)) + r.center, color, Vector2.zero);
+                vh.AddVert(Vector2.Scale(outerA, new Vector2(innerX, innerY)) + r.center, color, Vector2.zero);
                 vh.AddTriangle(start, start + 1, start + 2);
                 vh.AddTriangle(start, start + 2, start + 3);
             }
@@ -273,9 +287,10 @@ namespace Horizon.UI
     public sealed class GuidePulse : MonoBehaviour
     {
         public bool Active = true;
+        public float BaseScale = 1;
         private void Update()
         {
-            transform.localScale = Vector3.one * (Active ? 1 + Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 1);
+            transform.localScale = Vector3.one * (BaseScale + (Active && !VisualPreferences.ReducedMotion && !VisualPreferences.Paused ? Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 0));
         }
     }
 
@@ -291,6 +306,7 @@ namespace Horizon.UI
         }
         private void Update()
         {
+            if (VisualPreferences.ReducedMotion) { group.alpha = 1; transform.localScale = Vector3.one; enabled = false; return; }
             age += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(age / 0.28f);
             group.alpha = t;
@@ -304,8 +320,9 @@ namespace Horizon.UI
         public RectTransform Hand;
         private void Update()
         {
+            if (VisualPreferences.Paused || VisualPreferences.ReducedMotion) return;
             float t = Mathf.Repeat(Time.unscaledTime * 0.45f, 1);
-            float y = Mathf.Lerp(0.29f, 0.535f, Mathf.SmoothStep(0, 1, Mathf.Clamp01(t / 0.7f)));
+            float y = Mathf.Lerp(0.26f, 0.7075f, Mathf.SmoothStep(0, 1, Mathf.Clamp01(t / 0.7f)));
             Hand.anchorMin = new Vector2(0.49f, y);
             Hand.anchorMax = new Vector2(0.535f, y + 0.028f);
         }
@@ -352,6 +369,7 @@ namespace Horizon.UI
         private int value;
 
         private void Awake() { rect = (RectTransform)transform; }
+        public void Initialize(int initial) { value = Mathf.Clamp(initial, -3, 3); }
 
         public void OnPointerDown(PointerEventData eventData) { OnDrag(eventData); }
 

@@ -12,7 +12,7 @@ namespace Horizon
     {
         private void LessonSurface(string title, string introduction)
         {
-            if (overlay != null) Destroy(overlay.gameObject);
+            DismissStoryPage();
             overlay = View.Rect(root, "Observation exercise", 0, 0, 1, 1);
             View.Fill(overlay, "Exercise shade", Palette.Ink, 0, 0, 1, 1, true);
             View.Label(overlay, "Exercise title", title, 43, Palette.Text, TextAnchor.MiddleCenter,
@@ -24,13 +24,13 @@ namespace Horizon
                 0.15f, 0.047f, 0.85f, 0.12f, Palette.Mint, Palette.Ink, 30);
         }
 
-        private void ShowObservationChapter(int chapter)
+        private void ShowChapterExercise(int chapter)
         {
             if (chapter < 1 || chapter > archive.journey.Chapter) return;
             if (chapter == 7) { ShowThirtyDays(); return; }
             if (chapter == 6)
             {
-                var beginning = new GameSession(3, 15);
+                var beginning = new GameSession(3, 15, 4);
                 ForecastRange exercise = ForecastSimulator.Sample(beginning, null, 4);
                 exercise.assumption = "独立练习：从同一个起点比较两种选择；不读取或改变正在发生的人生。";
                 ShowForecastRange(exercise, false, true);
@@ -52,7 +52,7 @@ namespace Horizon
             }
             else
             {
-                GameSession practice = new GameSession(chapter == 4 ? 3 : 1, 15);
+                GameSession practice = new GameSession(chapter == 4 ? 3 : 1, 15, 4);
                 if (chapter == 2)
                     while (practice.Day < 6)
                     { if (practice.CanPredict) practice.SkipPrediction(); practice.Choose(practice.Hand[2].Id);
@@ -99,7 +99,7 @@ namespace Horizon
             }
             result += "\n\n现在的精力 " + practice.Energy + " · 心情 " + practice.Mood + " · 能力 " + practice.Ability;
             ResultText(panel, result);
-            View.Button(overlay, "Repeat exercise", "试试另一张", () => ShowObservationChapter(chapter),
+            View.Button(overlay, "Repeat exercise", "试试另一张", () => ShowChapterExercise(chapter),
                 0.16f, 0.188f, 0.84f, 0.258f, Palette.Deep, Palette.Gold, 28);
             View.RefreshText(overlay);
         }

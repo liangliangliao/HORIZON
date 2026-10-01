@@ -1,13 +1,14 @@
 """Decode every actual Unity preview instead of only checking file presence."""
 from pathlib import Path
 from PIL import Image
+import sys
 
-files = sorted(Path("artifacts/visuals").glob("[0-9][0-9]-*.png"))
-assert len(files) == 22, f"Expected 22 portrait previews, got {len(files)}"
-assert {int(p.name[:2]) for p in files} == set(range(1, 23))
+files = sorted(Path(sys.argv[1] if len(sys.argv) > 1 else "artifacts/visuals").glob("[0-9][0-9]-*.png"))
+assert len(files) == 39, f"Expected 39 portrait previews, got {len(files)}"
+assert {int(p.name[:2]) for p in files} == set(range(1, 40))
 for path in files:
     with Image.open(path) as image:
         image.load()
         assert image.size == (1080, 1920), (path, image.size)
         assert len(image.convert("RGB").getcolors(256) or []) != 1, f"Blank preview: {path}"
-print("22 actual Unity portrait previews decoded at 1080 x 1920")
+print("39 actual Unity portrait previews decoded at 1080 x 1920")

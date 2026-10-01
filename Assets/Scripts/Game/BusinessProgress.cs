@@ -21,6 +21,9 @@ namespace Horizon
             bool accurate = life.Prediction.accurate;
             life.MarkPredictionReviewed();
             if (accurate) calibrations++;
+            journey.Remember(Game.LifeLesson.Prediction);
+            if (!accurate) journey.Remember(Game.LifeLesson.Uncertainty);
+            journey.Observe(life);
             active = life.Snapshot();
             return true;
         }
@@ -31,7 +34,7 @@ namespace Horizon
                 JsonUtility.FromJson<Game.RunSnapshot>(JsonUtility.ToJson(live.Snapshot())), 30);
             if (active != null) return Game.GameSession.ForkForSimulation(
                 JsonUtility.FromJson<Game.RunSnapshot>(JsonUtility.ToJson(active)), 30);
-            Game.RunRecord latest = runs?.Where(r => r != null && r.actions?.Count == 12)
+            Game.RunRecord latest = runs?.Where(r => r != null && r.actions?.Count == Game.GameSession.RunLength(r))
                 .OrderByDescending(r => r.number).FirstOrDefault();
             if (latest != null) return Game.GameSession.FromRunForObservation(latest);
             // A fresh observation has an explicit, stable seed; it is never a save.
@@ -73,7 +76,7 @@ namespace Horizon.Game
         public static GameSession FromRunForObservation(RunRecord run)
         {
             ValidateReplay(run);
-            var result = ReplayPrefix(run, new Dictionary<int, string>(), LastDay, true);
+            var result = ReplayPrefix(run, new Dictionary<int, string>(), RunLength(run), true);
             if (result == null) throw new ArgumentException("The archived choices cannot be replayed.");
             return result;
         }

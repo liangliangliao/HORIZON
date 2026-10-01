@@ -21,7 +21,7 @@ namespace Horizon.Tests
         [Test]
         public void PredictionAcknowledgementGrantsKnowledgeOnceAcrossReload()
         {
-            var s = new GameSession(1, 15);
+            var s = new GameSession(1, 15, 4);
             while (s.Day < 4) Step(s);
             s.LockPrediction(0, 0, 0);
             while (s.Day < 7) Step(s);
@@ -43,14 +43,14 @@ namespace Horizon.Tests
             var data = new ArchiveData(); Assert.AreEqual(1, data.NextRunNumber);
             data.runs.Add(new RunRecord { number = 8 }); data.runs.Add(new RunRecord { number = 2 });
             Assert.AreEqual(9, data.NextRunNumber);
-            data.active = new GameSession(13, 15).Snapshot(); Assert.AreEqual(14, data.NextRunNumber);
+            data.active = new GameSession(13, 15, 4).Snapshot(); Assert.AreEqual(14, data.NextRunNumber);
             Assert.AreEqual(14, JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(data)).NextRunNumber);
         }
 
         [Test]
         public void ReopenedObservationKeepsTheActualActivePrefixAndDoesNotSpendAnything()
         {
-            var s = new GameSession(3, 41); Step(s, "portfolio");
+            var s = new GameSession(3, 41, 4); Step(s, "portfolio");
             while (s.Day < 8) Step(s);
             var data = new ArchiveData { active = Copy(s).Snapshot() }; data.wallet.stardust = 19;
             string frozen = JsonUtility.ToJson(data);
@@ -65,9 +65,9 @@ namespace Horizon.Tests
         [Test]
         public void ObservationAfterDeadlineUsesLatestActualLifeIncludingMystery()
         {
-            var s = new GameSession(7, 15); string origin = s.Hand[1].Id; Step(s, origin);
+            var s = new GameSession(7, 15, 4); string origin = s.Hand[1].Id; Step(s, origin);
             while (s.Day < 6) Step(s); s.ApplyMystery(1, origin); Complete(s);
-            var earlier = new GameSession(2, 15); Complete(earlier);
+            var earlier = new GameSession(2, 15, 4); Complete(earlier);
             var data = new ArchiveData(); data.runs.Add(s.CompletedRun); data.runs.Add(earlier.CompletedRun);
             string frozen = JsonUtility.ToJson(data);
             GameSession observed = data.ObservationSource();
@@ -81,7 +81,7 @@ namespace Horizon.Tests
         [Test]
         public void StationUsesActualMostFrequentBehaviorsAndRanksRealChains()
         {
-            var s = new GameSession(3, 15);
+            var s = new GameSession(3, 15, 4);
             // Build recorded observations with two large growth chains; category
             // quotas must not displace the second one with an unrelated action.
             for (int day = 1; day <= 6; day++)
@@ -107,7 +107,7 @@ namespace Horizon.Tests
         [Test]
         public void MysteryPaysActualResultOnceAndHidesOriginUntilDayNine()
         {
-            var s = new GameSession(3, 15); Step(s, "portfolio");
+            var s = new GameSession(3, 15, 4); Step(s, "portfolio");
             while (s.Day < 6) Step(s);
             int insight = s.Insight; CausalNode result = s.ApplyMystery(1, "portfolio");
             Assert.AreEqual(1, s.Insight - insight); Assert.AreEqual(1, result.effect.insight);
@@ -128,7 +128,7 @@ namespace Horizon.Tests
         [Test]
         public void MysteryAtRecoveryCapsHasAVisibleResultAndPreservesLegacyReceipts()
         {
-            var s = new GameSession(3, 15); while (s.Day < 6) Step(s);
+            var s = new GameSession(3, 15, 4); while (s.Day < 6) Step(s);
             Assert.AreEqual(10, s.Energy); Assert.AreEqual(10, s.Mood);
             int insight = s.Insight; CausalNode result = s.ApplyMystery();
             Assert.AreEqual(1, result.effect.insight); Assert.AreEqual(insight + 1, s.Insight);
@@ -136,7 +136,7 @@ namespace Horizon.Tests
             Assert.AreEqual(s.Insight, replay.finalInsight); Assert.AreEqual(1, replay.mysteries[0].delta.insight);
             // Early version-6 receipts did not store a delta. Preserve their
             // original clamped result instead of retroactively granting the fix.
-            var old = new GameSession(3, 15); while (old.Day < 6) Step(old);
+            var old = new GameSession(3, 15, 4); while (old.Day < 6) Step(old);
             int oldInsight = old.Insight;
             result = old.ApplyMystery(0, null, null, true); old.Mysteries[0].delta = null;
             Assert.AreEqual(0, result.effect.energy + result.effect.mood + result.effect.insight);
@@ -148,7 +148,7 @@ namespace Horizon.Tests
         [Test]
         public void MysteryReplayReproducesTheActualLifeAndDropsWhenItsCauseChanges()
         {
-            var s = new GameSession(3, 15); Step(s, "portfolio");
+            var s = new GameSession(3, 15, 4); Step(s, "portfolio");
             while (s.Day < 6) Step(s); s.ApplyMystery(1, "portfolio"); Complete(s);
             string frozen = JsonUtility.ToJson(s.CompletedRun);
             RunRecord same = GameSession.ReplayChoices(s.CompletedRun, new Dictionary<int, string>());
@@ -164,7 +164,7 @@ namespace Horizon.Tests
         [Test]
         public void MysteryContributesToPredictionExplanationBeforeItsSourceIsRevealed()
         {
-            var s = new GameSession(3, 15); Step(s, "portfolio");
+            var s = new GameSession(3, 15, 4); Step(s, "portfolio");
             while (s.Day < 4) Step(s); s.LockPrediction(0, 0, 0);
             while (s.Day < 6) Step(s); s.ApplyMystery(1, "portfolio"); Step(s);
             List<CausalNode> causes = ObservationDesign.PredictionCauses(s);
@@ -177,7 +177,7 @@ namespace Horizon.Tests
         [Test]
         public void PriorCatalogKeepsTheOriginalMemoryOnlyMystery()
         {
-            RunSnapshot saved = new GameSession(3, 15).Snapshot(); saved.catalogVersion = 0; saved.rulesVersion = 5;
+            RunSnapshot saved = new GameSession(3, 15, 4).Snapshot(); saved.catalogVersion = 0; saved.rulesVersion = 5;
             GameSession old = GameSession.Restore(saved); Assert.AreEqual(3, old.CatalogVersion);
             Step(old, "portfolio"); while (old.Day < 6) Step(old);
             int insight = old.Insight;
@@ -191,7 +191,7 @@ namespace Horizon.Tests
         [Test]
         public void FutureExamplesStartWithDifferentLegalChoicesWhenPossible()
         {
-            var s = new GameSession(3, 15);
+            var s = new GameSession(3, 15, 4);
             ForecastRange range = ForecastSimulator.Sample(s, null, 4, 3);
             Assert.AreNotEqual(range.example[0].cardId, range.otherExample[0].cardId);
             Assert.IsTrue(s.CanPlay(CardCatalog.FindById(range.example[0].cardId)));
@@ -202,7 +202,7 @@ namespace Horizon.Tests
         [Test]
         public void LifeTitlesDescribeRecordedBehaviorAndDoNotOverwriteEdits()
         {
-            var s = new GameSession(1, 15); Complete(s);
+            var s = new GameSession(1, 15, 4); Complete(s);
             Assert.AreEqual("这一次，我给自己留出了空间", s.CompletedRun.title);
             s.CompletedRun.title = "我的纪念";
             var data = new ArchiveData(); data.runs.Add(s.CompletedRun);
@@ -222,7 +222,7 @@ namespace Horizon.Tests
         [Test]
         public void ThirtyDayUnlockAndObservationBudgetCannotBeBypassedFromHome()
         {
-            var s = new GameSession(3, 15); var data = new ArchiveData { active = s.Snapshot() };
+            var s = new GameSession(3, 15, 4); var data = new ArchiveData { active = s.Snapshot() };
             for (int day = 1; day <= 6; day++) data.journey.Visit("2026-09-" + day.ToString("00"));
             Assert.IsFalse(data.TryThirtyDayObservation(null, out GameSession blocked)); Assert.IsNull(blocked);
             data.journey.Visit("2026-09-07");

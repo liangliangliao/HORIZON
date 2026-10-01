@@ -78,6 +78,21 @@ namespace Horizon.Game
     public sealed class JourneyProgress
     {
         public List<string> activeDates = new List<string>();
+        public List<int> readChapters = new List<int>();
+        public int storyChapter, storyBeat;
+        public int learnedStage = 1;
+        public int lessonBits;
+        public void Observe(GameSession life)
+        { learnedStage = Math.Max(learnedStage, HorizonProgress.LifeStage(life)); }
+        public bool Knows(LifeLesson lesson) { return (lessonBits & (int)lesson) != 0; }
+        public void Remember(LifeLesson lesson) { lessonBits |= (int)lesson; }
+        public void Repair()
+        {
+            learnedStage = Math.Max(1, Math.Min(7, learnedStage)); lessonBits &= 31;
+            if (activeDates == null) activeDates = new List<string>();
+            activeDates = activeDates.Where(d => !string.IsNullOrEmpty(d)).Distinct().ToList();
+            if (readChapters == null) readChapters = new List<int>();
+        }
         public int Chapter { get { return Math.Min(7, activeDates?.Count ?? 0); } }
         public bool Visit(string localDate)
         {
@@ -94,7 +109,7 @@ namespace Horizon.Game
     }
 
     [Serializable]
-    public sealed class RareMoment
+    public sealed partial class RareMoment
     {
         public int runNumber;
         public int day;
@@ -108,7 +123,7 @@ namespace Horizon.Game
         public bool revealed;
     }
 
-    public static class ExperienceContent
+    public static partial class ExperienceContent
     {
         public static void AttachMystery(RareMoment moment, GameSession session)
         {
@@ -166,9 +181,9 @@ namespace Horizon.Game
             return "成长、恢复、关系：今天想照顾哪一条路？";
         }
 
-        public static string CardPurpose(CardSpec card, int day)
+        public static string CardPurpose(CardSpec card, int day, int deadline = GameSession.LastDay)
         {
-            if (card.Delay > 0 && day + card.Delay > GameSession.LastDay)
+            if (card.Delay > 0 && day + card.Delay > deadline)
                 return "这次回声在截止日之后回来，今天的变化仍会发生。";
             if (card.GivesSupport) return "这条路会留下支援；朋友与成长可以产生新的连接。";
             if (card.Kind == CardKind.Growth) return "今天投入精力，等回声回来，为能力门留下成长。";
@@ -194,6 +209,7 @@ namespace Horizon.Game
             return session.Actions.Where(a => !CausalGraph.Ancestors(session.CausalNodes, a.nodeId)
                     .Exists(n => n.type == CausalNodeKind.Action && n.id != a.nodeId))
                 .OrderByDescending(a => CausalGraph.Descendants(session.CausalNodes, a.nodeId).Count)
+                .ThenByDescending(a => a.kind == CardKind.Growth)
                 .ThenByDescending(a => a.day).Take(3).ToList();
         }
 
@@ -208,14 +224,26 @@ namespace Horizon.Game
         public static string LifeTitle(RunRecord run)
         {
             if (run.actions == null || run.actions.Count == 0) return "还没走完的日子";
-            if (run.boss?.passed == 3) return "我把未来接住了";
             if (run.actions.All(a => a.kind == CardKind.Recovery)) return "这一次，我给自己留出了空间";
+            if (run.boss?.passed == 3 && (run.predictions == null || run.predictions.Count == 0) && (run.prediction == null || run.prediction.sourceDay == 0))
+                return "没有画过预测，我也走到了完整的未来";
+            if (run.boss?.support == true && run.boss.supports >= 3)
+                return "我留下的 " + run.boss.supports + " 次支援，接住了 D" + GameSession.RunLength(run);
+            List<CausalNode> graph = GameSession.GraphForRun(run);
+            ActionRecord connected = run.actions.OrderByDescending(a => CausalGraph.Descendants(graph, a.nodeId)
+                .Count(n => n.resolved)).ThenBy(a => a.day).FirstOrDefault(a => CausalGraph.Descendants(graph, a.nodeId)
+                .Any(n => n.type == CausalNodeKind.Gate && n.gatePassed));
+            if (connected != null) return "D" + connected.day + " 的「" + connected.cardName + "」，走到了 D" + GameSession.RunLength(run);
+            ActionRecord difficult = run.actions.Where(a => a.echoed && a.actualLaterRecorded && a.actualLater != null &&
+                (a.actualLater.energy < 0 || a.actualLater.mood < 0)).OrderByDescending(a =>
+                    -Math.Min(0, a.actualLater.energy) - Math.Min(0, a.actualLater.mood)).FirstOrDefault();
+            if (difficult != null) return run.boss?.state == true && run.actions.Any(a => a.day > difficult.echoDay &&
+                a.kind == CardKind.Recovery && a.actualNow?.energy > 0) ?
+                "D" + difficult.echoDay + " 之后，我重新给自己留了余力" : "D" + difficult.echoDay + " 的回声，让我重新看见代价";
             if (run.actions.All(a => a.later == null || a.later.energy >= 0 && a.later.mood >= 0))
                 return "这一次，我没有埋下疲惫";
-            if (run.boss?.support == true && run.actions.Count(a => a.givesSupport) >= 3)
-                return "我留下的支援，连接到了截止日";
             ActionRecord defining = run.actions.FindLast(a => a.kind == CardKind.Growth) ?? run.actions[0];
-            return "从「" + defining.cardName + "」开始的日子";
+            return "D" + defining.day + "，我留下了「" + defining.cardName + "」";
         }
 
         public static RareMoment Moment(int run, int day, List<RunRecord> runs)
@@ -252,14 +280,14 @@ namespace Horizon.Game
 
         public static string ShareLine(RunRecord run)
         {
-            if (run?.boss != null && run.actions?.Count == 12)
+            if (run?.boss != null && run.actions?.Count == GameSession.RunLength(run))
                 foreach (ActionRecord source in run.actions)
                     foreach (CardSpec card in GameSession.AlternativesForDay(run, source.day))
                     {
                         RunRecord other = GameSession.ReplayAlternative(run, source.day, card.Id);
                         if (other != null && (other.boss.ability != run.boss.ability || other.boss.state != run.boss.state ||
                             other.boss.support != run.boss.support))
-                            return "Day " + source.day + " 的一个选择，改变了 Day 12。";
+                            return "Day " + source.day + " 的一个选择，改变了 Day " + GameSession.RunLength(run) + "。";
                     }
             return "这一次，我走出了自己的时间线。";
         }

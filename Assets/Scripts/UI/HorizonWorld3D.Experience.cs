@@ -41,20 +41,22 @@ namespace Horizon.UI
         {
             if (ambientFilter != null) ambientFilter.cutoffFrequency = enabled ? 650 : 18000;
             if (ambience != null) ambience.volume = enabled ? 0.025f : 0.055f;
-            if (Avatar != null) Avatar.GetComponent<HorizonActor>().MotionRate = enabled ? 0.2f : 1;
+            if (Avatar != null) Avatar.GetComponent<HorizonActor>().MotionRate = paused ? 0 : enabled ? 0.2f : 1;
         }
 
         private Vector3 DayPoint(int day)
         {
-            float angle = Mathf.Lerp(-155, 155, Mathf.Clamp01((day - 1) / 11f)) * Mathf.Deg2Rad;
+            float angle = Mathf.Lerp(-155, 155, Mathf.Clamp01((day - 1) / (float)Mathf.Max(1, timelineLength - 1))) * Mathf.Deg2Rad;
             return new Vector3(Mathf.Sin(angle) * 3.8f, 0.09f, 1 - Mathf.Cos(angle) * 3.8f);
         }
 
-        public void SetTimeline(List<ActionRecord> actions)
+        private int timelineLength = 12;
+        public void SetTimeline(List<ActionRecord> actions, int length = 12)
         {
             if (timelineGroup != null) Dispose(timelineGroup.gameObject);
-            timelineGroup = Group("Twelve days left in the world");
-            for (int day = 1; day <= 12; day++)
+            timelineLength = length == 30 ? 30 : 12;
+            timelineGroup = Group("Days left in the world");
+            for (int day = 1; day <= timelineLength; day++)
             {
                 ActionRecord action = actions?.Find(a => a.day == day);
                 Material material = action == null ? dark : action.kind == CardKind.Growth ? teal :
@@ -64,12 +66,15 @@ namespace Horizon.UI
                 if (action != null && action.echoed)
                     Ring(timelineGroup, "Returned day " + day, DayPoint(day) + Vector3.up * 0.05f, 0.2f, glass, false);
             }
+            BuildTimelineLinks(actions);
         }
 
         public void BeginEcho(PendingEcho echo)
         {
             Avatar.GetComponent<HorizonActor>().FreezeUntil = Time.unscaledTime + 0.15f;
             if (ambientFilter != null) ambientFilter.cutoffFrequency = 500;
+            if (bloom != null && !preferences.reducedMotion) bloom.Echo = 0.55f;
+            if (preferences.reducedMotion) return;
             cameraPosition = new Vector3(2.2f, 3.3f, -6.3f);
             cameraLook = Vector3.Lerp(Avatar.position + Vector3.up, DayPoint(echo.sourceDay) + Vector3.up, 0.3f);
         }
@@ -105,6 +110,7 @@ namespace Horizon.UI
             Vector3 start = orb.position, end = new Vector3((gate - 1) * 2.7f, 1.8f, 4);
             for (float age = 0; age < 0.42f; age += Time.unscaledDeltaTime)
             {
+                while (paused) yield return null;
                 if (orb == null) yield break;
                 float t = age / 0.42f;
                 orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI);
@@ -151,12 +157,14 @@ namespace Horizon.UI
 
         private IEnumerator EchoLight(PendingEcho echo)
         {
-            Transform orb = Shape(transform, "A past choice arriving", PrimitiveType.Sphere,
-                DayPoint(echo.sourceDay) + Vector3.up * 0.2f, Vector3.one * 0.23f, echo.kind == CardKind.Temptation ? pink : teal);
+            Transform orb = IntentionSymbol(echo.kind, DayPoint(echo.sourceDay) + Vector3.up * 0.2f,
+                CardCatalog.FindById(echo.cardId)?.GivesSupport ?? false, true);
+            Trail(orb, echo.kind == CardKind.Temptation ? warmLight : portalLight);
             Vector3 start = orb.position;
             Vector3 end = Avatar.position + Vector3.up * 1.3f;
             for (float age = 0; age < 0.46f; age += Time.unscaledDeltaTime)
             {
+                while (paused) yield return null;
                 if (orb == null) yield break;
                 float t = age / 0.46f;
                 orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.4f;
@@ -210,11 +218,21 @@ namespace Horizon.UI
             HorizonActor actor = futureSelf.GetComponent<HorizonActor>();
             Vector3 start = futureSelf.position;
             Vector3 end = new Vector3(Mathf.Clamp(target.x, -1.7f, 1.7f), 0, 4.4f);
+            if (preferences.reducedMotion)
+            {
+                futureSelf.position = end; actor.Walking = false; actor.Pointing = true;
+                if (!memoryReading) { cameraPosition = futureSelf.position + stationCameraOffset;
+                    cameraLook = futureSelf.position + Vector3.up * 1.35f; }
+                yield break;
+            }
             actor.Walking = true;
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 2.2f)
             {
+                while (paused) yield return null;
                 if (!station || generation != touchGeneration) yield break;
                 futureSelf.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0, 1, t));
+                if (!memoryReading) { cameraPosition = futureSelf.position + stationCameraOffset;
+                    cameraLook = futureSelf.position + Vector3.up * 1.35f; }
                 yield return null;
             }
             actor.Walking = false; actor.Pointing = true;
@@ -252,6 +270,7 @@ namespace Horizon.UI
             futureSelf.localRotation = Quaternion.Euler(0, -90, 0);
             for (float age = 0; age < 5 && rareActive; age += Time.unscaledDeltaTime)
             {
+                while (paused) yield return null;
                 futureSelf.localPosition = new Vector3(Mathf.Lerp(-4, 4, age / 5), 0, 1.3f);
                 yield return null;
             }

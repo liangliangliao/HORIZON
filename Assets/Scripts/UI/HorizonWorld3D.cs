@@ -20,7 +20,7 @@ namespace Horizon.UI
         private Material floor, dark, teal, gold, pink, glass, skin, cloth, hair;
         private Light key;
         private AudioSource audioSource;
-        private Vector3 cameraPosition, cameraLook, avatarHome;
+        private Vector3 cameraPosition, cameraLook, avatarHome, stationCameraOffset;
         private float shake, pulse;
         private bool station;
         private int activeKind = -1;
@@ -37,6 +37,7 @@ namespace Horizon.UI
             skin = Lit(new Color(0.94f, 0.69f, 0.51f));
             cloth = Lit(new Color(0.15f, 0.37f, 0.53f));
             hair = Lit(new Color(0.06f, 0.04f, 0.07f));
+            foreach (AudioListener listener in FindObjectsOfType<AudioListener>()) listener.enabled = false;
             var cameraObject = new GameObject("HORIZON 3D Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             WorldCamera = cameraObject.GetComponent<Camera>();
@@ -62,14 +63,16 @@ namespace Horizon.UI
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = 0.025f;
+            InitializeArt();
             environment = Group("Future platform");
             BuildPlatform();
+            DressPlatform();
             StaticBatchingUtility.Combine(environment.gameObject);
-            Avatar = Person("You", transform, Vector3.zero, cloth);
+            Avatar = Person("You", transform, new Vector3(-0.7f,0,0), cloth);
             avatarHome = Avatar.localPosition;
             companions = Group("Friends and collaborators");
-            Person("Friend", companions, new Vector3(-0.95f, 0, 0.5f), teal);
-            Person("Collaborator", companions, new Vector3(0.95f, 0, 0.6f), pink);
+            Person("Friend", companions, new Vector3(-1.8f, 0, 0.65f), teal);
+            Person("Collaborator", companions, new Vector3(0.5f, 0, 1.2f), pink);
             companions.gameObject.SetActive(false);
             futureSelf = Person("Future you", transform, new Vector3(0, 0, 4.2f), cloth);
             bench = Group("Future station bench");
@@ -78,6 +81,7 @@ namespace Horizon.UI
             for (int i = -1; i <= 1; i += 2)
                 Box(bench, "Leg", new Vector3(i, 0.25f, 4.8f), new Vector3(0.13f, 0.5f, 0.4f), dark);
             BuildProps();
+            DressProps();
             gates = Group("Deadline gates");
             for (int i = 0; i < 3; i++)
             {
@@ -108,23 +112,32 @@ namespace Horizon.UI
                 theme == 2 ? new Color(0.13f, 0.065f, 0.24f) : new Color(0.025f, 0.045f, 0.1f);
             WorldCamera.backgroundColor = sky;
             RenderSettings.fogColor = sky;
+            if (RenderSettings.skybox != null)
+            {
+                RenderSettings.skybox.SetColor("_Top", sky);
+                RenderSettings.skybox.SetColor("_Horizon", theme == 1 ? new Color(0.48f,0.27f,0.28f) :
+                    theme == 2 ? new Color(0.22f,0.24f,0.46f) : new Color(0.13f,0.3f,0.34f));
+            }
             key.color = theme == 1 ? new Color(1, 0.7f, 0.48f) :
                 theme == 2 ? new Color(0.75f, 0.65f, 1) : new Color(0.8f, 0.9f, 1);
         }
 
         public void ShowBoard()
         {
+            EndCausalPresentation();
             rareActive = false;
             Focus(false);
             if (memoryGroup != null) memoryGroup.gameObject.SetActive(false);
             if (rareGroup != null) rareGroup.gameObject.SetActive(false);
             station = false;
-            WorldCamera.rect = new Rect(0, 0.43f, 1, 0.48f);
-            cameraPosition = new Vector3(5.8f, 4.8f, -8.7f);
-            cameraLook = new Vector3(0, 1, 1.2f);
+            Aim(false, false, CardKind.Growth);
+            WorldCamera.rect = new Rect(0, 0.43f, 1, 0.49f);
+            cameraPosition = new Vector3(3.8f, 3.3f, -7.4f);
+            cameraLook = new Vector3(0, 2.1f, 1.35f);
             Avatar.gameObject.SetActive(true);
             Avatar.localPosition = avatarHome;
             Avatar.GetComponent<HorizonActor>().Walking = false;
+            Avatar.localRotation = Quaternion.Euler(0,-18,0);
             futureSelf.gameObject.SetActive(false);
             bench.gameObject.SetActive(false);
             gates.gameObject.SetActive(false);
@@ -142,7 +155,9 @@ namespace Horizon.UI
 
         public void ShowStation(int stage, bool reveal)
         {
+            EndCausalPresentation();
             station = true;
+            Aim(false,false,CardKind.Growth);
             rareActive = false;
             if (rareGroup != null) rareGroup.gameObject.SetActive(false);
             Focus(false);
@@ -154,6 +169,7 @@ namespace Horizon.UI
             futureSelf.gameObject.SetActive(true);
             futureSelf.localRotation = Quaternion.Euler(0, reveal ? 0 : 145, 0);
             futureSelf.localPosition = new Vector3(0, 0, 4.2f);
+            stationCameraOffset = cameraPosition - futureSelf.position;
             futureSelf.GetComponent<HorizonActor>().Pointing = false;
             futureSelf.GetComponent<HorizonActor>().Walking = false;
             bench.gameObject.SetActive(true);
@@ -164,6 +180,7 @@ namespace Horizon.UI
         public void ShowDeadline()
         {
             station = false;
+            Aim(false,false,CardKind.Growth);
             WorldCamera.rect = new Rect(0, 0.39f, 1, 0.51f);
             cameraPosition = new Vector3(4.5f, 3.8f, -9.5f);
             cameraLook = new Vector3(0, 1.2f, 3);
@@ -176,12 +193,12 @@ namespace Horizon.UI
             foreach (Transform prop in props) prop.gameObject.SetActive(false);
         }
 
-        public void OpenGate(int gate, bool passed)
+        public void OpenGate(int gate, bool passed, bool animate = true)
         {
             Material material = doorLights[gate].GetComponent<Renderer>().sharedMaterial;
-            material.SetColor("_Color", passed ? new Color(0.5f, 1, 0.78f, 0.8f) :
-                new Color(1, 0.31f, 0.32f, 0.3f));
-            if (passed) Burst(new Vector3((gate - 1) * 2.7f, 1.8f, 4), Palette.Gold, 24);
+            material.SetColor("_Color", passed ? new Color(0.15f, 0.58f, 0.38f, 0.4f) :
+                new Color(0.8f, 0.17f, 0.21f, 0.25f));
+            if (passed && animate) Burst(new Vector3((gate - 1) * 2.7f, 1.8f, 4), Palette.Gold, 24);
         }
 
         public void Accept(CardKind kind, bool support = false, int dueDay = 0)
@@ -203,6 +220,8 @@ namespace Horizon.UI
             pulse = 1;
             shake = cascade ? 0.14f : 0.05f;
             Play(cascade ? 3 : 1);
+            WorldRipple(Avatar.position + Vector3.up * 0.06f, cascade ? warmLight : portalLight, cascade ? 1.3f : 0.8f);
+            if (bloom != null && !preferences.reducedMotion) bloom.Echo = cascade ? 0.65f : 0.25f;
         }
 
         public void Tick(int step) { audioSource.pitch = 0.8f + step * 0.12f; Play(0); }
@@ -216,14 +235,14 @@ namespace Horizon.UI
 
         private void Update()
         {
-            if (WorldCamera == null) return;
+            if (WorldCamera == null || paused) return;
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
-            Vector3 drift = station ? Vector3.zero : new Vector3(Mathf.Sin(Time.unscaledTime * 0.28f) * 0.14f, 0, 0);
+            Vector3 drift = station || preferences.reducedMotion ? Vector3.zero : new Vector3(Mathf.Sin(Time.unscaledTime * 0.28f) * 0.14f, 0, 0);
             WorldCamera.transform.position = Vector3.Lerp(WorldCamera.transform.position,
                 cameraPosition + drift, 1 - Mathf.Exp(-dt * 6));
             WorldCamera.transform.position += new Vector3(Mathf.Sin(Time.unscaledTime * 65),
-                Mathf.Cos(Time.unscaledTime * 73), 0) * shake;
+                Mathf.Cos(Time.unscaledTime * 73), 0) * (preferences.reducedMotion ? 0 : shake);
             WorldCamera.transform.LookAt(cameraLook);
             Avatar.localScale = Vector3.one * (1 + Mathf.Sin(Time.unscaledTime * 2) * 0.01f + pulse * 0.04f);
             pulse = Mathf.MoveTowards(pulse, 0, dt * 2);
@@ -233,12 +252,11 @@ namespace Horizon.UI
 
         private IEnumerator SendSymbol(CardKind kind, int dueDay)
         {
-            Transform symbol = Shape(transform, "Sent intention", kind == CardKind.Growth ? PrimitiveType.Cube :
-                PrimitiveType.Sphere, Avatar.position + Vector3.up * 1.8f,
-                Vector3.one * 0.25f, kind == CardKind.Temptation ? pink : kind == CardKind.Growth ? teal : gold);
+            Transform symbol = IntentionSymbol(kind, Avatar.position + Vector3.up * 1.8f);
+            Trail(symbol, kind == CardKind.Temptation ? warmLight : portalLight);
             Vector3 from = symbol.position;
             Vector3 to = kind == CardKind.Temptation ? new Vector3(0, 0.3f, -1) :
-                dueDay > 0 && dueDay <= 12 ? DayPoint(dueDay) + Vector3.up * 0.25f : new Vector3(0, 2.3f, 6);
+                dueDay > 0 && dueDay <= timelineLength ? DayPoint(dueDay) + Vector3.up * 0.25f : new Vector3(0, 2.3f, 6);
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.65f)
             {
                 symbol.position = Vector3.Lerp(from, to, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.2f;
@@ -246,14 +264,14 @@ namespace Horizon.UI
                 symbol.localScale = Vector3.one * Mathf.Lerp(0.25f, 0.07f, t);
                 yield return null;
             }
-            Burst(to, kind == CardKind.Temptation ? Palette.Coral : Palette.Mint, 20);
+            if (kind == CardKind.Growth) WorldRipple(to, portalLight, 0.22f);
+            else Burst(to, kind == CardKind.Temptation ? Palette.Coral : Palette.Mint, 20);
             Destroy(symbol.gameObject);
         }
 
         private void BuildPlatform()
         {
-            Shape(environment, "Floating platform", PrimitiveType.Cylinder, new Vector3(0, -0.22f, 1),
-                new Vector3(11, 0.2f, 11), floor);
+
             Ring(environment, "Platform neon", new Vector3(0, 0.015f, 1), 5.1f, glass, false);
             for (int i = 0; i < 6; i++)
             {
@@ -261,8 +279,7 @@ namespace Horizon.UI
                 Box(environment, "Path light", new Vector3(-0.78f, 0.03f, i), new Vector3(0.035f, 0.04f, 0.5f), teal);
                 Box(environment, "Path light", new Vector3(0.78f, 0.03f, i), new Vector3(0.035f, 0.04f, 0.5f), teal);
             }
-            Ring(environment, "Horizon portal", new Vector3(0, 2.1f, 6), 1.9f, glass, true);
-            Ring(environment, "Portal rim", new Vector3(0, 2.1f, 6.02f), 2.1f, teal, true);
+
             for (int i = 0; i < 15; i++)
             {
                 float x = (i - 7) * 1.8f;
@@ -313,18 +330,18 @@ namespace Horizon.UI
             Transform person = Group(name, parent);
             person.localPosition = position;
             var actor = person.gameObject.AddComponent<HorizonActor>();
-            Shape(person, "Jacket", PrimitiveType.Capsule, new Vector3(0, 1, 0), new Vector3(0.61f, 0.5f, 0.42f), coat);
+            Sculpt(person, "Tailored coat", coatMesh, new Vector3(0,0.67f,0), new Vector3(1,1,0.78f), coat);
             Box(person, "Jacket seam", new Vector3(0, 1.05f, -0.218f), new Vector3(0.02f, 0.58f, 0.02f), dark);
             for (int button = 0; button < 3; button++)
                 Shape(person, "Jacket button", PrimitiveType.Sphere, new Vector3(0.035f, 0.86f + button * 0.16f, -0.226f), Vector3.one * 0.035f, gold);
             Transform head = Group("Head pivot", person);
             head.localPosition = new Vector3(0, 1.66f, 0);
             actor.Head = head;
-            Shape(head, "Face", PrimitiveType.Sphere, Vector3.zero, new Vector3(0.47f, 0.48f, 0.44f), skin);
-            Shape(head, "Hair crown", PrimitiveType.Sphere, new Vector3(0, 0.15f, 0.025f), new Vector3(0.49f, 0.3f, 0.46f), hair);
-            Shape(head, "Hair fringe", PrimitiveType.Sphere, new Vector3(-0.09f, 0.12f, -0.13f), new Vector3(0.27f, 0.17f, 0.24f), hair);
-            Shape(head, "Nose", PrimitiveType.Sphere, new Vector3(0, 0.015f, -0.232f), new Vector3(0.067f, 0.06f, 0.085f), skin);
-            Box(head, "Smile", new Vector3(0, -0.073f, -0.218f), new Vector3(0.07f, 0.018f, 0.014f), hair);
+            Shape(head, "Face", PrimitiveType.Sphere, Vector3.zero, new Vector3(0.55f, 0.56f, 0.5f), skin);
+            Shape(head, "Hair crown", PrimitiveType.Sphere, new Vector3(0, 0.15f, 0.025f), new Vector3(0.57f, 0.34f, 0.52f), hair);
+            Shape(head, "Hair fringe", PrimitiveType.Sphere, new Vector3(-0.09f, 0.16f, -0.16f), new Vector3(0.27f, 0.17f, 0.24f), hair);
+            Shape(head, "Nose", PrimitiveType.Sphere, new Vector3(0, 0.015f, -0.255f), new Vector3(0.067f, 0.06f, 0.085f), skin);
+            Box(head, "Smile", new Vector3(0, -0.093f, -0.239f), new Vector3(0.07f, 0.018f, 0.014f), hair);
             for (int i = -1; i <= 1; i += 2)
             {
                 Transform leg = Group(i < 0 ? "Left hip" : "Right hip", person);
@@ -335,9 +352,9 @@ namespace Horizon.UI
                 arm.localPosition = new Vector3(i * 0.33f, 1.3f, 0);
                 Shape(arm, "Sleeve", PrimitiveType.Capsule, new Vector3(i * 0.04f, -0.22f, 0), new Vector3(0.19f, 0.24f, 0.2f), coat);
                 Transform hand = Shape(arm, "Hand", PrimitiveType.Sphere, new Vector3(i * 0.04f, -0.47f, 0), Vector3.one * 0.17f, skin);
-                Transform eye = Shape(head, "Eye", PrimitiveType.Sphere, new Vector3(i * 0.086f, 0.045f, -0.208f), new Vector3(0.052f, 0.061f, 0.042f), hair);
+                Transform eye = Shape(head, "Eye", PrimitiveType.Sphere, new Vector3(i * 0.1f, 0.045f, -0.244f), new Vector3(0.052f, 0.061f, 0.042f), hair);
                 Shape(eye, "Eye light", PrimitiveType.Sphere, new Vector3(-0.19f, 0.21f, -0.43f), Vector3.one * 0.24f, gold);
-                Shape(head, "Ear", PrimitiveType.Sphere, new Vector3(i * 0.232f, 0, 0), new Vector3(0.08f, 0.12f, 0.07f), skin);
+                Shape(head, "Ear", PrimitiveType.Sphere, new Vector3(i * 0.27f, 0, 0), new Vector3(0.08f, 0.12f, 0.07f), skin);
                 if (i < 0)
                 {
                     actor.LeftArm = arm; actor.LeftLeg = leg; actor.LeftEye = eye;
@@ -352,6 +369,8 @@ namespace Horizon.UI
             Box(person, "Scarf", new Vector3(0, 1.46f, -0.13f), new Vector3(0.44f, 0.1f, 0.32f), gold);
             Box(person, "Scarf tail", new Vector3(0.19f, 1.24f, -0.23f), new Vector3(0.1f, 0.38f, 0.045f), gold);
             Box(person, "Backpack", new Vector3(0, 1.1f, 0.28f), new Vector3(0.44f, 0.55f, 0.2f), teal);
+            Soft(person, "Left collar", new Vector3(-0.12f,1.34f,-0.21f), new Vector3(0.17f,0.16f,0.08f), ivory);
+            Soft(person, "Right collar", new Vector3(0.12f,1.34f,-0.21f), new Vector3(0.17f,0.16f,0.08f), ivory);
             actor.SetNeutral();
             return person;
         }
@@ -377,6 +396,8 @@ namespace Horizon.UI
 
         private void Burst(Vector3 position, Color color, int count)
         {
+            if (preferences.reducedMotion) count = Mathf.Min(count, 4);
+            else if (preferences.batterySaver) count = Mathf.Min(count, 16);
             for (int i = 0; i < count; i++)
             {
                 Transform spark = Shape(transform, "Stardust", PrimitiveType.Cylinder, position,
@@ -397,7 +418,8 @@ namespace Horizon.UI
         }
 
         private Transform Box(Transform parent, string name, Vector3 position, Vector3 scale, Material material)
-        { return Shape(parent, name, PrimitiveType.Cube, position, scale, material); }
+        { return softBlock == null ? Shape(parent, name, PrimitiveType.Cube, position, scale, material) :
+            Soft(parent, name, position, scale, material); }
 
         private Transform Shape(Transform parent, string name, PrimitiveType type, Vector3 position,
             Vector3 scale, Material material)
@@ -451,6 +473,7 @@ namespace Horizon.UI
         {
             foreach (Material material in materials) Dispose(material);
             foreach (AudioClip sound in sounds) Dispose(sound);
+            foreach (Mesh mesh in sculptures) Dispose(mesh);
         }
 
         private static void Dispose(Object value)
