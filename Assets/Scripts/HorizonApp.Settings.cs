@@ -200,7 +200,7 @@ namespace Horizon
             { View.Label(overlay, "Import error", "这次未导入完成，本机记录仍保留。", 26, Palette.Coral,
                 TextAnchor.MiddleCenter, 0.075f, 0.34f, 0.925f, 0.405f); return; }
             importCandidate = null; importCode = null;
-            archive = imported; session = null; CloseSettings();
+            archive = imported; session = null; CloseSettings(); world.SetTheme(archive.wallet.theme);
             if (archive.active != null || archive.pendingFeedback != null) ContinueRun(); else ShowHome();
         }
     }

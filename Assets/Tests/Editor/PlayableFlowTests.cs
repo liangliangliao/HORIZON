@@ -68,6 +68,21 @@ namespace Horizon.Tests
             var restored = store.Load();
             Assert.AreEqual(739, restored.active.worldSeed); Assert.IsTrue(restored.preferences.reducedMotion);
             Assert.IsFalse(restored.preferences.sound); Assert.AreEqual(12, restored.wallet.stardust);
+            // Complete the actual UI import too, including a different appearance
+            // and preferences. The old life remains in the separate rollback file.
+            restored.wallet.Claim("imported", 7); restored.wallet.ownedThemes.Add(2); restored.wallet.SelectTheme(2);
+            restored.preferences.sound = true; restored.preferences.reducedMotion = false; restored.preferences.batterySaver = false;
+            Color oldSky = RenderSettings.skybox.GetColor("_Top");
+            Call(app, "ShowSettings"); yield return null;
+            ButtonNamed(app, "Life backups").onClick.Invoke(); yield return null;
+            Call(app, "PrepareImport", ArchiveStore.Encode(restored)); yield return null;
+            ButtonNamed(app, "Confirm life import").onClick.Invoke(); yield return null;
+            Assert.IsNull(Get<RectTransform>(app, "overlay")); Assert.IsFalse(VisualPreferences.Paused);
+            Assert.IsFalse(VisualPreferences.ReducedMotion); Assert.AreEqual(60, Application.targetFrameRate);
+            Assert.AreEqual(19, Get<ArchiveData>(app, "archive").wallet.stardust);
+            Assert.AreEqual(frozen, JsonUtility.ToJson(Get<GameSession>(app, "session").Snapshot()));
+            Assert.AreNotEqual(oldSky, RenderSettings.skybox.GetColor("_Top"));
+            Assert.AreEqual(12, new ArchiveStore(store.Path + ".before-import").Load().wallet.stardust);
             PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
             yield return new ExitPlayMode();
         }
