@@ -16,9 +16,18 @@ namespace Horizon
         private int focusPage;
 
         private float FutureX(int day)
-        { return Mathf.Lerp(0.12f, 0.88f, Mathf.Clamp01((day - session.Day) / (float)Mathf.Max(1, session.Deadline - session.Day))); }
+        {
+            if (session.Deadline != 30) return Mathf.Lerp(0.12f, 0.88f,
+                Mathf.Clamp01((day - session.Day) / (float)Mathf.Max(1, session.Deadline - session.Day)));
+            List<int> days = ObservedFutureDays();
+            if (days.Count < 2 || day <= days[0]) return 0.12f;
+            for (int i = 1; i < days.Count; i++)
+                if (day <= days[i]) return Mathf.Lerp(0.12f, 0.88f,
+                    (i - 1 + Mathf.InverseLerp(days[i - 1], days[i], day)) / (days.Count - 1));
+            return 0.88f;
+        }
 
-        private void DrawObservedFuture()
+        private List<int> ObservedFutureDays()
         {
             var days = new List<int> { session.Day };
             foreach (int day in session.Pending.Select(e => e.dueDay).Where(d => d > session.Day && d < session.Deadline).Distinct().OrderBy(d => d).Take(2))
@@ -27,6 +36,12 @@ namespace Horizon
                 if (!days.Contains(day)) days.Add(day);
             if (!days.Contains(session.Deadline)) days.Add(session.Deadline);
             days.Sort();
+            return days;
+        }
+
+        private void DrawObservedFuture()
+        {
+            List<int> days = ObservedFutureDays();
             int seen = 0, visible = ObservationDesign.VisibleTypes(session, archive.journey.Chapter);
             foreach (int day in days)
             {

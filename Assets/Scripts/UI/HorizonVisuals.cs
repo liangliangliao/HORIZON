@@ -369,6 +369,7 @@ namespace Horizon.UI
         private int value;
 
         private void Awake() { rect = (RectTransform)transform; }
+        public void Initialize(int initial) { value = Mathf.Clamp(initial, -3, 3); }
 
         public void OnPointerDown(PointerEventData eventData) { OnDrag(eventData); }
 

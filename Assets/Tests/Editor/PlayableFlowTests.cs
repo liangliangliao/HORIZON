@@ -424,6 +424,7 @@ namespace Horizon.Tests
                 Assert.IsNotNull(Get<RectTransform>(app, "overlay"));
                 ButtonNamed(app, "Use card").onClick.Invoke();
                 yield return new WaitForSecondsRealtime(1);
+                yield return WaitForInput(app);
                 Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
                 ButtonNamed(app, "Continue result").onClick.Invoke();
                 yield return new WaitForSecondsRealtime(day == 3 ? 5 : 0.4f);
@@ -629,15 +630,28 @@ namespace Horizon.Tests
             yield return new EnterPlayMode();
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Expanded prediction flow").AddComponent<HorizonApp>();
+            yield return null;
             var s = new GameSession(3, 912);
             while (s.Day < 4) { s.Choose(s.Hand[2].Id); s.Advance(); }
             var a = new ArchiveData { active = s.Snapshot(), nextRareRun = 99, seenSecondLife = true };
             Set(app, "session", s); Set(app, "archive", a); Call(app, "BuildBoard"); yield return null;
             Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<PredictionAxisDrag>().Length);
+            PredictionAxisDrag energyAxis = Get<RectTransform>(app, "root").GetComponentsInChildren<PredictionAxisDrag>().First(t => t.name == "Draw future 0");
+            RectTransform energyTrack = (RectTransform)energyAxis.transform;
+            var pointer = new PointerEventData(EventSystem.current) { position = RectTransformUtility.WorldToScreenPoint(null,
+                energyTrack.TransformPoint(new Vector3(0, energyTrack.rect.yMax, 0))) };
+            energyAxis.OnPointerDown(pointer); Assert.AreEqual(3, Get<int[]>(app, "forecastOffsets")[0]);
             ButtonNamed(app, "Prediction horizon 1").onClick.Invoke(); yield return null;
+            Assert.AreEqual(3, Get<int[]>(app, "forecastOffsets")[0], "Changing dates must retain what the player drew.");
+            energyAxis = Get<RectTransform>(app, "root").GetComponentsInChildren<PredictionAxisDrag>().First(t => t.name == "Draw future 0");
+            energyTrack = (RectTransform)energyAxis.transform;
+            pointer.position = RectTransformUtility.WorldToScreenPoint(null, energyTrack.TransformPoint(energyTrack.rect.center));
+            energyAxis.OnDrag(pointer); Assert.AreEqual(0, Get<int[]>(app, "forecastOffsets")[0], "A rebuilt axis must still allow returning to unchanged.");
             yield return Capture(app, "26-expanded-prediction");
-            ButtonNamed(app, "Lock prediction").onClick.Invoke(); yield return null;
+            Button lockButton = ButtonNamed(app, "Lock prediction");
+            lockButton.onClick.Invoke(); lockButton.onClick.Invoke(); yield return null;
             Assert.AreEqual(5, s.Prediction.dueDay); Assert.IsTrue(s.Prediction.sixAxes);
+            Assert.AreEqual(1, s.Predictions.Count);
             s.Choose(s.Hand[2].Id); s.VisitStation(); s.Advance();
             a.active = s.Snapshot(); Call(app, "Save"); Call(app, "BuildBoard"); yield return null;
             Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Count(t => t.name == "Comparison text"));
@@ -672,7 +686,11 @@ namespace Horizon.Tests
             Call(app, "ShowObservationChapter", 7); yield return null;
             Button next = ButtonNamed(app, "Next story beat"); next.onClick.Invoke(); next.onClick.Invoke(); yield return null;
             Assert.AreEqual(1, a.journey.storyBeat);
-            ButtonNamed(app, "Leave story").onClick.Invoke(); yield return null;
+            Call(app, "HandleBack"); yield return null;
+            Assert.AreEqual("Journey chapters", Get<RectTransform>(app, "overlay").name);
+            a = new ArchiveStore(Get<ArchiveStore>(app, "saveStore").Path).Load();
+            Assert.AreEqual(7, a.journey.storyChapter); Assert.AreEqual(1, a.journey.storyBeat);
+            Set(app, "archive", a);
             Call(app, "ShowObservationChapter", 7); yield return null;
             Assert.AreEqual(1, a.journey.storyBeat);
             yield return Capture(app, "28-seventh-story");
@@ -713,6 +731,8 @@ namespace Horizon.Tests
             }
             Assert.AreEqual(30, s.CompletedRun.actions.Count); Assert.AreEqual(1, a.runs.Count); Assert.IsNull(a.active);
             CollectionAssert.AreEqual(new[] { 4, 12, 14, 21, 28 }, s.StationDays);
+            Text stateEvidence = Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Where(t => t.name == "Gate evidence").ElementAt(1);
+            Assert.That(stateEvidence.text, Does.Contain("后半程").And.Contain("D13"));
             yield return Capture(app, "30-long-life-deadline");
             Call(app, "ShowMap", false); yield return null;
             Assert.AreEqual(30, Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Count(b => b.name.StartsWith("Inspect day ")));
@@ -788,6 +808,14 @@ namespace Horizon.Tests
                 if (button.name == name && button.interactable) return button;
             Assert.Fail("Missing button " + name);
             return null;
+        }
+        private static IEnumerator WaitForInput(HorizonApp app)
+        {
+            float began = Time.realtimeSinceStartup;
+            while (Get<bool>(app, "busy")) {
+                Assert.Less(Time.realtimeSinceStartup - began, 8, "The result did not become readable and actionable.");
+                yield return null;
+            }
         }
         private static T Get<T>(HorizonApp app, string field) { return (T)typeof(HorizonApp).GetField(field, Private).GetValue(app); }
         private static void Set(HorizonApp app, string field, object value) { typeof(HorizonApp).GetField(field, Private).SetValue(app, value); }

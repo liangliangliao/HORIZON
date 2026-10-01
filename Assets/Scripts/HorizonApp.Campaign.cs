@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
@@ -17,6 +18,7 @@ namespace Horizon
         {
             if (reset) { Array.Clear(forecastOffsets, 0, forecastOffsets.Length); predictionHorizon = 3; }
             Clear();
+            int generation = viewGeneration;
             View.Fill(root, "Prediction hush", new Color(0.01f, 0.03f, 0.05f, 0.87f), 0, 0, 1, 1);
             View.Label(root, "Prediction day", "DAY " + session.Day.ToString("00") + " / " + session.Deadline, 29, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.07f, 0.92f, 0.93f, 0.97f);
@@ -29,6 +31,7 @@ namespace Horizon
             {
                 int span = spans[i]; float x = 0.08f + i * 0.285f;
                 View.Button(root, "Prediction horizon " + span, span + "天后 · D" + (session.Day + span), () => {
+                    if (generation != viewGeneration || !session.CanPredict) return;
                     predictionHorizon = span; ShowExpandedPrediction(false);
                 }, x, 0.729f, x + 0.27f, 0.782f, predictionHorizon == span ? Palette.Mint : Palette.Panel,
                     predictionHorizon == span ? Palette.Ink : Palette.Text, 25).interactable = session.Day + span <= session.Deadline;
@@ -41,23 +44,30 @@ namespace Horizon
                     x - 0.025f, y + 0.214f, x + 0.165f, y + 0.26f);
                 Image track = View.Fill(root, "Draw future " + i, Palette.Deep, x, y + 0.045f, x + 0.15f, y + 0.215f, true);
                 View.Fill(track.transform, "Zero", Palette.Muted, 0.12f, 0.495f, 0.88f, 0.505f);
+                View.Label(track.transform, "Up", "+", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.3f, 0.83f, 0.7f, 0.98f);
+                View.Label(track.transform, "Down", "-", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.3f, 0.02f, 0.7f, 0.17f);
                 float center = 0.1f + (forecastOffsets[i] + 3) / 6f * 0.8f;
                 RectTransform marker = View.Panel(track.transform, "Forecast mark", Palette.Mint,
                     0.2f, center - 0.04f, 0.8f, center + 0.04f, 18).rectTransform;
                 Text value = View.Label(root, "Forecast value", Direction(forecastOffsets[i]), 25, Palette.Mint,
                     TextAnchor.MiddleCenter, x - 0.045f, y, x + 0.195f, y + 0.045f);
-                track.gameObject.AddComponent<PredictionAxisDrag>().Changed = next => {
+                PredictionAxisDrag axis = track.gameObject.AddComponent<PredictionAxisDrag>();
+                axis.Initialize(forecastOffsets[i]);
+                axis.Changed = next => {
+                    if (generation != viewGeneration) return;
                     forecastOffsets[index] = next; float at = 0.1f + (next + 3) / 6f * 0.8f;
                     marker.anchorMin = new Vector2(0.2f, at - 0.04f); marker.anchorMax = new Vector2(0.8f, at + 0.04f);
                     value.text = Direction(next);
                 };
             }
             View.Button(root, "Lock prediction", "封存到第" + (session.Day + predictionHorizon) + "天", () => {
+                if (generation != viewGeneration || !session.CanPredict) return;
                 session.LockPrediction(new ResourceDelta(forecastOffsets[0], forecastOffsets[1], forecastOffsets[2],
                     forecastOffsets[3], forecastOffsets[4], forecastOffsets[5]), predictionHorizon);
                 archive.active = session.Snapshot(); Save(); BuildBoard();
             }, 0.10f, 0.09f, 0.90f, 0.153f, Palette.Mint, Palette.Ink, 29);
             View.Button(root, "Skip prediction", "这次先继续生活", () => {
+                if (generation != viewGeneration || !session.CanPredict) return;
                 session.SkipPrediction(); archive.active = session.Snapshot(); Save(); BuildBoard();
             }, 0.18f, 0.028f, 0.82f, 0.076f, Palette.Panel, Palette.Muted, 24);
             View.RefreshText(root);
@@ -114,6 +124,13 @@ namespace Horizon
         private static Vector2 ConstellationPoint(int day, int length)
         { return length == 30 ? new Vector2(0.096f + (day - 1) % 6 * 0.162f, 0.718f - (day - 1) / 6 * 0.073f) :
             new Vector2(0.15f + (day - 1) % 4 * 0.233f, 0.709f - (day - 1) / 4 * 0.135f); }
+
+        private static string LongGateEvidence(RunRecord run, int gate)
+        {
+            List<int> days = run.actions.Where(a => a.day > 12 && (gate == 0 ? a.echoed && a.later?.ability > 0 :
+                gate == 1 ? a.kind == CardKind.Recovery : a.givesSupport)).Select(a => a.day).ToList();
+            return "后半程 · " + EvidenceSummary(days);
+        }
 
         private void UpdateDragJourney(CardSpec card, Vector2 pointer, bool visible)
         {

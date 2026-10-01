@@ -181,7 +181,12 @@ namespace Horizon
             settingsVisible = false;
             SetPaused(false);
             if (world != null) world.Focus(false);
-            for (int i = root.childCount - 1; i >= 0; i--) Destroy(root.GetChild(i).gameObject);
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                GameObject previous = root.GetChild(i).gameObject;
+                previous.SetActive(false);
+                Destroy(previous);
+            }
             cards.Clear();
             overlay = null;
             trail = null;
@@ -470,6 +475,7 @@ namespace Horizon
         {
             if (session.UsesSixPredictionAxes) { ShowExpandedPrediction(true); return; }
             Clear();
+            int generation = viewGeneration;
             Array.Clear(forecastOffsets, 0, forecastOffsets.Length);
             View.Fill(root, "Prediction hush", new Color(0.01f, 0.03f, 0.05f, 0.75f), 0, 0, 1, 1);
             View.Label(root, "Day", "DAY " + session.Day.ToString("00") + " / " + session.Deadline, 31, Palette.Muted,
@@ -510,6 +516,7 @@ namespace Horizon
                 Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.19f, 0.92f, 0.25f);
             View.Button(root, "Lock prediction", "封存预测  /  LOCK", () =>
             {
+                if (generation != viewGeneration || !session.CanPredict) return;
                 session.LockPrediction(forecastOffsets[0], forecastOffsets[1], forecastOffsets[2]);
                 archive.active = session.Snapshot();
                 Save();
@@ -517,6 +524,7 @@ namespace Horizon
             }, 0.15f, 0.105f, 0.85f, 0.175f, Palette.Mint, Palette.Ink, 31);
             View.Button(root, "Skip prediction", "先玩下去，暂不预测", () =>
             {
+                if (generation != viewGeneration || !session.CanPredict) return;
                 session.SkipPrediction();
                 archive.active = session.Snapshot();
                 Save();
@@ -550,7 +558,7 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.08f, 0.62f, 0.92f, 0.68f);
             for (int i = 0; i < names.Length; i++)
             {
-                float y = 0.55f - i * (prediction.sixAxes ? 0.058f : 0.115f);
+                float y = (prediction.sixAxes ? 0.576f : 0.55f) - i * (prediction.sixAxes ? 0.055f : 0.115f);
                 View.Label(root, "Axis name", names[i], prediction.sixAxes ? 24 : 29, Palette.Text,
                     TextAnchor.MiddleLeft, 0.11f, y + 0.015f, 0.27f, y + 0.068f);
                 View.Fill(root, "Comparison rail", new Color(0.44f, 0.65f, 0.64f, 0.52f),
@@ -569,7 +577,7 @@ namespace Horizon
             if (close)
                 View.Label(root, "Understanding", ForecastKnowledge.UnlockAt(archive.calibrations + 1),
                     29, Palette.Mint,
-                    TextAnchor.MiddleCenter, 0.08f, 0.245f, 0.92f, 0.29f);
+                    TextAnchor.MiddleCenter, 0.08f, 0.237f, 0.92f, prediction.sixAxes ? 0.272f : 0.29f);
             View.Button(root, "Why", "为什么？  看这段时间的实际变化", ShowPredictionWhy,
                 0.13f, 0.16f, 0.87f, 0.225f, Palette.Panel, Palette.Text, 26);
             View.Button(root, "Continue", "继续前行", () =>
@@ -601,7 +609,7 @@ namespace Horizon
             View.Fill(root, "Future rail", new Color(0.55f, 0.90f, 0.80f, 0.40f),
                 0.12f, 0.843f, 0.88f, 0.844f);
             DrawObservedFuture();
-            View.Label(root, "Focus hint", session.RunNumber == 1 ? ExperienceContent.NextStep(session) :
+            View.Label(root, "Focus hint", session.RunNumber == 1 && session.Deadline == 12 ? ExperienceContent.NextStep(session) :
                 session.FocusUses == 0 ? FingerHint : "今天已经凝视过未来",
                 21, Palette.Muted, TextAnchor.MiddleCenter, 0.11f, 0.785f, 0.89f, 0.814f);
             View.Button(root, "Map", "时间地图", () => ShowMap(true), 0.745f, 0.877f,
@@ -1278,7 +1286,8 @@ namespace Horizon
                 View.Label(panel, "Gate outcome", (gates[i] ? "已点亮 · " : "未点亮 · ") + names[i], 32,
                     gates[i] ? Palette.Mint : Palette.Coral, TextAnchor.MiddleLeft,
                     0.065f, y + 0.045f, 0.935f, y + 0.13f);
-                View.Label(panel, "Gate evidence", notes[i] + "\n" + EvidenceSummary(evidence[i]), 24, Palette.Text,
+                View.Label(panel, "Gate evidence", notes[i] + "\n" + (GameSession.RunLength(run) == 30 ?
+                    LongGateEvidence(run, i) : EvidenceSummary(evidence[i])), 24, Palette.Text,
                     TextAnchor.MiddleLeft, 0.065f, y - 0.005f, 0.935f, y + 0.068f);
             }
             int stars = archive.pendingFeedback == null ? 0 : archive.pendingFeedback.stardust;

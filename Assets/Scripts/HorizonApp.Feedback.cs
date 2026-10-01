@@ -20,7 +20,7 @@ namespace Horizon
             { ShowDeadlineResult(archive.runs[archive.runs.Count - 1]); return; }
             Clear();
             world.ShowBoard();
-            world.SetTimeline(session.Actions);
+            world.SetTimeline(session.Actions, session.Deadline);
             bool firstPresentation = !receipt.presented;
             receipt.presented = true;
             List<FeedbackBeat> beats = receipt.beats;
