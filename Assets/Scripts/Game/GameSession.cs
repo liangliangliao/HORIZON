@@ -134,6 +134,8 @@ namespace Horizon.Game
     {
         public int catalogVersion;
         public int worldSeed;
+        public int deckSeed;
+        public bool deckSeedRecorded;
         public int number;
         public string title;
         public BossResult boss;
@@ -155,6 +157,8 @@ namespace Horizon.Game
         public int rulesVersion;
         public int catalogVersion;
         public int worldSeed;
+        public int deckSeed;
+        public bool deckSeedRecorded;
         public int deadline;
         public int day;
         public int runNumber;
@@ -260,7 +264,7 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 6;
+        public const int RulesVersion = 7;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -269,6 +273,7 @@ namespace Horizon.Game
         public int Deadline { get; private set; }
         public int CatalogVersion { get; private set; }
         public int WorldSeed { get; private set; }
+        public int DeckSeed { get; private set; }
         public int RunNumber { get; private set; }
         public int Energy { get; private set; }
         public int Mood { get; private set; }
@@ -340,7 +345,7 @@ namespace Horizon.Game
             get
             {
                 CardSpec[] hand = Day > LastDay && CatalogVersion >= 3 ? CardCatalog.ForOutlookDay(Day) :
-                    CardCatalog.ForDay((Day - 1) % LastDay + 1, RunNumber, CatalogVersion);
+                    CardCatalog.ForDay((Day - 1) % LastDay + 1, RunNumber, CatalogVersion, DeckSeed);
                 foreach (CausalNode node in CausalNodes)
                     if ((node.type == CausalNodeKind.Situation || node.type == CausalNodeKind.World) && node.day == Day && node.resolved)
                     {
@@ -360,8 +365,9 @@ namespace Horizon.Game
             }
         }
 
-        public GameSession(int runNumber) : this(runNumber, false, 4, Guid.NewGuid().GetHashCode()) { }
-        public GameSession(int runNumber, int worldSeed) : this(runNumber, false, 4, worldSeed) { }
+        public GameSession(int runNumber) : this(runNumber, false, CardCatalog.CurrentVersion, Guid.NewGuid().GetHashCode()) { }
+        public GameSession(int runNumber, int worldSeed, int catalogVersion = CardCatalog.CurrentVersion)
+            : this(runNumber, false, catalogVersion, worldSeed) { }
 
         private GameSession(int runNumber, bool replaying, int catalogVersion = 4, int worldSeed = 0)
         {
@@ -370,6 +376,7 @@ namespace Horizon.Game
             Deadline = LastDay;
             CatalogVersion = catalogVersion;
             WorldSeed = worldSeed;
+            DeckSeed = worldSeed;
             this.replaying = replaying;
             Day = 1;
             Energy = 6;
@@ -396,7 +403,7 @@ namespace Horizon.Game
             if (saved == null || saved.runNumber < 1 || saved.day < 1 || saved.day > deadline ||
                 saved.energy < 0 || saved.energy > ResourceCap || saved.mood < 0 ||
                 saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap ||
-                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > 4 || saved.catalogVersion < 0)
+                saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > CardCatalog.CurrentVersion || saved.catalogVersion < 0)
                 throw new ArgumentException("Invalid run snapshot.", "saved");
             int catalogVersion = saved.catalogVersion > 0 ? saved.catalogVersion : saved.rulesVersion < 4 ? 1 :
                 saved.rulesVersion < 5 ? 2 : saved.rulesVersion < 6 ? 3 : 4;
@@ -413,6 +420,7 @@ namespace Horizon.Game
                 throw new ArgumentException("Invalid extended resources.", "saved");
             var session = new GameSession(saved.runNumber, simulation, catalogVersion, saved.worldSeed)
             {
+                DeckSeed = saved.deckSeedRecorded ? saved.deckSeed : saved.worldSeed,
                 Deadline = deadline,
                 Day = saved.day, Energy = saved.energy, Mood = saved.mood,
                 Insight = saved.insight, Relation = saved.relation,
@@ -506,7 +514,8 @@ namespace Horizon.Game
         {
             return new RunSnapshot
             {
-                rulesVersion = RulesVersion, catalogVersion = CatalogVersion, worldSeed = WorldSeed, deadline = Deadline,
+                rulesVersion = RulesVersion, catalogVersion = CatalogVersion, worldSeed = WorldSeed,
+                deckSeed = DeckSeed, deckSeedRecorded = true, deadline = Deadline,
                 day = Day, runNumber = RunNumber,
                 energy = Energy, mood = Mood, insight = Insight,
                 relation = Relation, money = Money, ability = Ability,
@@ -827,7 +836,7 @@ namespace Horizon.Game
         private void ResolveWorldEvent()
         {
             if (CatalogVersion < 3 || RunNumber < 3 || CausalNodes.Exists(n => n.type == CausalNodeKind.World && n.day == Day)) return;
-            WorldEventSpec spec = Array.Find(WorldEvents.All, e => e.Day == Day);
+            WorldEventSpec spec = Array.Find(CatalogVersion >= 5 ? WorldEvents.Season : WorldEvents.All, e => e.Day == Day);
             if (spec == null || !WorldEvents.Occurs(WorldSeed, Day, spec.Chance)) return;
             ResourceDelta before = Values(); Apply(spec.Delta);
             CausalNode world = AddNode(CausalNodes, null, CausalNodeKind.World, Day, spec.Name, spec.ReplacementId, true);
@@ -839,7 +848,7 @@ namespace Horizon.Game
         {
             for (int day = Day + 1; day <= Deadline; day++)
                 if (((day > LastDay && CatalogVersion >= 3 ? CardCatalog.ForOutlookDay(day) :
-                        CardCatalog.ForDay((day - 1) % LastDay + 1, RunNumber, CatalogVersion))[2].GivesSupport ||
+                        CardCatalog.ForDay((day - 1) % LastDay + 1, RunNumber, CatalogVersion, DeckSeed))[2].GivesSupport ||
                     CatalogVersion >= 2 && RunNumber >= 2 && (day - 1) % LastDay + 1 == 12) &&
                     !Pending.Exists(e => e.depth >= 2 && e.dueDay == day &&
                         e.replacementSlot == CardKind.Recovery)) return day;
@@ -942,6 +951,7 @@ namespace Horizon.Game
         private static GameSession ReplayPrefix(RunRecord original, Dictionary<int, string> changes, int stopDay, bool chooseLast)
         {
             var replay = new GameSession(original.number, true, original.catalogVersion > 0 ? original.catalogVersion : 1, original.worldSeed);
+            replay.DeckSeed = original.deckSeedRecorded ? original.deckSeed : original.worldSeed;
             int firstChange = LastDay + 1;
             foreach (int day in changes.Keys) firstChange = Math.Min(firstChange, day);
             for (int day = 1; day <= stopDay; day++)
@@ -1105,7 +1115,7 @@ namespace Horizon.Game
             }
             CompletedRun = new RunRecord
             {
-                catalogVersion = CatalogVersion, worldSeed = WorldSeed,
+                catalogVersion = CatalogVersion, worldSeed = WorldSeed, deckSeed = DeckSeed, deckSeedRecorded = true,
                 number = RunNumber,
                 boss = boss,
                 actions = new List<ActionRecord>(Actions),

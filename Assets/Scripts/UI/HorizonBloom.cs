@@ -9,6 +9,7 @@ namespace Horizon.UI
         public float Echo;
         private Material material;
         private Camera view;
+        public bool IsSupported { get { return material != null; } }
 
         public void Initialize(Shader shader)
         {

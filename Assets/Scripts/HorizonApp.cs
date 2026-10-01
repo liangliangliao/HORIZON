@@ -27,11 +27,13 @@ namespace Horizon
         public int nextRareRun = 3;
         public int stationRun;
         public int stationBeat;
+        public PlayerPreferences preferences = new PlayerPreferences();
 
         public void Repair()
         {
             if (runs == null) runs = new List<RunRecord>();
             if (wallet == null) wallet = new RewardWallet();
+            if (preferences == null || preferences.version < 1) preferences = new PlayerPreferences();
             wallet.Repair();
             if (journey == null) journey = new JourneyProgress();
             if (moments == null) moments = new List<RareMoment>();
@@ -93,6 +95,7 @@ namespace Horizon
             world = new GameObject("HORIZON 3D diorama").AddComponent<HorizonWorld3D>();
             world.Initialize();
             world.SetTheme(archive.wallet.theme);
+            ApplyPreferences();
             DontDestroyOnLoad(world.gameObject);
 
             var canvasObject = new GameObject("HORIZON Canvas", typeof(RectTransform), typeof(Canvas),
@@ -129,6 +132,9 @@ namespace Horizon
         private void Update()
         {
             if (!Screen.safeArea.Equals(lastSafeArea)) ApplySafeArea();
+            if (Input.GetKeyDown(KeyCode.Escape)) HandleBack();
+            if (backRequested && !busy && overlay == null) { backRequested = false; ShowSettings(); }
+            if (!storageNoticeShown && !busy && overlay == null && !string.IsNullOrEmpty(saveStore?.Notice)) ShowStorageNotice();
         }
 
         private static Font ChooseFont()
@@ -145,26 +151,17 @@ namespace Horizon
             return Font.CreateDynamicFontFromOSFont(new[] { "Arial Unicode MS", "Arial" }, 44);
         }
 
-        private static ArchiveData LoadArchive()
+        private ArchiveData LoadArchive()
         {
-            try
-            {
-                string json = PlayerPrefs.GetString(SaveKey, "");
-                ArchiveData data = string.IsNullOrEmpty(json) ? new ArchiveData() : JsonUtility.FromJson<ArchiveData>(json);
-                if (data != null)
-                {
-                    data.Repair();
-                    return data;
-                }
-            }
-            catch (Exception exception) { Debug.LogWarning("Could not read HORIZON save: " + exception.Message); }
-            return new ArchiveData();
+            saveStore = new ArchiveStore(System.IO.Path.Combine(Application.persistentDataPath, "HORIZON.life.json"), SaveKey);
+            return saveStore.Load();
         }
 
         private void Save()
         {
-            PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(archive));
-            PlayerPrefs.Save();
+            if (archive == null) return;
+            if (saveStore == null) saveStore = new ArchiveStore(System.IO.Path.Combine(Application.persistentDataPath, "HORIZON.life.json"), SaveKey);
+            saveStore.Save(archive);
         }
 
         private void ApplySafeArea()
@@ -178,6 +175,8 @@ namespace Horizon
         private void Clear(bool immersive = false)
         {
             viewGeneration++;
+            settingsVisible = false;
+            SetPaused(false);
             if (world != null) world.Focus(false);
             for (int i = root.childCount - 1; i >= 0; i--) Destroy(root.GetChild(i).gameObject);
             cards.Clear();
@@ -315,7 +314,9 @@ namespace Horizon
         private void WalletButton(Transform parent)
         {
             View.Button(parent, "Stardust wallet", "星尘 " + archive.wallet.stardust, ShowThemes,
-                0.69f, 0.95f, 0.945f, 0.988f, Palette.Panel, Palette.Gold, 25);
+                0.60f, 0.95f, 0.81f, 0.988f, Palette.Panel, Palette.Gold, 25);
+            View.Button(parent, "Settings", "设置", ShowSettings,
+                0.825f, 0.95f, 0.945f, 0.988f, Palette.Panel, Palette.Muted, 22);
         }
 
         private void ShowThemes()
@@ -435,6 +436,7 @@ namespace Horizon
 
         private void StarBurst(int amount, Vector2 start)
         {
+            if (archive.preferences.reducedMotion) return;
             ReceiptPulse(root, start, Palette.Gold);
             for (int i = 0; i < Mathf.Clamp(amount * 3, 6, 20); i++)
             {
@@ -582,7 +584,7 @@ namespace Horizon
             View.Label(root, "Vision", "HORIZON " + Roman(session.HorizonLevel), 23, Palette.Mint,
                 TextAnchor.MiddleLeft, 0.055f, 0.92f, 0.46f, 0.949f);
             WalletButton(root);
-            View.Button(root, "Goal", "目标 · 点亮三道门", ShowGoal,
+            View.Button(root, "Goal", "第12天 · 已准备 " + ProductExperience.ReadyGates(session) + "/3", ShowGoal,
                 0.50f, 0.914f, 0.945f, 0.949f, Palette.Panel, Palette.Gold, 23);
             View.Label(root, "Future caption", archive.calibrations >= 10 ?
                 "未来 · 看见二阶影响" : archive.calibrations >= 3 ?
@@ -654,8 +656,8 @@ namespace Horizon
 
         private void HandRegion()
         {
-            boardHint = View.Label(root, "Drag hint", session.Day == 1 ? "每天选 1 张 · 拖向上方金色圈，变亮后松手" : "每天选 1 张 · 拖进金色圈 / 点牌也能使用", 23, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.05f, 0.025f, 0.95f, 0.063f);
+            boardHint = View.Label(root, "Drag hint", ProductExperience.Coach(session), 23, Palette.Muted,
+                TextAnchor.MiddleCenter, 0.045f, 0.008f, 0.955f, 0.074f);
             trail = View.Fill(root, "Causal light", new Color(0.53f, 1f, 0.83f, 0.76f),
                 0.5f, 0.5f, 0.5f, 0.5f).rectTransform;
             trail.gameObject.SetActive(false);
@@ -836,10 +838,11 @@ namespace Horizon
                 title = "今天选择了「" + card.Name + "」",
                 description = "今天实际变化\n" + PlayExperience.NowLabel(change) + "\n\n" +
                     PlayExperience.FutureLabel(card, session.Day), stardust = stars,
+                preparedGates = PreparedGateChanges(before),
                 beats = new List<FeedbackBeat> { new FeedbackBeat {
                     title = card.Name, source = card.Name, sourceDay = session.Day,
                     destinationDay = action.echoDay, intent = card.Kind, delta = change, support = card.GivesSupport,
-                    meaning = PlayExperience.FutureLabel(card, session.Day) } }
+                    meaning = PlayExperience.FutureLabel(card, session.Day), stardust = stars } }
             };
             if (session.CompletedRun == null) archive.active = session.Snapshot();
             else
@@ -898,7 +901,7 @@ namespace Horizon
             }
             if (card.Kind == CardKind.Temptation)
             {
-                Handheld.Vibrate();
+                Haptic();
             }
             yield return new WaitForSeconds(0.35f);
             if (session.CompletedRun != null)
@@ -929,11 +932,14 @@ namespace Horizon
                 foreach (PendingEcho echo in transition.Echos)
                 {
                     int amount = echo.depth >= 2 ? CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count : 3;
-                    stars += archive.wallet.Claim("run:" + session.RunNumber + ":echo:" + echo.nodeId, amount);
+                    int collected = archive.wallet.Claim("run:" + session.RunNumber + ":echo:" + echo.nodeId, amount);
+                    stars += collected;
                     beats.Add(new FeedbackBeat { title = echo.echoName, source = echo.cardName,
                         sourceDay = echo.sourceDay, destinationDay = session.Day, intent = echo.kind,
                         delta = echo.actualDelta ?? echo.delta, support = CardCatalog.FindById(echo.cardId)?.GivesSupport ?? false,
-                        meaning = "D" + echo.sourceDay + " 的「" + echo.cardName + "」，在今天留下了这些变化。" });
+                        meaning = "D" + echo.sourceDay + " 的「" + echo.cardName + "」，在今天留下了这些变化。" +
+                            (string.IsNullOrEmpty(echo.replacementId) ? "" : "\n今天的选择也改变了：" + CardCatalog.FindById(echo.replacementId)?.Name),
+                        stardust = collected, chainSize = CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count });
                     description += (description.Length == 0 ? "" : "\n\n") +
                         "D" + echo.sourceDay + "「" + echo.cardName + "」 → 今天\n" +
                         echo.echoName + " · " + PlayExperience.NowLabel(echo.actualDelta ?? echo.delta);
@@ -965,7 +971,7 @@ namespace Horizon
         {
             if (busy) return;
             busy = true;
-            Handheld.Vibrate();
+            Haptic();
             if (stationStage < 2) ShowInRunStation(stationStage + 1);
             else if (session.RunNumber == 3) ShowInRunStation(3);
             else FinishStation();
@@ -990,12 +996,14 @@ namespace Horizon
             world.SetTimeline(session.Actions);
             world.BeginEcho(echo);
             float total = archive.seenFirstEcho ? 1.4f : 2.9f;
+            bool difficult = PlayExperience.IsDifficult(echo.actualDelta ?? echo.delta);
+            Color echoColor = difficult ? Palette.Coral : echo.kind == CardKind.Growth ? Palette.Gold : Palette.Mint;
             View.Fill(root, "Echo shade", new Color(0.014f, 0.045f, 0.068f, 0.35f), 0, 0, 1, 1);
             View.Fill(root, "Left aberration", new Color(0.95f, 0.36f, 0.38f, 0.13f),
                 0, 0.16f, 0.012f, 0.84f);
             View.Fill(root, "Right aberration", new Color(0.24f, 0.89f, 0.93f, 0.17f),
                 0.988f, 0.16f, 1, 0.84f);
-            View.Label(root, "Echo title", "T I M E   E C H O", 50, Palette.Mint,
+            View.Label(root, "Echo title", "T I M E   E C H O", 50, echoColor,
                 TextAnchor.MiddleCenter, 0.06f, 0.71f, 0.94f, 0.78f);
             View.Label(root, "Echo subtitle", "有些选择，现在才抵达。", 29, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.1f, 0.65f, 0.9f, 0.7f);
@@ -1030,12 +1038,12 @@ namespace Horizon
             yield return new WaitForSeconds(total * 0.25f);
             View.Fill(root, "Consequence flash", new Color(0.39f, 0.99f, 0.83f, 0.11f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
             View.Label(root, "Consequence", echo.echoName + "   " + PlayExperience.NowLabel(echo.actualDelta ?? echo.delta), 42,
-                echo.kind == CardKind.Temptation ? Palette.Coral : Palette.Mint,
+                echoColor,
                 TextAnchor.MiddleCenter, 0.06f, 0.18f, 0.94f, 0.31f);
             world.ArriveEcho(echo);
-            Handheld.Vibrate();
+            Haptic();
             world.ReactToEcho(echo);
-            StarBurst(3, new Vector2(0.5f, 0.48f));
+            if (!difficult) { EchoCrown(new Vector2(0.5f, 0.542f), echoColor, 2); StarBurst(3, new Vector2(0.5f, 0.48f)); }
             yield return new WaitForSeconds(total * 0.34f);
             archive.seenFirstEcho = true;
             Save();
@@ -1109,9 +1117,11 @@ namespace Horizon
                     "。今天，你可以选择「" + replacement.Name + "」。"), 27,
                     Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.2f, 0.93f, 0.28f);
             }
-            Handheld.Vibrate();
-            world.Reward(chainSize, true);
-            StarBurst(path.Count, new Vector2(0.5f, 0.48f));
+            Haptic();
+            bool difficult = PlayExperience.IsDifficult(echo.actualDelta ?? echo.delta);
+            if (difficult) world.ReactToEcho(echo);
+            else { world.Reward(chainSize, true); EchoCrown(new Vector2(0.5f, 0.522f), Palette.Gold, network ? 5 : 3);
+                StarBurst(path.Count, new Vector2(0.5f, 0.48f)); }
             yield return new WaitForSeconds(network ? 0.95f : 0.66f);
         }
 
@@ -1223,7 +1233,7 @@ namespace Horizon
                 View.Label(root, "Gate opening", names[i] + (gates[i] ? "门 · 点亮" : "门 · 还差一点"),
                     38, gates[i] ? Palette.Mint : Palette.Coral, TextAnchor.MiddleCenter,
                     0.08f, 0.28f - i * 0.08f, 0.92f, 0.35f - i * 0.08f);
-                if (gates[i]) Handheld.Vibrate();
+                if (gates[i]) Haptic();
                 yield return new WaitForSeconds(0.5f);
             }
             ShowDeadlineResult(run);
@@ -1231,11 +1241,13 @@ namespace Horizon
 
         private void ShowDeadlineResult(RunRecord run)
         {
+            bool animateReward = archive.pendingFeedback != null && !archive.pendingFeedback.presented;
+            if (archive.pendingFeedback != null) { archive.pendingFeedback.presented = true; Save(); }
             Clear();
             world.SetTimeline(run.actions);
             world.ShowDeadline();
             bool[] gates = { run.boss.ability, run.boss.state, run.boss.support };
-            for (int i = 0; i < 3; i++) world.OpenGate(i, gates[i]);
+            for (int i = 0; i < 3; i++) world.OpenGate(i, gates[i], false);
             View.Label(root, "Deadline verdict", "点亮 " + run.boss.passed + " / 3 道门", 48, Palette.Text,
                 TextAnchor.MiddleCenter, 0.05f, 0.86f, 0.95f, 0.94f);
             View.Label(root, "Wallet", "星尘 " + archive.wallet.stardust, 28, Palette.Gold,
@@ -1270,7 +1282,7 @@ namespace Horizon
             {
                 if (!busy) StartCoroutine(RestartSequence());
             }, 0.065f, 0.035f, 0.935f, 0.148f, Palette.Mint, Palette.Ink, 31);
-            if (stars > 0) { world.Reward(stars, run.boss.passed == 3); StarBurst(stars, new Vector2(0.5f, 0.21f)); }
+            if (animateReward && stars > 0) { world.Reward(stars, run.boss.passed == 3); StarBurst(stars, new Vector2(0.5f, 0.21f)); }
             View.RefreshText(root);
         }
 

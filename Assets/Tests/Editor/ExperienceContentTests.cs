@@ -14,7 +14,7 @@ namespace Horizon.Tests
         [Test]
         public void PreviousCatalogSurvivesSaveUpgradeAndCounterfactualReplay()
         {
-            RunSnapshot old = new GameSession(2).Snapshot();
+            RunSnapshot old = new GameSession(2, 15, 4).Snapshot();
             old.rulesVersion = 3; old.catalogVersion = 0;
             GameSession session = GameSession.Restore(old);
             Assert.AreEqual(1, session.CatalogVersion);
@@ -35,14 +35,14 @@ namespace Horizon.Tests
             Assert.AreEqual("mentor", CardCatalog.ForDay(8, 2)[1].Id);
             Assert.AreEqual("play", CardCatalog.ForDay(10, 2)[0].Id);
             Assert.AreEqual("nightwalk", CardCatalog.ForDay(11, 2)[2].Id);
-            var session = new GameSession(2);
+            var session = new GameSession(2, 15, 4);
             Complete(session);
             Assert.AreEqual(4, session.CausalNodes.Count(n => n.type == CausalNodeKind.Situation));
             Assert.AreEqual("friend", session.Actions[11].cardId);
             Assert.IsNotEmpty(session.Actions[11].parentNodeId);
             foreach (int day in new[] { 7, 9, 10, 12 })
                 Assert.IsTrue(GameSession.AlternativesForDay(session.CompletedRun, day).Any(c => c.Kind == CardKind.Recovery));
-            var first = new GameSession(1);
+            var first = new GameSession(1, 15, 4);
             Complete(first);
             Assert.IsFalse(first.CausalNodes.Exists(n => n.type == CausalNodeKind.Situation));
         }
@@ -50,7 +50,7 @@ namespace Horizon.Tests
         [Test]
         public void ResourceReceiptsRecordActualClampedChangesAcrossSave()
         {
-            RunSnapshot full = new GameSession(1).Snapshot(); full.energy = full.mood = 10;
+            RunSnapshot full = new GameSession(1, 15, 4).Snapshot(); full.energy = full.mood = 10;
             GameSession session = GameSession.Restore(full);
             session.Choose("rest");
             Assert.AreEqual(0, session.Actions[0].actualNow.energy);
@@ -71,7 +71,7 @@ namespace Horizon.Tests
         [Test]
         public void ACollaborativeOpportunityMergesTwoActualHistoriesAndSurvivesSave()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             Complete(session, s => s.Day == 1 ? "portfolio" : s.Hand[2].Id);
             CausalNode collaboration = session.CausalNodes.Find(n => n.type == CausalNodeKind.Choice && n.replacementId == "together");
             Assert.IsNotNull(collaboration);
@@ -90,7 +90,7 @@ namespace Horizon.Tests
         [Test]
         public void DeadlineRequiresHistoricalPreparationAndConnectsItsEvidence()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             Complete(session, s => s.Day == 1 ? "practice" : s.Day == 3 ? "portfolio" : s.Hand[2].Id);
             Assert.AreEqual(3, session.CausalNodes.Count(n => n.type == CausalNodeKind.Gate));
             CausalNode gate = session.CausalNodes.Find(n => n.type == CausalNodeKind.Gate && n.label.StartsWith("能力"));
@@ -98,7 +98,7 @@ namespace Horizon.Tests
             Assert.GreaterOrEqual(CausalGraph.Parents(gate).Count, 2);
             Assert.IsTrue(CausalGraph.Ancestors(session.CausalNodes, gate.id).Exists(n => n.cardId == "practice"));
 
-            RunSnapshot numericOnly = new GameSession(1).Snapshot();
+            RunSnapshot numericOnly = new GameSession(1, 15, 4).Snapshot();
             numericOnly.day = 12; numericOnly.ability = numericOnly.energy = numericOnly.mood = 10;
             GameSession unprepared = GameSession.ForkForSimulation(numericOnly, 12);
             unprepared.Choose(unprepared.Hand[2].Id);
@@ -109,7 +109,7 @@ namespace Horizon.Tests
         [Test]
         public void MultiChoiceBranchesUseRealAvailableActionsAndLeaveOriginalUntouched()
         {
-            var session = new GameSession(1); Complete(session);
+            var session = new GameSession(1, 15, 4); Complete(session);
             RunRecord original = session.CompletedRun;
             string frozen = JsonUtility.ToJson(original);
             var changes = new Dictionary<int, string> { { 1, "practice" }, { 3, "portfolio" } };
@@ -125,7 +125,7 @@ namespace Horizon.Tests
         [Test]
         public void BranchCanSelectSituationCardRatherThanTheBaseCatalog()
         {
-            var session = new GameSession(2); Complete(session);
+            var session = new GameSession(2, 15, 4); Complete(session);
             Assert.IsTrue(GameSession.AlternativesForDay(session.CompletedRun, 7).Any(c => c.Id == "shortstudy"));
             RunRecord changed = GameSession.ReplayAlternative(session.CompletedRun, 7, "shortstudy");
             Assert.IsNotNull(changed);
@@ -135,7 +135,7 @@ namespace Horizon.Tests
         [Test]
         public void ForecastsReuseRulesAndNeverMutateLiveEchoesOrResources()
         {
-            var session = new GameSession(3, 15); session.Choose("portfolio"); session.Advance();
+            var session = new GameSession(3, 15, 4); session.Choose("portfolio"); session.Advance();
             string frozen = JsonUtility.ToJson(session.Snapshot());
             ForecastRange first = ForecastSimulator.Sample(session, null, 12, 12);
             ForecastRange again = ForecastSimulator.Sample(session, null, 12, 12);
@@ -156,7 +156,7 @@ namespace Horizon.Tests
         [Test]
         public void ThirtyDayOutlookUsesAnExtendedRulesFork()
         {
-            var source = new GameSession(4);
+            var source = new GameSession(4, 15, 4);
             ForecastRange outlook = ForecastSimulator.Sample(source, null, 30, 6);
             Assert.AreEqual(30, outlook.targetDay); Assert.AreEqual(6, outlook.samples);
             Assert.That(outlook.energyMin, Is.InRange(0, 10)); Assert.That(outlook.abilityMax, Is.InRange(0, 10));

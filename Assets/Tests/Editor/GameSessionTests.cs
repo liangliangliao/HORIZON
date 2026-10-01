@@ -10,7 +10,7 @@ namespace Horizon.Tests
         [Test]
         public void FirstDayHasExactlyThreeDistinctIntentions()
         {
-            CardSpec[] hand = new GameSession(1).Hand;
+            CardSpec[] hand = new GameSession(1, 15, 4).Hand;
             Assert.AreEqual(3, hand.Length);
             Assert.AreEqual(CardKind.Temptation, hand[0].Kind);
             Assert.AreEqual(CardKind.Growth, hand[1].Kind);
@@ -20,7 +20,7 @@ namespace Horizon.Tests
         [Test]
         public void GrowthEchoReturnsOnScheduledDayAndMarksItsSource()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             session.Choose("practice");
             Assert.AreEqual(2, session.Insight);
             Assert.AreEqual(4, session.Actions[0].echoDay);
@@ -40,7 +40,7 @@ namespace Horizon.Tests
         [Test]
         public void ImmediatePleasureSchedulesAHiddenCost()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             session.Choose("scroll");
             Assert.AreEqual(4, session.Energy);
             Assert.AreEqual(9, session.Mood);
@@ -54,7 +54,7 @@ namespace Horizon.Tests
         [Test]
         public void ARecoveryCardRemainsPlayableWhenEnergyIsEmpty()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             session.Choose("scroll");
             session.Advance();
             session.Choose("impulse");
@@ -69,7 +69,7 @@ namespace Horizon.Tests
         [Test]
         public void RunCompletesAfterTwelfthActionAndKeepsTwelveNodes()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             for (int day = 1; day <= 12; day++)
             {
                 if (session.HasPredictionReview) session.MarkPredictionReviewed();
@@ -92,7 +92,7 @@ namespace Horizon.Tests
         [Test]
         public void SnapshotRestoresResourcesAndOncePerDayFocus()
         {
-            var session = new GameSession(2);
+            var session = new GameSession(2, 15, 4);
             Assert.IsTrue(session.TryFocus());
             session.Choose(session.Hand[1].Id);
             GameSession restored = GameSession.Restore(session.Snapshot());
@@ -109,7 +109,7 @@ namespace Horizon.Tests
         [Test]
         public void FourthDayPredictionIsSealedAndMeasuredAfterTheSeventhDayEchoes()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             for (int day = 1; day <= 3; day++)
             {
                 session.Choose(session.Hand[2].Id);
@@ -142,7 +142,7 @@ namespace Horizon.Tests
         [Test]
         public void ASurprisingPredictionDoesNotChangeResourcesOrGrantPower()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             for (int day = 1; day <= 3; day++)
             {
                 session.Choose(session.Hand[2].Id);
@@ -166,7 +166,7 @@ namespace Horizon.Tests
         [Test]
         public void ThirdRunEchoCanRemoveAnInvitationWithoutRemovingRecovery()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             session.Choose("episode");
             session.Advance();
             session.Choose("avoid");
@@ -212,7 +212,7 @@ namespace Horizon.Tests
         [Test]
         public void ALowEnergyEchoDoesNotLockFirstRunOrARecoveredThirdRun()
         {
-            var first = new GameSession(1);
+            var first = new GameSession(1, 15, 4);
             first.Choose("scroll");
             first.Advance();
             first.Choose("impulse");
@@ -220,7 +220,7 @@ namespace Horizon.Tests
             Assert.AreEqual(1, first.Energy);
             Assert.IsFalse(first.Pending.Exists(e => e.depth >= 2));
 
-            var recovered = new GameSession(3, 15);
+            var recovered = new GameSession(3, 15, 4);
             recovered.Choose("episode");
             recovered.Advance();
             recovered.Choose(recovered.Hand[2].Id);
@@ -232,7 +232,7 @@ namespace Horizon.Tests
         [Test]
         public void HorizonThreeUnlocksOnlyAfterTheThirdFutureStation()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             Assert.AreEqual(2, session.HorizonLevel);
             Assert.Throws<InvalidOperationException>(() => session.ProjectFuture(session.Hand[0].Id));
             for (int day = 1; day <= 3; day++)
@@ -250,13 +250,13 @@ namespace Horizon.Tests
             Assert.AreEqual(3, restored.HorizonLevel);
             restored.Advance();
             Assert.AreEqual(3, restored.HorizonLevel);
-            Assert.AreEqual(3, new GameSession(4).HorizonLevel);
+            Assert.AreEqual(3, new GameSession(4, 15, 4).HorizonLevel);
         }
 
         [Test]
         public void TwoFutureProjectionsAreConditionalAndDoNotPlayCards()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             for (int day = 1; day <= 3; day++)
             {
                 session.Choose(session.Hand[2].Id);
@@ -304,7 +304,7 @@ namespace Horizon.Tests
         [Test]
         public void BossLightsActionEvidenceAndReplayedGhostReallyOpensAGate()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             for (int day = 1; day <= 12; day++)
             {
                 if (session.HasPredictionReview) session.MarkPredictionReviewed();
@@ -348,7 +348,7 @@ namespace Horizon.Tests
         [Test]
         public void SixResourcesPayImmediateCostsAndDelayedAbilityAndOpportunity()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             Assert.AreEqual(4, session.Relation);
             Assert.AreEqual(5, session.Money);
             Assert.AreEqual(2, session.Ability);
@@ -378,7 +378,7 @@ namespace Horizon.Tests
         [Test]
         public void MoneyBlocksSpendingButNeverBlocksRecovery()
         {
-            RunSnapshot low = new GameSession(2).Snapshot();
+            RunSnapshot low = new GameSession(2, 15, 4).Snapshot();
             low.money = 1;
             var session = GameSession.Restore(low);
             Assert.AreEqual("impulse", session.Hand[0].Id);
@@ -392,7 +392,7 @@ namespace Horizon.Tests
         [Test]
         public void BossAbilityAndSupportReadSixResourcesAndRecordedActions()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             for (int day = 1; day <= GameSession.LastDay; day++)
             {
                 if (session.HasPredictionReview) session.MarkPredictionReviewed();
@@ -407,7 +407,7 @@ namespace Horizon.Tests
             CollectionAssert.Contains(session.CompletedRun.boss.abilityDays, 3);
             CollectionAssert.Contains(session.CompletedRun.boss.supportDays, 2);
 
-            var deprived = new GameSession(1);
+            var deprived = new GameSession(1, 15, 4);
             for (int day = 1; day < GameSession.LastDay; day++)
             {
                 if (deprived.HasPredictionReview) deprived.MarkPredictionReviewed();
@@ -428,7 +428,7 @@ namespace Horizon.Tests
         [Test]
         public void OldThreeResourceSnapshotRebuildsPaidAndPendingEchoes()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             session.Choose("practice");
             session.Advance();
             session.Choose("friend");
@@ -462,7 +462,7 @@ namespace Horizon.Tests
         [Test]
         public void GrowthEchoChangesAChoiceAndThatChoiceBuildsALongerSavedChain()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             session.Choose("portfolio");
             session.Advance();
             session.Choose("review");
@@ -533,7 +533,7 @@ namespace Horizon.Tests
         [Test]
         public void SupportResponseOpensARecoverySafeCollaborativeChoice()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             session.Choose(session.Hand[2].Id);
             session.Advance();
             session.Choose(session.Hand[2].Id);
@@ -564,7 +564,7 @@ namespace Horizon.Tests
         [Test]
         public void VersionTwoSaveRebuildsPendingAndResolvedCausalLinksWithoutChangingResources()
         {
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             session.Choose("episode");
             session.Advance();
             session.Choose("avoid");

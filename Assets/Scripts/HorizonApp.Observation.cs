@@ -155,7 +155,7 @@ namespace Horizon
             }
             if (session.CatalogVersion >= 3 && session.RunNumber >= 3)
             {
-                WorldEventSpec next = Array.Find(WorldEvents.All, spec => spec.Day > session.Day);
+                WorldEventSpec next = Array.Find(session.CatalogVersion >= 5 ? WorldEvents.Season : WorldEvents.All, spec => spec.Day > session.Day);
                 if (next != null) View.Label(overlay, "World chance", archive.journey.Chapter >= 5 ?
                     "D" + next.Day + " · " + next.Chance + "% " + next.Name + "\n这是环境事件的概率，已种回声仍会按时回来。" :
                     "D" + next.Day + " · 环境可能改变当天的选择", 23, Palette.Gold,

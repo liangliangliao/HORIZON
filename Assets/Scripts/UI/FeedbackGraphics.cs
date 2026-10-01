@@ -98,7 +98,8 @@ namespace Horizon.UI
         private float age;
         private Graphic graphic;
         private Color tint;
-        private void Start() { graphic = GetComponent<Graphic>(); tint = graphic.color; }
+        private void Awake() { graphic = GetComponent<Graphic>(); tint = graphic.color;
+            if (VisualPreferences.ReducedMotion) { tint.a = 0; graphic.color = tint; } }
         private void Update()
         {
             age += Time.unscaledDeltaTime;

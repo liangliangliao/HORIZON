@@ -20,7 +20,7 @@ namespace Horizon.Tests
         [Test]
         public void OldCatalogKeepsItsWeatherAndEntertainmentRules()
         {
-            RunSnapshot saved = new GameSession(3, 41).Snapshot(); saved.catalogVersion = 2; saved.rulesVersion = 4;
+            RunSnapshot saved = new GameSession(3, 41, 4).Snapshot(); saved.catalogVersion = 2; saved.rulesVersion = 4;
             GameSession old = GameSession.Restore(saved); Complete(old);
             Assert.IsFalse(old.CausalNodes.Exists(n => n.type == CausalNodeKind.World));
             Assert.AreEqual(-1, CardCatalog.ForDay(10, 3, 2)[0].Later.mood);
@@ -38,7 +38,7 @@ namespace Horizon.Tests
                 var outcomes = new HashSet<bool>();
                 for (int seed = 0; seed < 24; seed++)
                 {
-                    var session = new GameSession(3, seed);
+                    var session = new GameSession(3, seed, 4);
                     while (session.Day < spec.Day) { Prepare(session); session.Choose(session.Hand[2].Id);
                         if (session.Day == 4) session.VisitStation(); session.Advance(); }
                     Prepare(session);
@@ -52,7 +52,7 @@ namespace Horizon.Tests
         [Test]
         public void SaveAndCounterfactualReplayKeepTheSameWorld()
         {
-            var s = new GameSession(3, 41);
+            var s = new GameSession(3, 41, 4);
             while (s.Day < 6) { Prepare(s); s.Choose(s.Hand[2].Id); if (s.Day == 4) s.VisitStation(); s.Advance(); }
             GameSession restored = GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(s.Snapshot())));
             Assert.AreEqual(41, restored.WorldSeed);
@@ -69,7 +69,7 @@ namespace Horizon.Tests
         [Test]
         public void HorizonTwoRevealsOneTypeAndChaptersOnlyChangeObservation()
         {
-            var first = new GameSession(1, 15); var second = new GameSession(2, 15);
+            var first = new GameSession(1, 15, 4); var second = new GameSession(2, 15, 4);
             string frozen = JsonUtility.ToJson(second.Snapshot());
             Assert.AreEqual(0, ObservationDesign.VisibleTypes(first, 1));
             Assert.AreEqual(1, ObservationDesign.VisibleTypes(second, 1));
@@ -82,7 +82,7 @@ namespace Horizon.Tests
         [Test]
         public void PredictionExplanationAddsUpToActualClampedResults()
         {
-            var s = new GameSession(3, 41);
+            var s = new GameSession(3, 41, 4);
             while (s.Day < 4) { s.Choose(s.Hand[2].Id); s.Advance(); }
             s.LockPrediction(0, 0, 0);
             while (s.Day < 7) { s.Choose(s.Hand[2].Id); if (s.Day == 4) s.VisitStation(); s.Advance(); }
@@ -99,7 +99,7 @@ namespace Horizon.Tests
         [Test]
         public void ThirtyDayContinuationUsesNewContentAndConcreteDifferentPaths()
         {
-            var source = new GameSession(3, 41); Complete(source);
+            var source = new GameSession(3, 41, 4); Complete(source);
             string frozen = JsonUtility.ToJson(source.Snapshot());
             ForecastRange range = ForecastSimulator.Sample(source, null, 30, 6);
             Assert.AreEqual(30, range.example.Count); Assert.AreEqual(30, range.otherExample.Count);
@@ -114,7 +114,7 @@ namespace Horizon.Tests
         [Test]
         public void UncertainForecastDoesNotRerollOrResolveTheRealLife()
         {
-            var s = new GameSession(3, 41); s.Choose("portfolio"); s.Advance();
+            var s = new GameSession(3, 41, 4); s.Choose("portfolio"); s.Advance();
             string frozen = JsonUtility.ToJson(s.Snapshot());
             ForecastRange a = ForecastSimulator.Sample(s, null, 12, 12);
             ForecastRange b = ForecastSimulator.Sample(s, null, 12, 12);

@@ -191,12 +191,12 @@ namespace Horizon.UI
             foreach (Transform prop in props) prop.gameObject.SetActive(false);
         }
 
-        public void OpenGate(int gate, bool passed)
+        public void OpenGate(int gate, bool passed, bool animate = true)
         {
             Material material = doorLights[gate].GetComponent<Renderer>().sharedMaterial;
             material.SetColor("_Color", passed ? new Color(0.5f, 1, 0.78f, 0.8f) :
                 new Color(1, 0.31f, 0.32f, 0.3f));
-            if (passed) Burst(new Vector3((gate - 1) * 2.7f, 1.8f, 4), Palette.Gold, 24);
+            if (passed && animate) Burst(new Vector3((gate - 1) * 2.7f, 1.8f, 4), Palette.Gold, 24);
         }
 
         public void Accept(CardKind kind, bool support = false, int dueDay = 0)
@@ -219,7 +219,7 @@ namespace Horizon.UI
             shake = cascade ? 0.14f : 0.05f;
             Play(cascade ? 3 : 1);
             WorldRipple(Avatar.position + Vector3.up * 0.06f, cascade ? warmLight : portalLight, cascade ? 1.3f : 0.8f);
-            if (bloom != null) bloom.Echo = cascade ? 0.65f : 0.25f;
+            if (bloom != null && !preferences.reducedMotion) bloom.Echo = cascade ? 0.65f : 0.25f;
         }
 
         public void Tick(int step) { audioSource.pitch = 0.8f + step * 0.12f; Play(0); }
@@ -233,14 +233,14 @@ namespace Horizon.UI
 
         private void Update()
         {
-            if (WorldCamera == null) return;
+            if (WorldCamera == null || paused) return;
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
-            Vector3 drift = station ? Vector3.zero : new Vector3(Mathf.Sin(Time.unscaledTime * 0.28f) * 0.14f, 0, 0);
+            Vector3 drift = station || preferences.reducedMotion ? Vector3.zero : new Vector3(Mathf.Sin(Time.unscaledTime * 0.28f) * 0.14f, 0, 0);
             WorldCamera.transform.position = Vector3.Lerp(WorldCamera.transform.position,
                 cameraPosition + drift, 1 - Mathf.Exp(-dt * 6));
             WorldCamera.transform.position += new Vector3(Mathf.Sin(Time.unscaledTime * 65),
-                Mathf.Cos(Time.unscaledTime * 73), 0) * shake;
+                Mathf.Cos(Time.unscaledTime * 73), 0) * (preferences.reducedMotion ? 0 : shake);
             WorldCamera.transform.LookAt(cameraLook);
             Avatar.localScale = Vector3.one * (1 + Mathf.Sin(Time.unscaledTime * 2) * 0.01f + pulse * 0.04f);
             pulse = Mathf.MoveTowards(pulse, 0, dt * 2);
@@ -394,6 +394,8 @@ namespace Horizon.UI
 
         private void Burst(Vector3 position, Color color, int count)
         {
+            if (preferences.reducedMotion) count = Mathf.Min(count, 4);
+            else if (preferences.batterySaver) count = Mathf.Min(count, 16);
             for (int i = 0; i < count; i++)
             {
                 Transform spark = Shape(transform, "Stardust", PrimitiveType.Cylinder, position,

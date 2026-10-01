@@ -26,12 +26,15 @@ namespace Horizon
             List<FeedbackBeat> beats = receipt.beats;
             bool hasBeats = beats != null && beats.Count > 0;
             receipt.page = hasBeats ? Mathf.Clamp(receipt.page, 0, beats.Count - 1) : 0;
+            bool newPage = firstPresentation || receipt.page > 0 && (receipt.presentedPages & (1 << receipt.page)) == 0;
+            receipt.presentedPages |= 1 << receipt.page;
             FeedbackBeat beat = hasBeats ? beats[receipt.page] : null;
             Save();
             bool action = receipt.kind == FeedbackKind.Choice;
             bool difficult = !action && beat != null && PlayExperience.IsDifficult(beat.delta);
             bool quiet = action && beat != null && beat.intent == CardKind.Growth;
-            Color accent = difficult ? Palette.Coral : action ? Palette.Gold : Palette.Mint;
+            bool chain = !action && beat != null && beat.chainSize >= 3;
+            Color accent = difficult ? Palette.Coral : chain ? Palette.Gold : action ? Palette.Gold : Palette.Mint;
             if (beat != null) world.Preview(beat.intent, beat.support);
 
             View.Label(root, "Result day", "DAY " + receipt.day.ToString("00") + " / 12", 32,
@@ -40,7 +43,7 @@ namespace Horizon
                 TextAnchor.MiddleRight, 0.6f, 0.951f, 0.94f, 0.986f);
             View.Panel(root, "Outcome ribbon", new Color(0.015f, 0.045f, 0.065f, 0.92f),
                 0.05f, 0.791f, 0.95f, 0.917f, 28);
-            View.Label(root, "Outcome type", action ? "行动完成 · 今天已记录" : difficult ?
+            View.Label(root, "Outcome type", action ? "行动完成 · 今天已记录" : chain ? "因果连锁 · CASCADE ×" + beat.chainSize : difficult ?
                 "回声抵达 · 现在仍可以调整" : "回声抵达 · 过去正在回应你", 29, accent,
                 TextAnchor.MiddleCenter, 0.085f, 0.861f, 0.915f, 0.903f);
             string origin = beat == null ? "" : "D" + beat.sourceDay.ToString("00") + " · " + beat.source;
@@ -64,17 +67,18 @@ namespace Horizon
             if (beat == null) ResultText(panel, receipt.description);
             else
             {
-                DrawReceiptChanges(panel, beat.delta, firstPresentation);
+                DrawReceiptChanges(panel, beat.delta, newPage);
                 View.Label(panel, "Result explanation", beat.meaning, 27, Palette.Text,
                     TextAnchor.UpperLeft, 0.065f, 0.287f, 0.935f, 0.441f);
             }
-            View.Label(panel, "Reward", "+" + receipt.stardust + " 星尘 · 已收集", 29, Palette.Gold,
+            int pageStars = beat != null && beat.stardust > 0 ? beat.stardust : receipt.stardust;
+            View.Label(panel, "Reward", "+" + pageStars + " 星尘 · 已收集", 29, Palette.Gold,
                 TextAnchor.MiddleLeft, 0.065f, 0.207f, 0.935f, 0.283f);
             bool more = hasBeats && receipt.page < beats.Count - 1;
             string next = more ? "下一条回声  " + (receipt.page + 2) + " / " + beats.Count : action ?
                 receipt.day == 4 && !session.StationVisited ? "走进未来站" : "前往第 " + (receipt.day + 1) + " 天" :
                 session.CanPredict ? "试着预测三天后" : "回到今天，选一张牌";
-            View.Label(panel, "Hold result", hasBeats && beats.Count > 1 ?
+            View.Label(panel, "Hold result", receipt.preparedGates != 0 ? PreparedGateText(receipt.preparedGates) : hasBeats && beats.Count > 1 ?
                 "回声 " + (receipt.page + 1) + " / " + beats.Count + " · 看完这一条再继续" :
                 difficult ? "未来还没写完。下一张牌，仍然由你决定。" : "这份变化会留下。看完，再继续。", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.065f, 0.145f, 0.935f, 0.205f);
@@ -83,11 +87,15 @@ namespace Horizon
             busy = true;
             nextButton.interactable = false;
             StartCoroutine(EnableReceipt(nextButton, viewGeneration));
-            if (firstPresentation)
+            if (newPage)
             {
-                if (!quiet && receipt.stardust > 0)
+                if (!quiet && !difficult && pageStars > 0)
                 {
-                    StarBurst(receipt.stardust, new Vector2(0.5f, 0.173f));
+                    StarBurst(pageStars, new Vector2(0.5f, 0.173f));
+                    if (!action) EchoCrown(new Vector2(0.5f, 0.665f), accent, chain ? 3 : 2);
+                }
+                if (firstPresentation && !quiet && receipt.stardust > 0)
+                {
                     var counter = wallet.gameObject.AddComponent<RewardCounter>();
                     counter.From = archive.wallet.stardust - receipt.stardust;
                     counter.To = archive.wallet.stardust;
@@ -95,6 +103,32 @@ namespace Horizon
                 ReceiptPulse(root, new Vector2(0.5f, 0.665f), accent);
             }
             View.RefreshText(root);
+        }
+
+        private int PreparedGateChanges(RunSnapshot before)
+        {
+            GameSession previous = GameSession.Restore(before);
+            int changes = 0;
+            for (int i = 0; i < 3; i++) if (!ProductExperience.GateReady(previous, i) && ProductExperience.GateReady(session, i)) changes |= 1 << i;
+            return changes;
+        }
+
+        private static string PreparedGateText(int mask)
+        {
+            string text = "";
+            string[] names = { "能力", "状态", "支援" };
+            for (int i = 0; i < 3; i++) if ((mask & (1 << i)) != 0) text += (text.Length == 0 ? "" : " · ") + names[i];
+            return text + "门 · 目前已准备好，继续照顾抵达前的自己。";
+        }
+
+        private void EchoCrown(Vector2 center, Color color, int intensity)
+        {
+            if (archive.preferences.reducedMotion) return;
+            RectTransform rect = View.Rect(root, "Echo bloom crown", center.x - 0.45f,
+                center.y - 0.25f, center.x + 0.45f, center.y + 0.25f);
+            var crown = rect.gameObject.AddComponent<EchoCrownGraphic>();
+            crown.color = new Color(color.r, color.g, color.b, 0.66f); crown.Intensity = intensity; crown.raycastTarget = false;
+            rect.SetSiblingIndex(2);
         }
 
         private IEnumerator EnableReceipt(Button button, int generation)
@@ -134,6 +168,7 @@ namespace Horizon
 
         private static void ReceiptPulse(Transform parent, Vector2 center, Color color)
         {
+            if (VisualPreferences.ReducedMotion) return;
             RectTransform rect = View.Rect(parent, "Feedback ripple",
                 center.x - 0.1f, center.y - 0.056f, center.x + 0.1f, center.y + 0.056f);
             var ring = rect.gameObject.AddComponent<DropRingGraphic>();

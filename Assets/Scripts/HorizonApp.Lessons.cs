@@ -30,7 +30,7 @@ namespace Horizon
             if (chapter == 7) { ShowThirtyDays(); return; }
             if (chapter == 6)
             {
-                var beginning = new GameSession(3, 15);
+                var beginning = new GameSession(3, 15, 4);
                 ForecastRange exercise = ForecastSimulator.Sample(beginning, null, 4);
                 exercise.assumption = "独立练习：从同一个起点比较两种选择；不读取或改变正在发生的人生。";
                 ShowForecastRange(exercise, false, true);
@@ -52,7 +52,7 @@ namespace Horizon
             }
             else
             {
-                GameSession practice = new GameSession(chapter == 4 ? 3 : 1, 15);
+                GameSession practice = new GameSession(chapter == 4 ? 3 : 1, 15, 4);
                 if (chapter == 2)
                     while (practice.Day < 6)
                     { if (practice.CanPredict) practice.SkipPrediction(); practice.Choose(practice.Hand[2].Id);

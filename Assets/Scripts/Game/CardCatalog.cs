@@ -75,6 +75,21 @@ namespace Horizon.Game
     // One of each intent every day. All recovery choices restore energy, so no run can deadlock.
     public static class CardCatalog
     {
+        public const int CurrentVersion = 5;
+        private static readonly CardSpec[] SeasonActions = {
+            new CardSpec("library", "借一本好书", CardKind.Growth, new ResourceDelta(-1),
+                new ResourceDelta(0, 0, 2, 0, 0, 1), 2, "2日后 · 灵感", "书里的一个想法成为了你的能力"),
+            new CardSpec("teamproject", "一起做点东西", CardKind.Growth, new ResourceDelta(-2, 0, 0, 1),
+                new ResourceDelta(0, 1, 1, 1, 0, 2), 3, "3日后 · 作品", "共同完成的作品带来了成长", true),
+            new CardSpec("music", "听完一张专辑", CardKind.Temptation, new ResourceDelta(-1, 2),
+                new ResourceDelta(0, 1), 1, "明天 · 余韵", "音乐留在了第二天的心情里"),
+            new CardSpec("rushjob", "接一份急活", CardKind.Temptation, new ResourceDelta(-2, 1, 0, 0, 3),
+                new ResourceDelta(-2, -1), 2, "2日后 · 倦意", "赶工留下的疲惫追上了你"),
+            new CardSpec("breathing", "给自己十分钟", CardKind.Recovery, new ResourceDelta(2, 2),
+                new ResourceDelta(1), 1, "明天 · 余力", "留给自己的时间慢慢回来了"),
+            new CardSpec("listen", "听朋友说说话", CardKind.Recovery, new ResourceDelta(2, 1, 0, 2),
+                new ResourceDelta(0, 1, 0, 1), 2, "2日后 · 信任", "有人记得你认真听过", true)
+        };
         public static readonly CardSpec BalancedPlay = new CardSpec("play", "玩一局", CardKind.Temptation,
             new ResourceDelta(-1, 3), new ResourceDelta(0, 1), 1, "明天  ·  余兴", "快乐留下了一点余温");
         private static readonly CardSpec[] OutlookActions = {
@@ -179,7 +194,7 @@ namespace Horizon.Game
                 "明天  ·  回声", "身体记住了呼吸")
         };
 
-        public static CardSpec[] ForDay(int day, int runNumber, int catalogVersion = 2)
+        public static CardSpec[] ForDay(int day, int runNumber, int catalogVersion = 2, int worldSeed = 0)
         {
             if (day < 1 || day > 12) throw new ArgumentOutOfRangeException("day");
             if (runNumber < 1) throw new ArgumentOutOfRangeException("runNumber");
@@ -188,6 +203,22 @@ namespace Horizon.Game
 
             int index = (day - 1 + runNumber - 1) % Temptations.Length;
             CardSpec[] hand = new[] { Temptations[index], Growth[index], Recovery[index] };
+            // Each six-day deck contains all six actions once per intent. Different
+            // streams prevent the three columns from forming a repeatable recipe.
+            // The first life and catalogs 1–4 retain their exact recorded rules.
+            if (catalogVersion >= 5 && runNumber >= 2)
+            {
+                hand[0] = Temptations[DeckIndex(day, worldSeed, 0)];
+                hand[1] = Growth[DeckIndex(day, worldSeed, 1)];
+                hand[2] = Recovery[DeckIndex(day, worldSeed, 2)];
+                if (runNumber >= 3)
+                {
+                    if (day == 2 || day == 5) hand[0] = SeasonActions[2 + DeckIndex(day, worldSeed, 3) % 2];
+                    if (day == 3 || day == 8) hand[1] = SeasonActions[DeckIndex(day, worldSeed, 4) % 2];
+                    // Keep the deck's relationship opportunities when adding rest.
+                    if (day == 5 || day == 11) hand[2] = SeasonActions[hand[2].GivesSupport ? 5 : 4];
+                }
+            }
             if (catalogVersion >= 2 && runNumber >= 2)
             {
                 if (day == 8) hand[1] = NewActions[1];
@@ -198,8 +229,27 @@ namespace Horizon.Game
             return hand;
         }
 
+        private static int DeckIndex(int day, int seed, int stream)
+        {
+            int[] deck = { 0, 1, 2, 3, 4, 5 };
+            unchecked
+            {
+                uint x = (uint)seed ^ (uint)(stream + 1) * 0x9e3779b9u ^ (uint)((day - 1) / 6 + 1) * 0x85ebca6bu;
+                for (int i = 5; i > 0; i--)
+                {
+                    x += 0x9e3779b9u; uint z = x;
+                    z ^= z >> 16; z *= 0x7feb352du; z ^= z >> 15; z *= 0x846ca68bu; z ^= z >> 16;
+                    int j = (int)(z % (uint)(i + 1));
+                    int value = deck[i]; deck[i] = deck[j]; deck[j] = value;
+                }
+            }
+            return deck[(day - 1) % 6];
+        }
+
         public static CardSpec FindById(string id)
         {
+            CardSpec seasonal = Array.Find(SeasonActions, candidate => candidate.Id == id);
+            if (seasonal != null) return seasonal;
             CardSpec outlook = Array.Find(OutlookActions, candidate => candidate.Id == id);
             if (outlook != null) return outlook;
             if (id == SoloRecovery.Id) return SoloRecovery;

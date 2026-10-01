@@ -96,7 +96,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Receipt test").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(2,15);
+            var session = new GameSession(2,15, 4);
             var archive = new ArchiveData { active = session.Snapshot(), nextRareRun = 99 };
             archive.wallet.Claim("test echoes",6);
             archive.pendingFeedback = new FeedbackRecord { kind = FeedbackKind.Echoes, runNumber = 2, day = 1,

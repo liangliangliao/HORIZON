@@ -83,6 +83,9 @@ jobs:
           test -s artifacts/visuals/20-boss-constellation.png
           test -s artifacts/visuals/21-mystery-first.png
           test -s artifacts/visuals/22-mystery-reveal.png
+          test -s artifacts/visuals/23-settings.png
+          test -s artifacts/visuals/24-new-life-deck.png
+          test -s artifacts/visuals/25-backup-confirmation.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -145,6 +148,7 @@ jobs:
           targetPlatform: Android
           buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage
+          customParameters: -horizonChannel preview -horizonVersion 0.4.0 -horizonBuildNumber ${{ github.run_number }}
 
       - name: Verify APK output
         shell: bash
@@ -164,6 +168,7 @@ jobs:
                           assert f'lib/{abi}/{library}' in entries, f'{apk}: missing {abi}/{library}'
               print(f'{apk}: ARMv7 and ARM64 verified')
           PY
+          python3 tools/verify_preview_apk.py build
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

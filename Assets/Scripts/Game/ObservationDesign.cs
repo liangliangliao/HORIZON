@@ -25,6 +25,12 @@ namespace Horizon.Game
             new WorldEventSpec(8, 60, "朋友刚好有空，一起吃饭吧", "dinner", CardKind.Recovery),
             new WorldEventSpec(10, 35, "事情提前结束，多了半小时", "shortstudy", CardKind.Growth, new ResourceDelta(1))
         };
+        public static readonly WorldEventSpec[] Season = {
+            new WorldEventSpec(3, 45, "通勤提前结束，留出一小段自己的时间", "breathing", CardKind.Recovery),
+            new WorldEventSpec(5, 55, "朋友推荐了一本书，你想借来看看吗？", "library", CardKind.Growth),
+            All[0], All[1], All[2],
+            new WorldEventSpec(11, 50, "朋友今天想找个人说说话", "listen", CardKind.Recovery)
+        };
         public static bool Occurs(int seed, int day, int chance)
         {
             unchecked {

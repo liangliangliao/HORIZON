@@ -16,6 +16,60 @@ namespace Horizon.Tests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
 
+        [SetUp]
+        public void IsolatePersistentStorage()
+        {
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            Directory.CreateDirectory(Application.persistentDataPath);
+            foreach (string file in Directory.GetFiles(Application.persistentDataPath, "HORIZON.life.json*")) File.Delete(file);
+        }
+
+        [UnityTest]
+        public IEnumerator ProductSettingsBackupAndBackNavigationPreserveTheNewLife()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Product readiness flow").AddComponent<HorizonApp>();
+            yield return null;
+            var life = new GameSession(3, 739);
+            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99, seenSecondLife = true };
+            archive.wallet.Claim("preview", 12);
+            Set(app, "session", life); Set(app, "archive", archive); Call(app, "BuildBoard");
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Capture(app, "24-new-life-deck");
+            string frozen = JsonUtility.ToJson(life.Snapshot());
+            ButtonNamed(app, "Settings").onClick.Invoke(); yield return null;
+            Assert.IsTrue(VisualPreferences.Paused);
+            ButtonNamed(app, "Toggle 0").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Toggle 3").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Toggle 4").onClick.Invoke(); yield return null;
+            Assert.IsFalse(archive.preferences.sound); Assert.IsTrue(VisualPreferences.ReducedMotion);
+            Assert.AreEqual(30, Application.targetFrameRate);
+            Assert.IsFalse(Get<HorizonWorld3D>(app, "world").WorldCamera.GetComponent<HorizonBloom>().enabled);
+            yield return Capture(app, "23-settings");
+            Assert.AreEqual(frozen, JsonUtility.ToJson(life.Snapshot()));
+            ButtonNamed(app, "Life backups").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Copy life backup").onClick.Invoke(); yield return null;
+            string code = GUIUtility.systemCopyBuffer;
+            Assert.That(code, Does.Contain("HORIZON-LIFE"));
+            ButtonNamed(app, "Paste life backup").onClick.Invoke(); yield return null;
+            Assert.IsNotNull(ButtonNamed(app, "Confirm life import"));
+            yield return Capture(app, "25-backup-confirmation");
+            Call(app, "HandleBack"); yield return null;
+            Assert.AreEqual(12, archive.wallet.stardust);
+            Call(app, "HandleBack"); yield return null;
+            Call(app, "HandleBack"); yield return null;
+            Assert.IsFalse(VisualPreferences.Paused);
+            Assert.AreEqual(frozen, JsonUtility.ToJson(life.Snapshot()));
+            // Restore also retains the receipt identity, seeded deck and settings.
+            var store = new ArchiveStore(Path.Combine(Application.persistentDataPath, "HORIZON.life.json"));
+            var restored = store.Load();
+            Assert.AreEqual(739, restored.active.worldSeed); Assert.IsTrue(restored.preferences.reducedMotion);
+            Assert.IsFalse(restored.preferences.sound); Assert.AreEqual(12, restored.wallet.stardust);
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
+            yield return new ExitPlayMode();
+        }
+
         [UnityTest]
         public IEnumerator ObservationChapterSixCannotUnlockThirtyDaysAndStateHoldWorks()
         {
@@ -23,7 +77,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test chapter boundary").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             var archive = new ArchiveData { active = session.Snapshot(), nextRareRun = 99 };
             for (int day = 1; day <= 6; day++) archive.journey.Visit("2026-09-" + day.ToString("00"));
             Set(app, "session", session); Set(app, "archive", archive); Call(app, "BuildBoard");
@@ -61,7 +115,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test prediction receipt").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(1, 15);
+            var session = new GameSession(1, 15, 4);
             while (session.Day < 4) { session.Choose(session.Hand[2].Id); session.Advance(); }
             session.LockPrediction(0, 0, 0);
             while (session.Day < 7) { session.Choose(session.Hand[2].Id);
@@ -87,7 +141,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test observation").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(3, 41);
+            var session = new GameSession(3, 41, 4);
             while (session.Day < 4) { session.Choose(session.Hand[2].Id); session.Advance(); }
             session.LockPrediction(0, 0, 0);
             while (session.Day < 7) { session.Choose(session.Hand[2].Id);
@@ -137,7 +191,7 @@ namespace Horizon.Tests
             Assert.AreEqual(wallet, archive.wallet.stardust);
             for (int run = 1; run <= 2; run++)
             {
-                var past = new GameSession(run, 15);
+                var past = new GameSession(run, 15, 4);
                 while (true) { if (past.CanPredict) past.SkipPrediction(); past.Choose(past.Hand[2].Id);
                     if (past.Day == 4) past.VisitStation(); if (past.Day == 12) break; past.Advance(); }
                 archive.runs.Add(past.CompletedRun);
@@ -170,7 +224,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test memory").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             while (session.Day < 6) { if (session.CanPredict) session.SkipPrediction();
                 session.Choose(session.Day == 1 ? "portfolio" : session.Hand[2].Id);
                 if (session.Day == 4) session.VisitStation(); session.Advance(); }
@@ -215,7 +269,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test station").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             while (session.Day < 4)
             { session.Choose(session.Hand[2].Id); session.Advance(); }
             session.SkipPrediction(); session.Choose(session.Hand[2].Id);
@@ -239,7 +293,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test future self").AddComponent<HorizonApp>();
             yield return null;
-            var session = new GameSession(3, 15);
+            var session = new GameSession(3, 15, 4);
             while (session.Day < 4)
             { session.Choose(session.Hand[2].Id); session.Advance(); }
             session.SkipPrediction(); session.Choose(session.Hand[2].Id);
@@ -494,7 +548,7 @@ namespace Horizon.Tests
             ButtonNamed(app, "Begin second life").onClick.Invoke();
             yield return null;
 
-            var third = new GameSession(3, 15);
+            var third = new GameSession(3, 15, 4);
             PendingEcho combined = null;
             while (third.Day < 6)
             {

@@ -84,6 +84,7 @@ namespace Horizon
             {
                 number = session.RunNumber, title = "正在发生", actions = session.Actions,
                 causalNodes = session.CausalNodes, catalogVersion = session.CatalogVersion,
+                worldSeed = session.WorldSeed, deckSeed = session.DeckSeed, deckSeedRecorded = true,
                 finalEnergy = session.Energy, finalMood = session.Mood, finalAbility = session.Ability,
                 prediction = session.Prediction
             };

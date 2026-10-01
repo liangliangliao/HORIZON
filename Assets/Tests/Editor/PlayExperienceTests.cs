@@ -16,7 +16,7 @@ namespace Horizon.Tests
             Assert.IsNull(archive.pendingFeedback);
             Assert.AreEqual(0, archive.wallet.stardust);
             var session = GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(
-                JsonUtility.ToJson(new GameSession(1).Snapshot())));
+                JsonUtility.ToJson(new GameSession(1, 15, 4).Snapshot())));
             Assert.IsNull(session.Prediction);
         }
 
@@ -56,7 +56,7 @@ namespace Horizon.Tests
         [Test]
         public void SkippingPredictionIsSavedAndNeverBlocksDaySeven()
         {
-            var session = new GameSession(1);
+            var session = new GameSession(1, 15, 4);
             for (int day = 1; day < 4; day++)
             {
                 session.Choose(session.Hand[2].Id);

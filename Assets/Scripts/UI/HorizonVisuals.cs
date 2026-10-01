@@ -290,7 +290,7 @@ namespace Horizon.UI
         public float BaseScale = 1;
         private void Update()
         {
-            transform.localScale = Vector3.one * (BaseScale + (Active ? Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 0));
+            transform.localScale = Vector3.one * (BaseScale + (Active && !VisualPreferences.ReducedMotion && !VisualPreferences.Paused ? Mathf.Sin(Time.unscaledTime * 3) * 0.025f : 0));
         }
     }
 
@@ -306,6 +306,7 @@ namespace Horizon.UI
         }
         private void Update()
         {
+            if (VisualPreferences.ReducedMotion) { group.alpha = 1; transform.localScale = Vector3.one; enabled = false; return; }
             age += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(age / 0.28f);
             group.alpha = t;
@@ -319,6 +320,7 @@ namespace Horizon.UI
         public RectTransform Hand;
         private void Update()
         {
+            if (VisualPreferences.Paused || VisualPreferences.ReducedMotion) return;
             float t = Mathf.Repeat(Time.unscaledTime * 0.45f, 1);
             float y = Mathf.Lerp(0.26f, 0.7075f, Mathf.SmoothStep(0, 1, Mathf.Clamp01(t / 0.7f)));
             Hand.anchorMin = new Vector2(0.49f, y);

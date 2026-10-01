@@ -41,7 +41,7 @@ namespace Horizon.UI
         {
             if (ambientFilter != null) ambientFilter.cutoffFrequency = enabled ? 650 : 18000;
             if (ambience != null) ambience.volume = enabled ? 0.025f : 0.055f;
-            if (Avatar != null) Avatar.GetComponent<HorizonActor>().MotionRate = enabled ? 0.2f : 1;
+            if (Avatar != null) Avatar.GetComponent<HorizonActor>().MotionRate = paused ? 0 : enabled ? 0.2f : 1;
         }
 
         private Vector3 DayPoint(int day)
@@ -71,7 +71,8 @@ namespace Horizon.UI
         {
             Avatar.GetComponent<HorizonActor>().FreezeUntil = Time.unscaledTime + 0.15f;
             if (ambientFilter != null) ambientFilter.cutoffFrequency = 500;
-            if (bloom != null) bloom.Echo = 0.55f;
+            if (bloom != null && !preferences.reducedMotion) bloom.Echo = 0.55f;
+            if (preferences.reducedMotion) return;
             cameraPosition = new Vector3(2.2f, 3.3f, -6.3f);
             cameraLook = Vector3.Lerp(Avatar.position + Vector3.up, DayPoint(echo.sourceDay) + Vector3.up, 0.3f);
         }
@@ -107,6 +108,7 @@ namespace Horizon.UI
             Vector3 start = orb.position, end = new Vector3((gate - 1) * 2.7f, 1.8f, 4);
             for (float age = 0; age < 0.42f; age += Time.unscaledDeltaTime)
             {
+                while (paused) yield return null;
                 if (orb == null) yield break;
                 float t = age / 0.42f;
                 orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI);
@@ -160,6 +162,7 @@ namespace Horizon.UI
             Vector3 end = Avatar.position + Vector3.up * 1.3f;
             for (float age = 0; age < 0.46f; age += Time.unscaledDeltaTime)
             {
+                while (paused) yield return null;
                 if (orb == null) yield break;
                 float t = age / 0.46f;
                 orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.4f;
@@ -216,6 +219,7 @@ namespace Horizon.UI
             actor.Walking = true;
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 2.2f)
             {
+                while (paused) yield return null;
                 if (!station || generation != touchGeneration) yield break;
                 futureSelf.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0, 1, t));
                 cameraPosition = futureSelf.position + stationCameraOffset;
@@ -257,6 +261,7 @@ namespace Horizon.UI
             futureSelf.localRotation = Quaternion.Euler(0, -90, 0);
             for (float age = 0; age < 5 && rareActive; age += Time.unscaledDeltaTime)
             {
+                while (paused) yield return null;
                 futureSelf.localPosition = new Vector3(Mathf.Lerp(-4, 4, age / 5), 0, 1.3f);
                 yield return null;
             }

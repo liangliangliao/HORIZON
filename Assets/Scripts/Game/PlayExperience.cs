@@ -16,6 +16,8 @@ namespace Horizon.Game
         public bool support;
         public ResourceDelta delta;
         public string meaning;
+        public int chainSize;
+        public int stardust;
     }
 
     [Serializable]
@@ -30,6 +32,8 @@ namespace Horizon.Game
         public List<FeedbackBeat> beats = new List<FeedbackBeat>();
         public int page;
         public bool presented;
+        public int presentedPages;
+        public int preparedGates;
     }
 
     [Serializable]
