@@ -8,12 +8,14 @@ namespace Horizon.Game
     {
         public readonly ActionRecord Origin;
         public readonly List<CausalNode> Nodes;
+        private readonly List<CausalNode> consequences;
         public MemoryChain(ActionRecord origin, List<CausalNode> graph)
         {
             Origin = origin;
             // Hidden provenance stays hidden in every presentation, including the station.
             List<CausalNode> observed = CausalGraph.ObservedGraph(graph);
             var descendants = CausalGraph.Descendants(observed, origin.nodeId);
+            consequences = descendants;
             var connected = new HashSet<string>();
             foreach (CausalNode node in descendants)
                 foreach (CausalNode ancestor in CausalGraph.Ancestors(observed, node.id)) connected.Add(ancestor.id);
@@ -23,11 +25,11 @@ namespace Horizon.Game
         public string Reflection
         {
             get {
-                CausalNode changed = Nodes.FindLast(n => n.resolved && n.type == CausalNodeKind.Choice);
-                CausalNode arrived = Nodes.FindLast(n => n.resolved && n.type == CausalNodeKind.Echo);
-                CausalNode waiting = Nodes.Find(n => !n.resolved);
+                CausalNode changed = consequences.FindLast(n => n.resolved && n.type == CausalNodeKind.Choice);
+                CausalNode arrived = consequences.FindLast(n => n.resolved && n.type == CausalNodeKind.Echo);
+                CausalNode waiting = consequences.Find(n => !n.resolved);
                 return changed != null ? "「你留下的不只是一次变化。D" + changed.day + "，后来能选的路也变了。」" :
-                    arrived != null ? "「D" + Origin.day + " 留下的东西，已经在 D" + arrived.day + " 回到你身上。」" :
+                    arrived != null ? "「从 D" + Origin.day + " 开始的这条路，已经走到了 D" + arrived.day + "。」" :
                     waiting != null ? "「这道光还在走向 D" + waiting.day + "。你不用停在原地等它。」" :
                     "「那天，你给自己留出了空间。这也属于你走过的路。」";
             }

@@ -24,13 +24,14 @@ namespace Horizon.Tests
             if (app == null) app = new GameObject("Test actual station chains").AddComponent<HorizonApp>();
             yield return null;
             var life = new GameSession(3, 15);
-            while (life.Day < 4) {
+            while (life.Day < 3) {
                 CausalReady(life); life.Choose(life.Day == 1 ? life.Hand[1].Id : life.Hand[2].Id); life.Advance();
             }
             var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99, calibrations = 3 };
             archive.wallet.Claim("already earned", 40);
             for (int day = 1; day <= 5; day++) archive.journey.Visit("2026-10-" + day.ToString("00"));
             Set(app, "session", life); Set(app, "archive", archive);
+            Call(app, "BuildBoard"); yield return null;
             string beforeFocus = JsonUtility.ToJson(life.Snapshot());
             Call(app, "RenderFocus", false); yield return null;
             Assert.IsNotNull(ButtonNamed(app, "Forecast range"));
@@ -38,6 +39,7 @@ namespace Horizon.Tests
             yield return Capture(app, "34-unified-time-vision");
             Assert.AreEqual(beforeFocus, JsonUtility.ToJson(life.Snapshot()));
             ButtonNamed(app, "Close").onClick.Invoke(); yield return null;
+            CausalReady(life); life.Choose(life.Hand[2].Id); life.Advance();
             CausalReady(life); life.Choose(life.Hand[2].Id); archive.active = life.Snapshot();
             string frozen = JsonUtility.ToJson(life.Snapshot());
             Call(app, "ShowInRunStation", 1); yield return null;
@@ -92,6 +94,11 @@ namespace Horizon.Tests
             ButtonNamed(app, "Inspect timeline").onClick.Invoke();
             yield return CausalWaitForButton(app, "Next ghost beat", "Restart from ghost");
             Assert.IsTrue(archive.ghostOpen); Assert.AreEqual(0, archive.ghostBeat);
+            HorizonWorld3D world = Get<HorizonWorld3D>(app, "world");
+            HorizonActor future = world.GetComponentsInChildren<HorizonActor>().Single(a => a.name == "Future you");
+            Vector3 visible = world.WorldCamera.WorldToViewportPoint(future.Head.position);
+            Assert.Greater(visible.z, 0); Assert.That(visible.x, Is.InRange(0.05f, 0.95f));
+            Assert.That(visible.y, Is.InRange(0.05f, 0.95f)); Assert.Less(future.transform.position.z, 3.8f);
             GhostStory story = CausalPresentation.Ghost(original); Assert.Greater(story.Beats.Count, 1);
             yield return Capture(app, "37-ghost-original-choice");
             Button old = ButtonNamed(app, "Next ghost beat"); old.onClick.Invoke(); old.onClick.Invoke(); yield return null;
@@ -119,6 +126,38 @@ namespace Horizon.Tests
             Assert.IsTrue(archive.pendingFeedback.presented);
             PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1");
             yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator AReopenedLongDeadlineRestartsAllThirtyDaysAndPreservesItsArchive()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>();
+            if (app == null) app = new GameObject("Test reopened long-life deadline").AddComponent<HorizonApp>();
+            yield return null;
+            GameSession life = GameSession.StartLongLife(4, 15);
+            while (life.CompletedRun == null) { CausalReady(life); life.Choose(life.Hand[2].Id);
+                if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance(); }
+            RunRecord original = life.CompletedRun; string frozen = JsonUtility.ToJson(original);
+            var archive = new ArchiveData { runs = new List<RunRecord> { original }, nextRareRun = 99,
+                pendingFeedback = new FeedbackRecord { kind = FeedbackKind.Deadline, runNumber = 4, day = 30, presented = true },
+                ghostRun = 4, ghostOpen = true };
+            for (int d = 1; d <= 7; d++) archive.journey.Visit("2026-10-" + d.ToString("00"));
+            archive.wallet.Claim("the old life", 40);
+            Set(app, "archive", archive); Set(app, "session", null); Call(app, "ContinueRun");
+            Assert.IsTrue(archive.ghostOpen);
+            GhostStory story = CausalPresentation.Ghost(original);
+            Call(app, "RenderGhostStory", story.Beats.Count - 1);
+            yield return CausalWaitForButton(app, "Restart from ghost");
+            ButtonNamed(app, "Restart from ghost").onClick.Invoke();
+            float start = Time.realtimeSinceStartup;
+            while (Get<GameSession>(app, "session") == null) {
+                Assert.Less(Time.realtimeSinceStartup - start, 3); yield return null;
+            }
+            life = Get<GameSession>(app, "session"); Assert.AreEqual(30, life.Deadline); Assert.AreEqual(1, life.Day);
+            Assert.AreEqual(5, life.RunNumber); Assert.AreEqual(40, archive.wallet.stardust);
+            Assert.AreEqual(frozen, JsonUtility.ToJson(archive.runs[0])); Assert.IsFalse(archive.ghostOpen);
+            PlayerPrefs.DeleteKey("HORIZON.PROTOTYPE.V1"); yield return new ExitPlayMode();
         }
 
         private static IEnumerator CausalWaitForButton(HorizonApp app, params string[] names)

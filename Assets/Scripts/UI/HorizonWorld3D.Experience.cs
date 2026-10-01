@@ -221,8 +221,8 @@ namespace Horizon.UI
             if (preferences.reducedMotion)
             {
                 futureSelf.position = end; actor.Walking = false; actor.Pointing = true;
-                cameraPosition = futureSelf.position + stationCameraOffset;
-                cameraLook = futureSelf.position + Vector3.up * 1.35f;
+                if (!memoryReading) { cameraPosition = futureSelf.position + stationCameraOffset;
+                    cameraLook = futureSelf.position + Vector3.up * 1.35f; }
                 yield break;
             }
             actor.Walking = true;
@@ -231,8 +231,8 @@ namespace Horizon.UI
                 while (paused) yield return null;
                 if (!station || generation != touchGeneration) yield break;
                 futureSelf.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0, 1, t));
-                cameraPosition = futureSelf.position + stationCameraOffset;
-                cameraLook = futureSelf.position + Vector3.up * 1.35f;
+                if (!memoryReading) { cameraPosition = futureSelf.position + stationCameraOffset;
+                    cameraLook = futureSelf.position + Vector3.up * 1.35f; }
                 yield return null;
             }
             actor.Walking = false; actor.Pointing = true;

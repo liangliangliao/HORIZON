@@ -11,6 +11,7 @@ namespace Horizon.UI
         private readonly List<Dictionary<string, Transform>> causalMemories = new List<Dictionary<string, Transform>>();
         private Transform ghostGroup;
         private int causalAnimation;
+        private bool memoryReading;
 
         public void ShowCausalMemories(List<MemoryChain> chains)
         {
@@ -74,6 +75,22 @@ namespace Horizon.UI
             if (!preferences.reducedMotion)
             { WorldRipple(token.position, portalLight, 0.3f); Burst(token.position, Palette.Mint, 8); }
             futureSelf.GetComponent<HorizonActor>().Pointing = true;
+            memoryReading = true;
+            Vector3 center = Vector3.zero;
+            foreach (Transform item in causalMemories[chain].Values) center += item.position;
+            center /= Mathf.Max(1, causalMemories[chain].Count);
+            WorldCamera.rect = new Rect(0, 0.514f, 1, 0.305f);
+            cameraPosition = new Vector3(center.x + 1.2f, 2.55f, center.z - 4.8f);
+            cameraLook = center;
+        }
+
+        public void EndMemoryReading()
+        {
+            memoryReading = false;
+            if (!station) return;
+            WorldCamera.rect = new Rect(0, 0, 1, 1);
+            cameraPosition = futureSelf.position + stationCameraOffset;
+            cameraLook = futureSelf.position + Vector3.up * 1.35f;
         }
 
         public void BeginGhostStory(GhostStory story)
@@ -108,15 +125,15 @@ namespace Horizon.UI
                 if (generation != causalAnimation || ghostGroup == null) yield break;
                 float day = Mathf.Lerp(from, to, Mathf.SmoothStep(0, 1, age / duration));
                 Vector3 at = Vector3.Lerp(DayPoint(Mathf.FloorToInt(day)), DayPoint(Mathf.CeilToInt(day)), day - Mathf.Floor(day));
-                futureSelf.position = at + new Vector3(0.45f, -0.09f, 0.3f);
-                cameraPosition = futureSelf.position + new Vector3(3.1f, 2.5f, -5.6f);
-                cameraLook = at + Vector3.up;
+                futureSelf.position = at + new Vector3(0.45f, -0.09f, -1.25f);
+                cameraPosition = futureSelf.position + new Vector3(2, 2.45f, -4.8f);
+                cameraLook = futureSelf.position + Vector3.up * 1.1f;
                 yield return null;
             }
             if (generation != causalAnimation || ghostGroup == null) yield break;
-            futureSelf.position = DayPoint(to) + new Vector3(0.45f, -0.09f, 0.3f);
-            cameraPosition = futureSelf.position + new Vector3(3.1f, 2.5f, -5.6f);
-            cameraLook = futureSelf.position + Vector3.up;
+            futureSelf.position = DayPoint(to) + new Vector3(0.45f, -0.09f, -1.25f);
+            cameraPosition = futureSelf.position + new Vector3(2, 2.45f, -4.8f);
+            cameraLook = futureSelf.position + Vector3.up * 1.1f;
             actor.Walking = false; actor.Pointing = true;
             if (!preferences.reducedMotion) WorldRipple(DayPoint(to), portalLight, 0.65f);
             Tick(2);
@@ -124,8 +141,27 @@ namespace Horizon.UI
 
         public void EndCausalPresentation()
         {
+            memoryReading = false;
             ++causalAnimation;
             if (ghostGroup != null) { ghostGroup.gameObject.SetActive(false); Dispose(ghostGroup.gameObject); ghostGroup = null; }
+        }
+
+        public void ShowRareMeaning(RareMoment moment)
+        {
+            if (moment == null || !rareActive) return;
+            if (moment.type == 0 && rareGroup != null)
+            {
+                CardSpec eventCard = CardCatalog.FindById(moment.futureCardId);
+                if (eventCard == null) return;
+                Transform token = IntentionSymbol(eventCard.Kind, new Vector3(0, 2.45f, 2.75f), eventCard.GivesSupport, !moment.futureFromWorld);
+                token.SetParent(rareGroup, true); token.localScale = Vector3.one * 0.8f;
+                token.name = "The actual signal at D" + moment.futureDay;
+            }
+            if (moment.type == 1)
+            {
+                CardSpec action = CardCatalog.FindById(moment.parallelCardId);
+                if (action != null) futureSelf.GetComponent<HorizonActor>().SetIntent(action.Kind);
+            }
         }
     }
 }

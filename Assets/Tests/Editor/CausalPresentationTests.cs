@@ -67,16 +67,18 @@ namespace Horizon.Tests
             var graph = new List<CausalNode> {
                 new CausalNode { id = "a", day = 1, type = CausalNodeKind.Action, label = "学习", resolved = true },
                 new CausalNode { id = "b", day = 2, type = CausalNodeKind.Action, label = "交朋友", resolved = true },
-                new CausalNode { id = "c", day = 4, parentId = "a", type = CausalNodeKind.Echo, label = "能力", resolved = true },
-                new CausalNode { id = "d", day = 5, parentIds = new List<string> { "b", "c" },
+                new CausalNode { id = "c", day = 3, parentId = "a", type = CausalNodeKind.Echo, label = "能力", resolved = true },
+                new CausalNode { id = "bEcho", day = 4, parentId = "b", type = CausalNodeKind.Echo, label = "回信", resolved = true },
+                new CausalNode { id = "d", day = 5, parentIds = new List<string> { "bEcho", "c" },
                     type = CausalNodeKind.Choice, label = "合作机会", resolved = false },
                 new CausalNode { id = "secret", day = 6, parentId = "a", originHidden = true,
                     type = CausalNodeKind.Mystery, label = "尚未认出的余力", resolved = true }
             };
             string frozen = JsonUtility.ToJson(new RunSnapshot { causalNodes = graph });
             var memory = new MemoryChain(root, graph);
-            CollectionAssert.AreEquivalent(new[] { "a", "b", "c", "d" }, memory.Nodes.Select(n => n.id));
-            CollectionAssert.AreEquivalent(new[] { "b", "c" }, CausalGraph.ObservedParents(memory.Nodes.Last()));
+            CollectionAssert.AreEquivalent(new[] { "a", "b", "bEcho", "c", "d" }, memory.Nodes.Select(n => n.id));
+            CollectionAssert.AreEquivalent(new[] { "bEcho", "c" }, CausalGraph.ObservedParents(memory.Nodes.Last()));
+            Assert.That(memory.Reflection, Does.Contain("D3").And.Not.Contain("D4"));
             Assert.That(CausalPresentation.NodeMeaning(memory.Nodes.Last()), Does.Contain("还在路上"));
             Assert.AreEqual(frozen, JsonUtility.ToJson(new RunSnapshot { causalNodes = graph }));
         }
@@ -113,6 +115,86 @@ namespace Horizon.Tests
             Assert.That(text, Does.Contain("状态门：这次打开了"));
             Assert.That(text, Does.Contain("能力门：这次尚未打开"));
             Assert.That(text, Does.Not.Contain("一个选择，改变了后来的抵达"));
+        }
+
+        private static GameSession RareLife()
+        {
+            var life = new GameSession(3, 15);
+            while (life.Day < 6) { Ready(life); life.Choose(life.Day == 1 ? life.Hand[1].Id : life.Hand[2].Id);
+                if (life.NeedsStation) life.VisitStation(); life.Advance(); }
+            return life;
+        }
+
+        [Test]
+        public void ALeakedFutureActuallyArrivesAndVerificationDoesNotPayOrChangeTheLife()
+        {
+            GameSession life = RareLife(); string frozen = JsonUtility.ToJson(life.Snapshot());
+            var moment = new RareMoment { type = 0, runNumber = life.RunNumber, day = life.Day };
+            ExperienceContent.GroundRareMoment(moment, life);
+            Assert.AreEqual(frozen, JsonUtility.ToJson(life.Snapshot()));
+            Assert.AreEqual(0, moment.type); Assert.Greater(moment.futureDay, life.Day);
+            Assert.That(moment.description, Does.Contain("D" + moment.futureDay).And.Contain(moment.futureName));
+            Assert.IsFalse(ExperienceContent.VerifyRareFuture(moment, life));
+            moment = JsonUtility.FromJson<RareMoment>(JsonUtility.ToJson(moment));
+            while (life.Day < moment.futureDay) { Ready(life); life.Choose(life.Hand[2].Id);
+                if (life.NeedsStation) life.VisitStation(); life.Advance(); }
+            frozen = JsonUtility.ToJson(life.Snapshot());
+            Assert.IsTrue(ExperienceContent.VerifyRareFuture(moment, life));
+            Assert.IsTrue(life.CausalNodes.Any(n => n.id == moment.futureNodeId && n.resolved && n.day == moment.futureDay));
+            Assert.IsFalse(ExperienceContent.VerifyRareFuture(moment, life));
+            Assert.AreEqual(frozen, JsonUtility.ToJson(life.Snapshot()));
+        }
+
+        [Test]
+        public void AnotherSelfUsesAnExecutableBranchAndKeepsTheSameWeatherAndResources()
+        {
+            GameSession life = RareLife(); string frozen = JsonUtility.ToJson(life.Snapshot());
+            var moment = new RareMoment { type = 1, runNumber = life.RunNumber, day = life.Day };
+            ExperienceContent.GroundRareMoment(moment, life); Assert.IsNotNull(moment.parallelState);
+            GameSession branch = GameSession.ForkForSimulation(JsonUtility.FromJson<RunSnapshot>(frozen), life.Deadline);
+            Ready(branch); branch.Choose(moment.parallelCardId);
+            while (branch.Day < moment.futureDay) { if (branch.NeedsStation) branch.VisitStation();
+                branch.Advance(); Ready(branch); branch.Choose(branch.Hand[2].Id); }
+            Assert.AreEqual(branch.WorldSeed, life.WorldSeed);
+            Assert.AreEqual(JsonUtility.ToJson(new ResourceDelta(branch.Energy, branch.Mood, branch.Insight,
+                branch.Relation, branch.Money, branch.Ability)), JsonUtility.ToJson(moment.parallelState));
+            Assert.AreEqual(frozen, JsonUtility.ToJson(life.Snapshot()));
+            Assert.That(moment.description, Does.Contain(CardCatalog.FindById(moment.parallelCardId).Name));
+        }
+
+        [Test]
+        public void PersonalTitleUsesActualGateEvidenceAndDoesNotRenameTheSavedLife()
+        {
+            var life = new GameSession(1, 15);
+            while (life.CompletedRun == null) {
+                while (life.HasPredictionReview) life.MarkPredictionReviewed();
+                if (life.CanPredict) life.LockPrediction(0, 0, 0);
+                CardSpec card = life.Day == 1 || life.Day == 2 || life.Day == 4 ? life.Hand[1] : life.Hand[2];
+                life.Choose(life.CanPlay(card) ? card.Id : life.Hand[2].Id);
+                if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance();
+            }
+            RunRecord run = life.CompletedRun; run.title = "我给这条路起了自己的名字";
+            string frozen = JsonUtility.ToJson(run), title = ExperienceContent.LifeTitle(run);
+            if (run.boss.support && run.boss.supports >= 3)
+                Assert.That(title, Does.Contain(run.boss.supports.ToString()).And.Contain("D12"));
+            else {
+                ActionRecord connected = run.actions.OrderByDescending(a => CausalGraph.Descendants(run.causalNodes, a.nodeId)
+                    .Count(n => n.resolved)).ThenBy(a => a.day).First(a => CausalGraph.Descendants(run.causalNodes, a.nodeId)
+                        .Any(n => n.type == CausalNodeKind.Gate && n.gatePassed));
+                Assert.That(title, Does.Contain("D" + connected.day).And.Contain(connected.cardName).And.Contain("D12"));
+            }
+            Assert.AreEqual(frozen, JsonUtility.ToJson(run));
+        }
+
+        [Test]
+        public void VersionOneBackupsStillOpenAndNewPresentationPositionsUseVersionTwo()
+        {
+            var data = new ArchiveData();
+            ArchiveEnvelope encoded = JsonUtility.FromJson<ArchiveEnvelope>(ArchiveStore.Encode(data));
+            Assert.AreEqual(2, encoded.version); encoded.version = 1;
+            ArchiveData restored; string error;
+            Assert.IsTrue(ArchiveStore.TryDecode(JsonUtility.ToJson(encoded), out restored, out error));
+            Assert.IsNull(error); Assert.AreEqual(0, restored.runs.Count);
         }
     }
 }

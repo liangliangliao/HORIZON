@@ -11,6 +11,7 @@ namespace Horizon
     public sealed partial class HorizonApp
     {
         private GhostStory ghostStory;
+        private static Color CausalPlate { get { return new Color(Palette.Panel.r, Palette.Panel.g, Palette.Panel.b, 1); } }
 
         private void ShowMemoryStory(int index, int beat = 0)
         {
@@ -36,7 +37,7 @@ namespace Horizon
             View.Label(page, "Memory source", chain.Summary, 25, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.07f, 0.896f, 0.93f, 0.938f);
             DrawMemoryRoute(page, chain, beat);
-            View.Panel(page, "Memory reading plate", Palette.Panel, 0.045f, 0.005f, 0.955f, 0.514f, 32);
+            View.Panel(page, "Memory reading plate", CausalPlate, 0.045f, 0.005f, 0.955f, 0.514f, 32);
             CausalNode node = chain.Nodes[beat];
             world.RevealMemoryNode(archive.stationMemoryIndex, node);
             View.Label(page, "Memory node title", "D" + node.day + " · " + node.label, 36, Palette.Text,
@@ -51,6 +52,7 @@ namespace Horizon
             bool last = beat == chain.Nodes.Count - 1;
             Button next = View.Button(page, "Next memory node", last ? "回到长椅，看看别的路" : "看看它后来去了哪里", () => {
                 if (overlay != page || !page.gameObject.activeSelf) return;
+                if (node.resolved && node.type == CausalNodeKind.Echo) archive.journey.Remember(LifeLesson.Returns);
                 if (last) CloseMemoryStory(); else RenderMemoryStory(chain, beat + 1);
             }, 0.12f, 0.055f, 0.88f, 0.117f, Palette.Mint, Palette.Ink, 29);
             ArmStoryButton(next, page);
@@ -63,6 +65,7 @@ namespace Horizon
         {
             archive.stationMemoryOpen = false; Save();
             DismissStoryPage();
+            world.EndMemoryReading();
         }
 
         private void OpenGhostStory(RunRecord run)
@@ -93,7 +96,7 @@ namespace Horizon
             View.Label(page, "Ghost hypothesis", "GHOST TIMELINE · 保留当时的天气，走一条可能的路", 23,
                 Palette.Mint, TextAnchor.MiddleCenter, 0.055f, 0.899f, 0.945f, 0.938f);
             DrawStoryRoute(page, ghostStory.Beats.Select(b => b.Day).ToList(), index, "Ghost");
-            View.Panel(page, "Ghost reading plate", Palette.Panel, 0.045f, 0.005f, 0.955f, 0.481f, 32);
+            View.Panel(page, "Ghost reading plate", CausalPlate, 0.045f, 0.005f, 0.955f, 0.481f, 32);
             Text day = View.Label(page, "Ghost day cursor", "DAY " + from.ToString("00") + " → " + beat.Day.ToString("00"),
                 24, Palette.Gold, TextAnchor.MiddleCenter, 0.07f, 0.453f, 0.93f, 0.482f);
             View.Label(page, "Ghost beat title", beat.Title, 34, Palette.Text,

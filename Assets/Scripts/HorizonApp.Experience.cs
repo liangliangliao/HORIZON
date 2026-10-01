@@ -145,6 +145,9 @@ namespace Horizon
         private bool TryRareMoment()
         {
             if (session == null || session.HasChosen) return false;
+            bool verified = false;
+            foreach (RareMoment memory in archive.moments) verified |= ExperienceContent.VerifyRareFuture(memory, session);
+            if (verified) Save();
             if (archive.pendingMoment == null)
                 foreach (RareMoment memory in archive.moments)
                 {
@@ -156,6 +159,7 @@ namespace Horizon
             {
                 archive.pendingMoment = ExperienceContent.Moment(session.RunNumber, session.Day, archive.runs);
                 ExperienceContent.AttachMystery(archive.pendingMoment, session);
+                ExperienceContent.GroundRareMoment(archive.pendingMoment, session);
                 archive.active = session.Snapshot();
                 archive.nextRareRun = session.RunNumber + ExperienceContent.RareGap(session.RunNumber);
                 archive.moments.Add(archive.pendingMoment);
@@ -165,6 +169,7 @@ namespace Horizon
             RareMoment moment = archive.pendingMoment;
             Clear(true);
             world.ShowRare(moment.type);
+            world.ShowRareMeaning(moment);
             View.Fill(root, "Rare shade", new Color(0.01f, 0.025f, 0.045f, 0.45f), 0, 0, 1, 1, true);
             View.Label(root, "Rare title", moment.title, 54, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.06f, 0.76f, 0.94f, 0.87f);
@@ -174,6 +179,7 @@ namespace Horizon
             View.Button(root, "Continue rare moment", "记住这一瞬，回到今天", () =>
             {
                 archive.pendingMoment = null;
+                if (moment.type == 0 || moment.type == 1) archive.journey.Remember(LifeLesson.Uncertainty);
                 Save();
                 BuildBoard();
             }, 0.12f, 0.045f, 0.88f, 0.115f, Palette.Mint, Palette.Ink, 30);

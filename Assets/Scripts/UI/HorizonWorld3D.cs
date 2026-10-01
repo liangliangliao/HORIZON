@@ -196,8 +196,8 @@ namespace Horizon.UI
         public void OpenGate(int gate, bool passed, bool animate = true)
         {
             Material material = doorLights[gate].GetComponent<Renderer>().sharedMaterial;
-            material.SetColor("_Color", passed ? new Color(0.5f, 1, 0.78f, 0.8f) :
-                new Color(1, 0.31f, 0.32f, 0.3f));
+            material.SetColor("_Color", passed ? new Color(0.15f, 0.58f, 0.38f, 0.4f) :
+                new Color(0.8f, 0.17f, 0.21f, 0.25f));
             if (passed && animate) Burst(new Vector3((gate - 1) * 2.7f, 1.8f, 4), Palette.Gold, 24);
         }
 

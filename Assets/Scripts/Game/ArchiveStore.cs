@@ -11,7 +11,7 @@ namespace Horizon
     public sealed class ArchiveEnvelope
     {
         public string format = "HORIZON-LIFE";
-        public int version = 1;
+        public int version = 2;
         public string savedAt;
         public string checksum;
         public string payload;
@@ -84,8 +84,8 @@ namespace Horizon
                 {
                     ArchiveEnvelope envelope = JsonUtility.FromJson<ArchiveEnvelope>(json);
                     if (envelope == null || envelope.format != "HORIZON-LIFE" || envelope.payload == null) return false;
-                    if (envelope.version > 1) { error = "newer"; return false; }
-                    if (envelope.version != 1 || envelope.checksum != Digest(envelope.payload)) return false;
+                    if (envelope.version > 2) { error = "newer"; return false; }
+                    if (envelope.version < 1 || envelope.checksum != Digest(envelope.payload)) return false;
                     payload = envelope.payload;
                 }
                 if (!payload.TrimStart().StartsWith("{") || !payload.Contains("\"runs\"")) return false;
