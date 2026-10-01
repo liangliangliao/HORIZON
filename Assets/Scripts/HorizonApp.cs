@@ -540,6 +540,7 @@ namespace Horizon
         private void ShowPredictionReview()
         {
             Clear();
+            int generation = viewGeneration;
             PredictionRecord prediction = session.Prediction;
             bool close = prediction.accurate;
             View.Fill(root, "Comparison hush", new Color(0.01f, 0.03f, 0.05f, 0.82f), 0, 0, 1, 1);
@@ -582,6 +583,7 @@ namespace Horizon
                 0.13f, 0.16f, 0.87f, 0.225f, Palette.Panel, Palette.Text, 26);
             View.Button(root, "Continue", "继续前行", () =>
             {
+                if (generation != viewGeneration) return;
                 if (!archive.ReviewPrediction(session)) return;
                 Save();
                 BuildBoard();

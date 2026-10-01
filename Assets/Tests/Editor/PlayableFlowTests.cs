@@ -670,6 +670,23 @@ namespace Horizon.Tests
             Assert.AreEqual(6, Get<RectTransform>(app, "root").GetComponentsInChildren<PredictionAxisDrag>().Length);
             ButtonNamed(app, "Lock prediction").onClick.Invoke(); yield return null;
             Assert.AreEqual(2, s.Predictions.Count); Assert.AreEqual(8, s.Prediction.sourceDay);
+            // D4 + 7 and D8 + 3 return together. One double tap must still
+            // acknowledge only the prediction whose result the player saw.
+            var pair = new GameSession(3, 531);
+            while (pair.Day < 11) {
+                if (pair.Day == 4) pair.LockPrediction(new ResourceDelta(), 7);
+                if (pair.Day == 8) pair.LockPrediction(new ResourceDelta(), 3);
+                pair.Choose(pair.Hand[2].Id); if (pair.NeedsStation) pair.VisitStation(); pair.Advance();
+            }
+            Assert.AreEqual(2, pair.Predictions.Count(p => p.evaluated && !p.reviewed));
+            foreach (PredictionRecord prediction in pair.Predictions) prediction.accurate = true;
+            a.active = pair.Snapshot(); Set(app, "session", pair); Call(app, "ShowPredictionReview"); yield return null;
+            int calibrations = a.calibrations;
+            Button review = ButtonNamed(app, "Continue"); review.onClick.Invoke(); review.onClick.Invoke(); yield return null;
+            Assert.AreEqual(1, pair.Predictions.Count(p => p.reviewed)); Assert.IsTrue(pair.HasPredictionReview);
+            Assert.AreEqual(calibrations + 1, a.calibrations); Assert.AreEqual(8, pair.Prediction.sourceDay);
+            ButtonNamed(app, "Continue").onClick.Invoke(); yield return null;
+            Assert.IsFalse(pair.HasPredictionReview); Assert.AreEqual(calibrations + 2, a.calibrations);
             yield return new ExitPlayMode();
         }
 
