@@ -91,6 +91,7 @@ namespace Horizon
             View.Button(overlay, "Save AI settings", "保存配置", () => { aiDraft.Repair(); archive.ai = aiDraft.Copy(); Save(); LeaveAISettings(); },
                 0.075f, 0.035f, 0.49f, 0.095f, Palette.Mint, Palette.Ink, 27);
             View.Button(overlay, "Back from AI settings", "返回", LeaveAISettings, 0.51f, 0.035f, 0.925f, 0.095f, Palette.Panel, Palette.Text, 27);
+            View.RefreshText(overlay);
         }
         private void LeaveAISettings()
         {

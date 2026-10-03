@@ -96,6 +96,7 @@ namespace Horizon.Tests
             var image = new RenderTexture(1080, 1920, 24); image.Create();
             var cameraObject = new GameObject("Master portrait capture", typeof(Camera)); Camera camera = cameraObject.GetComponent<Camera>();
             camera.clearFlags = CameraClearFlags.Depth; camera.cullingMask = 1 << 5; camera.nearClipPlane = 0.1f; camera.farClipPlane = 20; camera.targetTexture = image;
+            camera.depth = 20;
             foreach (Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer = 5;
             canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = camera; canvas.planeDistance = 5;
             world.WorldCamera.targetTexture = image; world.SnapCamera(); yield return null; yield return null;
@@ -105,6 +106,7 @@ namespace Horizon.Tests
             string directory = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals"); Directory.CreateDirectory(directory); File.WriteAllBytes(Path.Combine(directory, name + ".png"), pixels.EncodeToPNG());
             RenderTexture.active = previous; canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.worldCamera = null; world.WorldCamera.targetTexture = null;
             image.Release(); Object.Destroy(image); Object.Destroy(pixels); Object.Destroy(cameraObject);
+            yield return null; yield return null;
         }
 
         private sealed class TestAITransport : IAITransport

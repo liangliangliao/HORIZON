@@ -89,7 +89,7 @@ namespace Horizon
         private RectTransform SettingsPanel(string title, string subtitle)
         {
             CancelAIRequest();
-            if (overlay != null) Destroy(overlay.gameObject);
+            if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); }
             overlay = View.Rect(root, "Product settings", 0, 0, 1, 1);
             View.Fill(overlay, "Settings shade", new Color(0.008f, 0.022f, 0.04f, 0.985f), 0, 0, 1, 1, true);
             View.Label(overlay, "Settings heading", title, 43, Palette.Text, TextAnchor.MiddleLeft,
