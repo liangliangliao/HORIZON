@@ -24,6 +24,108 @@ namespace Horizon.Tests
         private static Button Button(HorizonApp app, string name)
         { var b = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(x => x.name == name); Assert.IsNotNull(b, name); return b; }
 
+        private static HorizonCardDrag Card(HorizonApp app, string id)
+        { return Get<RectTransform>(app, "root").GetComponentsInChildren<HorizonCardDrag>().Single(x => x.name == id); }
+
+        private static IEnumerator FinishDailyFeedback(HorizonApp app, int fromDay)
+        {
+            float until = Time.realtimeSinceStartup + 15;
+            while (Time.realtimeSinceStartup < until)
+            {
+                if (!Get<bool>(app, "busy") && Get<ArchiveData>(app, "archive").pendingFeedback == null && Get<GameSession>(app, "session").Day > fromDay) yield break;
+                var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b =>
+                    b.interactable && (b.name == "Continue result" || b.name == "Continue master event"));
+                if (next != null) next.onClick.Invoke();
+                yield return new WaitForSecondsRealtime(0.15f);
+            }
+            Assert.Fail("Daily feedback did not return to the next choice.");
+        }
+
+        [UnityTest]
+        public IEnumerator FirstLifeTeachesTimeAndPreparesAChoiceWithoutVisitingTheFeatureHub()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("First life experience").AddComponent<HorizonApp>();
+            yield return null;
+            var archive = new ArchiveData { nextRareRun = 99, preferences = new PlayerPreferences { reducedMotion = true, sound = false } }; archive.Repair();
+            Set(app, "archive", archive); Call(app, "ApplyPreferences"); Call(app, "StartNewRun"); yield return null;
+            GameSession life = Get<GameSession>(app, "session");
+            Assert.AreEqual(1, life.RunNumber); Assert.AreEqual(0, life.Actions.Count); Assert.AreEqual(0, archive.wallet.stardust);
+            yield return Capture(app, "50-first-life-goal");
+            Button(app, "Guide next").onClick.Invoke(); yield return null;
+            yield return Capture(app, "51-first-life-choice");
+            archive = JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(archive)); archive.Repair(); Set(app, "archive", archive);
+            Call(app, "ContinueRun"); yield return null; life = Get<GameSession>(app, "session");
+            Assert.AreEqual(1, archive.playGuide.page);
+            Button(app, "Guide start").onClick.Invoke(); yield return new WaitForSecondsRealtime(0.4f);
+            Assert.IsTrue(archive.playGuide.completed);
+            Call(app, "RevealResourceNumbers", false);
+            Assert.IsTrue(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Where(t => t.name == "Resource number").All(t => t.text.Contains("/10")));
+            yield return Capture(app, "52-first-life-board");
+            Call(app, "CardTapped", Card(app, life.Hand[1].Id)); yield return null;
+            Button(app, "Use card").onClick.Invoke();
+            yield return FinishDailyFeedback(app, 1);
+            Assert.AreEqual(2, life.Day); Assert.AreEqual(1, life.Actions.Count);
+            string before = JsonUtility.ToJson(life.Snapshot());
+            Button(app, "Future plans").onClick.Invoke(); yield return null;
+            yield return Capture(app, "53-first-life-future-schedule");
+            Assert.AreEqual(before, JsonUtility.ToJson(life.Snapshot()));
+            Button(app, "Master back").onClick.Invoke(); yield return null;
+            Call(app, "CardTapped", Card(app, life.Hand[2].Id)); yield return null;
+            Button(app, "Use card").onClick.Invoke(); yield return FinishDailyFeedback(app, 2);
+            Assert.AreEqual(3, life.Day);
+            string selected = life.Hand[1].Id;
+            Call(app, "CardTapped", Card(app, selected)); yield return null;
+            Button(app, "Imagine this choice").onClick.Invoke(); yield return null;
+            Button(app, "Start imagination").onClick.Invoke(); yield return null;
+            while (archive.imagination.phase != ImaginePhase.Complete)
+            {
+                if (archive.imagination.phase == ImaginePhase.Recover) Button(app, "Recovery action 1").onClick.Invoke();
+                else Button(app, "Continue imagination").onClick.Invoke();
+                yield return null;
+            }
+            Button(app, "Keep future memory").onClick.Invoke(); yield return null;
+            Assert.AreEqual(3, life.Day); Assert.AreEqual(2, life.Actions.Count); Assert.AreEqual(1, life.Master.memories.Count);
+            Assert.AreEqual(CardCatalog.FindById(selected).Name, Get<RectTransform>(app, "overlay").GetComponentsInChildren<Text>().Single(t => t.name == "Name").text);
+            Button(app, "Lock decision").onClick.Invoke(); yield return null;
+            Button(app, "Equip triggers").onClick.Invoke(); yield return null;
+            Button(app, "Trigger alarm").onClick.Invoke(); yield return null;
+            Button(app, "Master back").onClick.Invoke(); yield return null;
+            yield return Capture(app, "54-first-life-decision");
+            for (int i = 0; i < 4; i++) { Button(app, "Execute next step").onClick.Invoke(); yield return null; }
+            Button(app, "Execute next step").onClick.Invoke(); yield return FinishDailyFeedback(app, 3);
+            Assert.IsTrue(life.CanPredict);
+            Button(app, "Prediction decrease 0").onClick.Invoke(); Button(app, "Prediction decrease 0").onClick.Invoke();
+            Button(app, "Prediction increase 1").onClick.Invoke(); yield return null;
+            CollectionAssert.AreEqual(new[] { -2, 1, 0 }, Get<int[]>(app, "forecastOffsets").Take(3));
+            yield return Capture(app, "55-first-life-prediction");
+            Button(app, "Lock prediction").onClick.Invoke(); yield return null;
+            Assert.AreEqual(-2, life.Prediction.energy);
+            // Later day fixtures exercise the same default mode, not an experimental menu.
+            while (life.Day < 11)
+            {
+                while (life.HasPredictionReview) life.MarkPredictionReviewed();
+                if (life.CanPredict) life.SkipPrediction();
+                life.Choose(life.Hand[2].Id); if (life.NeedsStation) life.VisitStation(); life.Advance();
+                archive.active = life.Snapshot();
+                if (life.Day == 5) { Call(app, "BuildBoard"); yield return null; yield return Capture(app, "56-first-life-new-family"); }
+            }
+            while (life.HasPredictionReview) life.MarkPredictionReviewed(); if (life.CanPredict) life.SkipPrediction();
+            archive.active = life.Snapshot(); Call(app, "BuildBoard"); yield return null;
+            Call(app, "CardTapped", Card(app, "imagine")); yield return null;
+            Button(app, "Use card").onClick.Invoke(); yield return null;
+            Button(app, "Start imagination").onClick.Invoke(); yield return null;
+            while (archive.imagination.phase != ImaginePhase.Recover) { Button(app, "Continue imagination").onClick.Invoke(); yield return null; }
+            yield return Capture(app, "57-imagine-card-recovery");
+            Button(app, "Recovery action 2").onClick.Invoke(); yield return null;
+            while (archive.imagination.phase != ImaginePhase.Complete) { Button(app, "Continue imagination").onClick.Invoke(); yield return null; }
+            Button(app, "Keep future memory").onClick.Invoke(); yield return null;
+            Assert.AreEqual(11, life.Day); Assert.AreEqual(10, life.Actions.Count);
+            Assert.IsTrue(life.CanPlay(CardCatalog.FindById("imagine")));
+            Assert.AreEqual(0, archive.reality.quests.Count, "Imagination never creates a real-world achievement automatically.");
+            yield return new ExitPlayMode();
+        }
+
         [SetUp]
         public void IsolateStorage()
         {
@@ -62,6 +164,7 @@ namespace Horizon.Tests
             Assert.AreEqual(DecisionStatus.Ready, life.Master.decision.status);
             // Leave the completed decision available, then train an imagined setback.
             Button(app, "Master back").onClick.Invoke(); yield return null;
+            Button(app, "Master hub").onClick.Invoke(); yield return null;
             Button(app, "Master feature 0").onClick.Invoke(); yield return null;
             Button(app, "Start imagination").onClick.Invoke(); yield return null;
             Assert.AreEqual(ImaginePhase.VictoryAnchor, archive.imagination.phase);

@@ -24,7 +24,7 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.07f, 0.92f, 0.93f, 0.97f);
             View.Label(root, "Prediction title", "画下未来的自己", 43, Palette.Text,
                 TextAnchor.MiddleCenter, 0.07f, 0.848f, 0.93f, 0.915f);
-            View.Label(root, "Prediction note", "把状态向上或向下推。封存后，未来会来对照。", 25, Palette.Muted,
+            View.Label(root, "Prediction note", "点 + / - 或拖动滑块。封存后，未来会来对照。", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.07f, 0.798f, 0.93f, 0.848f);
             int[] spans = { 1, 3, 7 };
             for (int i = 0; i < spans.Length; i++)
@@ -44,8 +44,6 @@ namespace Horizon
                     x - 0.025f, y + 0.214f, x + 0.165f, y + 0.26f);
                 Image track = View.Fill(root, "Draw future " + i, Palette.Deep, x, y + 0.045f, x + 0.15f, y + 0.215f, true);
                 View.Fill(track.transform, "Zero", Palette.Muted, 0.12f, 0.495f, 0.88f, 0.505f);
-                View.Label(track.transform, "Up", "+", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.3f, 0.83f, 0.7f, 0.98f);
-                View.Label(track.transform, "Down", "-", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.3f, 0.02f, 0.7f, 0.17f);
                 float center = 0.1f + (forecastOffsets[i] + 3) / 6f * 0.8f;
                 RectTransform marker = View.Panel(track.transform, "Forecast mark", Palette.Mint,
                     0.2f, center - 0.04f, 0.8f, center + 0.04f, 18).rectTransform;
@@ -53,12 +51,18 @@ namespace Horizon
                     TextAnchor.MiddleCenter, x - 0.045f, y, x + 0.195f, y + 0.045f);
                 PredictionAxisDrag axis = track.gameObject.AddComponent<PredictionAxisDrag>();
                 axis.Initialize(forecastOffsets[i]);
-                axis.Changed = next => {
+                Action<int> change = next => {
                     if (generation != viewGeneration) return;
                     forecastOffsets[index] = next; float at = 0.1f + (next + 3) / 6f * 0.8f;
+                    axis.Initialize(next);
                     marker.anchorMin = new Vector2(0.2f, at - 0.04f); marker.anchorMax = new Vector2(0.8f, at + 0.04f);
                     value.text = Direction(next);
                 };
+                axis.Changed = change;
+                View.Button(track.transform, "Prediction increase " + index, "+", () => change(Mathf.Min(3, forecastOffsets[index] + 1)),
+                    0.1f, 0.82f, 0.9f, 0.98f, Palette.Panel, Palette.Text, 27);
+                View.Button(track.transform, "Prediction decrease " + index, "-", () => change(Mathf.Max(-3, forecastOffsets[index] - 1)),
+                    0.1f, 0.02f, 0.9f, 0.18f, Palette.Panel, Palette.Text, 27);
             }
             View.Button(root, "Lock prediction", "封存到第" + (session.Day + predictionHorizon) + "天", () => {
                 if (generation != viewGeneration || !session.CanPredict) return;

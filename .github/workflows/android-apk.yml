@@ -140,6 +140,14 @@ jobs:
           test -s artifacts/visuals/47-ai-future-self.png
           test -s artifacts/visuals/48-ai-foundry-resource.png
           test -s artifacts/visuals/49-ai-azure-deployments.png
+          test -s artifacts/visuals/50-first-life-goal.png
+          test -s artifacts/visuals/51-first-life-choice.png
+          test -s artifacts/visuals/52-first-life-board.png
+          test -s artifacts/visuals/53-first-life-future-schedule.png
+          test -s artifacts/visuals/54-first-life-decision.png
+          test -s artifacts/visuals/55-first-life-prediction.png
+          test -s artifacts/visuals/56-first-life-new-family.png
+          test -s artifacts/visuals/57-imagine-card-recovery.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash

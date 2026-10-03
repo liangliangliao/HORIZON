@@ -107,6 +107,16 @@ namespace Horizon.Game
         }
         private bool MasterAllows(CardSpec card)
         { return !UsesMasterRules || !InExecutionMode || Master.decision.cardId == card.Id && Master.decision.status == DecisionStatus.Ready; }
+        public bool NeedsImagination(CardSpec card)
+        {
+            return CatalogVersion >= 8 && card?.Id == "imagine" && !Master.commands.Any(c =>
+                c.day == Day && c.operation == "imagine" && c.imagination?.goalId == card.Id && c.imagination.phase == ImaginePhase.Complete);
+        }
+        public bool CanPrepareImagination(CardSpec card)
+        {
+            return NeedsImagination(card) && !InExecutionMode && !HasChosen && !CanPredict && !HasPredictionReview &&
+                CompletedRun == null && Array.Exists(Hand, c => c.Id == card.Id) && CanAfford(card);
+        }
         public ResourceDelta ImmediateEffect(CardSpec card)
         {
             ResourceDelta effect = ResourceMath.Copy(card.Now);
@@ -186,6 +196,12 @@ namespace Horizon.Game
             if (!UsesMasterRules) return;
             CausalNode n = CausalNodes.Find(x => x.id == action.nodeId);
             bool executed = InExecutionMode;
+            if (CatalogVersion >= 8 && card.Id == "trigger" && Master.triggers.Count < 3 && !Master.triggers.Contains(card.Traits.trigger))
+            {
+                Master.triggers.Add(card.Traits.trigger);
+                CausalNode equipment = MasterNode(CausalNodeKind.Trigger, "行动环境 · 闹钟提示已准备", n.id);
+                Emit(DomainEventKind.TriggerEquipped, equipment, "行动提示已装备", "这次准备留下了一个可继续使用的环境提示。");
+            }
             if (InExecutionMode) { CausalGraph.Link(n, Master.decision.nodeId); Master.decision.status = DecisionStatus.Completed;
                 ObservePattern("decision-reopen", true, n); ChargeOverdrive(10, n); }
             if (Master.awaitingComeback && (card.Kind == CardKind.Growth || card.Kind == CardKind.Recovery))

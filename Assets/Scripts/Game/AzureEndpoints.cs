@@ -8,15 +8,15 @@ namespace Horizon.Game
     {
         public readonly string Root;
         public readonly AzureAccessMode[] Modes;
-        private readonly bool serverless;
+        public readonly bool Serverless;
         internal AzureEndpoint(string root, AzureAccessMode[] modes, bool serverless)
-        { Root = root; Modes = modes; this.serverless = serverless; }
+        { Root = root; Modes = modes; Serverless = serverless; }
         public string ChatUrl(AzureAccessMode mode, string deployment, string version)
         {
             if (mode == AzureAccessMode.OpenAIV1) return Root + "/openai/v1/chat/completions";
             string apiVersion = AzureEndpoints.Version(mode, version);
             string path = mode == AzureAccessMode.AzureOpenAI ? "/openai/deployments/" + Uri.EscapeDataString(deployment) + "/chat/completions" :
-                (serverless ? "" : "/models") + "/chat/completions";
+                (Serverless ? "" : "/models") + "/chat/completions";
             return Root + path + "?api-version=" + Uri.EscapeDataString(apiVersion);
         }
     }

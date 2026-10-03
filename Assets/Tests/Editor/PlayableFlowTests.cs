@@ -89,7 +89,7 @@ namespace Horizon.Tests
         }
 
         [UnityTest]
-        public IEnumerator ObservationChapterSixCannotUnlockThirtyDaysAndStateHoldWorks()
+        public IEnumerator ObservationChapterSixCannotUnlockThirtyDaysAndStateNumbersRemainVisible()
         {
             yield return new EnterPlayMode();
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
@@ -108,7 +108,7 @@ namespace Horizon.Tests
             Assert.AreEqual(6, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
                 t => t.name == "Resource number" && !string.IsNullOrEmpty(t.text)).Length);
             state.OnPointerUp(pointer); yield return null;
-            Assert.AreEqual(2, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
+            Assert.AreEqual(6, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
                 t => t.name == "Resource number" && !string.IsNullOrEmpty(t.text)).Length);
             string frozen = JsonUtility.ToJson(session.Snapshot());
             Call(app, "ShowJourney"); yield return null;
@@ -363,6 +363,9 @@ namespace Horizon.Tests
             yield return null;
             Set(app, "archive", new ArchiveData());
             Call(app, "StartNewRun");
+            yield return null;
+            ButtonNamed(app, "Guide next").onClick.Invoke(); yield return null;
+            ButtonNamed(app, "Guide start").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.5f);
 
             Assert.AreNotEqual(UnityEngine.Rendering.GraphicsDeviceType.Null, SystemInfo.graphicsDeviceType,

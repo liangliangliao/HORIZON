@@ -109,6 +109,13 @@ test('explicit Foundry mode uses Models API and its own default version', async 
   assert.equal(f.calls[0].url, 'https://example.services.ai.azure.com/models/chat/completions?api-version=2024-05-01-preview');
   assert.equal(JSON.parse(f.calls[0].request.body).max_tokens, 900);
 });
+test('serverless inference endpoints retain their root path and SDK-compatible key headers', async t => {
+  const f = await sequence(t, { AZURE_OPENAI_ENDPOINT: 'https://coach.models.ai.azure.com', AZURE_OPENAI_DEPLOYMENT: 'coach' }, () => upstream());
+  assert.equal((await f.post(body('azure'))).status, 200);
+  assert.equal(f.calls[0].url, 'https://coach.models.ai.azure.com/chat/completions?api-version=2024-05-01-preview');
+  assert.equal(f.calls[0].request.headers.Authorization, `Bearer ${env.AZURE_OPENAI_API_KEY}`);
+  assert.equal(f.calls[0].request.headers['api-key'], env.AZURE_OPENAI_API_KEY);
+});
 test('explicit v1 mode accepts an openai/v1 base without repeating its path or dated version', async t => {
   const f = await sequence(t, { AZURE_OPENAI_ENDPOINT: 'https://example.openai.azure.com/openai/v1/',
     AZURE_ACCESS_MODE: 'v1', AZURE_OPENAI_API_VERSION: '2024-10-21' }, () => upstream());

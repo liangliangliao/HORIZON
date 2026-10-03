@@ -175,8 +175,11 @@ namespace Horizon.Game
             string body = mode == AzureAccessMode.AzureOpenAI ? JsonUtility.ToJson(new AzureBody { messages = messages }) :
                 mode == AzureAccessMode.OpenAIV1 ? JsonUtility.ToJson(new AzureV1Body { model = Required(deployment), messages = messages }) :
                 JsonUtility.ToJson(new DeepSeekBody { model = Required(deployment), messages = messages });
-            return new AIRequest(AzureEndpoints.Resolve(settings).ChatUrl(mode, Required(deployment), settings.azureApiVersion), body,
-                new Dictionary<string, string> { { "Content-Type", "application/json" }, { "api-key", credential.Trim() } },
+            AzureEndpoint endpoint = AzureEndpoints.Resolve(settings);
+            var headers = new Dictionary<string, string> { { "Content-Type", "application/json" }, { "api-key", credential.Trim() } };
+            // Azure's inference SDK also uses Bearer API-key auth for serverless deployments.
+            if (endpoint.Serverless) headers.Add("Authorization", "Bearer " + credential.Trim());
+            return new AIRequest(endpoint.ChatUrl(mode, Required(deployment), settings.azureApiVersion), body, headers,
                 Math.Max(5, Math.Min(45, settings.timeoutSeconds)));
         }
         public static AIRequest BuildAzureModelList(AISettings settings, string credential)

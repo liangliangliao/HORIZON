@@ -79,7 +79,7 @@ dotnet run --project tools/RulesHarness.csproj -- --workers=0
 npm --prefix services/ai-gateway test
 ```
 
-`OnlineAITests` 验证两个服务商的请求契约、Foundry 地址归一化、API 默认值、空部署读取、多个部署选择、限定错误重试、密钥与备份隔离、取消、失败回退、规则不可变和 Unity 空 Decision 占位符兼容。代理有 22 项模拟上游测试。Unity 交互测试生成 `45-ai-deepseek.png`、`46-ai-azure.png`、`47-ai-future-self.png`、`48-ai-foundry-resource.png` 和 `49-ai-azure-deployments.png`，使用虚拟密钥与模拟响应。
+`OnlineAITests` 验证两个服务商的请求契约、Foundry 地址归一化、API 默认值、空部署读取、多个部署选择、限定错误重试、密钥与备份隔离、取消、失败回退、规则不可变和 Unity 空 Decision 占位符兼容。代理有 23 项模拟上游测试。Unity 交互测试生成 `45-ai-deepseek.png`、`46-ai-azure.png`、`47-ai-future-self.png`、`48-ai-foundry-resource.png` 和 `49-ai-azure-deployments.png`，使用虚拟密钥与模拟响应。
 
 本次环境没有 DeepSeek/Azure 实际凭据，尚未进行付费模型连通测试，也没有部署公网代理。接入代码和连接测试可在配置凭据后使用。
 

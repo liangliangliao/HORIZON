@@ -77,7 +77,7 @@ namespace Horizon.Game
     // One of each intent every day. All recovery choices restore energy, so no run can deadlock.
     public static class CardCatalog
     {
-        public const int CurrentVersion = 7;
+        public const int CurrentVersion = 8;
         private static readonly CardSpec[] SeasonActions = {
             new CardSpec("library", "借一本好书", CardKind.Growth, new ResourceDelta(-1),
                 new ResourceDelta(0, 0, 2, 0, 0, 1), 2, "2日后 · 灵感", "书里的一个想法成为了你的能力"),

@@ -81,13 +81,27 @@ namespace Horizon.Game
             new CardSpec("risk", "承担一次小风险", CardKind.Growth, new ResourceDelta(-2, -1, 0, 0, -1), new ResourceDelta(0, 0, 1, 0, 2, 2), 3, "3日后 · 尝试", "承担过的风险留下了经验"),
             new CardSpec("again", "恢复以后再开始", CardKind.Recovery, new ResourceDelta(3, 1), new ResourceDelta(0, 1, 1), 1, "明天 · 再战", "失败后的你仍然向前走了一步")
         };
-        public static CardSpec[] Hand(CardSpec[] hand, int day, RunMode mode)
+        public static CardSpec[] Hand(CardSpec[] hand, int day, RunMode mode, int catalogVersion = 7, int runNumber = 1, bool comeback = false)
         {
-            // The onboarding deck stays small; experimental modes introduce the new families.
-            if (mode == RunMode.Quick || mode == RunMode.ThirtyDays || mode == RunMode.LongRun || mode == RunMode.ParallelLives || day == 1) return hand;
+            bool basic = mode == RunMode.Quick || mode == RunMode.ThirtyDays || mode == RunMode.LongRun || mode == RunMode.ParallelLives;
+            // Version 7 lives retain their original hand and replay. New lives
+            // encounter one new family at a time, after the first echo/prediction.
+            if (day == 1 || basic && (catalogVersion < 8 || day < 5) && !comeback) return hand;
             var result = (CardSpec[])hand.Clone();
-            if (hand[1].Id != "opportunity" && hand[1].Id != "together") result[1] = Actions[(day - 2) % 7];
-            if (day % 4 == 0) result[2] = Actions[7];
+            if (basic)
+            {
+                // Preserve growth, relationship opportunities and a recovery
+                // choice. The new family is an alternative on alternating days.
+                if (catalogVersion >= 8 && day >= 5 && day % 2 == 1 &&
+                    hand[0].Kind == CardKind.Temptation)
+                    result[0] = Actions[((day - 5) / 2 + (runNumber - 1) * 4) % 7];
+            }
+            else
+            {
+                if (hand[1].Id != "opportunity" && hand[1].Id != "together") result[1] = Actions[(day - 2) % 7];
+                if (day % 4 == 0) result[2] = Actions[7];
+            }
+            if (catalogVersion >= 8 && comeback && !hand[2].GivesSupport) result[2] = Actions[7];
             return result;
         }
     }

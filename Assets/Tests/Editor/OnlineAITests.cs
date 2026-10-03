@@ -101,6 +101,14 @@ namespace Horizon.Tests
             Assert.That(v1.Body, Does.Contain("\"model\":\"coach\"").And.Contain("max_completion_tokens"));
         }
         [Test]
+        public void AzureServerlessInferenceKeepsItsRootPathAndSdkCompatibleKeyHeaders()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://coach.models.ai.azure.com", azureDeployment = "coach" };
+            AIRequest request = AIProtocol.Build(settings, Secret, Context);
+            Assert.AreEqual("https://coach.models.ai.azure.com/chat/completions?api-version=2024-05-01-preview", request.Url);
+            Assert.AreEqual(Secret, request.Headers["api-key"]); Assert.AreEqual("Bearer " + Secret, request.Headers["Authorization"]);
+        }
+        [Test]
         public async Task Azure404TriesAnotherPathOnTheSameOriginWithoutTouchingGameRules()
         {
             var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.openai.azure.com", azureDeployment = "coach", azureResourceName = "练习资源" };

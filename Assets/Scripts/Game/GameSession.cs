@@ -397,7 +397,7 @@ namespace Horizon.Game
                 }
                 // For pre-graph saves which have already arrived at this day.
                 if (SocialUnavailableToday && hand[2].GivesSupport) hand[2] = CardCatalog.SoloRecovery;
-                return UsesMasterRules ? MasterContent.Hand(hand, Day, Master.mode) : hand;
+                return UsesMasterRules ? MasterContent.Hand(hand, Day, Master.mode, CatalogVersion, RunNumber, Master.awaitingComeback) : hand;
             }
         }
 
@@ -689,11 +689,17 @@ namespace Horizon.Game
 
         public bool CanPlay(CardSpec card)
         {
-            ResourceDelta cost = card == null ? new ResourceDelta() : ImmediateEffect(card);
             return card != null && Array.Exists(Hand, candidate => candidate.Id == card.Id) &&
-                MasterAllows(card) &&
+                MasterAllows(card) && !NeedsImagination(card) &&
                 !CanPredict && !HasPredictionReview && !HasChosen && CompletedRun == null &&
-                Energy + cost.energy >= 0 && Mood + cost.mood >= 0 &&
+                CanAfford(card);
+        }
+
+        public bool CanAfford(CardSpec card)
+        {
+            if (card == null) return false;
+            ResourceDelta cost = ImmediateEffect(card);
+            return Energy + cost.energy >= 0 && Mood + cost.mood >= 0 &&
                 Insight + cost.insight >= 0 && Relation + cost.relation >= 0 &&
                 Money + cost.money >= 0 && Ability + cost.ability >= 0;
         }

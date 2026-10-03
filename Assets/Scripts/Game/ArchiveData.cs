@@ -26,6 +26,7 @@ namespace Horizon
         public bool stationMemoryOpen, ghostOpen;
         public int stationMemoryIndex, stationMemoryBeat, ghostRun, ghostBeat;
         public PlayerPreferences preferences = new PlayerPreferences();
+        public PlayGuideProgress playGuide = new PlayGuideProgress();
 
         public void Repair()
         {
@@ -35,6 +36,8 @@ namespace Horizon
             wallet.Repair();
             if (journey == null) journey = new JourneyProgress();
             journey.Repair();
+            if (playGuide == null) playGuide = new PlayGuideProgress();
+            playGuide.Repair();
             RepairMasterArchive();
             if (runs.Any(r => r != null && r.number >= 3)) journey.learnedStage = Math.Max(6, journey.learnedStage);
             if (moments == null) moments = new List<RareMoment>();

@@ -1,13 +1,13 @@
 # v0.4.2 实现与验收
 
-开发分支：`feat/horizon-v0.4.2`，基于最新开发提交 `ac2d359`。规则版本 9，牌池版本 7，MasterRunState schema 1。旧规则版本、旧牌池、原短局/长局、存档备份、实际回声收据、因果地图、分支重演、十秒 GIF 与外观钱包继续保留。
+开发分支：`feat/horizon-v0.4.2`，基于最新开发提交 `ac2d359`。规则版本 9，牌池版本 8，MasterRunState schema 1。旧规则版本与牌池继续保留。**当前不等同于完整产品方案；每章可玩范围和缺口以 [53 章验收矩阵](SPEC_ACCEPTANCE_V042.md) 为准。**下表说明已有原型机制。
 
 ## 已实现的可玩系统
 
 | 系统 | 行为与入口 | 主要实现 |
 | --- | --- | --- |
 | 选择、时间、预测、Boss | 原竖屏卡牌与 12/30 天主局，延迟回声、三道门和多次预测 | GameSession、CampaignRules、CardCatalog |
-| 卡牌家族与选择空间 | 八张新牌；实验、镜像、混沌、想象模式进入扩展牌池；成熟因果机会优先保留 | MasterSpecification、MasterContent |
+| 卡牌家族与选择空间 | 八张新牌；默认模式第 5 天起逐步引入，保留成长与恢复；环境牌实际装备提示，想象牌须完成当日预演；牌池 7 保留原手牌 | MasterSpecification、MasterContent |
 | Decision Lock | 点牌后 LOCK；四步执行；主动解锁记录重新比较；执行中禁止直接换牌 | DecisionExecution、GameSession.Master |
 | Action Engine / Trigger | ME → 行动发动机；降低摩擦；最多装备三项环境提示 | HorizonApp.Master |
 | Thought Monsters / Council | 动机权重分解、来源展开与念头的合理部分/代价 | InnerCouncil、ThoughtMonsters |
@@ -26,7 +26,7 @@
 
 ## 运行
 
-用 Unity **2022.3.22f1** 打开 `Assets/Scenes/Boot.unity`，以 1080×1920 竖屏 Play。首局第 5 天起、后续人生开放 ME 入口；主页可进入想象和现实。完成当前人生后从 ME → 人生模式选新局。世界观与装备支持结构化选择，资源结算不调用内容生成器。
+用 Unity **2022.3.22f1** 打开 `Assets/Scenes/Boot.unity`，以 1080×1920 竖屏 Play。首局两页引导解释目标与时间；主界面常显资源、三项准备和下一次回声。第 3 天起可以从成长牌直接预演失败或锁定执行，完成预演后回到原牌；无需先访问 ME。默认模式第 5 天起逐步引入新牌。主页 ME 提供其他原型系统；资源结算不调用 AI。
 
 恢复入口：继续一生恢复执行状态；ME → 想象恢复未完成预演；奖励确认位置保存在事件记录中；现实节点跨局保留。Android 返回键可关闭新面板并执行其返回动作。
 
@@ -38,9 +38,9 @@
 dotnet run --project tools/RulesHarness.csproj -- --workers=0 --result=artifacts/rules.xml
 ```
 
-此 runner 使用 NUnitLite 和 Unity 公共字段 JSON 契约的兼容实现，只验证领域规则；不能替代 Unity JsonUtility、渲染、生命周期或 Android 设备测试。旧规则回归、新 Master 规则与在线 AI 契约共 131 项；覆盖 8 模式 × 8 种子、存档重载、命令重演、强制恢复、跨局模式证据、奖励幂等、真实图父节点、积累兑现、机会窗口、现实证据要求和服务商请求边界。代理另有 22 项模拟上游测试。
+此 runner 使用 NUnitLite 和 Unity 公共字段 JSON 契约的兼容实现，只验证领域规则；不能替代 Unity JsonUtility、渲染、生命周期或 Android 设备测试。旧规则回归、新 Master 规则、引导读写与在线 AI 契约共 139 项；覆盖 8 模式 × 8 种子、存档重载、命令重演、强制恢复、跨局模式证据、奖励幂等、真实图父节点、积累兑现、机会窗口、现实证据要求、牌池 7 兼容与服务商边界。代理另有 23 项模拟上游测试。
 
-`MasterPlayableFlowTests` 在真正 Unity Play Mode 操作 LOCK、Trigger、四步执行、目标输入、想象失败恢复、保存记忆、轨道、现实任务与星座，生成 `40`–`44` 号竖屏截图；AI 配置、测试连接、未来自己对话、建议接受、Foundry 资源编辑和部署选择生成 `45`–`49` 号截图。原 39 张画面和全部旧 EditMode/Play Mode 回归继续执行。CI 分别上传规则 XML、Unity 结果、竖屏图、GIF 与 ARMv7/ARM64 APK；必须看当前提交的结果，不能沿用旧提交的成功状态。
+`MasterPlayableFlowTests` 操作真实 Unity UI，生成 `40`–`44` 号系统图、`45`–`49` 号 AI 图，以及 `50`–`57` 号首局目标、引导、主界面、未来安排、执行、点击预测、默认新家族与想象牌恢复图。新流程检查引导读档、预演回到原选择、锁定执行、预测加减、强制失败和不自动生成现实任务。原 39 张图与旧回归继续执行。CI 上传规则 XML、Unity 结果、57 张竖屏图、GIF 与 ARMv7/ARM64 APK；必须看当前提交的结果，不能沿用旧提交的成功状态。此自动验证不能代替首次玩家的直观性验收。
 
 ## 尚未宣称完成的生产能力
 

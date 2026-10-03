@@ -146,6 +146,7 @@ export function createGateway({ env = process.env, fetchImpl = fetch, now = Date
       } else {
         const config = azureConfig(env);
         headers['api-key'] = config.key;
+        if (config.serverless) headers.Authorization = `Bearer ${config.key}`;
         let deployments = config.deployments;
         if (!deployments.length) {
           const listed = await send(config.root + '/openai/v1/models', null, 'GET');
