@@ -116,14 +116,14 @@ namespace Horizon
             {
                 DecisionRecord d = session.Master.decision;
                 string step = d.status == DecisionStatus.Ready ? "今天就做「" + CardCatalog.FindById(d.cardId).Name + "」" :
-                    session.CatalogVersion >= 9 ? "按这个计划准备 · 不再重新比较" : (d.step + 1) + "/4 · " + d.steps[d.step];
+                    "按这个计划准备 · 不再重新比较";
                 View.Button(overlay, "Execute next step", step, () => {
                     if (!CanPrepareMaster) return;
                     if (session.Master.decision.status == DecisionStatus.Ready)
                     { string id = session.Master.decision.cardId; CloseMasterPage();
                         HorizonCardDrag drag = cards.FirstOrDefault(pair => pair.Value.Id == id).Key; if (drag != null) CardPlayed(drag); }
                     else { session.ExecuteDecisionStep();
-                        if (session.CatalogVersion >= 9) while (session.Master.decision.status != DecisionStatus.Ready) session.ExecuteDecisionStep();
+                        while (session.Master.decision.status != DecisionStatus.Ready) session.ExecuteDecisionStep();
                         PersistMasterAction(); ShowExecution(); }
                 }, 0.07f, 0.132f, 0.72f, 0.205f, Palette.Mint, Palette.Ink, 27);
                 View.Button(overlay, "Unlock decision", "解锁", () => { session.UnlockDecision(); PersistMasterAction(); CloseMasterPage(); BuildBoard(); }, 0.745f, 0.132f, 0.93f, 0.205f, Palette.Deep, Palette.Coral, 24);
@@ -146,7 +146,8 @@ namespace Horizon
             for (int i = 0; i < names.Length; i++)
             { float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.71f - (i / 2) * 0.105f;
                 View.Label(overlay, "Engine variable " + i, names[i] + "  " + values[i] + "/10", 29, Palette.Text, TextAnchor.MiddleLeft, x, y, x + 0.4f, y + 0.08f); }
-            View.Label(overlay, "Factors meaning", "备妥条件 = 动机+能力+提示+情绪+承诺-摩擦-其他奖励-疲劳。完成准备后至少6，且有匹配提示时，执行省1精力。", 29, Palette.Muted,
+            View.Label(overlay, "Factors meaning", session.CatalogVersion >= 9 ? "备妥条件 = 动机+能力+提示+情绪+承诺-摩擦-其他奖励-疲劳。完成准备后至少6，且有匹配提示时，执行省1精力。" :
+                "这条人生保持原来的准备方式：记录提示与执行，行动仍按原成本结算。可进入自由练习体验新的准备策略。", 29, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.215f, 0.925f, 0.375f);
             View.Button(overlay, "Explain motives", "看看不同动机的来源", ShowCouncil, 0.075f, 0.125f, 0.925f, 0.2f, Palette.Panel, Palette.Mint, 28);
         }
@@ -154,17 +155,17 @@ namespace Horizon
         {
             if (!CanPrepareMaster) return;
             MasterPage("Trigger equipment", "T R I G G E R", ShowExecution);
-            View.Label(overlay, "Equipment limit", "最多三个提示。匹配行动并备妥条件，执行最多省1精力。", 27, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.79f, 0.925f, 0.855f);
+            View.Label(overlay, "Equipment limit", session.CatalogVersion >= 9 ? "最多三个提示。匹配行动并备妥条件，执行最多省1精力。" : "最多三个提示。当前人生记录准备，行动保持原成本。", 27, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.79f, 0.925f, 0.855f);
             for (int i = 0; i < TriggerEquipment.Ids.Length; i++)
             {
                 int index = i; string id = TriggerEquipment.Ids[i]; bool equipped = session.Master.triggers.Contains(id);
                 float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.675f - (i / 2) * 0.106f;
-                Button equipment = View.Button(overlay, "Trigger " + id, TriggerEquipment.Names[index] + (equipped ? " · 已装备" : TriggerEquipment.Cost(id) > 0 && session.CatalogVersion >= 9 ? " · 金钱-1" : " · 免费") + "\n" + TriggerEquipment.Effect(id), () => {
+                Button equipment = View.Button(overlay, "Trigger " + id, TriggerEquipment.Names[index] + (equipped ? " · 已装备" : TriggerEquipment.Cost(id) > 0 && session.CatalogVersion >= 9 ? " · 金钱-1" : " · 免费") + "\n" + (session.CatalogVersion >= 9 ? TriggerEquipment.Effect(id) : "记录环境提示"), () => {
                     session.EquipTrigger(id); PersistMasterAction(); ShowTriggers();
                 }, x, y, x + 0.4f, y + 0.08f, Palette.Panel, equipped ? Palette.Mint : Palette.Text, 27);
                 equipment.interactable = !equipped && session.Master.triggers.Count < 3 && (session.CatalogVersion < 9 || session.Money >= TriggerEquipment.Cost(id));
             }
-            View.Label(overlay, "Trigger observation", "选择与行动相符的提示。其作用会进入实际成本与因果图。", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.15f, 0.925f, 0.22f);
+            View.Label(overlay, "Trigger observation", session.CatalogVersion >= 9 ? "选择与行动相符的提示。其作用会进入实际成本与因果图。" : "保留这条人生的原有成本，准备与提示会留下记录。", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.15f, 0.925f, 0.22f);
         }
         private void ShowCouncil()
         {

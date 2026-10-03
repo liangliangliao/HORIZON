@@ -201,6 +201,33 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
         [UnityTest]
+        public IEnumerator LegacyPreparationIsFastAndNeverPromisesNewCostsOrBenefits()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Legacy upgrade audit").AddComponent<HorizonApp>();
+            yield return null;
+            var life = new GameSession(1, 17, 8); string cardId = life.Hand[1].Id; life.LockDecision(cardId);
+            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99,
+                preferences = new PlayerPreferences { reducedMotion = true, sound = false } }; archive.Repair();
+            Set(app, "archive", archive); Set(app, "session", life); Call(app, "ApplyPreferences"); Call(app, "BuildBoard"); Call(app, "ShowExecution"); yield return null;
+            Button(app, "Action factors").onClick.Invoke(); yield return null;
+            string description = string.Join(" ", Get<RectTransform>(app, "overlay").GetComponentsInChildren<Text>().Select(t => t.text));
+            Assert.That(description, Does.Contain("原成本").And.Not.Contain("省1精力"));
+            Button(app, "Master back").onClick.Invoke(); yield return null;
+            Button(app, "Equip triggers").onClick.Invoke(); yield return null;
+            Button(app, "Trigger ticket").onClick.Invoke(); yield return null;
+            Assert.AreEqual(5, life.Money);
+            description = string.Join(" ", Get<RectTransform>(app, "overlay").GetComponentsInChildren<Text>().Select(t => t.text));
+            Assert.That(description, Does.Not.Contain("金钱-1").And.Not.Contain("省1精力"));
+            Button(app, "Master back").onClick.Invoke(); yield return null;
+            Button(app, "Execute next step").onClick.Invoke(); yield return null;
+            Assert.AreEqual(4, life.Master.decision.step); Assert.AreEqual(DecisionStatus.Ready, life.Master.decision.status);
+            Assert.AreEqual(-2, life.ImmediateEffect(CardCatalog.FindById(cardId)).energy);
+            Assert.AreEqual(4, life.Master.commands.Count(c => c.operation == "step"));
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator WideChoicesGroupedEchoesAndPreparationCanCompleteAnActualLife()
         {
             yield return new EnterPlayMode();

@@ -643,20 +643,23 @@ namespace Horizon
 
         private IEnumerator RiseCard(RectTransform rect, CanvasGroup group, float delay)
         {
+            int generation = viewGeneration;
+            if (rect == null || group == null) yield break;
             group.alpha = 0;
             rect.localScale = Vector3.one * 0.94f;
             yield return new WaitForSeconds(delay);
-            if (rect == null || group == null) yield break;
+            if (generation != viewGeneration || rect == null || group == null) yield break;
             float elapsed = 0;
             while (elapsed < 0.22f)
             {
-                if (rect == null || group == null) yield break;
+                if (generation != viewGeneration || rect == null || group == null) yield break;
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / 0.22f);
                 group.alpha = t;
                 rect.localScale = Vector3.one * Mathf.Lerp(0.94f, 1f, t);
                 yield return null;
             }
+            if (generation != viewGeneration || rect == null || group == null) yield break;
             group.alpha = 1;
             rect.localScale = Vector3.one;
         }

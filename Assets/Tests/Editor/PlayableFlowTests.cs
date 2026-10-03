@@ -434,6 +434,11 @@ namespace Horizon.Tests
             Assert.AreEqual(4, session.Day);
             Assert.AreEqual(FeedbackKind.Echoes, archive.pendingFeedback.kind);
             Assert.That(archive.pendingFeedback.description, Does.Contain("D1"));
+            if (archive.pendingFeedback.beats.Count > 1)
+            {
+                ButtonNamed(app, "Review echo details").onClick.Invoke();
+                yield return new WaitForSecondsRealtime(0.4f);
+            }
             yield return Capture(app, "03-echo-result");
             int read = 0;
             int receipts = archive.pendingFeedback.beats.Count;
