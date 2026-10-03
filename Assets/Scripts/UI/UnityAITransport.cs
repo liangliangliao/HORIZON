@@ -11,9 +11,9 @@ namespace Horizon.UI
         public async Task<AIResponse> Send(AIRequest request, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
-            using (var web = new UnityWebRequest(request.Url, "POST"))
+            using (var web = new UnityWebRequest(request.Url, request.Method))
             {
-                web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(request.Body));
+                if (request.Method == "POST") web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(request.Body));
                 web.downloadHandler = new DownloadHandlerBuffer();
                 web.timeout = request.TimeoutSeconds; web.redirectLimit = 0;
                 foreach (var header in request.Headers) web.SetRequestHeader(header.Key, header.Value);

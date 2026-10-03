@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,10 +20,18 @@ namespace Horizon.Tests
         private sealed class Transport : IAITransport
         {
             public AIRequest Last;
+            public readonly List<AIRequest> Calls = new List<AIRequest>();
+            public readonly Queue<AIResponse> Responses = new Queue<AIResponse>();
+            public Action AfterSend;
             public AIResponse Response = Chat();
             public bool cancel, fail;
             public Task<AIResponse> Send(AIRequest request, CancellationToken cancellation)
-            { Last = request; cancellation.ThrowIfCancellationRequested(); if (cancel) throw new OperationCanceledException(); if (fail) throw new Exception(Secret); return Task.FromResult(Response); }
+            {
+                Last = request; Calls.Add(request); cancellation.ThrowIfCancellationRequested();
+                if (cancel) throw new OperationCanceledException(); if (fail) throw new Exception(Secret);
+                AIResponse response = Responses.Count > 0 ? Responses.Dequeue() : Response;
+                AfterSend?.Invoke(); return Task.FromResult(response);
+            }
         }
         [Test]
         public void DeepSeekUsesBearerAndPreservesVersionedBaseWithSixBoundedEvidenceItems()
@@ -54,6 +63,149 @@ namespace Horizon.Tests
             Assert.AreEqual("https://horizon.example/v1/personalize", request.Url);
             Assert.That(request.Body, Does.Contain("\"provider\":\"azure\"").And.Not.Contain(Secret).And.Not.Contain("azureEndpoint"));
             Assert.IsTrue(AIProtocol.Read(new AIResponse(200, Content), settings.provider, settings.connection).generatedByAI);
+        }
+        [TestCase("https://resource.services.ai.azure.com/api/projects/interview/", "https://resource.services.ai.azure.com", AzureAccessMode.OpenAIV1)]
+        [TestCase("https://resource.services.ai.azure.com", "https://resource.services.ai.azure.com", AzureAccessMode.OpenAIV1)]
+        [TestCase("https://resource.openai.azure.com/openai/v1/", "https://resource.openai.azure.com", AzureAccessMode.OpenAIV1)]
+        [TestCase("https://resource.openai.azure.com/openai/v1/chat/completions", "https://resource.openai.azure.com", AzureAccessMode.OpenAIV1)]
+        [TestCase("https://resource.services.ai.azure.com/models/", "https://resource.services.ai.azure.com", AzureAccessMode.FoundryModels)]
+        [TestCase("https://resource.openai.azure.com/", "https://resource.openai.azure.com", AzureAccessMode.AzureOpenAI)]
+        public void AzureResourceAndProjectEndpointsNormalizeWithoutChangingOrigin(string raw, string root, AzureAccessMode preferred)
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = raw, azureDeployment = "coach" };
+            AzureEndpoint endpoint = AzureEndpoints.Resolve(settings);
+            Assert.AreEqual(root, endpoint.Root); Assert.AreEqual(preferred, endpoint.Modes[0]);
+            Assert.That(AIProtocol.Build(settings, Secret, Context).Url, Does.StartWith(root + "/"));
+        }
+        [TestCase("http://resource.services.ai.azure.com/api/projects/demo")]
+        [TestCase("https://user:key@resource.services.ai.azure.com/api/projects/demo")]
+        [TestCase("https://resource.services.ai.azure.com/api/projects/demo?api-key=hidden")]
+        [TestCase("https://resource.services.ai.azure.com/api/projects/demo#hidden")]
+        [TestCase("https://resource.services.ai.azure.com/api/projects/demo/unknown")]
+        [TestCase("https://resource.services.ai.azure.com/unknown")]
+        public void AzureRejectsAmbiguousOrCredentialBearingPathsBeforeSending(string raw)
+        { Assert.Throws<AIException>(() => AzureEndpoints.Resolve(new AISettings { azureEndpoint = raw })); }
+        [Test]
+        public void AzureDefaultsAndPayloadsMatchEachApiWhileV1OmitsDatedVersion()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.services.ai.azure.com", azureDeployment = "coach" };
+            AIRequest classic = AIProtocol.BuildAzure(settings, Secret, Context, "coach", AzureAccessMode.AzureOpenAI);
+            Assert.That(classic.Url, Does.EndWith("api-version=2024-10-21"));
+            Assert.That(classic.Body, Does.Not.Contain("\"model\""));
+            AIRequest foundry = AIProtocol.BuildAzure(settings, Secret, Context, "coach", AzureAccessMode.FoundryModels);
+            Assert.That(foundry.Url, Does.EndWith("/models/chat/completions?api-version=2024-05-01-preview"));
+            Assert.That(foundry.Body, Does.Contain("\"model\":\"coach\"").And.Contain("max_tokens").And.Not.Contain("max_completion_tokens"));
+            settings.azureApiVersion = "2024-10-21";
+            AIRequest v1 = AIProtocol.BuildAzure(settings, Secret, Context, "coach", AzureAccessMode.OpenAIV1);
+            Assert.That(v1.Url, Does.EndWith("/openai/v1/chat/completions").And.Not.Contain("api-version"));
+            Assert.That(v1.Body, Does.Contain("\"model\":\"coach\"").And.Contain("max_completion_tokens"));
+        }
+        [Test]
+        public async Task Azure404TriesAnotherPathOnTheSameOriginWithoutTouchingGameRules()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.openai.azure.com", azureDeployment = "coach", azureResourceName = "练习资源" };
+            var transport = new Transport(); transport.Responses.Enqueue(new AIResponse(404, Secret)); transport.Responses.Enqueue(Chat());
+            var life = GameSession.StartMasterLife(2, 15, RunMode.Quick); string before = JsonUtility.ToJson(life.Snapshot());
+            PersonalContent result = await new OnlineContentAdapter(settings, Secret, transport).Personalize(NarrativeContext.From(life), CancellationToken.None);
+            Assert.AreEqual(2, transport.Calls.Count);
+            Assert.That(transport.Calls[0].Url, Does.Contain("/openai/deployments/coach/"));
+            Assert.AreEqual("https://resource.openai.azure.com/openai/v1/chat/completions", transport.Calls[1].Url);
+            Assert.AreEqual("练习资源 / coach", result.source); Assert.That(result.status, Does.Contain("v1"));
+            Assert.AreEqual(before, JsonUtility.ToJson(life.Snapshot()));
+            Assert.That(transport.Calls.All(x => x.Headers["api-key"] == Secret), Is.True);
+        }
+        [Test]
+        public async Task FoundryProject404MovesFromV1ToModelsWithAnApiSpecificDefault()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.services.ai.azure.com/api/projects/demo", azureDeployment = "coach" };
+            var transport = new Transport(); transport.Responses.Enqueue(new AIResponse(404, "")); transport.Responses.Enqueue(Chat());
+            await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None);
+            Assert.AreEqual("https://resource.services.ai.azure.com/openai/v1/chat/completions", transport.Calls[0].Url);
+            Assert.AreEqual("https://resource.services.ai.azure.com/models/chat/completions?api-version=2024-05-01-preview", transport.Calls[1].Url);
+            Assert.That(transport.Calls.All(x => !x.Url.Contains("api/projects")), Is.True);
+        }
+        [Test]
+        public async Task CommaSeparatedDeploymentsPrioritizeTheSelectedModelAndSkipMissingDeployments()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.services.ai.azure.com", azureDeployment = "good, missing，good", azureSelectedDeployment = "missing" };
+            var transport = new Transport(); for (int i = 0; i < 3; i++) transport.Responses.Enqueue(new AIResponse(404, "")); transport.Responses.Enqueue(Chat());
+            PersonalContent result = await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None);
+            Assert.AreEqual(4, transport.Calls.Count);
+            Assert.That(transport.Calls[0].Body, Does.Contain("\"model\":\"missing\""));
+            Assert.That(transport.Calls[3].Body, Does.Contain("\"model\":\"good\""));
+            Assert.AreEqual("resource / good", result.source);
+        }
+        [TestCase(401, AIError.Credentials)]
+        [TestCase(403, AIError.Credentials)]
+        [TestCase(429, AIError.RateLimit)]
+        [TestCase(500, AIError.Unavailable)]
+        [TestCase(503, AIError.Unavailable)]
+        [TestCase(504, AIError.Timeout)]
+        [TestCase(400, AIError.Unavailable)]
+        public void AzureDoesNotRetryAuthenticationLimitsTimeoutsOrOtherFailures(int status, AIError code)
+        {
+            var transport = new Transport { Response = new AIResponse(status, Secret) };
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.services.ai.azure.com", azureDeployment = "one,two" };
+            AIException error = Assert.ThrowsAsync<AIException>(async () => await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None));
+            Assert.AreEqual(code, error.Code); Assert.AreEqual(1, transport.Calls.Count); Assert.That(error.Message, Does.Not.Contain(Secret));
+        }
+        [Test]
+        public async Task OnlyAnExplicitMissingDeploymentErrorCanRetryA400()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.openai.azure.com", azureDeployment = "coach" };
+            var transport = new Transport(); transport.Responses.Enqueue(new AIResponse(400, "{\"error\":{\"code\":\"DeploymentNotFound\"}}")); transport.Responses.Enqueue(Chat());
+            await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None);
+            Assert.AreEqual(2, transport.Calls.Count);
+        }
+        [Test]
+        public async Task EmptyDeploymentReadsV1ModelsWithGetThenUsesReturnedId()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.services.ai.azure.com/api/projects/demo" };
+            var transport = new Transport(); transport.Responses.Enqueue(new AIResponse(200, "{\"data\":[{\"id\":\"returned-coach\"}]}")); transport.Responses.Enqueue(Chat());
+            await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None);
+            Assert.AreEqual("GET", transport.Calls[0].Method); Assert.IsEmpty(transport.Calls[0].Body);
+            Assert.AreEqual("https://resource.services.ai.azure.com/openai/v1/models", transport.Calls[0].Url);
+            Assert.That(transport.Calls[1].Body, Does.Contain("\"model\":\"returned-coach\"")); Assert.AreEqual("POST", transport.Calls[1].Method);
+        }
+        [Test]
+        public void EmptyDeploymentNeverGuessesNamesWhenModelListingIsUnavailable()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.openai.azure.com" };
+            var transport = new Transport { Response = new AIResponse(404, Secret) };
+            AIException error = Assert.ThrowsAsync<AIException>(async () => await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None));
+            Assert.AreEqual(AIError.Deployment, error.Code); Assert.AreEqual(1, transport.Calls.Count);
+            Assert.That(error.Message, Does.Contain("部署名").And.Not.Contain(Secret));
+        }
+        [Test]
+        public void AzureDeploymentListsAndDiscoveredModelsHaveFiniteBounds()
+        {
+            Assert.Throws<AIException>(() => AzureEndpoints.Deployments(new AISettings { azureDeployment = "a,b,c,d,e,f,g" }));
+            Assert.Throws<AIException>(() => AzureEndpoints.Deployments(new AISettings { azureDeployment = "a\nb" }));
+            Assert.Throws<AIException>(() => AzureEndpoints.ReadModels(new AIResponse(200, "{}")));
+            string data = "{\"data\":[" + string.Join(",", Enumerable.Range(0, 20).Select(x => "{\"id\":\"coach" + x + "\"}")) + "]}";
+            Assert.AreEqual(6, AzureEndpoints.ReadModels(new AIResponse(200, data)).Length);
+        }
+        [Test]
+        public void CancellationBetweenAzureFallbackAttemptsStopsImmediately()
+        {
+            using (var cancel = new CancellationTokenSource())
+            {
+                var settings = new AISettings { provider = AIProvider.AzureOpenAI, azureEndpoint = "https://resource.openai.azure.com", azureDeployment = "coach" };
+                var transport = new Transport { Response = new AIResponse(404, ""), AfterSend = () => cancel.Cancel() };
+                var adapter = new ResilientContentAdapter(new OnlineContentAdapter(settings, Secret, transport));
+                Assert.CatchAsync<OperationCanceledException>(async () => await adapter.Personalize(Context, cancel.Token)); Assert.AreEqual(1, transport.Calls.Count);
+            }
+        }
+        [Test]
+        public void OlderAzureSettingsKeepWorkingAndNewProfileFieldsSurviveBackupWithoutKeys()
+        {
+            var legacy = JsonUtility.FromJson<AISettings>("{\"provider\":2,\"azureEndpoint\":\"https://example.openai.azure.com\",\"azureDeployment\":\"coach\",\"azureApiVersion\":\"2024-10-21\"}");
+            legacy.Repair(); Assert.AreEqual(AzureAccessMode.Auto, legacy.azureAccessMode);
+            Assert.That(AIProtocol.Build(legacy, Secret, Context).Url, Does.Contain("/openai/deployments/coach/"));
+            legacy.azureResourceName = "练习资源"; legacy.azureDeployment = "one,two"; legacy.azureSelectedDeployment = "two";
+            AISettings restored = JsonUtility.FromJson<AISettings>(JsonUtility.ToJson(legacy)); restored.Repair();
+            Assert.AreEqual("练习资源", restored.azureResourceName); Assert.AreEqual("two", AzureEndpoints.Deployments(restored)[0]);
+            Assert.That(ArchiveStore.Encode(new ArchiveData { ai = restored }), Does.Not.Contain(Secret));
         }
         [TestCase("http://api.deepseek.com")]
         [TestCase("https://user:password@api.deepseek.com")]

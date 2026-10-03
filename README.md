@@ -4,7 +4,7 @@ Unity 竖屏时间策略与人生卡牌游戏。**Master Product Specification v
 
 本轮在原有 12/30 天、TIME ECHO、预测、CauseGraph、未来站、Boss、分支重演与分享上，加入 Decision Lock、行动发动机、Trigger、内在议会、强制失败与恢复的想象演练、Future Memory、跨局模式检测、Pattern Broken、Overdrive、Future Orbit、Causal Reservoir、Reality Bridge / Constellation，以及本地平行比较和经验回声。规则版本 9、牌池版本 7；旧存档沿用原牌池与规则。
 
-先看 [v0.4.2 产品基线](docs/MASTER_PRODUCT_SPEC_V0.4.2.md) 与 [实现、验证和交付边界](docs/IMPLEMENTATION_V042.md)。打开 Unity 2022.3.22f1 的 Boot 场景即可试玩；首局第 5 天起和后续人生开放「ME · 想象」入口，主页「HORIZON ME」连接各新系统。在线 AI 支持 [DeepSeek / Azure OpenAI](docs/ONLINE_AI.md)，从「设置 → 在线 AI」配置；无凭据时使用本地内容，Parallel Lives 使用本地同起点重演。
+先看 [v0.4.2 产品基线](docs/MASTER_PRODUCT_SPEC_V0.4.2.md) 与 [实现、验证和交付边界](docs/IMPLEMENTATION_V042.md)。打开 Unity 2022.3.22f1 的 Boot 场景即可试玩；首局第 5 天起和后续人生开放「ME · 想象」入口，主页「HORIZON ME」连接各新系统。在线 AI 支持 [DeepSeek / Azure / Microsoft Foundry](docs/ONLINE_AI.md)，从「设置 → 在线 AI」配置资源、终结点与部署；无凭据时使用本地内容，Parallel Lives 使用本地同起点重演。
 
 ## 怎么玩
 

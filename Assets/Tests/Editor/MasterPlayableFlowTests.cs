@@ -112,9 +112,11 @@ namespace Horizon.Tests
         private sealed class TestAITransport : IAITransport
         {
             public AIRequest last;
+            public readonly System.Collections.Generic.List<AIRequest> calls = new System.Collections.Generic.List<AIRequest>();
             public Task<AIResponse> Send(AIRequest request, CancellationToken cancellation)
             {
-                cancellation.ThrowIfCancellationRequested(); last = request;
+                cancellation.ThrowIfCancellationRequested(); last = request; calls.Add(request);
+                if (request.Method == "GET") return Task.FromResult(new AIResponse(200, "{\"data\":[{\"id\":\"auto-coach\"}]}"));
                 string content = JsonUtility.ToJson(new PersonalContent { futureSelfLine = "你已经练过失败后的下一步。现在想怎样继续？",
                     quest = "打开一份材料并读两分钟", patternExplanation = "近期模式可以被新的选择改变。" });
                 string escaped = content.Replace("\\", "\\\\").Replace("\"", "\\\"");
@@ -144,6 +146,7 @@ namespace Horizon.Tests
             foreach (InputField field in Get<RectTransform>(app, "root").GetComponentsInChildren<InputField>())
             {
                 if (field.name == "AI Azure endpoint") field.text = "https://example.openai.azure.com";
+                if (field.name == "AI Azure resource name") field.text = "面试练习";
                 if (field.name == "AI Azure deployment") field.text = "test-deployment";
                 if (field.name == "AI provider key") field.text = "dummy-azure-session-key";
             }
@@ -161,6 +164,51 @@ namespace Horizon.Tests
             Button(app, "Accept AI reality suggestion").onClick.Invoke(); yield return null;
             Assert.AreEqual(1, archive.reality.quests.Count); Assert.IsFalse(archive.reality.quests[0].completed);
             Assert.IsTrue(string.IsNullOrEmpty(archive.reality.quests[0].memoryId), "Generated suggestions cannot invent a convergence.");
+            yield return new ExitPlayMode();
+        }
+        [UnityTest]
+        public IEnumerator FoundryResourceEditorMatchesOptionalFieldsAndDeploymentSelection()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Foundry resource flow").AddComponent<HorizonApp>();
+            yield return null;
+            var life = GameSession.StartMasterLife(2, 15, RunMode.Quick);
+            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99, seenSecondLife = true };
+            archive.preferences.reducedMotion = true; archive.preferences.sound = false;
+            var transport = new TestAITransport(); Set(app, "aiTransport", transport);
+            Set(app, "session", life); Set(app, "archive", archive); Call(app, "BuildBoard"); Call(app, "ShowSettings"); yield return null;
+            Button(app, "Online AI settings").onClick.Invoke(); yield return null;
+            Button(app, "AI provider 2").onClick.Invoke(); yield return null;
+            foreach (InputField field in Get<RectTransform>(app, "root").GetComponentsInChildren<InputField>())
+            {
+                if (field.name == "AI Azure resource name") field.text = "我的 Azure 资源";
+                if (field.name == "AI Azure endpoint") field.text = "https://example.services.ai.azure.com/api/projects/interview";
+                if (field.name == "AI Azure deployment" || field.name == "AI Azure api version") field.text = "";
+                if (field.name == "AI provider key") field.text = "dummy-foundry-session-key";
+            }
+            Button(app, "Test AI connection").onClick.Invoke(); yield return null;
+            Assert.AreEqual(2, transport.calls.Count); Assert.AreEqual("GET", transport.calls[0].Method);
+            Assert.That(transport.last.Body, Does.Contain("auto-coach"));
+            // All four options are real settings; switching preserves draft fields and session credentials.
+            for (int i = 0; i < 4; i++) { Button(app, "AI Azure access mode").onClick.Invoke(); yield return null; }
+            Assert.AreEqual(AzureAccessMode.Auto, Get<AISettings>(app, "aiDraft").azureAccessMode);
+            foreach (InputField field in Get<RectTransform>(app, "root").GetComponentsInChildren<InputField>())
+                if (field.name == "AI Azure deployment") field.text = "coach, review-coach";
+            yield return Capture(app, "48-ai-foundry-resource");
+            Button(app, "Save AI settings").onClick.Invoke(); yield return null;
+            Assert.AreEqual("我的 Azure 资源", archive.ai.azureResourceName); Assert.AreEqual("", archive.ai.azureApiVersion);
+            Assert.That(ArchiveStore.Encode(archive), Does.Not.Contain("dummy-foundry-session-key"));
+            Button(app, "Close settings").onClick.Invoke(); yield return null;
+            Call(app, "ShowFutureSelfDialogue"); yield return null;
+            Button(app, "Choose Azure deployment").onClick.Invoke(); yield return null;
+            Assert.That(Button(app, "Azure deployment choice 1").GetComponentInChildren<Text>().text, Does.Contain("我的 Azure 资源 / review-coach"));
+            yield return Capture(app, "49-ai-azure-deployments");
+            Button(app, "Azure deployment choice 1").onClick.Invoke(); yield return null;
+            Assert.AreEqual("review-coach", archive.ai.azureSelectedDeployment);
+            Button(app, "Generate personal content").onClick.Invoke(); yield return null;
+            Assert.AreEqual("https://example.services.ai.azure.com/openai/v1/chat/completions", transport.last.Url);
+            Assert.That(transport.last.Body, Does.Contain("\"model\":\"review-coach\""));
+            Assert.AreEqual(0, archive.reality.quests.Count);
             yield return new ExitPlayMode();
         }
     }

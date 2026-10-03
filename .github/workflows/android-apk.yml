@@ -138,6 +138,8 @@ jobs:
           test -s artifacts/visuals/45-ai-deepseek.png
           test -s artifacts/visuals/46-ai-azure.png
           test -s artifacts/visuals/47-ai-future-self.png
+          test -s artifacts/visuals/48-ai-foundry-resource.png
+          test -s artifacts/visuals/49-ai-azure-deployments.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash

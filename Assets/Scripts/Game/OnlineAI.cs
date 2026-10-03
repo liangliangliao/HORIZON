@@ -9,6 +9,7 @@ namespace Horizon.Game
 {
     public enum AIProvider { Local, DeepSeek, AzureOpenAI }
     public enum AIConnection { Direct, Gateway }
+    public enum AzureAccessMode { Auto, AzureOpenAI, FoundryModels, OpenAIV1 }
 
     [Serializable]
     public sealed class AISettings
@@ -19,8 +20,11 @@ namespace Horizon.Game
         public string deepSeekEndpoint = "https://api.deepseek.com";
         public string deepSeekModel = "deepseek-chat";
         public string azureEndpoint = "";
+        public string azureResourceName = "";
+        public AzureAccessMode azureAccessMode;
         public string azureDeployment = "";
-        public string azureApiVersion = "2024-10-21";
+        public string azureSelectedDeployment = "";
+        public string azureApiVersion = "";
         public string gatewayEndpoint = "";
         public int timeoutSeconds = 25;
         public AISettings Copy() { return (AISettings)MemberwiseClone(); }
@@ -31,7 +35,10 @@ namespace Horizon.Game
             deepSeekEndpoint = AIText.Bound(deepSeekEndpoint, 500);
             deepSeekModel = AIText.Bound(deepSeekModel, 100);
             azureEndpoint = AIText.Bound(azureEndpoint, 500);
-            azureDeployment = AIText.Bound(azureDeployment, 100);
+            azureResourceName = AIText.Bound(azureResourceName, 100);
+            if (!Enum.IsDefined(typeof(AzureAccessMode), azureAccessMode)) azureAccessMode = AzureAccessMode.Auto;
+            azureDeployment = AIText.Bound(azureDeployment, 600);
+            azureSelectedDeployment = AIText.Bound(azureSelectedDeployment, 100);
             azureApiVersion = AIText.Bound(azureApiVersion, 50);
             gatewayEndpoint = AIText.Bound(gatewayEndpoint, 500);
             timeoutSeconds = Math.Max(5, Math.Min(45, timeoutSeconds == 0 ? 25 : timeoutSeconds));
@@ -55,7 +62,7 @@ namespace Horizon.Game
         { value = (value ?? "").Trim(); return value.Length <= maximum ? value : value.Substring(0, maximum); }
     }
 
-    public enum AIError { Configuration, Credentials, RateLimit, Unavailable, Network, Timeout, InvalidContent }
+    public enum AIError { Configuration, Credentials, RateLimit, Unavailable, Network, Timeout, InvalidContent, Deployment }
     public sealed class AIException : Exception
     {
         public readonly AIError Code;
@@ -69,6 +76,7 @@ namespace Horizon.Game
                 case AIError.RateLimit: return "服务暂时限流，请稍后重试。";
                 case AIError.Timeout: return "请求超时，请稍后重试。";
                 case AIError.InvalidContent: return "服务没有返回完整的个人内容。";
+                case AIError.Deployment: return "无法读取可用对话部署，请填写实际部署名；多个名称用逗号分隔。";
                 case AIError.Unavailable: return "服务或部署暂时不可用，请检查配置。";
                 default: return "网络暂时不可用。";
             }
@@ -77,11 +85,11 @@ namespace Horizon.Game
 
     public sealed class AIRequest
     {
-        public readonly string Url, Body;
+        public readonly string Url, Body, Method;
         public readonly Dictionary<string, string> Headers;
         public readonly int TimeoutSeconds;
-        public AIRequest(string url, string body, Dictionary<string, string> headers, int timeout)
-        { Url = url; Body = body; Headers = headers; TimeoutSeconds = timeout; }
+        public AIRequest(string url, string body, Dictionary<string, string> headers, int timeout, string method = "POST")
+        { Url = url; Body = body; Headers = headers; TimeoutSeconds = timeout; Method = method; }
     }
     public sealed class AIResponse
     {
@@ -104,6 +112,8 @@ namespace Horizon.Game
         { public string model; public Message[] messages; public Format response_format = new Format(); public int max_tokens = 900; }
         [Serializable] private sealed class AzureBody
         { public Message[] messages; public Format response_format = new Format(); public int max_completion_tokens = 1800; }
+        [Serializable] private sealed class AzureV1Body
+        { public string model; public Message[] messages; public Format response_format = new Format(); public int max_completion_tokens = 1800; }
         [Serializable] private sealed class ContextBody { public string goal, recentPattern; public string[] evidence; }
         [Serializable] private sealed class GatewayBody { public string provider; public ContextBody context; }
         [Serializable] private sealed class ChatMessage { public string content; }
@@ -125,7 +135,7 @@ namespace Horizon.Game
         {
             if (settings == null || settings.provider == AIProvider.Local || !Enum.IsDefined(typeof(AIProvider), settings.provider) ||
                 !Enum.IsDefined(typeof(AIConnection), settings.connection)) throw new AIException(AIError.Configuration);
-            if (string.IsNullOrWhiteSpace(credential) || credential.Length > 2048 || credential.Any(char.IsControl)) throw new AIException(AIError.Credentials);
+            ValidateCredential(credential);
             string url, body;
             var headers = new Dictionary<string, string> { { "Content-Type", "application/json" } };
             if (settings.connection == AIConnection.Gateway)
@@ -148,17 +158,34 @@ namespace Horizon.Game
                 }
                 else
                 {
-                    url = Endpoint(settings.azureEndpoint);
-                    if (new Uri(url).AbsolutePath != "/") throw new AIException(AIError.Configuration);
-                    url += "/openai/deployments/" + Uri.EscapeDataString(Required(settings.azureDeployment)) +
-                        "/chat/completions?api-version=" + Uri.EscapeDataString(Required(settings.azureApiVersion));
-                    body = JsonUtility.ToJson(new AzureBody { messages = messages });
-                    headers.Add("api-key", credential.Trim());
+                    string[] deployments = AzureEndpoints.Deployments(settings);
+                    if (deployments.Length == 0) throw new AIException(AIError.Deployment);
+                    return BuildAzure(settings, credential, context, deployments[0], AzureEndpoints.Resolve(settings).Modes[0]);
                 }
             }
             return new AIRequest(url, body, headers, Math.Max(5, Math.Min(45, settings.timeoutSeconds)));
         }
-        public static PersonalContent Read(AIResponse response, AIProvider provider, AIConnection connection)
+        public static void ValidateCredential(string credential)
+        { if (string.IsNullOrWhiteSpace(credential) || credential.Length > 2048 || credential.Any(char.IsControl)) throw new AIException(AIError.Credentials); }
+        public static AIRequest BuildAzure(AISettings settings, string credential, NarrativeContext context, string deployment, AzureAccessMode mode)
+        {
+            ValidateCredential(credential);
+            var messages = new[] { new Message { role = "system", content = SystemPrompt },
+                new Message { role = "user", content = JsonUtility.ToJson(Context(context)) } };
+            string body = mode == AzureAccessMode.AzureOpenAI ? JsonUtility.ToJson(new AzureBody { messages = messages }) :
+                mode == AzureAccessMode.OpenAIV1 ? JsonUtility.ToJson(new AzureV1Body { model = Required(deployment), messages = messages }) :
+                JsonUtility.ToJson(new DeepSeekBody { model = Required(deployment), messages = messages });
+            return new AIRequest(AzureEndpoints.Resolve(settings).ChatUrl(mode, Required(deployment), settings.azureApiVersion), body,
+                new Dictionary<string, string> { { "Content-Type", "application/json" }, { "api-key", credential.Trim() } },
+                Math.Max(5, Math.Min(45, settings.timeoutSeconds)));
+        }
+        public static AIRequest BuildAzureModelList(AISettings settings, string credential)
+        {
+            ValidateCredential(credential);
+            return new AIRequest(AzureEndpoints.Resolve(settings).Root + "/openai/v1/models", "",
+                new Dictionary<string, string> { { "api-key", credential.Trim() } }, Math.Max(5, Math.Min(45, settings.timeoutSeconds)), "GET");
+        }
+        public static void CheckStatus(AIResponse response)
         {
             if (response.Status == 401 || response.Status == 403) throw new AIException(AIError.Credentials);
             if (response.Status == 429) throw new AIException(AIError.RateLimit);
@@ -166,6 +193,10 @@ namespace Horizon.Game
             if (response.Status == 0) throw new AIException(AIError.Network);
             if (response.Status < 200 || response.Status >= 300) throw new AIException(AIError.Unavailable);
             if (response.Body.Length > 65536) throw new AIException(AIError.InvalidContent);
+        }
+        public static PersonalContent Read(AIResponse response, AIProvider provider, AIConnection connection)
+        {
+            CheckStatus(response);
             try
             {
                 string content = response.Body;
@@ -200,15 +231,43 @@ namespace Horizon.Game
         public async Task<PersonalContent> Personalize(NarrativeContext context, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
-            AIRequest request = AIProtocol.Build(settings, credential, context);
             using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
             {
-                timeout.CancelAfter(TimeSpan.FromSeconds(request.TimeoutSeconds));
-                try { AIResponse response = await transport.Send(request, timeout.Token); cancellation.ThrowIfCancellationRequested(); return AIProtocol.Read(response, settings.provider, settings.connection); }
+                timeout.CancelAfter(TimeSpan.FromSeconds(Math.Max(5, Math.Min(45, settings.timeoutSeconds))));
+                try
+                {
+                    if (settings.provider == AIProvider.AzureOpenAI && settings.connection == AIConnection.Direct)
+                        return await AzurePersonalize(context, timeout.Token);
+                    AIResponse response = await transport.Send(AIProtocol.Build(settings, credential, context), timeout.Token);
+                    timeout.Token.ThrowIfCancellationRequested(); return AIProtocol.Read(response, settings.provider, settings.connection);
+                }
                 catch (OperationCanceledException) { cancellation.ThrowIfCancellationRequested(); throw new AIException(AIError.Timeout); }
                 catch (AIException) { throw; }
                 catch (Exception) { throw new AIException(AIError.Network); }
             }
+        }
+        private async Task<PersonalContent> AzurePersonalize(NarrativeContext context, CancellationToken cancellation)
+        {
+            AIProtocol.ValidateCredential(credential);
+            AzureEndpoint endpoint = AzureEndpoints.Resolve(settings);
+            string[] deployments = AzureEndpoints.Deployments(settings);
+            if (deployments.Length == 0)
+            {
+                AIResponse listed = await transport.Send(AIProtocol.BuildAzureModelList(settings, credential), cancellation);
+                cancellation.ThrowIfCancellationRequested(); deployments = AzureEndpoints.Prioritize(AzureEndpoints.ReadModels(listed), settings.azureSelectedDeployment);
+            }
+            foreach (string deployment in deployments)
+                foreach (AzureAccessMode mode in endpoint.Modes)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    AIResponse response = await transport.Send(AIProtocol.BuildAzure(settings, credential, context, deployment, mode), cancellation);
+                    cancellation.ThrowIfCancellationRequested();
+                    if (AzureEndpoints.PathOrDeploymentMissing(response)) continue;
+                    PersonalContent result = AIProtocol.Read(response, settings.provider, settings.connection);
+                    result.source = AzureEndpoints.ModelLabel(settings, deployment);
+                    result.status = "在线内容 · " + AzureEndpoints.ModeLabel(mode); return result;
+                }
+            throw new AIException(AIError.Deployment);
         }
     }
     public sealed class ResilientContentAdapter : IAIAdapter
