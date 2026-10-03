@@ -36,7 +36,7 @@ namespace Horizon
                 }, x, 0.729f, x + 0.27f, 0.782f, predictionHorizon == span ? Palette.Mint : Palette.Panel,
                     predictionHorizon == span ? Palette.Ink : Palette.Text, 25).interactable = session.Day + span <= session.Deadline;
             }
-            string[] names = { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+            string[] names = { "精力", "心情", "专注", "关系", "金钱", "能力" };
             for (int i = 0; i < 6; i++)
             {
                 int index = i; float x = 0.145f + i % 3 * 0.29f; float y = i < 3 ? 0.437f : 0.177f;

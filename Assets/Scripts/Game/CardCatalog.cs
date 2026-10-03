@@ -56,6 +56,7 @@ namespace Horizon.Game
         public readonly string FutureHint;
         public readonly string EchoName;
         public readonly bool GivesSupport;
+        public readonly CardTraits Traits;
 
         public CardSpec(string id, string name, CardKind kind, ResourceDelta now,
             ResourceDelta later, int delay, string futureHint, string echoName, bool givesSupport = false)
@@ -69,13 +70,14 @@ namespace Horizon.Game
             FutureHint = futureHint;
             EchoName = echoName;
             GivesSupport = givesSupport;
+            Traits = CardTraits.For(id, kind, givesSupport);
         }
     }
 
     // One of each intent every day. All recovery choices restore energy, so no run can deadlock.
     public static class CardCatalog
     {
-        public const int CurrentVersion = 6;
+        public const int CurrentVersion = 7;
         private static readonly CardSpec[] SeasonActions = {
             new CardSpec("library", "借一本好书", CardKind.Growth, new ResourceDelta(-1),
                 new ResourceDelta(0, 0, 2, 0, 0, 1), 2, "2日后 · 灵感", "书里的一个想法成为了你的能力"),
@@ -249,6 +251,8 @@ namespace Horizon.Game
 
         public static CardSpec FindById(string id)
         {
+            CardSpec master = Array.Find(MasterContent.Actions, candidate => candidate.Id == id);
+            if (master != null) return master;
             CardSpec story = Array.Find(CampaignContent.Actions, candidate => candidate.Id == id);
             if (story != null) return story;
             CardSpec seasonal = Array.Find(SeasonActions, candidate => candidate.Id == id);

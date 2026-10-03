@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - codex/unity-prototype-v0-3
+      - codex/playable-feedback-3d
   workflow_dispatch:
 
 permissions:
@@ -19,6 +20,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run portable rules and legacy regressions
+        run: |
+          mkdir -p artifacts
+          dotnet run --project tools/RulesHarness.csproj -- --workers=0 --result=artifacts/rules.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-v042-Rule-Results
+          path: artifacts/rules.xml
+          retention-days: 14
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -100,6 +119,11 @@ jobs:
           test -s artifacts/visuals/37-ghost-original-choice.png
           test -s artifacts/visuals/38-ghost-returning-consequence.png
           test -s artifacts/visuals/39-ghost-deadline.png
+          test -s artifacts/visuals/40-master-execution.png
+          test -s artifacts/visuals/41-victory-anchor.png
+          test -s artifacts/visuals/42-imagine-recovery.png
+          test -s artifacts/visuals/43-future-orbit.png
+          test -s artifacts/visuals/44-reality-constellation.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -119,7 +143,7 @@ jobs:
           retention-days: 14
 
   build:
-    needs: test
+    needs: [rules, test]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -162,7 +186,7 @@ jobs:
           targetPlatform: Android
           buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage
-          customParameters: -horizonChannel preview -horizonVersion 0.6.0 -horizonBuildNumber ${{ github.run_number }}
+          customParameters: -horizonChannel preview -horizonVersion 0.4.2 -horizonBuildNumber ${{ github.run_number }}
 
       - name: Verify APK output
         shell: bash

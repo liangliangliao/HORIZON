@@ -79,7 +79,7 @@ namespace Horizon
             int[] values = session.RunNumber == 1 && session.Deadline == 12 ? new[] { session.Energy, session.Mood, session.Ability } :
                 new[] { session.Energy, session.Mood, session.Insight, session.Relation, session.Money, session.Ability };
             string[] names = session.RunNumber == 1 && session.Deadline == 12 ? new[] { "精力", "心情", "能力" } :
-                new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+                new[] { "精力", "心情", "专注", "关系", "金钱", "能力" };
             View.Label(root, "State heading", "此刻的你", 22, Palette.Muted, TextAnchor.MiddleLeft,
                 0.06f, 0.416f, 0.5f, 0.443f);
             View.Button(root, "All resources", "全部状态", ShowGoal, 0.73f, 0.417f, 0.94f, 0.442f,

@@ -146,7 +146,7 @@ namespace Horizon
         {
             int[] values = delta == null ? new int[6] : new[] {
                 delta.energy, delta.mood, delta.insight, delta.relation, delta.money, delta.ability };
-            string[] names = { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+            string[] names = { "精力", "心情", "专注", "关系", "金钱", "能力" };
             int count = 0;
             for (int i = 0; i < values.Length; i++)
             {

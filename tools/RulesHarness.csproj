@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>HORIZON_PORTABLE_RULES</DefineConstants>
+    <NoWarn>CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NUnitLite" Version="3.14.0" />
+    <Compile Include="../Assets/Scripts/Game/*.cs" />
+    <Compile Include="RulesHarness/*.cs" />
+    <Compile Include="../Assets/Tests/Editor/GameSessionTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/BusinessRuleTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CampaignCompletionTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CausalPresentationTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/ObservationDesignTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/MasterSpecificationTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/MasterInvariantTests.cs" />
+  </ItemGroup>
+</Project>

@@ -202,6 +202,6 @@ namespace Horizon
 
         private static string StateComparison(ResourceDelta before, ResourceDelta after)
         { return "精力 " + before.energy + "→" + after.energy + "   心情 " + before.mood + "→" + after.mood + "   能力 " + before.ability + "→" + after.ability +
-            "\n关系 " + before.relation + "→" + after.relation + "   金钱 " + before.money + "→" + after.money + "   洞察 " + before.insight + "→" + after.insight; }
+            "\n关系 " + before.relation + "→" + after.relation + "   金钱 " + before.money + "→" + after.money + "   专注 " + before.insight + "→" + after.insight; }
     }
 }

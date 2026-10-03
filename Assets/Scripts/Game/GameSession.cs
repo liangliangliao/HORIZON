@@ -48,7 +48,8 @@ namespace Horizon.Game
         public CardKind replacementSlot;
     }
 
-    public enum CausalNodeKind { Action, Echo, Choice, Gate, Situation, World, Mystery }
+    public enum CausalNodeKind { Action, Echo, Choice, Gate, Situation, World, Mystery,
+        Decision, Execution, Trigger, Thought, Imagination, Memory, Pattern, Insight, Opportunity, Breakthrough, Prediction, Reality }
 
     [Serializable]
     public sealed class CausalNode
@@ -136,6 +137,7 @@ namespace Horizon.Game
     [Serializable]
     public sealed class RunRecord
     {
+        public MasterRunState master;
         public int catalogVersion;
         public int deadline;
         public int worldSeed;
@@ -162,6 +164,7 @@ namespace Horizon.Game
     [Serializable]
     public sealed class RunSnapshot
     {
+        public MasterRunState master;
         public int rulesVersion;
         public int catalogVersion;
         public int deadline;
@@ -252,7 +255,7 @@ namespace Horizon.Game
             if (calibrations == 0 || echo.delta == null) return clue;
             int[] effects = { echo.delta.energy, echo.delta.mood, echo.delta.insight,
                 echo.delta.relation, echo.delta.money, echo.delta.ability };
-            string[] names = { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+            string[] names = { "精力", "心情", "专注", "关系", "金钱", "能力" };
             int strongest = -1;
             for (int i = 0; i < effects.Length; i++)
                 if (effects[i] != 0 && (strongest < 0 ||
@@ -275,7 +278,7 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 8;
+        public const int RulesVersion = 9;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -394,7 +397,7 @@ namespace Horizon.Game
                 }
                 // For pre-graph saves which have already arrived at this day.
                 if (SocialUnavailableToday && hand[2].GivesSupport) hand[2] = CardCatalog.SoloRecovery;
-                return hand;
+                return UsesMasterRules ? MasterContent.Hand(hand, Day, Master.mode) : hand;
             }
         }
 
@@ -418,6 +421,7 @@ namespace Horizon.Game
             Relation = 4;
             Money = 5;
             Ability = 2;
+            InitializeMaster();
         }
 
         public static GameSession Restore(RunSnapshot saved)
@@ -469,6 +473,8 @@ namespace Horizon.Game
             if (saved.pending != null) session.Pending.AddRange(saved.pending);
             session.CausalNodes.AddRange(saved.causalNodes);
             if (saved.mysteries != null) session.Mysteries.AddRange(saved.mysteries);
+            if (session.UsesMasterRules && saved.master != null)
+            { saved.master.Validate(saved.day, deadline); session.Master = saved.master.Copy(); }
             if (simulation && deadline > (saved.deadline > 0 ? saved.deadline : LastDay))
                 foreach (ActionRecord action in session.Actions)
                     if (!action.echoed && action.echoDay > (saved.deadline > 0 ? saved.deadline : LastDay) &&
@@ -547,6 +553,7 @@ namespace Horizon.Game
         {
             return new RunSnapshot
             {
+                master = Master?.Copy(),
                 rulesVersion = RulesVersion, catalogVersion = CatalogVersion, worldSeed = WorldSeed,
                 deckSeed = DeckSeed, deckSeedRecorded = true, deadline = Deadline,
                 day = Day, runNumber = RunNumber,
@@ -682,11 +689,13 @@ namespace Horizon.Game
 
         public bool CanPlay(CardSpec card)
         {
+            ResourceDelta cost = card == null ? new ResourceDelta() : ImmediateEffect(card);
             return card != null && Array.Exists(Hand, candidate => candidate.Id == card.Id) &&
+                MasterAllows(card) &&
                 !CanPredict && !HasPredictionReview && !HasChosen && CompletedRun == null &&
-                Energy + card.Now.energy >= 0 && Mood + card.Now.mood >= 0 &&
-                Insight + card.Now.insight >= 0 && Relation + card.Now.relation >= 0 &&
-                Money + card.Now.money >= 0 && Ability + card.Now.ability >= 0;
+                Energy + cost.energy >= 0 && Mood + cost.mood >= 0 &&
+                Insight + cost.insight >= 0 && Relation + cost.relation >= 0 &&
+                Money + cost.money >= 0 && Ability + cost.ability >= 0;
         }
 
         public bool TryFocus()
@@ -708,12 +717,13 @@ namespace Horizon.Game
             if (!available) return new FutureProjection(card, false, Day, target,
                 Energy, Mood, Insight, Relation, Money, Ability);
 
-            int energy = Clamp(Energy + card.Now.energy);
-            int mood = Clamp(Mood + card.Now.mood);
-            int insight = Clamp(Insight + card.Now.insight);
-            int relation = Clamp(Relation + card.Now.relation);
-            int money = Clamp(Money + card.Now.money);
-            int ability = Clamp(Ability + card.Now.ability);
+            ResourceDelta immediate = ImmediateEffect(card);
+            int energy = Clamp(Energy + immediate.energy);
+            int mood = Clamp(Mood + immediate.mood);
+            int insight = Clamp(Insight + immediate.insight);
+            int relation = Clamp(Relation + immediate.relation);
+            int money = Clamp(Money + immediate.money);
+            int ability = Clamp(Ability + immediate.ability);
             var projected = new List<PendingEcho>(Pending);
             if (card.Delay > 0 && Day + card.Delay <= target)
                 projected.Add(new PendingEcho
@@ -747,7 +757,8 @@ namespace Horizon.Game
             if (!CanPlay(card)) throw new InvalidOperationException("Insufficient resources.");
 
             ResourceDelta before = Values();
-            Apply(card.Now);
+            ResourceDelta immediate = ImmediateEffect(card);
+            Apply(immediate);
             if (card.GivesSupport) SupportActions++;
             CausalNode changedChoice = CausalNodes.FindLast(n => (n.type == CausalNodeKind.Choice ||
                 n.type == CausalNodeKind.Situation || n.type == CausalNodeKind.World) &&
@@ -760,7 +771,7 @@ namespace Horizon.Game
                 day = Day, cardId = card.Id, cardName = card.Name, kind = card.Kind,
                 echoDay = card.Delay > 0 ? Day + card.Delay : 0,
                 echoName = card.EchoName, givesSupport = card.GivesSupport,
-                now = card.Now, later = card.Later,
+                now = immediate, later = card.Later,
                 actualNow = origin.effect, actualNowRecorded = true,
                 nodeId = origin.id, parentNodeId = origin.parentId,
                 parentNodeIds = new List<string>(CausalGraph.Parents(origin))
@@ -779,6 +790,7 @@ namespace Horizon.Game
                 });
             }
             HasChosen = true;
+            MasterAfterChoice(action, card, before);
             if (Day == Deadline) Complete();
             return action;
         }
@@ -824,8 +836,10 @@ namespace Horizon.Game
                     { source.echoed = true; source.actualLater = echo.actualDelta; source.actualLaterRecorded = true; }
                     if (RunNumber >= 3 || CatalogVersion >= 6 && Deadline == 30) ScheduleConsequences(echo, source);
                 }
+                MasterAfterEcho(echo);
             }
             ResolveWorldEvent();
+            MasterAfterAdvance(due);
             EvaluatePredictions();
             EnsureSituation();
             return new DayTransition(Day, due);
@@ -975,6 +989,8 @@ namespace Horizon.Game
             var replay = new GameSession(original.number, true, original.catalogVersion > 0 ? original.catalogVersion : 1, original.worldSeed);
             replay.Deadline = RunLength(original);
             replay.DeckSeed = original.deckSeedRecorded ? original.deckSeed : original.worldSeed;
+            if (replay.UsesMasterRules && original.master != null)
+                replay.InitializeMaster(original.master.mode, original.master.initialPatterns, original.master.initialMemories, original.master.initialFailures, original.master.initialInsightPoints, original.master.initialKnowledge);
             int firstChange = replay.Deadline + 1;
             foreach (int day in changes.Keys) firstChange = Math.Min(firstChange, day);
             for (int day = 1; day <= stopDay; day++)
@@ -993,10 +1009,12 @@ namespace Horizon.Game
                         prediction.relation, prediction.money, prediction.ability), prediction.dueDay - prediction.sourceDay);
                 }
                 if (day == stopDay && !chooseLast) return replay;
+                replay.ReplayMasterCommands(original, day);
                 ActionRecord recorded = original.actions[day - 1];
                 if (recorded == null) return null;
                 bool explicitChoice = changes.TryGetValue(day, out string desired);
                 if (!explicitChoice) desired = recorded.cardId;
+                if (replay.InExecutionMode && desired != replay.Master.decision.cardId) replay.UnlockDecision();
                 CardSpec choice = Array.Find(replay.Hand, c => c.Id == desired);
                 if (choice == null || !replay.CanPlay(choice))
                 {
@@ -1139,8 +1157,10 @@ namespace Horizon.Game
                             (mystery.effect.energy > 0 || mystery.effect.mood > 0)) CausalGraph.Link(node, mystery.id);
                 }
             }
+            MasterComplete(boss);
             CompletedRun = new RunRecord
             {
+                master = Master?.Copy(),
                 catalogVersion = CatalogVersion, deadline = Deadline, worldSeed = WorldSeed, deckSeed = DeckSeed, deckSeedRecorded = true,
                 number = RunNumber,
                 boss = boss,

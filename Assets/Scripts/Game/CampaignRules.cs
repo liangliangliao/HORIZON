@@ -35,6 +35,7 @@ namespace Horizon.Game
                 sixAxes = UsesSixPredictionAxes
             };
             Predictions.Add(Prediction);
+            MasterPredictionLocked();
         }
 
         private void RefreshPredictionCursor()
@@ -51,6 +52,7 @@ namespace Horizon.Game
                 int distance = Math.Abs(p.energy - p.actualEnergy) + Math.Abs(p.mood - p.actualMood) + Math.Abs(p.insight - p.actualInsight);
                 if (p.sixAxes) distance += Math.Abs(p.relation - p.actualRelation) + Math.Abs(p.money - p.actualMoney) + Math.Abs(p.ability - p.actualAbility);
                 p.accurate = distance <= (p.sixAxes ? 4 : 2); p.evaluated = true;
+                MasterPredictionEvaluated(p);
             }
             RefreshPredictionCursor();
         }

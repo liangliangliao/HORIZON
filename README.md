@@ -1,8 +1,10 @@
 # HORIZON / 远见
 
-Unity 竖屏人生卡牌游戏，基于《HORIZON / 远见》v0.3。每天选一张行动牌，今天的变化立即发生，延迟回声在卡牌标记的日期回来。短局第 12 天、长局第 30 天，过去的选择共同回答能力、状态与支援三道门。
+Unity 竖屏时间策略与人生卡牌游戏。**Master Product Specification v0.4.2 是唯一开发基线**，旧版本文档保留为历史参考。最新开发基础为 `codex/playable-feedback-3d@ac2d359`，本轮开发分支为 `feat/horizon-v0.4.2`。
 
-v0.5 补齐多次关键决策预测、六资源与 1/3/7 天对照、七章个人回望剧情及真正可玩的 30 天人生。牌池版本 6、规则版本 8，保留旧人生的规则；原 12 天短局和可解锁长局都能存档、重演、结算与分享。实现契约和验收边界见 [v0.5 完整玩法升级](docs/COMPLETE_GAME_V05.md)。当前 v0.6 统一观察层级与预测清晰度，未来站展示真实多来源因果链，失败分支按实际日期与变化逐段演出，支持中断恢复。详见 [v0.6 体验升级](docs/EXPERIENCE_V06.md)。最终通过状态以当前提交的 CI 为准。
+本轮在原有 12/30 天、TIME ECHO、预测、CauseGraph、未来站、Boss、分支重演与分享上，加入 Decision Lock、行动发动机、Trigger、内在议会、强制失败与恢复的想象演练、Future Memory、跨局模式检测、Pattern Broken、Overdrive、Future Orbit、Causal Reservoir、Reality Bridge / Constellation，以及本地平行比较和经验回声。规则版本 9、牌池版本 7；旧存档沿用原牌池与规则。
+
+先看 [v0.4.2 产品基线](docs/MASTER_PRODUCT_SPEC_V0.4.2.md) 与 [实现、验证和交付边界](docs/IMPLEMENTATION_V042.md)。打开 Unity 2022.3.22f1 的 Boot 场景即可试玩；首局第 5 天起和后续人生开放「ME · 想象」入口，主页「HORIZON ME」连接各新系统。在线 AI 尚待凭证配置；当前内容可离线运行，Parallel Lives 使用本地同起点重演。
 
 ## 怎么玩
 
@@ -67,7 +69,7 @@ Unity -batchmode -force-glcore -projectPath . -runTests -testPlatform EditMode -
 
 三维模型、音效与动作仍是程序化原型，尚未达到成熟美术资产的品质。实际截图和规则测试不能证明游戏已足够有趣；触控成功率、反馈辨识、阅读时间、帧率、前一小时节奏和重玩意愿需要手机试玩。Android 原生分享入口需要设备验证。短局和长局仍需真人内容与平衡验收，未来站的情感效果也需玩家评估。详见 [0–35 节逐项验收](docs/V03_ACCEPTANCE.md) 与 [体验验收清单](docs/PLAYABILITY_GAPS.md)。
 
-## v0.3 本轮理念修正
+## v0.3 历史理念修正
 
 - 新牌池从第三局加入天气与邀约，真实存档固定事件种子；概率说明环境的不确定性，已埋回声仍按时抵达。旧人生保留旧规则。
 - Horizon II 限定一个类型，FOCUS 分页保留所有待回声；预测的“为什么”逐项显示三天真实变化与合计，预测不奖励货币。
@@ -75,7 +77,7 @@ Unity -batchmode -force-glcore -projectPath . -runTests -testPlatform EditMode -
 - 回访章节可自愿练习；跨局回声档案、沿用真实历史的三十天走法与无因之果先兑现后揭因均可进入。观察不改变资源和概率，实际人生观察计次保存。
 - 自动化仍不能证明好玩或正式美术品质。逐项完成范围与调整理由见验收文档。
 
-## 2026-10-01 体验改进
+## 2026-10-01 历史体验改进
 
 本轮变更在 `codex/playable-feedback-3d`，基于 `codex/unity-prototype-v0-3@864d607`。[PR #2](https://github.com/liangliangliao/HORIZON/pull/2) 仅包含这一轮变化。最新 CI、APK 和实际渲染截图均从 PR 的工作流获取；不能用旧提交的成功结果证明本轮通过。
 

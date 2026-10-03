@@ -247,7 +247,7 @@ namespace Horizon
                 28, Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.716f, 0.93f, 0.829f);
             string[] rows = { "精力  " + range.energyMin + "–" + range.energyMax,
                 "心情  " + range.moodMin + "–" + range.moodMax,
-                "洞察  " + range.insightMin + "–" + range.insightMax,
+                "专注  " + range.insightMin + "–" + range.insightMax,
                 "关系  " + range.relationMin + "–" + range.relationMax,
                 "金钱  " + range.moneyMin + "–" + range.moneyMax,
                 "能力  " + range.abilityMin + "–" + range.abilityMax };
