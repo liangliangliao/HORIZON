@@ -54,6 +54,11 @@ namespace Horizon
                 !runs.Any(r => r != null && r.number == ghostRun)) ghostOpen = false;
             foreach (RunRecord run in runs)
             {
+                // Unity materializes optional inline classes even when an old
+                // completed life never had a story. Keep its original finale.
+                if (run.master?.chapter != null && string.IsNullOrEmpty(run.master.chapter.id) && run.master.chapter.startDay == 0)
+                    run.master.chapter = null;
+                if (run.master?.chapter != null) run.master.chapter.Validate(GameSession.RunLength(run));
                 if (!GameSession.ValidPrediction(run.prediction, GameSession.RunLength(run))) run.prediction = null;
                 if (run.boss != null && run.boss.ghostTimeline != null && run.boss.ghostTimeline.sourceDay < 1)
                     run.boss.ghostTimeline = null;

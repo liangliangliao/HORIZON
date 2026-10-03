@@ -149,5 +149,17 @@ namespace Horizon.Tests
             Assert.That(node.label, Does.Contain("还没有开始"));
             Assert.IsFalse(CausalGraph.Ancestors(s.CausalNodes, node.id).Any(n => n.type == CausalNodeKind.Action));
         }
+
+        [Test]
+        public void OldCompletedLifeDoesNotBecomeAnEmptyStoryAfterUnitySerialization()
+        {
+            var s = GameSession.StartMasterLife(2, 41, RunMode.Quick); RunRecord run = Finish(s);
+            var archive = new ArchiveData(); archive.runs.Add(run);
+            var restored = JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(archive));
+            // Exercise the Unity inline-null representation in both harnesses.
+            restored.runs[0].master.chapter = new StoryChapter(); restored.Repair();
+            Assert.IsNull(restored.runs[0].master.chapter);
+            Assert.IsNull(GameSession.ReplayChoices(restored.runs[0], new Dictionary<int, string>()).master.chapter);
+        }
     }
 }
