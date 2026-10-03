@@ -113,7 +113,7 @@ namespace Horizon.Tests
         {
             var cancel = new CancellationTokenSource(); cancel.Cancel();
             var adapter = new ResilientContentAdapter(new OnlineContentAdapter(new AISettings { provider = AIProvider.DeepSeek }, Secret, new Transport()));
-            Assert.ThrowsAsync<OperationCanceledException>(async () => await adapter.Personalize(Context, cancel.Token)); cancel.Dispose();
+            Assert.CatchAsync<OperationCanceledException>(async () => await adapter.Personalize(Context, cancel.Token)); cancel.Dispose();
         }
         [Test]
         public void ProviderKeysStayInMemoryAndNeverEnterArchiveBackups()

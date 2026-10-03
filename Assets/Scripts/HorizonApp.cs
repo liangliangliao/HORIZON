@@ -1235,7 +1235,7 @@ namespace Horizon
 
         private void ShowDeadlineResult(RunRecord run)
         {
-            if (archive.pendingFeedback != null && TryMasterSpectacle(() => ShowDeadlineResult(run))) return;
+            if (archive.pendingFeedback != null && !archive.ghostOpen && TryMasterSpectacle(() => ShowDeadlineResult(run))) return;
             bool animateReward = archive.pendingFeedback != null && !archive.pendingFeedback.presented;
             if (archive.pendingFeedback != null) { archive.pendingFeedback.presented = true; Save(); }
             Clear();

@@ -17,7 +17,7 @@ namespace Horizon.Tests
 {
     public sealed class MasterPlayableFlowTests
     {
-        private static readonly BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+        private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private static T Get<T>(HorizonApp app, string field) { return (T)typeof(HorizonApp).GetField(field, Private).GetValue(app); }
         private static void Set(HorizonApp app, string field, object value) { typeof(HorizonApp).GetField(field, Private).SetValue(app, value); }
         private static void Call(HorizonApp app, string method, params object[] args) { typeof(HorizonApp).GetMethod(method, Private).Invoke(app, args); }
@@ -38,11 +38,18 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Master product flow").AddComponent<HorizonApp>();
             yield return null;
             var life = GameSession.StartMasterLife(2, 15, RunMode.ExperimentRun);
-            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99, seenSecondLife = true };
-            archive.preferences.reducedMotion = true; archive.preferences.sound = false;
+            Assert.IsNotNull(life); Assert.IsNotNull(life.Master);
+            RunSnapshot initial = life.Snapshot(); Assert.IsNotNull(initial.master);
+            var archive = new ArchiveData { active = initial, nextRareRun = 99, seenSecondLife = true,
+                preferences = new PlayerPreferences { reducedMotion = true, sound = false } };
+            archive.Repair();
             Set(app, "session", life); Set(app, "archive", archive); Call(app, "ApplyPreferences"); Call(app, "BuildBoard");
             yield return new WaitForSecondsRealtime(0.4f);
-            HorizonCardDrag card = Get<RectTransform>(app, "root").GetComponentsInChildren<HorizonCardDrag>().First(x => x.name == life.Hand[1].Id);
+            // A captured GameSession cannot be reconstructed when EnterPlayMode reloads this coroutine.
+            HorizonCardDrag card = null;
+            foreach (HorizonCardDrag candidate in Get<RectTransform>(app, "root").GetComponentsInChildren<HorizonCardDrag>())
+                if (candidate.name == life.Hand[1].Id) { card = candidate; break; }
+            Assert.IsNotNull(card);
             Call(app, "CardTapped", card); yield return null;
             Button(app, "Lock decision").onClick.Invoke(); yield return null;
             Assert.IsTrue(life.InExecutionMode);
@@ -120,7 +127,7 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("AI product flow").AddComponent<HorizonApp>();
             yield return null;
             var life = GameSession.StartMasterLife(2, 15, RunMode.Quick);
-            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99 };
+            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99, seenSecondLife = true };
             archive.preferences.reducedMotion = true; archive.preferences.sound = false;
             var transport = new TestAITransport(); Set(app, "aiTransport", transport);
             Set(app, "session", life); Set(app, "archive", archive); Call(app, "BuildBoard"); Call(app, "ShowSettings"); yield return null;

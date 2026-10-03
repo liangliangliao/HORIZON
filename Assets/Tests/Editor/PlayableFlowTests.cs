@@ -726,9 +726,11 @@ namespace Horizon.Tests
             Assert.AreEqual(13, s.Day); Assert.IsNull(s.CompletedRun);
             yield return Capture(app, "29-long-life-board");
             int guard = 0; float began = Time.realtimeSinceStartup;
-            while (s.CompletedRun == null || Get<bool>(app, "busy")) {
+            while (s.CompletedRun == null || Get<bool>(app, "busy") || Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Continue master event")) {
                 Assert.Less(Time.realtimeSinceStartup - began, 150, "Long UI flow stalled.");
                 if (Get<bool>(app, "busy")) { yield return null; continue; }
+                Button masterEvent = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.name == "Continue master event");
+                if (masterEvent != null) { if (masterEvent.interactable) masterEvent.onClick.Invoke(); yield return null; continue; }
                 if (a.pendingFeedback != null) {
                     if (a.pendingFeedback.kind == FeedbackKind.Deadline) break;
                     ButtonNamed(app, "Continue result").onClick.Invoke(); yield return null; continue;
