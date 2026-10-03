@@ -19,7 +19,7 @@ namespace Horizon.Game
         public static string Coach(GameSession life)
         {
             if (life.Energy <= 2) return "精力见底了。选一张恢复牌，给明天留点力气。";
-            if (life.Deadline == 30) return "长局 · " + CampaignContent.ActName(life.Day) + "\n" + (life.Day > 12 ? "三道门需要后半程的成长、恢复与支援各留下三次证据。" : "第12天是一段路的回望，真正截止日在第30天。");
+            if (life.Deadline >= 30) return "长局 · " + CampaignContent.ActName(life.Day) + "\n" + (life.Day > 12 ? "三道门需要后半程的成长、恢复与支援各留下三次证据。" : "第12天是一段路的回望，真正截止日仍在后面。");
             if (life.RunNumber == 1 && life.Day == 1)
                 return "每天选一张。第12天，用成长、状态和朋友点亮三道门。\n拖进上方金色圈，圈变亮后松手；也可以点牌。";
             if (life.RunNumber == 1 && life.Day == 2)
@@ -34,13 +34,13 @@ namespace Horizon.Game
             return "每天选 1 张 · 拖进金色圈，变亮后松手 / 点牌也能使用";
         }
 
-        public static int EvidenceNeeded(GameSession life) { return life.Deadline == 30 ? 3 : 2; }
+        public static int EvidenceNeeded(GameSession life) { return life.Deadline >= 30 ? 3 : 2; }
         public static int GrowthEvidence(GameSession life)
-        { return life.Actions.Count(a => (life.Deadline != 30 || a.day > 12) && a.echoed && a.later?.ability > 0); }
+        { return life.Actions.Count(a => (life.Deadline < 30 || a.day > 12) && a.echoed && a.later?.ability > 0); }
         public static int RecoveryEvidence(GameSession life)
-        { return life.Actions.Count(a => (life.Deadline != 30 || a.day > 12) && a.kind == CardKind.Recovery); }
+        { return life.Actions.Count(a => (life.Deadline < 30 || a.day > 12) && a.kind == CardKind.Recovery); }
         public static int SupportEvidence(GameSession life)
-        { return life.Actions.Count(a => (life.Deadline != 30 || a.day > 12) && a.givesSupport); }
+        { return life.Actions.Count(a => (life.Deadline < 30 || a.day > 12) && a.givesSupport); }
         public static bool GateReady(GameSession life, int gate)
         {
             int need = EvidenceNeeded(life);

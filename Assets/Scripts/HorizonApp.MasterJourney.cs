@@ -11,6 +11,7 @@ namespace Horizon
     {
         private void ShowForge()
         {
+            if (session?.UsesExpedition == true || archive.knowledgeSkills.Count > 1) { ShowExpandedForge(); return; }
             MasterPage("Knowledge forge", "K N O W L E D G E  F O R G E", ShowMasterHub);
             KnowledgeSkill k = CanPrepareMaster ? session.Master.knowledge[0] : archive.knowledgeSkills.FirstOrDefault();
             KnowledgeSkill remembered = archive.knowledgeSkills.FirstOrDefault(); if (remembered != null && (k == null || remembered.stage > k.stage)) k = remembered;
@@ -36,7 +37,10 @@ namespace Horizon
                     MasterPage("Worldview perspective", name, ShowWorldviews);
                     View.Label(overlay, "Perspective", WorldviewDeck.Perspectives[index], 36, Palette.Text, TextAnchor.MiddleCenter, 0.1f, 0.4f, 0.9f, 0.74f);
                     View.Button(overlay, "Worldview equip", archive.worldview.Contains(name) ? "从卡组移出" : "加入我的世界观卡组", () => {
-                        if (archive.worldview.Contains(name)) archive.worldview.Remove(name); else archive.worldview.Add(name); Save(); ShowWorldviews();
+                        bool adding = !archive.worldview.Contains(name);
+                        if (adding && archive.worldview.Count >= 3) return;
+                        if (CanPrepareMaster && session.UsesExpedition) { if (!session.SetWorldview(name, adding)) return; PersistMasterAction(); }
+                        if (adding) archive.worldview.Add(name); else archive.worldview.Remove(name); Save(); ShowWorldviews();
                     }, 0.075f, 0.22f, 0.925f, 0.3f, Palette.Mint, Palette.Ink, 28);
                 }, x, y, x + 0.4f, y + 0.09f, Palette.Panel, Palette.Text, 26); }
         }
@@ -44,15 +48,18 @@ namespace Horizon
         {
             MasterPage("Recent behavior model", "近期模式 · HORIZON ME", ShowMasterHub);
             View.Label(overlay, "Recent model", archive.me.Summary, 29, Palette.Text, TextAnchor.UpperLeft, 0.075f, 0.7f, 0.925f, 0.855f);
+            View.Label(overlay, "Recent action preferences", archive.me.RecentPreference + "\n" + archive.me.RestOrPush, 24, Palette.Mint, TextAnchor.MiddleLeft, 0.075f, 0.625f, 0.925f, 0.70f);
             if (session != null && session.UsesMasterRules)
             {
                 string[] names = { "精力", "心情", "专注", "金钱", "关系", "能力" };
                 for (int i = 0; i < 6; i++)
-                { ResourceTrend t = ResourceMath.Trend(session.Master.resources, i); float y = 0.58f - i * 0.068f;
+                { ResourceTrend t = ResourceMath.Trend(session.Master.resources, i); float y = 0.58f - i * 0.061f;
                     View.Label(overlay, "Resource trend " + i, names[i] + "  " + t.current + "   趋势 " + (t.trend > 0 ? "+" : "") + t.trend.ToString("0.0") + "   波动 " + t.volatility.ToString("0.0"), 27,
                         Palette.Text, TextAnchor.MiddleLeft, 0.075f, y, 0.925f, y + 0.06f); }
-                View.Label(overlay, "Model context", "记录近期选择与情境，不是永久人格标签。\n低资源会缩小选择范围，恢复能重新打开空间。", 25, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.12f, 0.925f, 0.195f);
+                View.Label(overlay, "Model context", "记录近期选择与情境，不是永久人格标签。\n低资源会缩小选择范围，恢复能重新打开空间。", 23, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.11f, 0.925f, 0.19f);
             }
+            View.Button(overlay, "Explain recent pattern", "理解近期模式", () => ShowContentStudio(NarrativePurpose.Pattern, archive.me.Summary, ShowMe), 0.075f, 0.20f, 0.49f, 0.265f, Palette.Deep, Palette.Mint, 25);
+            View.Button(overlay, "My time horizon", "我的时间视野", ShowTimeVision, 0.51f, 0.20f, 0.925f, 0.265f, Palette.Deep, Palette.Gold, 25);
         }
         private MasterRunState CurrentMaster
         { get { if (session != null && session.UsesMasterRules && (archive.active?.runNumber == session.RunNumber || archive.runs.Contains(session.CompletedRun))) return session.Master;
@@ -70,7 +77,8 @@ namespace Horizon
                     TextAnchor.MiddleCenter, x - 0.07f, y - 0.028f, x + 0.07f, y + 0.028f); }
             View.Label(overlay, "Future self identity", state.allLinked ? "ALL LINKED\n未来自己 · 已连成星图" : "未来自己\n" + (session != null && session.Master?.resilienceChain > 1 ? "失败但继续的我" : "正在形成的我"), 29,
                 Palette.Gold, TextAnchor.MiddleCenter, 0.32f, 0.5f, 0.68f, 0.64f);
-            View.Label(overlay, "Causal reservoir", "CAUSAL RESERVOIR  " + state.reservoir + "/6\n积累需要能力、状态、关系与机会同时成熟。", 28, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.215f, 0.925f, 0.315f);
+            View.Button(overlay, "Causal reservoir", "长期积累  " + state.reservoir + "/6 · 查看四类储备与条件", ShowReservoir,
+                0.075f, 0.23f, 0.925f, 0.31f, Palette.Panel, Palette.Text, 26);
             View.Label(overlay, "Overdrive state", "OVERDRIVE  " + state.overdriveEnergy + "%  ·  Resilience ×" + state.resilienceChain,
                 26, Palette.Mint, TextAnchor.MiddleCenter, 0.075f, 0.12f, 0.925f, 0.19f);
         }
@@ -90,6 +98,7 @@ namespace Horizon
             else if (!quest.completed)
                 View.Button(overlay, "Complete reality quest", "我已经在现实中完成", () => {
                     if (!archive.reality.Complete(quest.id, DateTime.Now, archive.futureMemories)) return;
+                    archive.ObserveRealityCalibration(quest);
                     FutureMemory m = archive.futureMemories.Find(x => x.id == quest.memoryId);
                     foreach (KnowledgeSkill k in archive.knowledgeSkills.Where(k => k.stage == KnowledgeStage.Simulate && k.simulationNodeId == m?.simulationNodeId && k.simulationRun == m?.simulationRun))
                         KnowledgeForge.Advance(k, KnowledgeStage.Execute, quest.id);
@@ -107,9 +116,10 @@ namespace Horizon
             var nodes = archive.reality.nodes.TakeLastPortable(12).ToList();
             for (int i = 0; i < nodes.Count; i++)
             {
+                RealityNode selected = nodes[i];
                 float x = 0.075f + i % 3 * 0.3f, y = 0.65f - i / 3 * 0.13f;
                 View.Panel(overlay, "Reality star", nodes[i].kind == CausalNodeKind.Reality ? Palette.Mint : Palette.Gold, x + 0.12f, y + 0.07f, x + 0.145f, y + 0.09f, 12);
-                View.Label(overlay, "Constellation node " + i, nodes[i].label, 23, Palette.Text, TextAnchor.UpperCenter, x, y, x + 0.26f, y + 0.06f);
+                View.Button(overlay, "Constellation node " + i, nodes[i].label, () => ShowRealityNode(selected), x, y - 0.015f, x + 0.26f, y + 0.065f, Palette.Panel, Palette.Text, 22);
                 foreach (string parent in nodes[i].parents)
                 {
                     int p = nodes.FindIndex(n => n.id == parent); if (p < 0) continue;
@@ -125,17 +135,18 @@ namespace Horizon
             MasterPage("Life modes", "下一条人生", ShowMasterHub);
             if (archive.active != null)
             {
-                View.Label(overlay, "Mode active life", "当前人生正在进行。先走到未来站与截止日，再选择下一条人生。", 34, Palette.Text, TextAnchor.MiddleCenter, 0.1f, 0.4f, 0.9f, 0.74f);
-                View.Button(overlay, "Resume before new mode", "继续当前人生", () => { CloseMasterPage(); ContinueRun(); }, 0.075f, 0.365f, 0.925f, 0.445f, Palette.Mint, Palette.Ink, 29);
+                View.Label(overlay, "Mode active life", "当前人生正在进行。先走到未来站与截止日，再选择下一条人生。", 34, Palette.Text, TextAnchor.MiddleCenter, 0.1f, 0.5f, 0.9f, 0.74f);
+                View.Button(overlay, "Resume before new mode", "继续当前人生", () => { CloseMasterPage(); ContinueRun(); }, 0.075f, 0.40f, 0.925f, 0.48f, Palette.Mint, Palette.Ink, 29);
             }
             else for (int i = 0; i < ModeNames.Length; i++)
-            { RunMode mode = (RunMode)i; float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.7f - (i / 2) * 0.12f;
+            { RunMode mode = (RunMode)i; float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.72f - (i / 2) * 0.10f;
                 View.Button(overlay, "Run mode " + i, ModeNames[i] + "\n" + ModeDescriptions[i], () => {
-                    requestedMasterMode = mode; requestedLifeLength = mode == RunMode.ThirtyDays || mode == RunMode.LongRun ? 30 : 12;
+                    requestedMasterMode = mode; requestedLifeLength = mode == RunMode.LongRun ? 60 : mode == RunMode.ThirtyDays ? 30 : 12;
                     CloseMasterPage(); StartNewRun(); if (mode == RunMode.ImaginationRun) ShowImagineSetup();
                 }, x, y, x + 0.4f, y + 0.095f, Palette.Panel, Palette.Text, 22); }
             View.Button(overlay, "Local parallel comparison", "相同起点 · 本地平行重演", ShowParallelComparison, 0.075f, 0.15f, 0.925f, 0.23f, Palette.Deep, Palette.Gold, 27);
             View.Button(overlay, "Future messages", "Future Message · 留一段经验", ShowFutureMessages, 0.075f, 0.24f, 0.925f, 0.31f, Palette.Deep, Palette.Text, 25);
+            View.Button(overlay, "Online parallel lives", "邀请朋友 · 在线平行人生", ShowOnlineLives, 0.075f, 0.325f, 0.925f, 0.385f, Palette.Deep, Palette.Mint, 27);
         }
         private void ShowParallelComparison()
         {

@@ -10,32 +10,84 @@ namespace Horizon.UI
         private float elapsed;
         private void Update()
         { if (VisualPreferences.Paused || VisualPreferences.ReducedMotion) return; elapsed += Mathf.Min(Time.unscaledDeltaTime, 0.05f); SetVerticesDirty(); }
+        public int PastFailures = 3, ChainSize = 6, OrbitBits;
+        public float Elapsed { get { return elapsed; } }
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
-            mesh.Clear(); Rect r = rectTransform.rect; Vector2 center = r.center;
-            float size = Mathf.Min(r.width, r.height) * 0.37f;
-            bool broken = Kind == DomainEventKind.PatternBroken;
-            float progress = VisualPreferences.ReducedMotion ? 1 : Mathf.Clamp01((elapsed - 0.6f) / 1.6f);
-            Color faint = color; faint.a *= 0.2f;
+            mesh.Clear(); Rect r = rectTransform.rect; Vector2 centre = r.center;
+            float size = Mathf.Min(r.width, r.height) * 0.40f;
+            float time = VisualPreferences.ReducedMotion ? 4 : elapsed;
+            Color faint = color; faint.a *= 0.20f;
+            if (Kind == DomainEventKind.PatternBroken)
+            {
+                float advance = Mathf.Clamp01((time - 1.05f) / 1.3f), fracture = Mathf.Clamp01((time - 1.9f) / 0.8f);
+                for (int i = 0; i < Mathf.Clamp(PastFailures, 2, 6); i++)
+                {
+                    float y = centre.y + (i - 2.5f) * size * 0.19f;
+                    Vector2 start = new Vector2(centre.x - size, y), stop = new Vector2(centre.x - size * 0.12f, y);
+                    Color past = new Color(0.9f, 0.35f, 0.34f, (1 - fracture) * 0.65f);
+                    Line(mesh, start, stop, 2, past); Dot(mesh, stop, 5, past);
+                    for (int shard = 0; shard < 6; shard++)
+                    { Vector2 p = Vector2.Lerp(start, stop, shard / 5f) + new Vector2((shard % 2 == 0 ? -1 : 1) * fracture * size * 0.15f, (i - 2.5f) * fracture * size * 0.38f);
+                        Dot(mesh, p, Mathf.Max(1, 4 * (1 - fracture)), past); }
+                }
+                Vector2 from = centre + new Vector2(-size, -size * 0.62f), crossing = centre + new Vector2(size * (advance * 2 - 1), -size * 0.62f);
+                Line(mesh, from, crossing, 5, color); Dot(mesh, crossing, 8 + advance * 4, color);
+                return;
+            }
+            if (Kind == DomainEventKind.RealityConvergence)
+            {
+                float link = Mathf.Clamp01((time - 0.4f) / 1.8f);
+                Color[] colours = { Palette.Gold, Palette.Mint, Palette.Text };
+                for (int i = 0; i < 3; i++)
+                { float angle = (90 + i * 120) * Mathf.Deg2Rad;
+                    Vector2 point = centre + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * size * (1 - link * 0.50f);
+                    Line(mesh, point, Vector2.Lerp(point, centre, link), 3 + link * 3, colours[i]); Dot(mesh, point, 12, colours[i]); }
+                Dot(mesh, centre, 4 + link * 20, color); return;
+            }
+            if (Kind == DomainEventKind.Cascade || Kind == DomainEventKind.CausalSingularity || Kind == DomainEventKind.Breakthrough)
+            {
+                int count = Mathf.Clamp(ChainSize, 4, 18); float progress = Mathf.Clamp01(time / 2.7f);
+                int activated = Mathf.FloorToInt(Mathf.Pow(progress, 0.58f) * count);
+                Vector2 previous = centre + Vector2.down * size;
+                for (int i = 0; i < count; i++)
+                { float x = Mathf.Sin(i * 1.5f) * size * 0.55f, y = Mathf.Lerp(-size, size, i / (float)(count - 1)); Vector2 p = centre + new Vector2(x, y);
+                    Line(mesh, previous, p, i <= activated ? 4 : 1, i <= activated ? color : faint);
+                    Dot(mesh, p, i == activated ? 13 : i < activated ? 7 : 4, i <= activated ? color : faint); previous = p; }
+                if (Kind == DomainEventKind.CausalSingularity && progress > 0.75f)
+                    for (int i = 0; i < 48; i++) { float angle = i * Mathf.PI / 24; Vector2 outward = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                        Line(mesh, centre + outward * size * (progress - 0.75f), centre + outward * size * progress * 1.3f, 2, color); }
+                return;
+            }
+            if (Kind == DomainEventKind.OrbitActivated || Kind == DomainEventKind.AllLinked)
+            {
+                for (int i = 0; i < 8; i++) { float angle = i * Mathf.PI / 4; Vector2 p = centre + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * size;
+                    bool active = Kind == DomainEventKind.AllLinked || (OrbitBits & (1 << i)) != 0;
+                    Line(mesh, centre, p, active ? 3 : 1, active ? color : faint); Dot(mesh, p, active ? 10 : 4, active ? color : faint); }
+                Dot(mesh, centre, Kind == DomainEventKind.AllLinked ? 22 : 10, color); return;
+            }
+            if (Kind == DomainEventKind.DejaVu || Kind == DomainEventKind.FutureMemory)
+            { Dot(mesh, centre + Vector2.up * size * 0.38f, size * 0.17f, color);
+                Line(mesh, centre + Vector2.up * size * 0.16f, centre + Vector2.down * size * 0.55f, size * 0.27f, faint);
+                for (int i = 0; i < 7; i++) Line(mesh, centre + new Vector2(-size, (i - 3) * size * 0.14f), centre + new Vector2(size, (i - 3) * size * 0.14f), 1, faint);
+                return;
+            }
+            if (Kind == DomainEventKind.VictoryAnchor)
+            { float opening = Mathf.Clamp01(time / 1.5f); Vector2 bottom = centre - Vector2.up * size, top = centre + Vector2.up * size;
+                Line(mesh, bottom + Vector2.left * size * 0.5f, top + Vector2.left * size * 0.5f, 5, color);
+                Line(mesh, top + Vector2.left * size * 0.5f, top + Vector2.right * size * 0.5f, 5, color);
+                Line(mesh, top + Vector2.right * size * 0.5f, bottom + Vector2.right * size * 0.5f, 5, color);
+                Line(mesh, bottom, centre + Vector2.right * size * opening, 3, faint); Dot(mesh, centre, 10 + opening * 14, color); return;
+            }
+            float wave = Kind == DomainEventKind.TimeEcho ? (time % 1.4f) / 1.4f : Mathf.Clamp01(time / 2);
             for (int layer = 0; layer < 4; layer++)
-            {
-                float radius = size * (0.45f + layer * 0.18f) * (broken ? 1 + progress * layer * 0.3f : 1);
-                for (int i = 0; i < 48; i++)
-                { float a = i * Mathf.PI * 2 / 48, b = (i + 1) * Mathf.PI * 2 / 48;
-                    Vector2 shift = broken ? new Vector2(Mathf.Sin(i * 7 + layer), Mathf.Cos(i * 3 + layer)) * progress * size * 0.35f : Vector2.zero;
-                    Line(mesh, center + shift + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius,
-                        center + shift + new Vector2(Mathf.Cos(b), Mathf.Sin(b)) * radius, layer == 0 ? 3 : 1.5f, faint); }
-            }
-            for (int i = 0; i < 24; i++)
-            {
-                float a = i * Mathf.PI * 2 / 24 + elapsed * (VisualPreferences.ReducedMotion ? 0 : 0.08f);
-                float radius = size * (0.5f + (i % 3) * 0.2f) * (broken ? 1 + progress * 0.8f : 1);
-                Vector2 p = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius;
-                Dot(mesh, p, i % 3 == 0 ? 4 : 2, color);
-                if (i % 3 == 0) Line(mesh, center, p, 1.5f, faint);
-            }
-            if (broken) Line(mesh, center + Vector2.down * size, center + Vector2.up * size * (0.3f + progress), 4, color);
-            else Dot(mesh, center, 6 + progress * 5, color);
+            { float radius = size * (0.35f + layer * 0.18f + wave * 0.12f);
+                for (int i = 0; i < 64; i++) { float a = i * Mathf.PI / 32, b = (i + 1) * Mathf.PI / 32;
+                    Line(mesh, centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius,
+                        centre + new Vector2(Mathf.Cos(b), Mathf.Sin(b)) * radius, layer == 0 ? 3 : 1, layer == 0 ? color : faint); } }
+            if (Kind == DomainEventKind.Comeback || Kind == DomainEventKind.FailAndAgain)
+                Line(mesh, centre + Vector2.down * size, centre + Vector2.up * size * Mathf.Clamp01(time / 1.4f), 5, color);
+            Dot(mesh, centre, 7 + wave * 9, color);
         }
         internal static void Line(VertexHelper mesh, Vector2 a, Vector2 b, float width, Color tint)
         {

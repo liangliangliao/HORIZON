@@ -124,6 +124,7 @@ namespace Horizon
                 session.CompletedRun != null && archive.runs.Contains(session.CompletedRun))) archive.journey.Observe(session);
             if (saveStore == null) saveStore = new ArchiveStore(System.IO.Path.Combine(Application.persistentDataPath, "HORIZON.life.json"), SaveKey);
             if (!IsPractice) saveStore.Save(archive);
+            if (parallelPlaying) SaveParallelSession();
         }
 
         private void ApplySafeArea()
@@ -202,6 +203,7 @@ namespace Horizon
             archive.ghostOpen = archive.stationMemoryOpen = false;
             session = GameSession.StartMasterLife(archive.NextRunNumber, Guid.NewGuid().GetHashCode(),
                 requestedLifeLength == 30 && requestedMasterMode == RunMode.Quick ? RunMode.ThirtyDays : requestedMasterMode, archive.me, archive.futureMemories, archive.knowledgeSkills);
+            foreach (string tool in archive.worldview.Take(3)) if (session.UsesExpedition) session.SetWorldview(tool, true);
             requestedMasterMode = RunMode.Quick;
             requestedLifeLength = 12;
             archive.stationRun = archive.stationBeat = 0;
@@ -291,6 +293,7 @@ namespace Horizon
             BuildMasterBoard();
             world.SetTimeline(session.Actions, session.Deadline);
             if (ShowChapterMoment()) return;
+            if (session.UsesExpedition && ShowMirrorEncounter()) return;
             if (TryRareMoment()) return;
             if (session.RunNumber == 2 && session.CatalogVersion >= 2 && session.Day == 1 && !archive.seenSecondLife)
                 ShowSecondLife();
@@ -662,12 +665,13 @@ namespace Horizon
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / 0.22f);
                 group.alpha = t;
-                rect.localScale = Vector3.one * Mathf.Lerp(0.94f, 1f, t);
+                if (rect.GetComponent<HorizonCardDrag>()?.IsDragging != true)
+                    rect.localScale = Vector3.one * Mathf.Lerp(0.94f, 1f, t);
                 yield return null;
             }
             if (generation != viewGeneration || rect == null || group == null) yield break;
             group.alpha = 1;
-            rect.localScale = Vector3.one;
+            if (rect.GetComponent<HorizonCardDrag>()?.IsDragging != true) rect.localScale = Vector3.one;
         }
 
         private void CardDragged(HorizonCardDrag drag, Vector2 pointer)
@@ -765,6 +769,7 @@ namespace Horizon
             foreach (HorizonCardDrag item in cards.Keys) item.Available = false;
             RunSnapshot before = session.Snapshot();
             ActionRecord action = session.Choose(card.Id);
+            session.RecordChoiceDuration((int)Mathf.Clamp((Time.unscaledTime - choiceVisibleSince) * 1000, 0, 300000));
             int stars = archive.wallet.Claim("run:" + session.RunNumber + ":action:" + session.Day, 1);
             ResourceDelta change = new ResourceDelta(session.Energy - before.energy, session.Mood - before.mood,
                 session.Insight - before.insight, session.Relation - before.relation,
@@ -911,7 +916,7 @@ namespace Horizon
             busy = true;
             Haptic();
             if (stationStage < 2) ShowInRunStation(stationStage + 1);
-            else if (session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) ShowInRunStation(3);
+            else if (session.RunNumber == 3 || session.Deadline >= 30 && session.Day >= 14) ShowInRunStation(3);
             else FinishStation();
         }
 
@@ -1338,6 +1343,7 @@ namespace Horizon
 
         private void ShowStation()
         {
+            if (archive.runs.LastOrDefault()?.catalogVersion >= 10) { ShowFutureGallery(); return; }
             Clear(true);
             world.ShowStation(2, archive.runs.Count >= 3);
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 35, Palette.Mint,

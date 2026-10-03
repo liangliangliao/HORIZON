@@ -28,7 +28,7 @@ namespace Horizon.Game
         public static int LifeStage(GameSession life)
         {
             if (life == null) return 1;
-            if (life.Deadline == 30) return 7;
+            if (life.Deadline >= 30) return 7;
             if (life.HorizonLevel >= 3) return 6;
             int stage = life.RunNumber >= 3 ? 4 : life.RunNumber >= 2 ? 3 : 1;
             if (life.CausalNodes.Any(n => n.type == CausalNodeKind.World && n.resolved)) stage = Math.Max(stage, 5);
@@ -36,7 +36,7 @@ namespace Horizon.Game
         }
 
         public static HorizonProgress Resolve(GameSession life, JourneyProgress journey, int calibrations = 0)
-        { if (life != null && life.UsesMasterRules) { int level = Math.Max(life.MasterHorizon, Math.Max(journey?.learnedStage ?? 1, journey?.Chapter ?? 1)); return new HorizonProgress(level, calibrations, level); }
+        { if (life != null && life.UsesMasterRules) { int level = life.CatalogVersion >= 10 ? Math.Max(life.MasterHorizon, journey?.learnedStage ?? 1) : Math.Max(life.MasterHorizon, Math.Max(journey?.learnedStage ?? 1, journey?.Chapter ?? 1)); return new HorizonProgress(level, calibrations, level); }
           return new HorizonProgress(Math.Max(LifeStage(life), Math.Max(journey?.Chapter ?? 1,
             journey?.learnedStage ?? 1)), calibrations); }
 

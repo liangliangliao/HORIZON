@@ -29,6 +29,10 @@ namespace Horizon
             Color accent = e.tier == RewardTier.Mythic ? Palette.Gold : Palette.Mint;
             var art = View.Rect(overlay, "Causal spectacle", 0.02f, 0.18f, 0.98f, 0.84f).gameObject.AddComponent<MasterSpectacleGraphic>();
             art.Kind = e.kind; art.color = accent; art.raycastTarget = false;
+            art.ChainSize = Math.Max(4, e.chainSize); art.OrbitBits = CurrentMaster?.orbitBits ?? 0;
+            art.PastFailures = CurrentMaster?.patterns.Where(p => p.broken).Select(p => p.failureRuns.Count).DefaultIfEmpty(2).Max() ?? 2;
+            if (e.kind == DomainEventKind.RealityConvergence)
+                View.Label(overlay, "Convergence evidence labels", "IMAGINATION · SIMULATION · REALITY", 23, Palette.Gold, TextAnchor.MiddleCenter, 0.045f, 0.78f, 0.955f, 0.83f);
             View.Label(overlay, "Reward event title", e.title, e.tier == RewardTier.Mythic ? 73 : 52, accent,
                 TextAnchor.MiddleCenter, 0.045f, 0.48f, 0.955f, 0.75f);
             View.Label(overlay, "Reward story", e.detail, 31, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.275f, 0.925f, 0.465f);
@@ -40,7 +44,7 @@ namespace Horizon
         }
         private IEnumerator EnableMasterEvent(Button button, int generation)
         {
-            yield return new WaitForSecondsRealtime(archive.preferences.reducedMotion ? 0.1f : 1.4f);
+            yield return new WaitForSecondsRealtime(archive.preferences.reducedMotion ? 0.1f : 2.8f);
             if (button != null && generation == viewGeneration) { busy = false; button.interactable = true; }
         }
     }

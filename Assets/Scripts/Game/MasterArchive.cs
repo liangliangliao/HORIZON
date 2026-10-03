@@ -28,7 +28,7 @@ namespace Horizon
             if (chapterSeenSetbacks == null) chapterSeenSetbacks = new List<string>();
             if (imaginedLives == null) imaginedLives = new List<ImagineRun>();
             if (imaginationComparisons == null) imaginationComparisons = new List<ImaginationCalibration>();
-            imaginationComparisons.RemoveAll(c => c == null || c.run < 1 || c.plannedDay < 1 || c.plannedDay > 30);
+            imaginationComparisons.RemoveAll(c => c == null || c.run < 1 || c.plannedDay < 1 || c.plannedDay > 60);
             if (worldview == null) worldview = new List<string>();
             if (futureMessages == null) futureMessages = new List<FutureMessage>();
             if (knowledgeSkills == null) knowledgeSkills = new List<KnowledgeSkill>();

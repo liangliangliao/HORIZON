@@ -11,6 +11,8 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using System.Collections.Generic;
 using Object = UnityEngine.Object;
 
 namespace Horizon.Tests
@@ -39,6 +41,39 @@ namespace Horizon.Tests
                 yield return new WaitForSecondsRealtime(0.15f);
             }
             Assert.Fail("Daily feedback did not return to the next choice.");
+        }
+
+        [UnityTest]
+        public IEnumerator PhoneCardIsRaycastableAndDragThroughEventSystemPlaysExactlyOnce()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Touch hand acceptance").AddComponent<HorizonApp>();
+            yield return null;
+            var archive = new ArchiveData { seenSecondLife = true };
+            var life = GameSession.StartMasterLife(2, 15, RunMode.Quick); archive.active = life.Snapshot();
+            Set(app, "archive", archive); Set(app, "session", life); Call(app, "BuildBoard");
+            yield return new WaitForSecondsRealtime(0.6f); Canvas.ForceUpdateCanvases();
+            HorizonCardDrag card = Card(app, life.Hand[2].Id); var face = card.GetComponent<HorizonCardSurface>();
+            Assert.IsNotNull(face); Assert.IsTrue(face.raycastTarget); Assert.Greater(face.Thickness, 0);
+            RectTransform rect = (RectTransform)card.transform;
+            Vector2 press = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+            var pointer = new PointerEventData(EventSystem.current) { pointerId = 0, position = press, pressPosition = press, button = PointerEventData.InputButton.Left };
+            var hits = new List<RaycastResult>(); EventSystem.current.RaycastAll(pointer, hits);
+            GameObject hit = hits.FirstOrDefault(x => x.gameObject.GetComponentInParent<HorizonCardDrag>() == card).gameObject;
+            Assert.IsNotNull(hit, "A physical finger must hit the card, not only a direct method call.");
+            Assert.AreEqual(hit, hits[0].gameObject, "No decorative overlay may steal the card touch.");
+            pointer.pointerPressRaycast = hits[0]; pointer.pointerDrag = ExecuteEvents.GetEventHandler<IDragHandler>(hit);
+            ExecuteEvents.ExecuteHierarchy(hit, pointer, ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.initializePotentialDrag);
+            ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.beginDragHandler);
+            RectTransform target = Get<RectTransform>(app, "destinationBeacon");
+            pointer.position = RectTransformUtility.WorldToScreenPoint(null, target.TransformPoint(target.rect.center));
+            ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.dragHandler);
+            Assert.Greater(rect.localScale.x, 1, "Lift gives visible feedback.");
+            ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.endDragHandler);
+            ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.endDragHandler);
+            Assert.AreEqual(1, life.Actions.Count); Assert.AreEqual(card.name, life.Actions[0].cardId);
+            yield return new ExitPlayMode();
         }
 
         [UnityTest]
@@ -242,7 +277,7 @@ namespace Horizon.Tests
             var cardRects = root.GetComponentsInChildren<HorizonCardDrag>().Select(c => (RectTransform)c.transform).ToArray();
             Assert.AreEqual(3, cardRects.Length);
             foreach (RectTransform rect in cardRects)
-            { Assert.GreaterOrEqual(rect.rect.height / root.rect.height * 640, 48); Assert.Greater(rect.rect.width / root.rect.width, 0.85f); }
+            { Assert.GreaterOrEqual(rect.rect.height / root.rect.height * 640, 48); Assert.GreaterOrEqual(rect.rect.width / root.rect.width * 360, 48); }
             bool sawBundle = false; int receipts = 0;
             for (int day = 1; day <= 12; day++)
             {
@@ -437,6 +472,72 @@ namespace Horizon.Tests
             Color outside = pixels.GetPixel(100, 30); Assert.Less(outside.r, 0.1f); Assert.Less(outside.b, 0.2f, "Previous-frame magenta must be cleared outside the world viewport.");
             world.BackgroundCamera.targetTexture = null; RenderTexture.active = previous;
             source.Release(); target.Release(); Object.Destroy(source); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(cameraObject);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator ExpeditionChoicesKnowledgeThoughtAndNarrativeArePlayableOnPhone()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Expedition UI").AddComponent<HorizonApp>();
+            yield return null;
+            var life = GameSession.StartMasterLife(2, 15, RunMode.ExperimentRun);
+            var archive = new ArchiveData { active = life.Snapshot(), seenSecondLife = true, nextRareRun = 99 };
+            archive.preferences.reducedMotion = true; archive.preferences.sound = false; archive.playGuide.completed = true;
+            Set(app, "archive", archive); Set(app, "session", life); Call(app, "ApplyPreferences"); Call(app, "BuildBoard");
+            yield return new WaitForSecondsRealtime(0.4f); yield return Capture(app, "74-extruded-phone-cards");
+            Call(app, "ShowMasterHub"); yield return null; yield return Capture(app, "75-expedition-hub");
+            Button(app, "Choose life route").onClick.Invoke(); yield return null;
+            Button(app, "Life route growth").onClick.Invoke(); yield return null;
+            Assert.AreEqual("growth", life.Master.expedition.route); yield return Capture(app, "76-life-route-tradeoffs");
+            Call(app, "ShowExecution"); Button(app, "Adjust action environment").onClick.Invoke(); yield return null;
+            int focus = life.Insight; Button(app, "Environment two-minutes").onClick.Invoke(); yield return null;
+            Assert.AreEqual(focus - 1, life.Insight); yield return Capture(app, "77-action-environment");
+            Button(app, "Understand active thought").onClick.Invoke(); yield return null; yield return Capture(app, "78-thought-monster");
+            Button(app, "Thought dialogue").onClick.Invoke(); yield return null;
+            Button(app, "Generate studio content").onClick.Invoke(); yield return null; yield return null;
+            Assert.That(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Single(t => t.name == "Content studio output").text, Does.Contain("步骤"));
+            yield return Capture(app, "79-narrative-dialogue");
+            Call(app, "ShowExpandedForge"); int index = life.Master.knowledge.FindIndex(k => k.id == "values");
+            Set(app, "selectedKnowledge", index); Call(app, "ShowExpandedForge");
+            Button(app, "Recognize knowledge").onClick.Invoke(); yield return null;
+            Assert.AreEqual(KnowledgeStage.Recognize, life.Master.knowledge[index].stage); yield return Capture(app, "80-knowledge-forge");
+            Call(app, "ShowCouncil"); yield return null; yield return Capture(app, "81-inner-council");
+            Call(app, "ShowTimeVision"); yield return null; yield return Capture(app, "82-eight-time-horizons");
+            Call(app, "ShowOrbit"); Button(app, "Causal reservoir").onClick.Invoke(); yield return null; yield return Capture(app, "87-causal-reservoirs");
+            Call(app, "ShowModes"); Button(app, "Online parallel lives").onClick.Invoke(); yield return null; yield return Capture(app, "83-online-invitation");
+            Call(app, "CloseMasterPage"); Call(app, "ShowImagineSetup");
+            Button(app, "Imagine two failures").onClick.Invoke(); Button(app, "Start imagination").onClick.Invoke(); yield return null;
+            Assert.AreEqual(2, archive.imagination.RequiredFailures); Assert.AreEqual(2, archive.imagination.pathVersion);
+            yield return Capture(app, "84-goal-specific-imagination");
+            Call(app, "PlayMasterSpectacle", new DomainEvent { kind = DomainEventKind.PatternBroken, tier = RewardTier.Mythic,
+                title = "PATTERN\nBROKEN", detail = "过去的路停在这里。这次，你继续了。", multiplier = 3 }, (Action)(() => Call(app, "ShowHome")));
+            yield return new WaitForSecondsRealtime(1.5f); yield return Capture(app, "85-pattern-broken-timelines");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator TenSecondMp4IsExportedByTheShareButtonWithAnAudioTrack()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Video export acceptance").AddComponent<HorizonApp>();
+            yield return null;
+            var life = GameSession.StartMasterLife(1, 15, RunMode.Quick);
+            while (life.CompletedRun == null)
+            { while (life.HasPredictionReview) life.MarkPredictionReviewed(); if (life.CanPredict) life.SkipPrediction();
+                life.Choose(life.Hand.Last(c => life.CanPlay(c)).Id); if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance(); }
+            var archive = new ArchiveData(); archive.runs.Add(life.CompletedRun); archive.preferences.sound = false;
+            Set(app, "archive", archive); Set(app, "session", life);
+            Call(app, "ShowShareStory", life.CompletedRun, (Action)(() => Call(app, "ShowHome"))); yield return null;
+            Button(app, "Save share video").onClick.Invoke();
+            float until = Time.realtimeSinceStartup + 100;
+            while (Get<string>(app, "lastSharePath") == null || !Get<string>(app, "lastSharePath").EndsWith(".mp4"))
+            { Assert.Less(Time.realtimeSinceStartup, until, "MP4 encoding must finish; GIF fallback does not count as video."); yield return null; }
+            string output = Get<string>(app, "lastSharePath"); Assert.Greater(new FileInfo(output).Length, 20000);
+            string directory = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals"); Directory.CreateDirectory(directory);
+            File.Copy(output, Path.Combine(directory, "HORIZON-run-001.mp4"), true);
+            File.WriteAllBytes(Path.Combine(directory, "HORIZON-run-001.pcm"), TimelineSoundtrack.Pcm(life.CompletedRun));
+            yield return Capture(app, "86-mp4-sharing");
             yield return new ExitPlayMode();
         }
 

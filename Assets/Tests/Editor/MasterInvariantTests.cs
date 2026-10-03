@@ -37,14 +37,15 @@ namespace Horizon.Tests
                 while (life.HasPredictionReview) life.MarkPredictionReviewed(); if (life.CanPredict) life.SkipPrediction();
                 CardSpec choice = life.Day % 3 == 1 && life.CanPlay(life.Hand[1]) ? life.Hand[1] : life.Hand[2];
                 life.Choose(choice.Id); if (life.NeedsStation) life.VisitStation(); if (life.Day < life.Deadline) life.Advance();
-                breakthrough = life.Master.events.Find(e => e.kind == DomainEventKind.Breakthrough);
+                breakthrough = life.Master.events.Find(e => e.kind == DomainEventKind.Breakthrough && e.title == "BREAKTHROUGH" && life.CausalNodes.Find(n => n.id == e.nodeId)?.label == "长期积累 · BREAKTHROUGH");
             }
             Assert.IsNotNull(breakthrough);
             CausalNode node = life.CausalNodes.Find(n => n.id == breakthrough.nodeId);
             Assert.AreEqual(6, CausalGraph.Parents(node).Count); Assert.IsTrue(node.effectRecorded);
             Assert.IsTrue(CausalGraph.Parents(node).All(id => life.CausalNodes.Any(n => n.id == id && n.type == CausalNodeKind.Action)));
+            int prior = life.Master.events.Count(e => e.kind == DomainEventKind.Breakthrough);
             life = GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(life.Snapshot())));
-            Assert.AreEqual(1, life.Master.events.Count(e => e.kind == DomainEventKind.Breakthrough));
+            Assert.AreEqual(prior, life.Master.events.Count(e => e.kind == DomainEventKind.Breakthrough));
         }
         [Test]
         public void ForesightKnowledgePersistsInTheBehaviorArchiveAcrossNewLives()

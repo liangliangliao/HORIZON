@@ -11,6 +11,8 @@ namespace Horizon.Game
         public string imaginationId, goal, expectedCardId, actualCardId, actualNodeId, failureNodeId, recoveryNodeId, expectedRecovery, actualRecovery, difference;
         public int run, plannedDay, actualDay, failureDay, recoveryDay;
         public bool actionObserved, actionMatched, recoveryObserved, recoveryMatched;
+        public string realityNodeId, realityAt, realityAction;
+        public bool realityObserved;
         public ImaginationCalibration Copy() { return (ImaginationCalibration)MemberwiseClone(); }
 
         // Compare only evidence that actually happened. An imagined failure is never
@@ -65,6 +67,19 @@ namespace Horizon
                 comparison.Observe(life);
                 if (comparison.actionObserved) me.ObserveCalibration(comparison.imaginationId + ":action", comparison.actionMatched);
                 if (comparison.recoveryObserved) me.ObserveCalibration(comparison.imaginationId + ":recovery", comparison.recoveryMatched);
+            }
+        }
+        public void ObserveRealityCalibration(RealityQuest quest)
+        {
+            if (quest == null || !quest.completed) return;
+            FutureMemory memory = futureMemories.FirstOrDefault(m => m.id == quest.memoryId);
+            if (memory == null) return;
+            foreach (ImaginationCalibration comparison in imaginationComparisons.Where(c => c.imaginationId == memory.id.Split(new[] { ":memory:" }, StringSplitOptions.None)[0]))
+            {
+                if (comparison.realityObserved) continue;
+                comparison.realityObserved = true; comparison.realityNodeId = quest.id; comparison.realityAt = quest.completedAt; comparison.realityAction = quest.title;
+                comparison.difference += "\n现实路径：你亲自报告了「" + quest.title + "」。把实际成本和恢复方法带进下一次想象。";
+                me.ObserveCalibration(comparison.imaginationId + ":reality", comparison.recoveryMatched);
             }
         }
     }

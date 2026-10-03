@@ -11,23 +11,25 @@ namespace Horizon
     public sealed partial class HorizonApp
     {
         private string selectedChapter = "uncertainty";
+        private int chapterPage;
 
         private void ShowChapterSelection()
         {
             MasterPage("Story selection", "这次你想穿过什么？");
             View.Label(overlay, "Story introduction", "一个目标，一次真实挫折。\n你的准备、恢复和再次行动，决定这条未来。", 30, Palette.Text,
-                TextAnchor.UpperLeft, 0.075f, 0.745f, 0.925f, 0.855f);
-            string[] ids = { "uncertainty", "tomorrow", "perfection" };
-            string[] titles = { "穿过不确定", "在机会关闭之前", "让不完美的作品出发" };
-            string[] details = { "D12 面试 · 独自准备，或带着支持抵达", "D10 邀约过期 · 动机和机会都不会永远等待", "D12 交出作品 · 先交初稿，或继续打磨" };
-            for (int i = 0; i < ids.Length; i++)
+                TextAnchor.UpperLeft, 0.235f, 0.745f, 0.765f, 0.855f);
+            var entries = BossCatalog.All.Skip(chapterPage * 3).Take(3).ToArray();
+            for (int i = 0; i < entries.Length; i++)
             {
-                string id = ids[i]; float y = 0.56f - i * 0.145f;
-                View.Button(overlay, "Select chapter " + id, (selectedChapter == id ? "● " : "○ ") + titles[i] + "\n" + details[i],
-                    () => { selectedChapter = id; ShowChapterSelection(); }, 0.07f, y, 0.93f, y + 0.125f,
+                BossDefinition boss = entries[i]; string id = boss.id; float y = 0.56f - i * 0.14f;
+                View.Button(overlay, "Select chapter " + id, (selectedChapter == id ? "● " : "○ ") + boss.title + "\n" + boss.preparation,
+                    () => { selectedChapter = id; ShowChapterSelection(); }, 0.07f, y, 0.93f, y + 0.12f,
                     Palette.Panel, selectedChapter == id ? Palette.Mint : Palette.Text, 30);
             }
-            bool current = CanPrepareMaster && session.CatalogVersion >= 9 && session.Master.chapter == null && session.Deadline - session.Day >= 7;
+            View.Button(overlay, "Previous bosses", "‹", () => { chapterPage = (chapterPage + 3) % 4; ShowChapterSelection(); }, 0.07f, 0.752f, 0.22f, 0.832f, Palette.Deep, Palette.Text, 35);
+            View.Label(overlay, "Boss catalogue page", "10个行为挑战 · " + (chapterPage + 1) + "/4", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.22f, 0.689f, 0.78f, 0.741f);
+            View.Button(overlay, "Next bosses", "›", () => { chapterPage = (chapterPage + 1) % 4; ShowChapterSelection(); }, 0.78f, 0.752f, 0.93f, 0.832f, Palette.Deep, Palette.Text, 35);
+            bool current = CanPrepareMaster && session.CatalogVersion >= 10 && session.Master.chapter == null && session.Deadline - session.Day >= 7;
             if (current || archive.active == null)
                 View.Button(overlay, "Begin story chapter", current ? "让当前人生走向这个目标" : "开始这条故事人生", () => {
                     if (!current) StartNewRun();

@@ -246,6 +246,7 @@ namespace Horizon.UI
         private void Update()
         {
             if (WorldCamera == null || paused) return;
+            UpdateInsight();
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
             Vector3 drift = station || preferences.reducedMotion ? Vector3.zero : new Vector3(Mathf.Sin(Time.unscaledTime * 0.28f) * 0.14f, 0, 0);

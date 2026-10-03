@@ -91,7 +91,7 @@ namespace Horizon
                     AIField("AI provider key", "API 密钥 · 仅本次会话", aiSecrets.Get(aiDraft.provider, aiDraft.connection),
                         x => aiSecrets.Set(AIProvider.AzureOpenAI, AIConnection.Direct, x), 0.437f, true, true);
                     View.Button(overlay, "AI Azure access mode", "接入方式：" + AzureEndpoints.ModeLabel(aiDraft.azureAccessMode) + " · 切换", () =>
-                    { aiDraft.azureAccessMode = (AzureAccessMode)(((int)aiDraft.azureAccessMode + 1) % 4); RenderAISettings(); },
+                    { aiDraft.azureAccessMode = (AzureAccessMode)(((int)aiDraft.azureAccessMode + 1) % Enum.GetValues(typeof(AzureAccessMode)).Length); RenderAISettings(); },
                         0.075f, 0.375f, 0.925f, 0.42f, Palette.Deep, Palette.Gold, 23);
                     AIField("AI Azure api version", "api-version（可留空；v1 接口无需版本）", aiDraft.azureApiVersion, x => aiDraft.azureApiVersion = x, 0.295f,
                         compact: true, placeholder: "默认 OpenAI 2024-10-21 · Foundry 2024-05-01-preview").characterLimit = 50;
@@ -221,7 +221,7 @@ namespace Horizon
             bool available = !archive.reality.quests.Any(q => q.localDate == DateTime.Now.ToString("yyyy-MM-dd"));
             View.Button(overlay, "Accept AI reality suggestion", available ? "选择为今天的现实行动" : "今天已有现实行动 · 查看", () =>
             {
-                if (available) { archive.reality.Offer(DateTime.Now, "personal:" + AIText.Bound(aiGoal, 100).ToLowerInvariant(), content.quest, null); Save(); }
+                if (available) { archive.reality.Offer(DateTime.Now, "personal:" + AIText.Bound(aiGoal, 100).ToLowerInvariant(), AIText.Bound(content.quest, 100), null); Save(); }
                 ShowReality();
             }, 0.075f, 0.13f, 0.925f, 0.215f, Palette.Panel, Palette.Gold, 27);
         }

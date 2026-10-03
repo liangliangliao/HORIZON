@@ -83,11 +83,13 @@ namespace Horizon
             shareStatus = View.Label(shareControls.transform, "Share status", "三个选择，慢慢连成整段人生。", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.06f, 0.946f, 0.94f, 0.987f);
             View.Button(shareControls.transform, "Replay share", "再看一次", () => StartCoroutine(PlayShare(++shareGeneration, run, false)),
-                0.055f, 0.045f, 0.335f, 0.107f, Palette.Panel, Palette.Text, 24);
-            View.Button(shareControls.transform, "Save share animation", "保存并分享", () => StartCoroutine(PlayShare(++shareGeneration, run, true)),
-                0.36f, 0.045f, 0.665f, 0.107f, Palette.Mint, Palette.Ink, 24);
+                0.04f, 0.045f, 0.26f, 0.107f, Palette.Panel, Palette.Text, 24);
+            View.Button(shareControls.transform, "Save share video", "分享视频", () => StartCoroutine(PlayShare(++shareGeneration, run, true, true)),
+                0.275f, 0.045f, 0.555f, 0.107f, Palette.Mint, Palette.Ink, 24);
+            View.Button(shareControls.transform, "Save share animation", "保存GIF", () => StartCoroutine(PlayShare(++shareGeneration, run, true)),
+                0.57f, 0.045f, 0.78f, 0.107f, Palette.Panel, Palette.Text, 23);
             View.Button(shareControls.transform, "Close share", "返回", () => { shareGeneration++; back(); },
-                0.69f, 0.045f, 0.945f, 0.107f, Palette.Panel, Palette.Text, 24);
+                0.795f, 0.045f, 0.96f, 0.107f, Palette.Panel, Palette.Text, 24);
             View.RefreshText(overlay);
             StartCoroutine(PlayShare(generation, run, false));
         }
@@ -113,9 +115,9 @@ namespace Horizon
             shareQuote.alpha = Mathf.Clamp01((seconds - 7.3f) / 1.1f);
         }
 
-        private IEnumerator PlayShare(int generation, RunRecord run, bool export)
+        private IEnumerator PlayShare(int generation, RunRecord run, bool export, bool video = false)
         {
-            IEnumerator playback = PlayShareCore(generation, run, export);
+            IEnumerator playback = PlayShareCore(generation, run, export, video);
             try
             {
                 while (true)
@@ -137,7 +139,7 @@ namespace Horizon
             finally { (playback as IDisposable)?.Dispose(); }
         }
 
-        private IEnumerator PlayShareCore(int generation, RunRecord run, bool export)
+        private IEnumerator PlayShareCore(int generation, RunRecord run, bool export, bool video)
         {
             if (shareScene == null) yield break;
             if (!export)
@@ -152,6 +154,8 @@ namespace Horizon
             Directory.CreateDirectory(directory);
             string final = Path.Combine(directory, "HORIZON-RUN-" + run.number.ToString("000") + ".gif");
             string temporary = final + ".tmp";
+            string frames = video ? Path.Combine(directory, "frames-" + Guid.NewGuid().ToString("N")) : null;
+            if (video) Directory.CreateDirectory(frames);
             bool completed = false;
             Canvas canvas = root.GetComponentInParent<Canvas>();
             Camera sceneCamera = world.WorldCamera;
@@ -180,6 +184,7 @@ namespace Horizon
                         Color32[] pixels = recorder.Capture(canvas);
                         shareControls.alpha = 1;
                         gif.Frame(pixels, frame % 3 == 0 ? 16 : 17);
+                        if (video) recorder.SavePng(Path.Combine(frames, "frame-" + frame.ToString("000") + ".png"));
                         while (Time.unscaledTime < start + (frame + 1) / 6f) yield return null;
                     }
                 }
@@ -187,14 +192,27 @@ namespace Horizon
                 File.Move(temporary, final);
                 completed = true;
                 lastSharePath = final;
+                sceneCamera.enabled = sceneWasEnabled;
+                if (video)
+                {
+                    shareStatus.text = "正在编码十秒视频与声音…";
+                    string pcm = Path.Combine(frames, "story.pcm"); File.WriteAllBytes(pcm, TimelineSoundtrack.Pcm(run));
+                    string mp4 = Path.ChangeExtension(final, ".mp4");
+                    var encoding = TimelineVideoWriter.EncodeAsync(frames, pcm, mp4);
+                    while (!encoding.IsCompleted) yield return null;
+                    if (generation != shareGeneration || shareStatus == null) yield break;
+                    if (encoding.Result == "") lastSharePath = mp4;
+                    else { shareStatus.text = "当前设备的视频编码没有完成，已保留十秒GIF。可以选择保存GIF分享。"; yield break; }
+                }
                 Debug.Log("Timeline recording finished in " + (Time.unscaledTime - start).ToString("0.0") + " seconds.");
-                if (shareStatus != null) shareStatus.text = TimelineSharing.Publish(final);
+                if (shareStatus != null) shareStatus.text = TimelineSharing.Publish(lastSharePath);
                 DrawShare(10);
             }
             finally
             {
                 if (sceneCamera != null) sceneCamera.enabled = sceneWasEnabled;
                 if (!completed && File.Exists(temporary)) File.Delete(temporary);
+                if (frames != null && Directory.Exists(frames)) Directory.Delete(frames, true);
                 if (generation == shareGeneration && shareControls != null)
                 {
                     shareControls.alpha = 1;
@@ -238,6 +256,7 @@ namespace Horizon
                     View.RefreshText(canvas.transform);
                 }
             }
+            public void SavePng(string path) { File.WriteAllBytes(path, pixels.EncodeToPNG()); }
             public void Dispose()
             { image.Release(); UnityEngine.Object.Destroy(image); UnityEngine.Object.Destroy(pixels); UnityEngine.Object.Destroy(camera.gameObject); }
         }

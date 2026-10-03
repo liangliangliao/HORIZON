@@ -9,10 +9,12 @@ namespace Horizon.Game
         public readonly string Root;
         public readonly AzureAccessMode[] Modes;
         public readonly bool Serverless;
-        internal AzureEndpoint(string root, AzureAccessMode[] modes, bool serverless)
-        { Root = root; Modes = modes; Serverless = serverless; }
+        public readonly string Deployment;
+        internal AzureEndpoint(string root, AzureAccessMode[] modes, bool serverless, string deployment = "")
+        { Root = root; Modes = modes; Serverless = serverless; Deployment = deployment; }
         public string ChatUrl(AzureAccessMode mode, string deployment, string version)
         {
+            if (mode == AzureAccessMode.Responses) return Root + "/openai/v1/responses";
             if (mode == AzureAccessMode.OpenAIV1) return Root + "/openai/v1/chat/completions";
             string apiVersion = AzureEndpoints.Version(mode, version);
             string path = mode == AzureAccessMode.AzureOpenAI ? "/openai/deployments/" + Uri.EscapeDataString(deployment) + "/chat/completions" :
@@ -40,19 +42,27 @@ namespace Horizon.Game
             string path = uri.AbsolutePath.TrimEnd('/');
             string[] parts = path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             bool project = parts.Length == 3 && parts[0] == "api" && parts[1] == "projects" && parts[2].Length > 0;
-            bool v1 = path == "/openai/v1" || path == "/openai/v1/chat/completions";
+            bool responses = path == "/openai/v1/responses";
+            bool v1 = path == "/openai/v1" || path == "/openai/v1/chat/completions" || responses;
             bool models = path == "/models" || path == "/models/chat/completions";
-            if (path != "" && path != "/openai" && !project && !v1 && !models) throw new AIException(AIError.Configuration);
+            bool deploymentPath = parts.Length == 5 && parts[0] == "openai" && parts[1] == "deployments" &&
+                parts[2].Length > 0 && parts[3] == "chat" && parts[4] == "completions";
+            if (path != "" && path != "/openai" && !project && !v1 && !models && !deploymentPath) throw new AIException(AIError.Configuration);
             bool serverless = uri.Host.EndsWith(".models.ai.azure.com", StringComparison.OrdinalIgnoreCase);
             AzureAccessMode preferred = settings.azureAccessMode;
+            // A pasted operation URL is stronger evidence than a stale selector.
+            if (responses) preferred = AzureAccessMode.Responses;
+            else if (deploymentPath) preferred = AzureAccessMode.AzureOpenAI;
             if (preferred == AzureAccessMode.Auto)
                 preferred = serverless || models ? AzureAccessMode.FoundryModels :
                     project || v1 || uri.Host.EndsWith(".services.ai.azure.com", StringComparison.OrdinalIgnoreCase) ? AzureAccessMode.OpenAIV1 : AzureAccessMode.AzureOpenAI;
-            AzureAccessMode[] modes = preferred == AzureAccessMode.AzureOpenAI ?
+            AzureAccessMode[] modes = preferred == AzureAccessMode.Responses ?
+                new[] { AzureAccessMode.Responses, AzureAccessMode.OpenAIV1, AzureAccessMode.FoundryModels, AzureAccessMode.AzureOpenAI } : preferred == AzureAccessMode.AzureOpenAI ?
                 new[] { AzureAccessMode.AzureOpenAI, AzureAccessMode.OpenAIV1, AzureAccessMode.FoundryModels } :
                 preferred == AzureAccessMode.FoundryModels ? new[] { AzureAccessMode.FoundryModels, AzureAccessMode.OpenAIV1, AzureAccessMode.AzureOpenAI } :
                 new[] { AzureAccessMode.OpenAIV1, AzureAccessMode.FoundryModels, AzureAccessMode.AzureOpenAI };
-            return new AzureEndpoint(uri.GetLeftPart(UriPartial.Authority), modes, serverless);
+            return new AzureEndpoint(uri.GetLeftPart(UriPartial.Authority), modes, serverless,
+                deploymentPath ? Uri.UnescapeDataString(parts[2]) : "");
         }
         public static string Version(AzureAccessMode mode, string raw)
         {
@@ -66,6 +76,8 @@ namespace Horizon.Game
             string raw = settings.azureDeployment ?? "";
             if (raw.Length > 600 || raw.Any(char.IsControl)) throw new AIException(AIError.Configuration);
             string[] values = raw.Split(new[] { ',', '，' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0).Distinct().ToArray();
+            if (values.Length == 0 && !string.IsNullOrWhiteSpace(settings.azureEndpoint))
+            { string inferred = Resolve(settings).Deployment; if (!string.IsNullOrEmpty(inferred)) values = new[] { inferred }; }
             if (values.Length > MaximumDeployments || values.Any(x => x.Length > 100)) throw new AIException(AIError.Configuration);
             return Prioritize(values, settings.azureSelectedDeployment);
         }
@@ -105,6 +117,7 @@ namespace Horizon.Game
                 case AzureAccessMode.AzureOpenAI: return "Azure OpenAI · 部署接口";
                 case AzureAccessMode.FoundryModels: return "Foundry Models · 推理接口";
                 case AzureAccessMode.OpenAIV1: return "Azure OpenAI · v1 接口";
+                case AzureAccessMode.Responses: return "Azure / Foundry · Responses 接口";
                 default: return "自动识别（按终结点判断）";
             }
         }

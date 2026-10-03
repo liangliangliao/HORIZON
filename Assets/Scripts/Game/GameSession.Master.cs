@@ -19,7 +19,8 @@ namespace Horizon.Game
         {
             if (!Enum.IsDefined(typeof(RunMode), mode)) throw new ArgumentException("Unknown run mode.");
             var s = new GameSession(number, seed);
-            if (mode == RunMode.ThirtyDays || mode == RunMode.LongRun) s.Deadline = 30;
+            if (mode == RunMode.ThirtyDays) s.Deadline = 30;
+            if (mode == RunMode.LongRun) s.Deadline = 60;
             s.InitializeMaster(mode, model?.patterns, memories, model?.failedRuns ?? 0, model?.foresightPoints ?? 0, knowledge);
             return s;
         }
@@ -37,6 +38,16 @@ namespace Horizon.Game
             Master.initialKnowledge = Master.knowledge.Select(k => k.Copy()).ToList();
             Master.resources.Add(new ResourceSample { day = Day, values = Values() });
             RefreshEngine();
+            InitializeExpedition();
+            if (UsesExpedition && knowledge != null)
+            {
+                foreach (KnowledgeSkill remembered in knowledge)
+                {
+                    int index = Master.knowledge.FindIndex(k => k.id == remembered.id);
+                    if (index >= 0 && remembered.stage > Master.knowledge[index].stage) Master.knowledge[index] = remembered.Copy();
+                }
+                Master.initialKnowledge = Master.knowledge.Select(k => k.Copy()).ToList();
+            }
         }
         private void RefreshEngine()
         {
@@ -44,6 +55,7 @@ namespace Horizon.Game
             Master.engine.ability = Ability; Master.engine.emotion = Mood; Master.engine.fatigue = 10 - Energy;
             Master.engine.trigger = Math.Min(10, Master.triggers.Count * 2);
             Master.engine.socialPressure = Master.triggers.Contains("promise") || Master.triggers.Contains("friend") ? 2 : 0;
+            RefreshExpeditionEngine();
         }
         private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0)
         {
@@ -91,6 +103,7 @@ namespace Horizon.Game
             CausalNode n = MasterNode(CausalNodeKind.Execution, d.steps[d.step], d.nodeId); d.nodeId = n.id;
             d.step++; d.status = d.step == d.steps.Count ? DecisionStatus.Ready : DecisionStatus.Executing;
             Master.engine.friction = Math.Max(0, Master.engine.friction - 1);
+            SpendPreparation(n);
             Command("step"); ChargeOverdrive(4, n); Emit(DomainEventKind.ExecutionStep, n, "EXECUTION " + d.step + " / " + d.steps.Count);
         }
         public bool EquipTrigger(string id)
@@ -104,7 +117,7 @@ namespace Horizon.Game
             Master.triggers.Add(id); RefreshEngine(); Command("trigger", id);
             CausalNode n = MasterNode(CausalNodeKind.Trigger, "Trigger · " + TriggerEquipment.Names[Array.IndexOf(TriggerEquipment.Ids, id)], InExecutionMode ? Master.decision.nodeId : null,
                 CatalogVersion >= 9 ? new ResourceDelta(money: Money - before.money) : null);
-            if (CatalogVersion >= 9) { n.cardId = id; RecordResourceSample(); }
+            if (CatalogVersion >= 9) { n.cardId = id; SpendPreparation(n); RefreshEngine(); RecordResourceSample(); }
             Emit(DomainEventKind.TriggerEquipped, n, "行动提示已装备"); return true;
         }
         public bool LowerFriction()
@@ -113,8 +126,10 @@ namespace Horizon.Game
             if (CatalogVersion >= 9 && Insight < 1) return false;
             if (CatalogVersion >= 9) Apply(new ResourceDelta(insight: -1));
             Master.engine.friction = Math.Max(1, Master.engine.friction - (CatalogVersion >= 9 ? 2 : 1));
-            Command("friction"); MasterNode(CausalNodeKind.Execution, CatalogVersion >= 9 ? "缩小准备步骤" : "删去一个准备步骤", InExecutionMode ? Master.decision.nodeId : null,
-                CatalogVersion >= 9 ? new ResourceDelta(insight: -1) : null); if (CatalogVersion >= 9) RecordResourceSample(); return true;
+            Command("friction"); CausalNode n = MasterNode(CausalNodeKind.Execution, CatalogVersion >= 9 ? "缩小准备步骤" : "删去一个准备步骤", InExecutionMode ? Master.decision.nodeId : null,
+                CatalogVersion >= 9 ? new ResourceDelta(insight: -1) : null);
+            if (UsesExpedition) Master.expedition.frictionReduction = Math.Min(4, Master.expedition.frictionReduction + 2);
+            SpendPreparation(n); RefreshExpeditionEngine(); if (CatalogVersion >= 9) RecordResourceSample(); return true;
         }
         private bool MasterAllows(CardSpec card)
         { return !UsesMasterRules || !ChapterNeedsChoice && (!InExecutionMode || Master.decision.cardId == card.Id && Master.decision.status == DecisionStatus.Ready); }
@@ -232,7 +247,7 @@ namespace Horizon.Game
                 if (CatalogVersion >= 9) foreach (CausalNode trigger in CausalNodes.Where(x => x.type == CausalNodeKind.Trigger &&
                     x.parentId != n.id && Master.triggers.Contains(x.cardId) && TriggerEquipment.Supports(x.cardId, card))) CausalGraph.Link(n, trigger.id);
                 ObservePattern("decision-reopen", true, n); ChargeOverdrive(10, n); }
-            if (Master.chapter == null && Master.awaitingComeback && (card.Kind == CardKind.Growth || card.Kind == CardKind.Recovery))
+            if (Master.chapter == null && Master.mode != RunMode.MirrorRun && Master.awaitingComeback && (card.Kind == CardKind.Growth || card.Kind == CardKind.Recovery))
             {
                 Master.awaitingComeback = false; Master.insightPoints += Master.resilienceChain;
                 if (!string.IsNullOrEmpty(Master.lastFailureNode)) CausalGraph.Link(n, Master.lastFailureNode);
@@ -262,6 +277,7 @@ namespace Horizon.Game
             foreach (OpportunityWindow w in Master.windows.Where(w => !w.taken && !w.expired && w.cardId == card.Id && w.expiresDay >= Day))
             { w.taken = true; CausalGraph.Link(n, w.nodeId); if (Day <= w.momentumUntilDay) ChargeOverdrive(8, n); }
             ChapterAfterChoice(action, card);
+            ExpeditionAfterChoice(action, card, n, before);
             action.parentNodeId = n.parentId; action.parentNodeIds = CausalGraph.Parents(n);
             Master.insightPoints++; RefreshEngine(); RecordResourceSample(); Emit(DomainEventKind.ActionTaken, n, card.Name);
         }
@@ -271,8 +287,10 @@ namespace Horizon.Game
             CausalNode n = CausalNodes.Find(x => x.id == echo.nodeId);
             int chain = EchoChainSize(echo);
             Emit(DomainEventKind.TimeEcho, n, "TIME ECHO", "D" + echo.sourceDay + " 的「" + echo.cardName + "」回来了。", chain);
-            if (chain >= 5) { Master.insightPoints += 2; Emit(chain >= 9 ? DomainEventKind.CausalSingularity : DomainEventKind.Cascade, n,
+            if (chain >= (UsesExpedition && Day <= Master.overdriveUntilDay ? 4 : 5)) { Master.insightPoints += 2; Emit(chain >= 9 ? DomainEventKind.CausalSingularity : DomainEventKind.Cascade, n,
                 chain >= 9 ? "CAUSAL SINGULARITY" : "CASCADE ×" + chain, "过去多个选择形成了真实因果路径。", chain); }
+            if (UsesExpedition && Day <= Master.overdriveUntilDay && chain >= 4)
+            { if (echo.delta?.money > 0 && Energy >= 4) ActivateOrbit(5, n); if (echo.replacementId == "opportunity") ActivateOrbit(0, n); }
             if (echo.delta != null && (echo.delta.energy < 0 || echo.delta.mood < 0) && (Energy <= 3 || Mood <= 3))
             {
                 if (!Master.awaitingComeback) Master.resilienceChain = Math.Min(10, Master.resilienceChain + 1);
@@ -295,6 +313,7 @@ namespace Horizon.Game
         {
             if (!UsesMasterRules) return;
             ChapterAfterAdvance();
+            ExpeditionAfterAdvance(due);
             foreach (OpportunityWindow w in Master.windows.Where(w => !w.taken && !w.expired && w.expiresDay < Day))
             { w.expired = true; CausalNode n = MasterNode(CausalNodeKind.Opportunity, "机会窗口已关闭", w.nodeId);
                 Emit(DomainEventKind.MomentumExpired, n, "MOMENTUM 已消退", "动机也有时间窗口。准备下一次更容易开始的环境。");
@@ -347,6 +366,16 @@ namespace Horizon.Game
                     case "friction": LowerFriction(); break;
                     case "imagine": AttachImagination(c.imagination); break;
                     case "recognize": RecognizeKnowledge(); break;
+                    case "life-route": ChooseLifeRoute(c.argument); break;
+                    case "remove-trigger": RemoveTrigger(c.argument); break;
+                    case "environment": AdjustEnvironment(c.argument); break;
+                    case "worldview-add": SetWorldview(c.argument, true); break;
+                    case "worldview-remove": SetWorldview(c.argument, false); break;
+                    case "recognize-skill": RecognizeSkill(c.argument); break;
+                    case "thought": RespondToThought(c.argument); break;
+                    case "mirror": ResolveMirror(c.argument); break;
+                    case "future-message": { int split = c.argument.IndexOf('|'); if (split > 0) ReceiveFutureMessage(c.argument.Substring(0, split), c.argument.Substring(split + 1), c.value); break; }
+                    case "reveal-cause": RevealHiddenCause(c.argument); break;
                 }
             }
         }

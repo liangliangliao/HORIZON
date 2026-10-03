@@ -11,6 +11,37 @@ namespace Horizon.Tests
 {
     public sealed class OnlineAITests
     {
+        [Test]
+        public async Task PastedResponsesEndpointOverridesStaleFoundrySelectorAndDiscoversDeployment()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI,
+                azureEndpoint = "https://modleapikey-resource.services.ai.azure.com/openai/v1/responses", azureAccessMode = AzureAccessMode.FoundryModels };
+            var transport = new Transport();
+            transport.Responses.Enqueue(new AIResponse(200, "{\"data\":[{\"id\":\"coach\"}]}"));
+            transport.Responses.Enqueue(new AIResponse(200, "{\"status\":\"completed\",\"output\":[{\"type\":\"reasoning\"},{\"type\":\"message\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":" + Quote(Content) + "}]}]}"));
+            PersonalContent result = await new OnlineContentAdapter(settings, Secret, transport).Personalize(Context, CancellationToken.None);
+            Assert.AreEqual(2, transport.Calls.Count);
+            Assert.That(transport.Last.Url, Does.EndWith("/openai/v1/responses"));
+            Assert.That(transport.Last.Body, Does.Contain("max_output_tokens").And.Contain("\"input\"").And.Contain("\"store\":false").And.Not.Contain("max_tokens").And.Not.Contain(Secret));
+            Assert.AreEqual("coach", AzureEndpoints.ReadModels(new AIResponse(200, "{\"data\":[{\"id\":\"coach\"}]}"))[0]);
+            Assert.That(result.status, Does.Contain("Responses")); Assert.IsTrue(result.generatedByAI);
+        }
+
+        [TestCase("incomplete")]
+        [TestCase("failed")]
+        [TestCase("queued")]
+        public void ResponsesMustBeCompletedBeforeAnyContentIsAccepted(string status)
+        { Assert.Throws<AIException>(() => AIProtocol.Read(new AIResponse(200, "{\"status\":\"" + status + "\",\"output\":[]}"), AIProvider.AzureOpenAI, AIConnection.Direct)); }
+
+        [Test]
+        public void FullAzureDeploymentUrlCanSupplyItsOwnDeployment()
+        {
+            var settings = new AISettings { provider = AIProvider.AzureOpenAI,
+                azureEndpoint = "https://resource.openai.azure.com/openai/deployments/interview%20coach/chat/completions" };
+            Assert.AreEqual("interview coach", AzureEndpoints.Deployments(settings).Single());
+            Assert.That(AIProtocol.Build(settings, Secret, Context).Url, Does.Contain("/deployments/interview%20coach/chat/completions"));
+        }
+
         private const string Secret = "test-key-never-persist-this";
         private const string Content = "{\"futureSelfLine\":\"你已经走过一步。\",\"quest\":\"打开一份材料并读两分钟\",\"patternExplanation\":\"近期证据还不足，需要继续观察。\"}";
         private static NarrativeContext Context { get { return new NarrativeContext("面试", "近期犹豫", Enumerable.Range(1, 10).Select(x => "D" + x)); } }

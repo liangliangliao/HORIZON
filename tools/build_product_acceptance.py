@@ -1,82 +1,69 @@
-"""Combine the 53-chapter product audit with observed NUnit evidence.
+"""Aggregate this commit's 53-chapter checklist and executed evidence.
 
-A passing test of a related rule is partial evidence, never completion of a
-chapter or proof of usability. Run against the results of the same commit.
+A claim earns its capped credit only if all named evidence was executed and
+passed. The gate includes human/live/device gaps as zero; it does not turn
+passing tests into proof that the game is enjoyable or all features complete.
 """
 import argparse
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path
-import re
 import subprocess
 import xml.etree.ElementTree as ET
+from acceptance_catalog import CHAPTERS
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--results", type=Path, required=True)
-parser.add_argument("--output", type=Path, default=Path("artifacts/product-acceptance.json"))
+parser.add_argument('--results', type=Path, required=True)
+parser.add_argument('--output', type=Path, default=Path('artifacts/product-acceptance.json'))
+parser.add_argument('--enforce', action='store_true', help='Require every observed test to pass and comprehensive engineering score >85')
 args = parser.parse_args()
-matrix = Path("docs/SPEC_ACCEPTANCE_V042.md").read_text(encoding="utf-8")
-rows = re.findall(r"^\| (\d+) \| (.*?) \| (.*?) \| (.*?) \|$", matrix, re.M)
-assert [int(row[0]) for row in rows] == list(range(1, 54)), "All 53 chapters must be audited exactly once"
-
-# These fixtures verify implemented subsets. Missing features remain missing
-# even when a nearby rule has passing tests.
-groups = {
-    3: ["WideChoicesGroupedEchoesAndPreparation"], 4: ["EveryModeCompletes", "CampaignCompletionTests"],
-    5: ["CausalFlowTests", "ObservationDesignTests"], 6: ["PlayGuideTests", "MasterSpecificationTests"],
-    7: ["GameSessionTests", "WideChoicesGroupedEchoes"], 8: ["CausalFlowTests", "CausalPresentationTests"],
-    9: ["CampaignCompletionTests", "BusinessRuleTests"], 10: ["MasterSpecificationTests", "ObservationDesignTests"],
-    11: ["PreparationConsumesFocus", "LegacyLivesKeep", "MasterInvariantTests"],
-    12: ["PreparationConsumesFocus", "UnmatchedReminder", "PaidTriggers"], 13: ["PreparationConsumesFocus", "PaidTriggers", "LegacyLivesKeep"],
-    14: [], 15: [], 16: ["KnowledgeCannotSkip"],
-    18: ["ImaginedPreparationBranches", "FirstLifeTeachesTime"], 19: ["ImaginationCannotReachVictory", "ImaginedPreparationBranches"],
-    20: ["MasterSpecificationTests"], 21: ["ActualChoiceDivergence", "NoActualSetback", "RealSetbackAndNextAction", "PracticePreservesOriginalLife"],
-    22: ["MasterInvariantTests", "RealSetbackAndNextAction"], 23: ["MasterInvariantTests", "MasterSpecificationTests"],
-    24: ["MasterSpecificationTests"], 25: ["MasterInvariantTests", "MasterSpecificationTests"],
-    26: [], 27: ["ReplayingCommandsReproducesResourcesAndDecisionCausality"], 28: ["ReservoirPayoutHasSixRealParentsAndDoesNotRepeatOnReload"],
-    29: ["OneActionWithManyPreparationNodes", "CausalFlowTests"], 30: ["OnlineAITests", "PlayableFlowTests"],
-    31: ["PlayableFlowTests", "WideChoicesGroupedEchoes"], 32: ["MasterSpecificationTests", "MasterInvariantTests"],
-    33: ["MasterFeaturesCanBePlayed"], 34: ["MasterSpecificationTests", "MasterInvariantTests"],
-    35: ["EveryModeCompletes", "GameSessionTests"], 36: ["CausalPresentationTests", "PlayableFlowTests"],
-    37: ["MasterInvariantTests"], 38: ["MasterInvariantTests"], 39: ["ActualChoiceDivergence", "MasterSpecificationTests"],
-    40: ["OnlineAITests", "OnlineProviders", "AzureResource"], 41: ["WideChoicesGroupedEchoes", "FeedbackInteractionTests"],
-    42: ["MasterFeaturesCanBePlayed", "CausalPresentationTests"], 43: [], 44: [],
-    45: ["FirstLifeTeachesTime", "WideChoicesGroupedEchoes", "PracticePreservesOriginalLife"],
-    47: [], 48: ["PlayableFlowTests"], 49: ["BusinessRuleTests", "MasterInvariantTests"],
-    51: ["MasterInvariantTests", "OnlineAITests"],
-}
-for chapter in (3, 8, 14, 22, 23, 24, 35, 37, 45):
-    groups.setdefault(chapter, []).extend(["StoryChapterTests", "StoryChallengeConnects"])
-groups[41].extend(["PartialViewportBloomAndFrameClear", "StoryChallengeConnects"])
-files = [args.results] if args.results.is_file() else sorted(args.results.rglob("*.xml"))
+files = [args.results] if args.results.is_file() else sorted(args.results.rglob('*.xml'))
+files += sorted(Path('artifacts/services').glob('*.xml'))
 cases = {}
 for file in files:
     try:
-        for case in ET.parse(file).getroot().iter("test-case"):
-            name = case.get("fullname", case.get("name", ""))
-            if name:
-                cases[name] = {"test": name, "result": case.get("result"), "source": str(file)}
-    except ET.ParseError:
-        continue
-assert cases, "No NUnit execution evidence found"
-chapters = []
-for number, requirement, implemented, pending in rows:
-    number = int(number)
-    evidence = [case for name, case in cases.items() if any(key in name for key in groups.get(number, []))]
-    chapters.append({"chapter": number, "requirement": requirement, "implemented_scope": implemented,
-                     "remaining_scope": pending, "verification": "related_subset_executed" if evidence else "not_automated",
-                     "evidence": evidence})
-report = {
-    "baseline": "0.4.2", "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-    "working_tree_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip()),
-    "all_specification_features_implemented": False, "all_specification_features_verified": False,
-    "interpretation": "Execution evidence covers the listed implemented subset. It does not accept the remaining scope, visual quality, fun, or real-world outcomes.",
-    "test_results": dict(Counter(case["result"] for case in cases.values())),
-    "chapters_audited": len(chapters), "chapters": chapters,
-    "not_verified_by_this_report": ["Android physical-device touch, performance, audio and haptics", "first-time-player comprehension and enjoyment",
-        "live DeepSeek/Azure with user credentials", "online Parallel Lives/Future Messages", "independent ten-Boss gameplay", "MP4 export"],
-}
-args.output.parent.mkdir(parents=True, exist_ok=True)
-args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-print(json.dumps({"chapters_audited": 53, "test_results": report["test_results"], "all_features_implemented": False,
-                  "all_features_verified": False, "report": str(args.output)}, ensure_ascii=False))
+        root=ET.parse(file).getroot()
+        for tag in ('test-case','testcase'):
+            for case in root.iter(tag):
+                name=case.get('fullname',case.get('name',''))
+                result=case.get('result')
+                if result is None: result='Failed' if case.find('failure') is not None or case.find('error') is not None else 'Skipped' if case.find('skipped') is not None else 'Passed'
+                if name: cases[name]={'test':name,'result':result,'source':str(file)}
+    except ET.ParseError: continue
+assert cases, 'No executed acceptance evidence found'
+chapters=[]
+for chapter in CHAPTERS:
+    source_ok=all(Path(p).is_file() for p in chapter['source'])
+    criteria=[]
+    for criterion in chapter['criteria']:
+        checks=[ [case for name,case in cases.items() if test in name] for test in criterion['tests'] ]
+        verified=bool(checks) and all(matches and all(case['result']=='Passed' for case in matches) for matches in checks)
+        credit=criterion['completion_cap'] if source_ok and verified else 0
+        criteria.append({**criterion, 'earned_credit':credit,
+                         'verification':'executed' if verified else 'pending',
+                         'evidence':[case for matches in checks for case in matches]})
+    score=sum(c['earned_credit'] for c in criteria)/len(criteria)
+    chapters.append({**chapter,'criteria':criteria,'source_files_exist':source_ok,'score':score})
+percentage=sum(c['score'] for c in chapters)/53*100
+pending=[{'id':c['id'],'requirement':c['requirement'],'credit':c['earned_credit'],'known_limit':c['known_limit']}
+         for chapter in chapters for c in chapter['criteria'] if c['earned_credit']<1]
+counts=dict(Counter(c['result'] for c in cases.values()))
+report={'baseline':'0.4.2','commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+        'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+        'checklist_sha256':hashlib.sha256(Path('tools/acceptance_catalog.py').read_bytes()).hexdigest(),
+        'working_tree_dirty':bool(subprocess.check_output(['git','status','--porcelain'],text=True).strip()),
+        'assessment':'53 equally weighted chapters; named checks equally weighted inside each chapter; unverified checks score zero',
+        'chapters_audited':53,'checks_audited':sum(len(c['criteria']) for c in chapters),
+        'comprehensive_engineering_percent':round(percentage,4), 'threshold':'strictly greater than 85%',
+        'threshold_met':percentage>85, 'all_specification_features_implemented':not pending,
+        'all_specification_features_verified':not pending and not counts.get('Failed',0),
+        'interpretation':'Includes the listed device/live/player gaps as zero. This measures implemented and demonstrated specification behavior, not fun, retention, market readiness or real-world transfer.',
+        'test_results':counts, 'chapters':chapters, 'remaining_checks':pending}
+args.output.parent.mkdir(parents=True,exist_ok=True)
+args.output.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+print(json.dumps({k:report[k] for k in ['chapters_audited','checks_audited','comprehensive_engineering_percent','threshold_met','test_results']},ensure_ascii=False))
+if args.enforce and (percentage<=85 or any(v for k,v in counts.items() if k!='Passed')):
+    for c in pending:
+        if not c['known_limit']: print('Missing execution evidence:',c['id'],c['requirement'])
+    raise SystemExit('Specification gate has not passed; continue implementation or verification.')

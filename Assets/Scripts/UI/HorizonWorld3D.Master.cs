@@ -6,7 +6,17 @@ namespace Horizon.UI
 {
     public sealed partial class HorizonWorld3D
     {
-        private AudioClip masterGrowthTone, masterEchoTone, masterMythicTone;
+        private AudioClip masterGrowthTone, masterEchoTone, masterMythicTone, masterRecoveryTone;
+        private float insightTarget, insightAmount;
+        public void SetInsightState(int energy, bool active)
+        { insightTarget = active ? 1 : Mathf.Clamp01((energy - 55) / 45f) * 0.65f; }
+        private void UpdateInsight()
+        {
+            insightAmount = Mathf.MoveTowards(insightAmount, insightTarget, Time.unscaledDeltaTime * 0.7f);
+            if (portalLight != null) portalLight.SetColor("_Color", Color.Lerp(new Color(0.55f, 1.9f, 1.3f, 0.68f), new Color(1.6f, 2.6f, 1.9f, 0.82f), insightAmount));
+            if (ambience != null) ambience.pitch = 1 + insightAmount * 0.16f;
+            if (bloom != null && !preferences.reducedMotion && !preferences.batterySaver) bloom.Echo = Mathf.Max(bloom.Echo, insightAmount * 0.22f);
+        }
         public void PresentMasterEvent(DomainEvent e)
         {
             if (e == null) return;
@@ -28,12 +38,18 @@ namespace Horizon.UI
                 yield return new WaitForSecondsRealtime(0.45f);
                 if (paused || !preferences.sound) { UpdateAudio(); yield break; }
             }
-            if (masterEchoTone == null) masterEchoTone = CreateMasterTone("Past returning", 174, false);
-            if (masterGrowthTone == null) masterGrowthTone = CreateMasterTone("Future unfolding", 110, false);
-            if (masterMythicTone == null) masterMythicTone = CreateMasterTone("Pattern breakthrough", 65, true);
+            if (masterEchoTone == null) masterEchoTone = LanguageClip("Past returning", DomainEventKind.TimeEcho);
+            if (masterGrowthTone == null) masterGrowthTone = LanguageClip("Future unfolding", DomainEventKind.FutureMemory);
+            if (masterMythicTone == null) masterMythicTone = LanguageClip("Pattern breakthrough", DomainEventKind.PatternBroken);
+            if (masterRecoveryTone == null) masterRecoveryTone = LanguageClip("Room to recover", DomainEventKind.FailAndAgain);
             audioSource.pitch = 1;
-            audioSource.PlayOneShot(mythic ? masterMythicTone : e.kind == DomainEventKind.TimeEcho ? masterEchoTone : masterGrowthTone, 0.4f);
-            if (mythic) { yield return new WaitForSecondsRealtime(1.5f); UpdateAudio(); }
+            audioSource.PlayOneShot(mythic ? masterMythicTone : e.kind == DomainEventKind.TimeEcho ? masterEchoTone : e.kind == DomainEventKind.FailAndAgain ? masterRecoveryTone : masterGrowthTone, 0.4f);
+            if (mythic) { yield return new WaitForSecondsRealtime(3.0f); UpdateAudio(); }
+        }
+        private AudioClip LanguageClip(string name, DomainEventKind kind)
+        {
+            float[] samples = SoundLanguage.Render(kind); AudioClip clip = AudioClip.Create(name, samples.Length, 1, 22050, false);
+            clip.SetData(samples, 0); sounds.Add(clip); return clip;
         }
         private static AudioClip CreateMasterTone(string name, float frequency, bool mythic)
         {
@@ -55,9 +71,7 @@ namespace Horizon.UI
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!preferences.haptics) return;
-            long[] timing = e.tier == RewardTier.Mythic ? new long[] { 450, 30, 170, 100 } :
-                e.kind == DomainEventKind.TimeEcho ? new long[] { 0, 25, 90, 35 } :
-                e.tier >= RewardTier.Epic ? new long[] { 0, 15, 80, 25, 70, 45 } : new long[] { 0, 18 };
+            HapticPhrase phrase = HapticLanguage.For(e.kind, e.tier); if (phrase == null) return;
             try
             {
                 using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
@@ -67,8 +81,8 @@ namespace Horizon.UI
                 {
                     if (version.GetStatic<int>("SDK_INT") >= 26)
                         using (var effectClass = new AndroidJavaClass("android.os.VibrationEffect"))
-                        using (var effect = effectClass.CallStatic<AndroidJavaObject>("createWaveform", timing, -1)) vibrator.Call("vibrate", effect);
-                    else vibrator.Call("vibrate", timing, -1);
+                        using (var effect = effectClass.CallStatic<AndroidJavaObject>("createWaveform", phrase.timings, phrase.amplitudes, -1)) vibrator.Call("vibrate", effect);
+                    else vibrator.Call("vibrate", phrase.timings, -1);
                 }
             } catch (System.Exception) { Handheld.Vibrate(); }
 #endif

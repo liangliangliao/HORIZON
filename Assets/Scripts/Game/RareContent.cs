@@ -20,7 +20,7 @@ namespace Horizon.Game
             if (moment == null || life == null || moment.type > 1) return;
             if (moment.type == 0)
             {
-                WorldEventSpec spec = life.CatalogVersion >= 3 && (life.RunNumber >= 3 || life.Deadline == 30) ?
+                WorldEventSpec spec = life.CatalogVersion >= 3 && (life.RunNumber >= 3 || life.Deadline >= 30) ?
                     WorldEvents.ForCatalog(life.CatalogVersion).FirstOrDefault(e => e.Day > life.Day && e.Day <= life.Deadline &&
                         WorldEvents.Occurs(life.WorldSeed, e.Day, e.Chance)) : null;
                 PendingEcho echo = life.Pending.Where(e => e.dueDay > life.Day).OrderBy(e => e.dueDay).FirstOrDefault();

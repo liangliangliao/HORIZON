@@ -150,7 +150,7 @@ namespace Horizon.UI
     }
 
     public sealed class HorizonCardDrag : MonoBehaviour, IBeginDragHandler, IDragHandler,
-        IEndDragHandler, IPointerClickHandler, IPointerDownHandler
+        IEndDragHandler, IPointerClickHandler, IPointerDownHandler, IInitializePotentialDragHandler
     {
         public Action<HorizonCardDrag, Vector2> Dragged;
         public Action<HorizonCardDrag> Played;
@@ -161,16 +161,23 @@ namespace Horizon.UI
         public System.Func<HorizonCardDrag, bool> CanBegin;
         public System.Action<HorizonCardDrag> Began;
         private bool dragging;
+        public bool IsDragging { get { return dragging; } }
         private int pointerId;
         private RectTransform rect;
         private Vector3 origin;
         private Vector2 down;
         private bool dragged;
         private Coroutine returning;
+        private Quaternion homeRotation;
+        private Vector3 homeScale;
+        private CanvasGroup group;
+        private RectTransform parent;
+        private Camera eventCamera;
 
         private void Awake() { rect = (RectTransform)transform; }
 
-        public void OnPointerDown(PointerEventData eventData) { dragged = false; }
+        public void OnPointerDown(PointerEventData eventData) { if (!dragging) dragged = false; }
+        public void OnInitializePotentialDrag(PointerEventData eventData) { eventData.useDragThreshold = true; }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
@@ -186,7 +193,10 @@ namespace Horizon.UI
                 rect.position = origin;
             }
             origin = rect.position;
-            down = eventData.pressPosition;
+            homeRotation = rect.localRotation; homeScale = rect.localScale;
+            parent = rect.parent as RectTransform; eventCamera = eventData.pressEventCamera;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.pressPosition, eventCamera, out down);
+            group = GetComponent<CanvasGroup>(); if (group != null) group.blocksRaycasts = false;
             dragged = true;
             rect.SetAsLastSibling();
         }
@@ -194,9 +204,10 @@ namespace Horizon.UI
         public void OnDrag(PointerEventData eventData)
         {
             if (!Available || !dragging || eventData.pointerId != pointerId) return;
-            rect.position = origin + (Vector3)(eventData.position - down);
-            rect.localScale = Vector3.one * 0.86f;
-            rect.localRotation = Quaternion.Euler(0, 0, -4);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.position, eventCamera, out Vector2 point);
+            rect.position = origin + parent.TransformVector(point - down);
+            rect.localScale = homeScale * 1.06f;
+            rect.localRotation = Quaternion.Euler(-8, Mathf.Clamp((point.x - down.x) * 0.05f, -18, 18), -3);
             Dragged?.Invoke(this, eventData.position);
         }
 
@@ -204,10 +215,11 @@ namespace Horizon.UI
         {
             if (!Available || !dragging || eventData.pointerId != pointerId) return;
             dragging = false;
+            if (group != null) group.blocksRaycasts = true;
             bool reached = IsOverTarget != null && IsOverTarget(eventData.position);
             Dragged?.Invoke(this, Vector2.zero);
-            rect.localScale = Vector3.one;
-            rect.localRotation = Quaternion.identity;
+            rect.localScale = homeScale;
+            rect.localRotation = homeRotation;
             if (reached)
             {
                 Available = false;
@@ -223,6 +235,14 @@ namespace Horizon.UI
         public void OnPointerClick(PointerEventData eventData)
         {
             if (!dragged) Tapped?.Invoke(this);
+        }
+
+        private void OnDisable()
+        {
+            if (!dragging) return;
+            dragging = false; if (group != null) group.blocksRaycasts = true;
+            rect.position = origin; rect.localRotation = homeRotation; rect.localScale = homeScale;
+            Rejected?.Invoke(this);
         }
 
         private System.Collections.IEnumerator ReturnCard()

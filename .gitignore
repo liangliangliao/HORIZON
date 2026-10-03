@@ -27,3 +27,4 @@ tools/obj/
 .env.*
 !.env.example
 node_modules/
+tools/media/

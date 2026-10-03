@@ -20,6 +20,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  parallel-lives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify two actual HTTP clients, invitations, persistence and messages
+        working-directory: services/parallel-lives
+        run: |
+          mkdir -p ../../artifacts/services
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../artifacts/services/parallel-lives.xml server.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-Parallel-Service-Results
+          path: artifacts/services/parallel-lives.xml
   ai-gateway:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -30,7 +48,14 @@ jobs:
           node-version: '22'
       - name: Verify DeepSeek and Azure gateway with mocked providers
         working-directory: services/ai-gateway
-        run: npm test
+        run: |
+          mkdir -p ../../artifacts/services
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../artifacts/services/ai-gateway.xml server.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-Gateway-Service-Results
+          path: artifacts/services/ai-gateway.xml
   rules:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -52,11 +77,18 @@ jobs:
             artifacts/playability/
           retention-days: 14
   test:
+    needs: [ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Check out project
         uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: HORIZON-*-Service-Results
+          merge-multiple: true
+          path: artifacts/services
 
       - name: Free disk space for Unity test image
         uses: jlumbroso/free-disk-space@v1.3.1
@@ -68,6 +100,15 @@ jobs:
           large-packages: false
           docker-images: false
           swap-storage: true
+
+      - name: Prepare pinned editor video codec
+        shell: bash
+        run: |
+          curl -fL --retry 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          echo 'abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67  /tmp/horizon-ffmpeg.tar.xz' | sha256sum -c -
+          mkdir -p tools/media
+          tar -xJf /tmp/horizon-ffmpeg.tar.xz -C /tmp --wildcards '*/ffmpeg' '*/ffprobe'
+          cp /tmp/ffmpeg-*-amd64-static/ffmpeg /tmp/ffmpeg-*-amd64-static/ffprobe tools/media/
 
       - name: Run rules and playable UX tests with visual capture
         id: tests
@@ -87,13 +128,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-EditMode-Results
-          path: ${{ steps.tests.outputs.artifactsPath }}
+          path: |
+            ${{ steps.tests.outputs.artifactsPath }}/**/*.xml
+            ${{ steps.tests.outputs.artifactsPath }}/**/*.log
           if-no-files-found: ignore
           retention-days: 14
 
       - name: Publish honest chapter-by-chapter execution evidence
         if: always()
-        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json"
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
 
       - name: Upload product acceptance report
         if: always()
@@ -187,18 +230,36 @@ jobs:
           /tmp/horizon-gif-verification/bin/python -m pip install pillow==12.3.0
           /tmp/horizon-gif-verification/bin/python tools/verify_timeline_exports.py
           /tmp/horizon-gif-verification/bin/python tools/verify_v03_previews.py
+          python3 tools/verify_video_exports.py --ffprobe tools/media/ffprobe
 
       - name: Upload Unity portrait previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Unity-Portrait-Previews
-          path: artifacts/visuals/
+          path: |
+            artifacts/visuals/[0-6]*.png
+            artifacts/visuals/7[0-3]*.png
+            artifacts/visuals/*.gif
+            artifacts/visuals/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload expedition phone previews and actual MP4
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-v042-Expedition-Previews
+          path: |
+            artifacts/visuals/7[4-9]*.png
+            artifacts/visuals/8*.png
+            artifacts/visuals/*.mp4
+            artifacts/visuals/*.pcm
           if-no-files-found: ignore
           retention-days: 14
 
   build:
-    needs: [rules, test, ai-gateway]
+    needs: [rules, test, ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

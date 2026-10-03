@@ -54,7 +54,7 @@ namespace Horizon.UI
         public void SetTimeline(List<ActionRecord> actions, int length = 12)
         {
             if (timelineGroup != null) Dispose(timelineGroup.gameObject);
-            timelineLength = length == 30 ? 30 : 12;
+            timelineLength = length == 30 || length == 60 ? length : 12;
             timelineGroup = Group("Days left in the world");
             for (int day = 1; day <= timelineLength; day++)
             {

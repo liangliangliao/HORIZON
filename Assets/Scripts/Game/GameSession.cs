@@ -278,7 +278,7 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 11;
+        public const int RulesVersion = 12;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -374,7 +374,7 @@ namespace Horizon.Game
 
         public int HorizonLevel
         {
-            get { return CatalogVersion >= 6 && Deadline == 30 || RunNumber >= 4 || (RunNumber == 3 && StationVisited) ? 3 : Math.Min(2, RunNumber); }
+            get { return CatalogVersion >= 6 && Deadline >= 30 || RunNumber >= 4 || (RunNumber == 3 && StationVisited) ? 3 : Math.Min(2, RunNumber); }
         }
         public CardSpec[] Hand
         {
@@ -397,7 +397,8 @@ namespace Horizon.Game
                 }
                 // For pre-graph saves which have already arrived at this day.
                 if (SocialUnavailableToday && hand[2].GivesSupport) hand[2] = CardCatalog.SoloRecovery;
-                return UsesMasterRules ? MasterContent.Hand(hand, Day, Master.mode, CatalogVersion, RunNumber, Master.awaitingComeback) : hand;
+                if (UsesMasterRules) hand = MasterContent.Hand(hand, Day, Master.mode, CatalogVersion, RunNumber, Master.awaitingComeback);
+                return ExpeditionHand(hand);
             }
         }
 
@@ -426,18 +427,18 @@ namespace Horizon.Game
 
         public static GameSession Restore(RunSnapshot saved)
         {
-            return Restore(saved, false, saved != null && saved.deadline == 30 ? 30 : LastDay);
+            return Restore(saved, false, saved != null && (saved.deadline == 30 || saved.deadline == 60) ? saved.deadline : LastDay);
         }
 
         public static GameSession ForkForSimulation(RunSnapshot saved, int deadline)
         {
-            if (deadline < LastDay || deadline > 30) throw new ArgumentOutOfRangeException("deadline");
+            if (deadline < LastDay || deadline > 60) throw new ArgumentOutOfRangeException("deadline");
             return Restore(saved, true, deadline);
         }
 
         private static GameSession Restore(RunSnapshot saved, bool simulation, int deadline)
         {
-            if (saved == null || saved.runNumber < 1 || saved.day < 1 || saved.day > deadline || !simulation && saved.deadline != 0 && saved.deadline != 12 && saved.deadline != 30 ||
+            if (saved == null || saved.runNumber < 1 || saved.day < 1 || saved.day > deadline || !simulation && saved.deadline != 0 && saved.deadline != 12 && saved.deadline != 30 && saved.deadline != 60 ||
                 saved.energy < 0 || saved.energy > ResourceCap || saved.mood < 0 ||
                 saved.mood > ResourceCap || saved.insight < 0 || saved.insight > ResourceCap ||
                 saved.rulesVersion > RulesVersion || saved.rulesVersion < 0 || saved.catalogVersion > CardCatalog.CurrentVersion || saved.catalogVersion < 0)
@@ -827,7 +828,7 @@ namespace Horizon.Game
                 echo.actualDelta = Difference(before);
                 CausalNode node = CausalNodes.Find(n => n.id == echo.nodeId);
                 if (node != null) { node.resolved = true; node.effect = echo.actualDelta; node.effectRecorded = true; }
-                ActionRecord source = Actions.Find(a => a.day == echo.sourceDay);
+                ActionRecord source = echo.cardId == "future-message" ? null : Actions.Find(a => a.day == echo.sourceDay);
                 if (echo.depth >= 2)
                 {
                     if (echo.replacementId == CardCatalog.SoloRecovery.Id)
@@ -840,11 +841,12 @@ namespace Horizon.Game
                 {
                     if (source != null)
                     { source.echoed = true; source.actualLater = echo.actualDelta; source.actualLaterRecorded = true; }
-                    if (RunNumber >= 3 || CatalogVersion >= 6 && Deadline == 30) ScheduleConsequences(echo, source);
+                    if (RunNumber >= 3 || CatalogVersion >= 6 && Deadline >= 30) ScheduleConsequences(echo, source);
                 }
                 MasterAfterEcho(echo);
             }
             ResolveWorldEvent();
+            if (UsesExpedition && Day > 6 && Day % 7 == 0) ApplyMystery();
             MasterAfterAdvance(due);
             EvaluatePredictions();
             EnsureSituation();
@@ -853,7 +855,7 @@ namespace Horizon.Game
 
         private void EnsureSituation()
         {
-            if (RunNumber < 2 && Deadline != 30 || CatalogVersion < 2 || CausalNodes.Exists(n => n.type == CausalNodeKind.Situation && n.day == Day)) return;
+            if (RunNumber < 2 && Deadline < 30 || CatalogVersion < 2 || CausalNodes.Exists(n => n.type == CausalNodeKind.Situation && n.day == Day)) return;
             if (Day > LastDay && CatalogVersion >= 3)
             {
                 string milestone = Day == 14 ? "project" : Day == 21 ? "collaborate" : Day == 28 ? "publish" : null;
@@ -877,7 +879,7 @@ namespace Horizon.Game
 
         private void ResolveWorldEvent()
         {
-            if (CatalogVersion < 3 || RunNumber < 3 && !(CatalogVersion >= 6 && Deadline == 30) || CausalNodes.Exists(n => n.type == CausalNodeKind.World && n.day == Day)) return;
+            if (CatalogVersion < 3 || RunNumber < 3 && !(CatalogVersion >= 6 && Deadline >= 30) || CausalNodes.Exists(n => n.type == CausalNodeKind.World && n.day == Day)) return;
             WorldEventSpec spec = Array.Find(WorldEvents.ForCatalog(CatalogVersion), e => e.Day == Day);
             if (spec == null || !WorldEvents.Occurs(WorldSeed, Day, spec.Chance)) return;
             ResourceDelta before = Values(); Apply(spec.Delta);

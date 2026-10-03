@@ -7,6 +7,23 @@ const token = 'test-gateway-token-24-characters-minimum';
 const env = { HORIZON_GATEWAY_TOKEN: token, DEEPSEEK_API_KEY: 'test-deepseek-private-key',
   AZURE_OPENAI_API_KEY: 'test-azure-private-key', AZURE_OPENAI_ENDPOINT: 'https://example.openai.azure.com', AZURE_OPENAI_DEPLOYMENT: 'interview coach' };
 const personal = { futureSelfLine: '你已经迈出一步。', quest: '打开一份材料并读两分钟', patternExplanation: '近期证据仍然有限。' };
+test('pasted Responses operation URL takes priority over stale Foundry mode and discovers model', async t => {
+  const f = await sequence(t, { AZURE_OPENAI_ENDPOINT: 'https://modleapikey-resource.services.ai.azure.com/openai/v1/responses',
+    AZURE_ACCESS_MODE: 'foundry', AZURE_OPENAI_DEPLOYMENT: '' }, i => i === 0 ? Response.json({ data: [{ id: 'coach' }] }) :
+    Response.json({ status: 'completed', output: [{ type: 'reasoning' }, { type: 'message', status: 'completed', content: [{ type: 'output_text', text: JSON.stringify(personal) }] }] }));
+  const response = await f.post(body('azure'));
+  assert.equal(response.status, 200); assert.deepEqual(await response.json(), personal);
+  assert.equal(f.calls[1].url, 'https://modleapikey-resource.services.ai.azure.com/openai/v1/responses');
+  const payload = JSON.parse(f.calls[1].request.body);
+  assert.equal(payload.model, 'coach'); assert.equal(payload.store, false); assert.equal(payload.text.format.type, 'json_object');
+  assert.equal(payload.messages, undefined); assert.equal(payload.max_output_tokens, 1800);
+});
+test('Responses incomplete or refused output is rejected', async t => {
+  for (const response of [{ status: 'incomplete', output: [] }, { status: 'completed', output: [{ type: 'message', status: 'completed', content: [{ type: 'refusal', refusal: 'no' }] }] }]) {
+    const f = await sequence(t, { AZURE_OPENAI_ENDPOINT: 'https://example.services.ai.azure.com/openai/v1/responses' }, () => Response.json(response));
+    assert.equal((await f.post(body('azure'))).status, 502);
+  }
+});
 const body = provider => ({ provider, context: { goal: '面试', recentPattern: '', evidence: ['D2 · 学习'] } });
 function upstream(value = personal, finish = 'stop') {
   return Response.json({ choices: [{ finish_reason: finish, message: { content: JSON.stringify(value) } }] });

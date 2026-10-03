@@ -17,7 +17,7 @@ namespace Horizon
 
         private float FutureX(int day)
         {
-            if (session.Deadline != 30) return Mathf.Lerp(0.12f, 0.88f,
+            if (session.Deadline < 30) return Mathf.Lerp(0.12f, 0.88f,
                 Mathf.Clamp01((day - session.Day) / (float)Mathf.Max(1, session.Deadline - session.Day)));
             List<int> days = ObservedFutureDays();
             if (days.Count < 2 || day <= days[0]) return 0.12f;
@@ -31,7 +31,7 @@ namespace Horizon
         {
             var days = new List<int> { session.Day };
             IEnumerable<int> candidates = session.Pending.Select(e => e.dueDay);
-            if (Vision.Probability && session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+            if (Vision.Probability && session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline >= 30))
                 candidates = candidates.Concat(WorldEvents.ForCatalog(session.CatalogVersion).Select(e => e.Day));
             foreach (int day in candidates.Where(d => d > session.Day && d < session.Deadline).Distinct().OrderBy(d => d).Take(2))
                 days.Add(day);
@@ -56,7 +56,7 @@ namespace Horizon
                 string mark = day == session.Day ? "今天" : day == session.Deadline ? "截止日" : "D" + day;
                 string type = known || strain ? ObservationDesign.EchoType(echo) : day == session.Day ? "" : "?";
                 if (echo == null && vision.Probability && day > session.Day && day <= session.Day + vision.Days &&
-                    session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+                    session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline >= 30))
                 {
                     WorldEventSpec potential = WorldEvents.ForCatalog(session.CatalogVersion).FirstOrDefault(e => e.Day == day);
                     if (potential != null) type = "变动 " + potential.Chance + "%";
@@ -180,7 +180,7 @@ namespace Horizon
                 View.Button(overlay, "Next focus page", ">", () => { focusPage++; RenderFocus(false); },
                     0.73f, 0.342f, 0.92f, 0.398f, Palette.Panel, Palette.Text, 27).interactable = focusPage < pages - 1;
             }
-            if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+            if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline >= 30))
             {
                 WorldEventSpec next = Array.Find(WorldEvents.ForCatalog(session.CatalogVersion), spec => spec.Day > session.Day);
                 if (next != null) View.Label(overlay, "World chance", vision.Probability ?

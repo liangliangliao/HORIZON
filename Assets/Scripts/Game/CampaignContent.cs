@@ -52,7 +52,7 @@ namespace Horizon.Game
         {
             if (question) return "「这一次，你最想留住什么？」";
             if (life.Day == 4 && life.RunNumber == 3 && stage == 2) return "「现在你终于看见我了。」";
-            if (life.Deadline == 30 && life.Day >= 12) {
+            if (life.Deadline >= 30 && life.Day >= 12) {
                 string[] lines = life.Day == 12 ? new[] { "「十二天以后，路还没有结束。」", "「你留下的种子，可以走得更远。」", "「我们还有十八天，创造一个不同的自己。」" } :
                     life.Day == 14 ? new[] { "「原来长大，是继续照顾开始的东西。」", "「成果、朋友和休息，正在互相连接。」", "「别急着抵达。先把今天活好。」" } :
                     life.Day == 21 ? new[] { "「我已经记得，你是怎样走来的。」", "「有些小事，比当时想的留得更久。」", "「最后九天，仍然有新的选择。」" } :
@@ -73,7 +73,7 @@ namespace Horizon.Game
             ActionRecord last = life.Actions.LastOrDefault();
             if (stage == 0) return "「走近一点。这里没有标准答案。」";
             if (stage == 1 && last != null) return "「第" + last.day + "天的「" + last.cardName + "」，也是这条路的一部分。」";
-            return life.Deadline == 30 ? "「我们会在第30天，再看一看整条路。」" : "「下一次选择，仍然在你手里。」";
+            return life.Deadline >= 30 ? "「我们会在第30天，再看一看整条路。」" : "「下一次选择，仍然在你手里。」";
         }
     }
 }

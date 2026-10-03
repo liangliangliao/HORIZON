@@ -13,13 +13,13 @@ namespace Horizon.Game
         public int startDay, encounterDay, failureDay, windowDay, targetAbility = 6;
         public bool setbackOccurred;
         public ChapterOutcome outcome;
-        public string Title { get { return id == "tomorrow" ? "在机会关闭之前" : id == "perfection" ? "让不完美的作品出发" : "穿过不确定"; } }
-        public string BossName { get { return id == "tomorrow" ? "明天再说" : id == "perfection" ? "永远准备" : "不确定"; } }
-        public string Goal { get { return id == "tomorrow" ? "D" + windowDay + " 前接住一次邀约" : id == "perfection" ? "D" + windowDay + " 交出一份作品" : "D" + windowDay + " 带着作品参加面试"; } }
+        public string Title { get { return BossCatalog.Find(id)?.title ?? "穿过不确定"; } }
+        public string BossName { get { return BossCatalog.Find(id)?.name ?? "不确定"; } }
+        public string Goal { get { return "D" + windowDay + (id == "tomorrow" ? " 前" : " ") + (BossCatalog.Find(id)?.goal ?? "带着作品参加面试"); } }
         public StoryChapter Copy() { return (StoryChapter)MemberwiseClone(); }
         public void Validate(int deadline)
         {
-            if (!new[] { "uncertainty", "tomorrow", "perfection" }.Contains(id) || startDay < 1 ||
+            if (BossCatalog.Find(id) == null || startDay < 1 ||
                 encounterDay != startDay + 2 || failureDay < encounterDay + 1 || windowDay > deadline || windowDay < failureDay + 2 ||
                 targetAbility < 4 || targetAbility > 8 || !Enum.IsDefined(typeof(ChapterOutcome), outcome) || string.IsNullOrEmpty(originNode) ||
                 !string.IsNullOrEmpty(response) && !new[] { "step", "help", "delay" }.Contains(response))
@@ -39,11 +39,11 @@ namespace Horizon.Game
         {
             RequireMasterChoice();
             if (Master.chapter != null || CatalogVersion < 9 || InExecutionMode || Deadline - Day < 7 ||
-                !new[] { "uncertainty", "tomorrow", "perfection" }.Contains(id)) throw new InvalidOperationException("Start a chapter before its opportunity window.");
+                BossCatalog.Find(id) == null || CatalogVersion < 10 && !new[] { "uncertainty", "tomorrow", "perfection" }.Contains(id)) throw new InvalidOperationException("Start a chapter before its opportunity window.");
             CausalNode origin = MasterNode(CausalNodeKind.Opportunity, "未来目标 · " + id);
             Master.chapter = new StoryChapter { id = id, originNode = origin.id, startDay = Day, encounterDay = Day + 2,
                 failureDay = Math.Min(Day + 4, (id == "tomorrow" ? Deadline - 2 : Deadline) - 2), windowDay = id == "tomorrow" ? Deadline - 2 : Deadline, targetAbility = Math.Min(8, Math.Max(6, Ability + 2)) };
-            origin.label = Master.chapter.Goal; Command("chapter", id);
+            origin.label = "确立目标 · " + Master.chapter.Goal; Command("chapter", id);
         }
 
         public ResourceDelta ChapterPreparationCost(string response)
@@ -103,13 +103,39 @@ namespace Horizon.Game
             if (route == "leave") return "允许放下这次机会，时间线会保留真实结果";
             string condition = route == "help" ? "能力≥4 · 关系≥5 · 金钱≥1 · 精力≥2" :
                 route == "draft" ? "能力≥4 · 精力≥2" : route == "polish" ? "能力≥8 · 精力≥3" : "能力≥" + c.targetAbility + " · 精力≥3";
-            return condition + " · 受挫后恢复并重新行动";
+            return condition + " · 受挫后恢复并重新行动" + (UsesExpedition ? "\n" + AdditionalBossCondition(c.id) : "");
+        }
+        public string AdditionalBossCondition(string id)
+        {
+            if (id == "deadline") return "至少2次成长回声已经回来";
+            if (id == "comfort") return "实际探索过，或准备了路线提示";
+            if (id == "gaze") return "建立两次支持，或实际执行过锁定决定";
+            if (id == "possibility") return "选择一条人生路线，并实际执行过锁定决定";
+            if (id == "fatigue") return "至少3次恢复，精力至少4";
+            if (id == "waiting") return "装备截止提示，或接住过机会窗口";
+            if (id == "preparation") return "实际执行过锁定决定，准备不再只有清单";
+            return "准备的代价和机会由你权衡";
+        }
+        private bool BossEvidenceReady(string id)
+        {
+            bool executed = Actions.Any(a => { var ancestors = CausalGraph.Ancestors(CausalNodes, a.nodeId);
+                return ancestors.Any(n => n.type == CausalNodeKind.Decision && n.label.StartsWith("LOCK · ")) &&
+                    ancestors.Count(n => n.type == CausalNodeKind.Execution) >= 3; });
+            if (id == "deadline") return Actions.Count(a => a.kind == CardKind.Growth && a.echoed) >= 2;
+            if (id == "comfort") return Actions.Any(a => CardCatalog.FindById(a.cardId)?.Traits.families.HasFlag(CardFamily.Exploration) == true) || Master.triggers.Contains("route");
+            if (id == "gaze") return SupportActions >= 2 || executed;
+            if (id == "possibility") return !string.IsNullOrEmpty(Master.expedition.route) && executed;
+            if (id == "fatigue") return Actions.Count(a => a.kind == CardKind.Recovery) >= 3 && Energy >= 4;
+            if (id == "waiting") return Master.triggers.Contains("deadline") || Master.windows.Any(w => w.taken);
+            if (id == "preparation") return executed;
+            return true;
         }
         public bool CanResolveChapter(string route)
         {
             StoryChapter c = Master?.chapter; if (!ChapterNeedsBoss || c == null) return false;
             if (route == "leave") return true;
             if (string.IsNullOrEmpty(c.returnNode)) return false;
+            if (UsesExpedition && !BossEvidenceReady(c.id)) return false;
             if (route == "help") return c.id != "perfection" && Ability >= 4 && Relation >= 5 && Money >= 1 && Energy >= 2;
             if (route == "draft") return c.id == "perfection" && Ability >= 4 && Energy >= 2;
             if (route == "polish") return c.id == "perfection" && Ability >= 8 && Energy >= 3;
@@ -131,7 +157,7 @@ namespace Horizon.Game
             node.gatePassed = route != "leave"; c.outcome = route == "leave" ? ChapterOutcome.WindowClosed : ChapterOutcome.Arrived;
             c.route = route; c.outcomeNode = node.id; Command("chapter-boss", route); RefreshEngine(); RecordResourceSample();
             if (route == "leave") { ObservePattern("setback", false, node); Emit(DomainEventKind.OpportunityExpired, node, "窗口关闭", "这次没有抵达。回看具体原因，下一次仍可换一种准备与恢复方法。"); }
-            else { Master.insightPoints += 3; ChargeOverdrive(12, node); Emit(DomainEventKind.Victory, node, "LIVE THE FUTURE", c.Goal + "。你没有消除困难，而是穿过了它。", CausalGraph.Ancestors(CausalNodes, node.id).Count); }
+            else { Master.insightPoints += 3; ChargeOverdrive(12, node); ActivateOrbit(7, node); Emit(DomainEventKind.Victory, node, "LIVE THE FUTURE", c.Goal + "。你没有消除困难，而是穿过了它。", CausalGraph.Ancestors(CausalNodes, node.id).Count); }
             return true;
         }
 
@@ -144,7 +170,7 @@ namespace Horizon.Game
                 if (!c.setbackOccurred) return "D" + c.failureDay + " 会收到作品反馈。成长、恢复与支持都能成为准备。";
                 if (string.IsNullOrEmpty(c.recoveryNode)) return "第一次没有做好。先恢复或求助，给下一次行动留下空间。";
                 if (string.IsNullOrEmpty(c.returnNode)) return "你已恢复。现在选一次成长行动，真正重新开始。";
-                return "你已经再次行动。D" + c.windowDay + " 前带着能力、状态或支持抵达。";
+                return "你已经再次行动。" + (UsesExpedition ? AdditionalBossCondition(c.id) + "；" : "") + "D" + c.windowDay + " 前抵达。";
             }
         }
     }

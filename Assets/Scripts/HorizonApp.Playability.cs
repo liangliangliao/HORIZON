@@ -28,6 +28,7 @@ namespace Horizon
         private void ExitPractice()
         {
             if (!IsPractice) return;
+            if (parallelPlaying) { SaveParallelSession(); parallelPlaying = false; }
             StopAllCoroutines(); CancelAIRequest();
             archive = practiceParent; session = practiceParentSession; practiceParent = null; practiceParentSession = null;
             Clear(); ApplyPreferences(); world.SetTheme(archive.wallet.theme);
@@ -44,6 +45,7 @@ namespace Horizon
 
         private void BuildReadableHand()
         {
+            choiceVisibleSince = Time.unscaledTime;
             boardHint = View.Label(root, "Drag hint", IsPractice ? "练习采用正式规则，退出后原人生保持原样" : "点牌查看 · 向上拖进金色圈行动", 28,
                 Palette.Muted, TextAnchor.MiddleCenter, 0.045f, 0.014f, 0.955f, 0.057f);
             trail = View.Fill(root, "Causal light", Palette.Mint, 0.5f, 0.5f, 0.5f, 0.5f).rectTransform;
@@ -51,16 +53,22 @@ namespace Horizon
             for (int i = 0; i < session.Hand.Length; i++)
             {
                 CardSpec card = session.Hand[i]; bool available = session.CanPlay(card), canImagine = session.CanPrepareImagination(card);
-                float y = 0.258f - i * 0.099f;
+                float x = 0.055f + i * 0.302f, y = i == 1 ? 0.082f : 0.074f;
                 Color accent = card.Kind == CardKind.Temptation ? Palette.Coral : card.Kind == CardKind.Recovery ? Palette.Gold : Palette.Mint;
-                RectTransform rect = View.Panel(root, card.Id, Palette.Panel, 0.055f, y, 0.945f, y + 0.091f, 25).rectTransform;
-                View.Fill(rect, "Family color", accent, 0, 0.12f, 0.007f, 0.88f);
-                View.Label(rect, "Name", card.Name, 42, Palette.Text, TextAnchor.MiddleLeft, 0.035f, 0.51f, 0.615f, 0.95f);
+                RectTransform rect = View.Rect(root, card.Id, x, y, x + 0.283f, y + 0.267f);
+                var surface = rect.gameObject.AddComponent<HorizonCardSurface>();
+                surface.Accent = accent; surface.Available = available || canImagine; surface.raycastTarget = true;
+                var shadow = rect.gameObject.AddComponent<Shadow>(); shadow.effectColor = new Color(0, 0, 0, 0.55f); shadow.effectDistance = new Vector2(10, -16);
+                rect.localRotation = Quaternion.Euler(5, (i - 1) * 7, (1 - i) * 3);
+                View.Label(rect, "Type", PlayGuide.Family(card), 25, accent, TextAnchor.MiddleCenter, 0.06f, 0.88f, 0.94f, 0.98f);
+                View.Label(rect, "Name", card.Name, 40, Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.63f, 0.93f, 0.87f);
+                var emblem = View.Rect(rect, "Card causal emblem", 0.31f, 0.44f, 0.69f, 0.60f).gameObject.AddComponent<DropRingGraphic>();
+                emblem.color = accent; emblem.raycastTarget = false; emblem.Thickness = 3;
+                View.Label(rect, "Time marker", card.Delay == 0 ? "NOW" : "+" + card.Delay + "D", 26, accent, TextAnchor.MiddleCenter, 0.20f, 0.43f, 0.80f, 0.60f);
                 View.Label(rect, "Now", canImagine ? "先预演失败与恢复" : available ? PlayExperience.NowLabel(session.ImmediateEffect(card)) : "暂不可用 · 点开查看",
-                    36, available || canImagine ? Palette.Text : Palette.Coral, TextAnchor.MiddleLeft, 0.035f, 0.08f, 0.63f, 0.49f);
-                View.Label(rect, "Type", PlayGuide.Family(card), 26, accent, TextAnchor.MiddleRight, 0.66f, 0.62f, 0.965f, 0.94f);
+                    28, available || canImagine ? Palette.Text : Palette.Coral, TextAnchor.MiddleCenter, 0.06f, 0.23f, 0.94f, 0.41f);
                 string date = card.Delay == 0 ? "现在恢复" : "D" + (session.Day + card.Delay) + (session.Day + card.Delay > session.Deadline ? " · 局后" : " 回来");
-                View.Label(rect, "Future", date + (card.Delay > 0 ? "\n" + PlayExperience.FutureMeaning(card) : ""), 32, accent, TextAnchor.MiddleRight, 0.66f, 0.12f, 0.965f, 0.62f);
+                View.Label(rect, "Future", date + (card.Delay > 0 ? "\n" + PlayExperience.FutureMeaning(card) : ""), 26, accent, TextAnchor.MiddleCenter, 0.07f, 0.03f, 0.93f, 0.21f);
                 HorizonCardDrag drag = rect.gameObject.AddComponent<HorizonCardDrag>();
                 drag.Available = available || canImagine; drag.Dragged = CardDragged; drag.Played = CardPlayed; drag.Tapped = CardTapped;
                 drag.IsOverTarget = IsInsideDropZone; drag.CanBegin = item => !busy && overlay == null && (activeDrag == null || activeDrag == item);
@@ -125,7 +133,7 @@ namespace Horizon
             }
             Text divergence = View.Label(overlay, "Divergence evidence", comparison.difference, 34, Palette.Text, TextAnchor.UpperLeft, 0.075f, 0.195f, 0.925f, 0.34f);
             divergence.resizeTextForBestFit = false;
-            View.Label(overlay, "Calibration scope", "对照保留为近期经验；现实行动需在现实桥梁亲自确认。", 25, Palette.Muted,
+            View.Label(overlay, "Calibration scope", comparison.realityObserved ? "现实路径 · " + comparison.realityAction + "\n" + comparison.realityAt : "对照保留为近期经验；现实行动需在现实桥梁亲自确认。", 25, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.115f, 0.925f, 0.185f);
             View.RefreshText(overlay);
         }

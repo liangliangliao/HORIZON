@@ -83,7 +83,7 @@ namespace Horizon.Game
         };
         public static CardSpec[] Hand(CardSpec[] hand, int day, RunMode mode, int catalogVersion = 7, int runNumber = 1, bool comeback = false)
         {
-            bool basic = mode == RunMode.Quick || mode == RunMode.ThirtyDays || mode == RunMode.LongRun || mode == RunMode.ParallelLives;
+            bool basic = mode == RunMode.Quick || mode == RunMode.ThirtyDays || mode == RunMode.LongRun || mode == RunMode.ParallelLives || mode == RunMode.MirrorRun;
             // Version 7 lives retain their original hand and replay. New lives
             // encounter one new family at a time, after the first echo/prediction.
             if (day == 1 || basic && (catalogVersion < 8 || day < 5) && !comeback) return hand;
@@ -160,6 +160,7 @@ namespace Horizon.Game
         public string lastFailureNode;
         public DecisionRecord decision;
         public StoryChapter chapter;
+        public ExpeditionState expedition = new ExpeditionState();
         public ActionEngineState engine = new ActionEngineState();
         public List<string> triggers = new List<string>();
         public List<DomainEvent> events = new List<DomainEvent>();
@@ -178,7 +179,7 @@ namespace Horizon.Game
         public MasterRunState Copy()
         {
             var c = (MasterRunState)MemberwiseClone();
-            c.decision = decision?.Copy(); c.chapter = chapter?.Copy(); c.engine = engine.Copy(); c.triggers = new List<string>(triggers);
+            c.decision = decision?.Copy(); c.chapter = chapter?.Copy(); c.expedition = expedition?.Copy() ?? new ExpeditionState(); c.engine = engine.Copy(); c.triggers = new List<string>(triggers);
             c.events = events.Select(e => e.Copy()).ToList(); c.commands = commands.Select(x => x.Copy()).ToList();
             c.windows = windows.Select(w => w.Copy()).ToList();
             c.resources = resources.Select(s => new ResourceSample { day = s.day, values = ResourceMath.Copy(s.values) }).ToList();
@@ -190,6 +191,7 @@ namespace Horizon.Game
         }
         public void Validate(int today, int deadline)
         {
+            if (expedition == null) expedition = new ExpeditionState(); expedition.Validate();
             if (chapter != null && string.IsNullOrEmpty(chapter.id) && chapter.startDay == 0) chapter = null;
             if (chapter != null) chapter.Validate(deadline);
             // Unity's inline serializer materializes a null optional class as an empty instance.
@@ -199,7 +201,7 @@ namespace Horizon.Game
                 overdriveEnergy < 0 || overdriveEnergy > 100 || mythicCount < 0 || mythicCount > MasterSpecification.MythicLimit ||
                 orbitBits < 0 || orbitBits > 255 || reservoir < 0 || insightPoints < 0 || initialInsightPoints < 0 || events == null || commands == null || engine == null ||
                 triggers == null || triggers.Count > 3 || triggers.Distinct().Count() != triggers.Count || triggers.Any(id => !TriggerEquipment.Ids.Contains(id)) ||
-                windows == null || resources == null || observations == null || initialPatterns == null || patterns == null || initialMemories == null || memories == null || knowledge == null || knowledge.Count != 1 || initialKnowledge == null || initialKnowledge.Count != 1 || reservoirSources == null ||
+                windows == null || resources == null || observations == null || initialPatterns == null || patterns == null || initialMemories == null || memories == null || knowledge == null || knowledge.Count < 1 || knowledge.Count > 8 || initialKnowledge == null || initialKnowledge.Count < 1 || initialKnowledge.Count > 8 || reservoirSources == null ||
                 events.Count > 2048 || commands.Count > 2048 || events.Any(e => e == null || string.IsNullOrEmpty(e.id) || e.day < 1 || e.day > deadline) ||
                 events.Select(e => e.id).Distinct().Count() != events.Count) throw new ArgumentException("Invalid v0.4.2 state.");
             if (decision != null) { decision.Validate(today); if (CardCatalog.FindById(decision.cardId) == null) throw new ArgumentException("Unknown locked action."); }

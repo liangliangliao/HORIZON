@@ -165,7 +165,7 @@ namespace Horizon
             if (action.echoDay > 0)
                 description += "\n\nD" + action.echoDay + (action.echoed ? " · 回声已经回来\n" + action.echoName +
                     "\n" + PlayExperience.NowLabel(action.actualLaterRecorded ? action.actualLater : action.later) :
-                    action.echoDay > (archive.runs.Find(r => r.actions == actions)?.deadline == 30 || session?.Deadline == 30 && session.Actions == actions ? 30 : 12) ? " · 超过本局截止日，尚未兑现" : " · 回声还没有回来");
+                    action.echoDay > (archive.runs.Find(r => r.actions == actions)?.deadline == 30 || session?.Deadline >= 30 && session.Actions == actions ? 30 : 12) ? " · 超过本局截止日，尚未兑现" : " · 回声还没有回来");
             if (node != null)
             {
                 List<CausalNode> parents = CausalGraph.Ancestors(graph, node.id).FindAll(n => n.id != node.id);

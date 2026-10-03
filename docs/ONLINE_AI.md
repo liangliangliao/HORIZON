@@ -1,6 +1,6 @@
 # DeepSeek / Azure / Microsoft Foundry
 
-v0.4.2 支持离线、DeepSeek、Azure OpenAI 三种内容来源。设置入口为「设置 → 在线 AI」，使用入口为「HORIZON ME → AI · 未来自己」。AI 返回未来自己的一段话、近期模式解释和一个现实小动作。它不能改变资源、概率、Boss 结果、奖励或自动完成现实行动。
+v0.4.2 支持离线、DeepSeek、Azure OpenAI 三种内容来源。设置入口为「设置 → 在线 AI」，使用入口包括未来自己、近期模式、思维怪物、知识熔炉和想象设置。六种用途分别生成未来对话、Personal Quest、Pattern 解释、预演情境、知识转行动或 NPC 对话。它不能改变资源、概率、Boss 结果、奖励或自动完成现实行动。
 
 ## 直接接入
 
@@ -9,9 +9,9 @@ v0.4.2 支持离线、DeepSeek、Azure OpenAI 三种内容来源。设置入口�
 | 字段 | DeepSeek | Azure OpenAI |
 | --- | --- | --- |
 | 资源 / 项目名称 | 无 | 可填写资源标签；模型列表显示为 `资源名 / 部署名`，留空使用终结点中的资源名 |
-| Endpoint | 默认 `https://api.deepseek.com`，也可使用 `/v1` 基础地址 | Azure 资源根地址、Foundry 项目地址（含 `/api/projects/项目名`）、`/openai/v1` 或 `/models` 基础地址 |
+| Endpoint | 默认 `https://api.deepseek.com`，也可使用 `/v1` 基础地址 | Azure 资源根地址、Foundry 项目地址（含 `/api/projects/项目名`）、`/openai/v1`、`/models`、完整 `/openai/v1/responses` 或完整部署对话地址 |
 | Model / Deployment | 默认 `deepseek-chat`，可填写帐户支持的模型 | Azure 中实际创建的 **部署名称**；可留空或用英文 / 中文逗号分隔最多 6 个名称 |
-| 接入方式 | 无 | 自动识别、Azure OpenAI 部署接口、Foundry Models 推理接口、OpenAI v1；选择决定尝试顺序 |
+| 接入方式 | 无 | 自动识别、Azure OpenAI 部署接口、Foundry Models 推理接口、OpenAI v1、Responses；选择决定尝试顺序，但完整操作地址优先于旧的选择 |
 | API Version | 无 | 可留空；按实际接口使用默认值，v1 无需日期版本 |
 | API Key | DeepSeek 密钥，Bearer 认证 | Azure 资源密钥，`api-key` 认证 |
 
@@ -21,13 +21,14 @@ Azure 编辑页对应参考图中的资源名称、终结点、会话密钥、�
 | --- | --- | --- | --- |
 | Azure OpenAI 部署接口 | `/openai/deployments/{deployment}/chat/completions` | `2024-10-21` | 部署名在 URL 中 |
 | Azure OpenAI v1 | `/openai/v1/chat/completions` | 不需要日期版本 | `model` 为部署名 |
+| Azure Responses | `/openai/v1/responses` | 不需要日期版本 | `model` 为部署名 |
 | Foundry Models | `/models/chat/completions` | `2024-05-01-preview` | `model` 为部署名 |
 
 自动识别优先：Azure OpenAI 根地址使用部署接口，Foundry 项目 / `services.ai.azure.com` 使用 v1，`/models` 使用 Foundry Models。接入方式只调整尝试顺序；遇到 404 / 405 路径缺失，或明确的 `DeploymentNotFound` / `ModelNotFound` 错误，才尝试另一接口或已填写的下一部署。认证失败、限流、其他请求错误、网络错误、超时和无效内容均不触发额外尝试。整个操作共用一次超时，退出页面会取消所有后续请求。
 
 部署名留空时，先通过同源 `GET /openai/v1/models` 读取服务返回的模型标识，最多尝试六个；不会猜测部署名，也不会使用旧 `/openai/models` 的基础模型目录。资源未开放列表、返回空列表或所列模型不支持对话时，需要填写实际部署名。填写多个部署后，可在未来自己对话页点击模型，按 `资源名 / 部署名` 选择当前部署；只有路径或部署不存在时才切换候选。
 
-所有部署都需支持 Chat Completions 与 JSON 输出。Foundry 中支持这些接口的非 OpenAI 模型也可使用；Anthropic Messages、Agents / Responses 和 Entra ID 认证不在当前适配范围内。
+Chat Completions 路径要求模型支持对话与 JSON 输出；Responses 路径使用 `instructions`、`input` 和 `text.format`，仅接受完成状态的一段 `output_text`，拒绝未完成、拒绝和多段歧义响应。完整部署对话地址会提取实际部署名；完整 Responses 地址即使曾选择 Foundry Models 也优先调用 Responses。Anthropic Messages、Agents 和 Entra ID 认证不在当前适配范围内。
 
 配置会保存服务商、连接方式、资源标签、接入偏好、地址、部署列表、当前部署和版本。**密钥仅在本次应用会话的内存中使用**，输入框遮蔽，不写入 PlayerPrefs、人生存档、备份、日志、源代码或 APK。重启应用后需重新输入。关闭页面或进入后台会取消正在进行的请求；退出时清除会话凭据。
 
@@ -52,7 +53,7 @@ Node 版本要求 20+。配置：
 | `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` / `DEEPSEEK_ENDPOINT` | DeepSeek 服务端配置 |
 | `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_ENDPOINT` | Azure 资源密钥与基础地址 |
 | `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_API_VERSION` | 可选部署列表（逗号分隔，最多 6 个）和可选 API 版本 |
-| `AZURE_ACCESS_MODE` | `auto`（默认）、`openai`、`foundry` 或 `v1`，影响尝试顺序 |
+| `AZURE_ACCESS_MODE` | `auto`（默认）、`openai`、`foundry`、`v1` 或 `responses`，影响尝试顺序 |
 | `HOST` / `PORT` | 默认 `127.0.0.1:8787`，放在 HTTPS 反向代理之后 |
 
 Unity 配置页切换「服务端代理」，选择 DeepSeek 或 Azure，填写代理 HTTPS 基础地址（或完整 `/v1/personalize` 地址）与会话访问令牌，再测试和保存。模型、资源地址与部署由服务端控制；请求不能传入任意上游地址。
@@ -64,6 +65,7 @@ Unity 配置页切换「服务端代理」，选择 DeepSeek 或 Azure，填写�
   "provider": "azure",
   "context": {
     "goal": "准备一次面试",
+    "purpose": "Imagination",
     "recentPattern": "近期在开始前反复比较",
     "evidence": ["D2 · 深度学习", "D4 · 请求帮助"]
   }
@@ -79,7 +81,7 @@ dotnet run --project tools/RulesHarness.csproj -- --workers=0
 npm --prefix services/ai-gateway test
 ```
 
-`OnlineAITests` 验证两个服务商的请求契约、Foundry 地址归一化、API 默认值、空部署读取、多个部署选择、限定错误重试、密钥与备份隔离、取消、失败回退、规则不可变和 Unity 空 Decision 占位符兼容。代理有 23 项模拟上游测试。Unity 交互测试生成 `45-ai-deepseek.png`、`46-ai-azure.png`、`47-ai-future-self.png`、`48-ai-foundry-resource.png` 和 `49-ai-azure-deployments.png`，使用虚拟密钥与模拟响应。
+`OnlineAITests` 验证两个服务商的请求契约、Foundry 地址归一化、API 默认值、空部署读取、多个部署选择、限定错误重试、密钥与备份隔离、取消、失败回退、规则不可变和 Unity 空 Decision 占位符兼容。代理有 25 项模拟上游测试，包含截图所示 Responses 地址与错误接入选项的兼容案例。Unity 交互测试生成 `45-ai-deepseek.png`、`46-ai-azure.png`、`47-ai-future-self.png`、`48-ai-foundry-resource.png` 和 `49-ai-azure-deployments.png`，使用虚拟密钥与模拟响应。
 
 本次环境没有 DeepSeek/Azure 实际凭据，尚未进行付费模型连通测试，也没有部署公网代理。接入代码和连接测试可在配置凭据后使用。
 

@@ -38,6 +38,18 @@ namespace Horizon.Game
     }
     public static class InnerCouncil
     {
+        public static List<CouncilVoice> Explain(GameSession life)
+        {
+            var voices = Explain(life.Master.engine);
+            voices.Add(new CouncilVoice { name = "金钱", weight = 10 + (10 - life.Money) * 2, sources = new List<string> { "当前金钱 " + life.Money, "准备、预约和机会的实际成本" } });
+            voices.Add(new CouncilVoice { name = "别人评价", weight = 4 + life.Master.engine.socialPressure * 2, sources = new List<string> { "外部承诺 " + life.Master.engine.socialPressure, "他人的期待不能完全控制" } });
+            CouncilVoice comfort = voices.Find(v => v.name == "舒适"); comfort.sources.Add("今天的环境 · " + life.Master.expedition.environment);
+            CouncilVoice fear = voices.Find(v => v.name == "害怕失败");
+            if (life.Master.awaitingComeback) { fear.weight += 8; fear.sources.Add("最近的受挫 · " + (life.CausalNodes.Find(n => n.id == life.Master.lastFailureNode)?.label ?? "失败回声")); }
+            int sum = voices.Sum(v => v.weight), used = 0;
+            for (int i = 0; i < voices.Count; i++) { voices[i].weight = i == voices.Count - 1 ? 100 - used : voices[i].weight * 100 / sum; used += voices[i].weight; }
+            return voices.OrderByDescending(v => v.weight).ToList();
+        }
         public static List<CouncilVoice> Explain(ActionEngineState e)
         {
             var voices = new List<CouncilVoice> {
@@ -53,6 +65,15 @@ namespace Horizon.Game
     }
     public static class ThoughtMonsters
     {
+        public static ThoughtMonster ById(string id)
+        {
+            string[] ids = { "possibility", "tomorrow", "perfect", "unsuitable", "comfort", "gaze" };
+            string[] names = { "更好的机会", "明天再说", "完美计划", "今天不适合", "舒服一点", "别人怎么看" };
+            string[] reasons = { "比较能帮助你发现机会。", "疲劳时休息能保护状态。", "准备能降低不确定性。", "环境确实影响行动。", "眼前的快乐也有价值。", "他人的反馈可以提供线索。" };
+            string[] costs = { "不断切换会让已经选择的路线停下。", "机会窗口可能在等待中关闭。", "清单增加，也让开始更难。", "每一天都可能有新的不理想。", "连续即时奖励可能挤掉恢复和成长。", "评价无法完全控制，动作仍可以选择。" };
+            int i = Array.IndexOf(ids, id); if (i < 0) throw new ArgumentException("Unknown thought.");
+            return new ThoughtMonster { id = id, name = names[i], reasonablePart = reasons[i], tradeoff = costs[i], response = "理解它的合理性，再权衡、决定并行动。" };
+        }
         public static ThoughtMonster Current(ActionEngineState e, int reopens)
         {
             if (reopens > 0) return new ThoughtMonster { id = "possibility", name = "另一个可能", reasonablePart = "比较能帮助你避免草率决定。", tradeoff = "执行时重新比较会消耗已经打开的窗口。", response = "保留备选，先完成已经锁定的一步。" };
