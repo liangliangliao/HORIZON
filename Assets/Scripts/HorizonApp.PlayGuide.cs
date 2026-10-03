@@ -63,7 +63,7 @@ namespace Horizon
         {
             var panel = View.Panel(root, "Daily direction", new Color(0.014f, 0.046f, 0.068f, 0.88f),
                 0.055f, 0.445f, 0.945f, 0.52f, 25).rectTransform;
-            string message = session.Day == 1 ? session.Deadline + "天后，展示你学到的东西。今天先选一个行动。" :
+            string message = session.Day == 1 ? session.Deadline + "天后，展示你学到的东西。\n今天先选一个行动。" :
                 session.SocialUnavailableToday ? "状态影响了邀约；恢复能重新打开选择。" :
                 session.Master?.awaitingComeback == true ? "受挫并未结束人生。恢复或再试一次，由你选择。" :
                 session.Situation ?? PlayGuide.Today(session);

@@ -364,8 +364,7 @@ namespace Horizon.Tests
             Set(app, "archive", new ArchiveData());
             Call(app, "StartNewRun");
             yield return null;
-            ButtonNamed(app, "Guide next").onClick.Invoke(); yield return null;
-            ButtonNamed(app, "Guide start").onClick.Invoke();
+            Assert.IsNull(Get<RectTransform>(app, "overlay"), "New life begins with actual choices, with help available on demand.");
             yield return new WaitForSecondsRealtime(0.5f);
 
             Assert.AreNotEqual(UnityEngine.Rendering.GraphicsDeviceType.Null, SystemInfo.graphicsDeviceType,

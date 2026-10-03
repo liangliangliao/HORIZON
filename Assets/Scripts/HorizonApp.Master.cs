@@ -15,7 +15,7 @@ namespace Horizon
         private int imagineDifficulty = 1;
         private bool executionFromBoard;
         private static readonly string[] ModeNames = { "12 DAYS", "30 DAYS", "LONG RUN", "PARALLEL LIVES", "IMAGINATION RUN", "EXPERIMENT RUN", "MIRROR RUN", "CHAOS RUN" };
-        private static readonly string[] ModeDescriptions = { "十二天，看看今天的行为怎样回来。", "三十天，给更长的因果链留出空间。", "三十天长期投资与回望。", "从相同起点重演并比较两条人生。", "先预演失败与恢复，再进入行动。", "尝试 Trigger、知识与不同路线。", "带着最近的模式，走过相似的节点。", "扩展行为家族，面对更多不确定性。" };
+        private static readonly string[] ModeDescriptions = { "十二天，看看今天的行为怎样回来。", "三十天，给更长的因果链留出空间。", "三十天长期投资与回望。", "从相同起点重演并比较两条人生。", "先预演失败与恢复，再进入行动。", "尝试 Trigger、知识与不同路线。", "查看最近的选择模式，再走一条人生。", "扩展行为家族，面对更多不确定性。" };
 
         private void BuildMasterHome()
         {
@@ -103,10 +103,12 @@ namespace Horizon
                 TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.84f);
             CardSpec locked = session.InExecutionMode ? CardCatalog.FindById(session.Master.decision.cardId) : null;
             string cost = locked == null ? "查看行动条件与来源" : "执行成本 · " + PlayExperience.NowLabel(session.ImmediateEffect(locked)) +
-                (session.PreparationWillSave(locked) ? " · 准备可省1精力" : " · 查看准备条件");
+                (session.PreparationSaving(locked) > 0 ? " · 准备已省1精力" : session.PreparationWillSave(locked) ? " · 准备可省1精力" : " · 查看准备条件");
             View.Button(overlay, "Action factors", cost, ShowActionFactors,
                 0.075f, 0.455f, 0.925f, 0.515f, Palette.Deep, Palette.Muted, 24);
-            View.Button(overlay, "Lower friction", session.CatalogVersion >= 9 ? "缩小准备 · 专注-1" : "删掉一步准备", () => { session.LowerFriction(); PersistMasterAction(); ShowExecution(); }, 0.07f, 0.37f, 0.49f, 0.435f, Palette.Panel, Palette.Text, 25);
+            string preparationLabel = e.friction <= 1 ? "准备已经最小" : session.CatalogVersion >= 9 && session.Insight < 1 ? "专注不足 · 需要1" : session.CatalogVersion >= 9 ? "缩小准备 · 专注-1" : "删掉一步准备";
+            Button preparation = View.Button(overlay, "Lower friction", preparationLabel, () => { session.LowerFriction(); PersistMasterAction(); ShowExecution(); }, 0.07f, 0.37f, 0.49f, 0.435f, Palette.Panel, Palette.Text, 25);
+            preparation.interactable = e.friction > 1 && (session.CatalogVersion < 9 || session.Insight >= 1);
             View.Button(overlay, "Equip triggers", "设置行动提示  " + session.Master.triggers.Count + "/3", ShowTriggers, 0.51f, 0.37f, 0.93f, 0.435f, Palette.Panel, Palette.Mint, 25);
             ThoughtMonster monster = ThoughtMonsters.Current(e, session.Master.decision?.reopens ?? 0);
             View.Label(overlay, "Thought monster", "念头 · " + monster.name + "\n" + monster.reasonablePart + "\n" + monster.tradeoff, 25, Palette.Muted, TextAnchor.UpperLeft, 0.075f, 0.21f, 0.925f, 0.355f);
@@ -157,9 +159,10 @@ namespace Horizon
             {
                 int index = i; string id = TriggerEquipment.Ids[i]; bool equipped = session.Master.triggers.Contains(id);
                 float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.675f - (i / 2) * 0.106f;
-                View.Button(overlay, "Trigger " + id, TriggerEquipment.Names[index] + (equipped ? " · 已装备" : TriggerEquipment.Cost(id) > 0 && session.CatalogVersion >= 9 ? " · 金钱-1" : " · 免费") + "\n" + TriggerEquipment.Effect(id), () => {
+                Button equipment = View.Button(overlay, "Trigger " + id, TriggerEquipment.Names[index] + (equipped ? " · 已装备" : TriggerEquipment.Cost(id) > 0 && session.CatalogVersion >= 9 ? " · 金钱-1" : " · 免费") + "\n" + TriggerEquipment.Effect(id), () => {
                     session.EquipTrigger(id); PersistMasterAction(); ShowTriggers();
                 }, x, y, x + 0.4f, y + 0.08f, Palette.Panel, equipped ? Palette.Mint : Palette.Text, 27);
+                equipment.interactable = !equipped && session.Master.triggers.Count < 3 && (session.CatalogVersion < 9 || session.Money >= TriggerEquipment.Cost(id));
             }
             View.Label(overlay, "Trigger observation", "选择与行动相符的提示。其作用会进入实际成本与因果图。", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.15f, 0.925f, 0.22f);
         }

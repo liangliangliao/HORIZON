@@ -52,6 +52,7 @@ namespace Horizon.Tests
             GameSession life = Get<GameSession>(app, "session");
             Assert.AreEqual(1, life.RunNumber); Assert.AreEqual(0, life.Actions.Count); Assert.AreEqual(0, archive.wallet.stardust);
             Assert.IsNull(Get<RectTransform>(app, "overlay"), "A new life starts with real choices, without mandatory reading pages.");
+            archive.playGuide.completed = false;
             Call(app, "ShowPlayGuidePage", 0, true); yield return null;
             yield return Capture(app, "50-first-life-goal");
             Button(app, "Guide next").onClick.Invoke(); yield return null;

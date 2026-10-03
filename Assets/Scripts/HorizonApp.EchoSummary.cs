@@ -47,10 +47,10 @@ namespace Horizon
                 receipt.page = receipt.beats.Count - 1; ContinueFeedback();
             }, 0.075f, 0.055f, 0.925f, 0.129f, Palette.Mint, Palette.Ink, 34);
             busy = true; next.interactable = false; StartCoroutine(EnableReceipt(next, viewGeneration));
-            receipt.presented = true; PresentLocalMasterFeedback(); Save(); View.RefreshText(root); return true;
+            receipt.presented = true; PresentLocalMasterFeedback(true); Save(); View.RefreshText(root); return true;
         }
 
-        private void PresentLocalMasterFeedback()
+        private void PresentLocalMasterFeedback(bool summary = false)
         {
             MasterRunState state = CurrentMaster;
             if (state == null) return;
@@ -61,7 +61,7 @@ namespace Horizon
                 world.PresentMasterEvent(strongest);
                 if (strongest.tier >= RewardTier.Combo)
                     View.Label(root, "Joined reward event", strongest.title.Replace("\n", " "), 36, Palette.Mint,
-                        TextAnchor.MiddleCenter, 0.055f, 0.55f, 0.945f, 0.615f);
+                        TextAnchor.MiddleCenter, 0.055f, summary ? 0.887f : 0.55f, 0.945f, summary ? 0.935f : 0.615f);
             }
             foreach (DomainEvent e in pending) e.acknowledged = true;
             if (session != null && session.CompletedRun == null && archive.active?.runNumber == session.RunNumber)

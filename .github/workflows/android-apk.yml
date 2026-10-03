@@ -93,14 +93,14 @@ jobs:
 
       - name: Publish honest chapter-by-chapter execution evidence
         if: always()
-        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}"
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json"
 
       - name: Upload product acceptance report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-v042-Product-Acceptance
-          path: artifacts/product-acceptance.json
+          path: ${{ runner.temp }}/HORIZON-product-acceptance.json
           if-no-files-found: error
           retention-days: 14
 

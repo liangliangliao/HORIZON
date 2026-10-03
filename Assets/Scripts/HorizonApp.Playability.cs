@@ -36,7 +36,7 @@ namespace Horizon
         {
             if (IsPractice)
                 View.Button(parent, "Exit practice", "练习中 · 返回原人生", ExitPractice,
-                    0.075f, home ? 0.51f : 0.015f, 0.925f, home ? 0.58f : 0.055f, Palette.Panel, Palette.Gold, 30);
+                    0.075f, home ? 0.51f : 0.545f, 0.925f, home ? 0.58f : 0.625f, Palette.Panel, Palette.Gold, 30);
             else if (home)
                 View.Button(parent, "Practice life", "自由练习 · 保留当前人生", StartPractice, 0.12f, 0.51f, 0.88f, 0.58f, Palette.Panel, Palette.Text, 31);
         }
@@ -120,7 +120,8 @@ namespace Horizon
                 View.Label(overlay, "Imagined step " + i, imagined[i], 29, Palette.Gold, TextAnchor.MiddleLeft, 0.105f, y, 0.48f, y + 0.102f);
                 View.Label(overlay, "Actual step " + i, actual[i], 29, Palette.Mint, TextAnchor.MiddleLeft, 0.535f, y, 0.895f, y + 0.102f);
             }
-            View.Label(overlay, "Divergence evidence", comparison.difference, 32, Palette.Text, TextAnchor.UpperLeft, 0.075f, 0.195f, 0.925f, 0.34f);
+            Text divergence = View.Label(overlay, "Divergence evidence", comparison.difference, 34, Palette.Text, TextAnchor.UpperLeft, 0.075f, 0.195f, 0.925f, 0.34f);
+            divergence.resizeTextForBestFit = false;
             View.Label(overlay, "Calibration scope", "对照保留为近期经验；现实行动需在现实桥梁亲自确认。", 25, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.115f, 0.925f, 0.185f);
             View.RefreshText(overlay);
