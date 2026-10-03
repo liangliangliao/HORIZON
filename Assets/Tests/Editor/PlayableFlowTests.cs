@@ -791,6 +791,7 @@ namespace Horizon.Tests
             canvas.worldCamera = ui;
             canvas.planeDistance = 5;
             world.WorldCamera.targetTexture = image;
+            world.BackgroundCamera.targetTexture = image;
             world.SnapCamera();
             yield return null;
             yield return null;
@@ -799,6 +800,7 @@ namespace Horizon.Tests
             // dynamic font atlas. Rebuild all active text meshes after every
             // character request, before reading the rendered pixels.
             View.RefreshText(canvas.transform);
+            world.BackgroundCamera.Render();
             world.WorldCamera.Render();
             ui.Render();
             RenderTexture old = RenderTexture.active;
@@ -813,6 +815,7 @@ namespace Horizon.Tests
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.worldCamera = null;
             world.WorldCamera.targetTexture = null;
+            world.BackgroundCamera.targetTexture = null;
             Object.Destroy(uiObject);
             Object.Destroy(pixels);
             image.Release();

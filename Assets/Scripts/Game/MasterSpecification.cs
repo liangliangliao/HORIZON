@@ -159,6 +159,7 @@ namespace Horizon.Game
         public bool awaitingComeback, allLinked;
         public string lastFailureNode;
         public DecisionRecord decision;
+        public StoryChapter chapter;
         public ActionEngineState engine = new ActionEngineState();
         public List<string> triggers = new List<string>();
         public List<DomainEvent> events = new List<DomainEvent>();
@@ -177,7 +178,7 @@ namespace Horizon.Game
         public MasterRunState Copy()
         {
             var c = (MasterRunState)MemberwiseClone();
-            c.decision = decision?.Copy(); c.engine = engine.Copy(); c.triggers = new List<string>(triggers);
+            c.decision = decision?.Copy(); c.chapter = chapter?.Copy(); c.engine = engine.Copy(); c.triggers = new List<string>(triggers);
             c.events = events.Select(e => e.Copy()).ToList(); c.commands = commands.Select(x => x.Copy()).ToList();
             c.windows = windows.Select(w => w.Copy()).ToList();
             c.resources = resources.Select(s => new ResourceSample { day = s.day, values = ResourceMath.Copy(s.values) }).ToList();
@@ -189,6 +190,8 @@ namespace Horizon.Game
         }
         public void Validate(int today, int deadline)
         {
+            if (chapter != null && string.IsNullOrEmpty(chapter.id) && chapter.startDay == 0) chapter = null;
+            if (chapter != null) chapter.Validate(deadline);
             // Unity's inline serializer materializes a null optional class as an empty instance.
             if (decision != null && decision.day == 0 && decision.step == 0 && decision.reopens == 0 &&
                 decision.status == DecisionStatus.Locked && string.IsNullOrEmpty(decision.cardId) && string.IsNullOrEmpty(decision.nodeId)) decision = null;

@@ -19,6 +19,7 @@ namespace Horizon
             PersistLiveLife();
             practiceParent = archive; practiceParentSession = session;
             archive = new ArchiveData { nextRareRun = 99,
+                me = JsonUtility.FromJson<PlayerBehavioralModel>(JsonUtility.ToJson(practiceParent.me)),
                 preferences = JsonUtility.FromJson<PlayerPreferences>(JsonUtility.ToJson(practiceParent.preferences)),
                 ai = JsonUtility.FromJson<AISettings>(JsonUtility.ToJson(practiceParent.ai)) };
             archive.Repair(); archive.playGuide.completed = true;
@@ -36,9 +37,9 @@ namespace Horizon
         {
             if (IsPractice)
                 View.Button(parent, "Exit practice", "练习中 · 返回原人生", ExitPractice,
-                    0.075f, home ? 0.51f : 0.545f, 0.925f, home ? 0.58f : 0.625f, Palette.Panel, Palette.Gold, 30);
+                    0.075f, home ? 0.328f : 0.545f, 0.925f, home ? 0.395f : 0.625f, Palette.Panel, Palette.Gold, 30);
             else if (home)
-                View.Button(parent, "Practice life", "自由练习 · 保留当前人生", StartPractice, 0.12f, 0.51f, 0.88f, 0.58f, Palette.Panel, Palette.Text, 31);
+                View.Button(parent, "Practice life", "自由练习 · 保留当前人生", StartPractice, 0.12f, 0.328f, 0.88f, 0.395f, Palette.Panel, Palette.Text, 31);
         }
 
         private void BuildReadableHand()
@@ -111,8 +112,10 @@ namespace Horizon
             string[] actual = { comparison.actionObserved ? "D" + comparison.actualDay + " · " + CardCatalog.FindById(comparison.actualCardId)?.Name : "行动尚未发生",
                 comparison.failureDay > 0 ? "D" + comparison.failureDay + " · 确实受挫" : "尚未遇到对应困难",
                 comparison.recoveryObserved ? "D" + comparison.recoveryDay + " · " + comparison.actualRecovery : "恢复路径仍待观察" };
-            View.Label(overlay, "Compared timelines", "想象中的路径                 实际游戏行动", 28, Palette.Muted,
-                TextAnchor.MiddleLeft, 0.075f, 0.71f, 0.925f, 0.775f);
+            View.Label(overlay, "Imagined timeline heading", "想象中的路径", 28, Palette.Muted,
+                TextAnchor.MiddleLeft, 0.105f, 0.71f, 0.48f, 0.775f);
+            View.Label(overlay, "Actual timeline heading", "实际游戏行动", 28, Palette.Muted,
+                TextAnchor.MiddleLeft, 0.535f, 0.71f, 0.895f, 0.775f);
             for (int i = 0; i < 3; i++)
             {
                 float y = 0.57f - i * 0.115f;

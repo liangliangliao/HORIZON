@@ -2,7 +2,9 @@
 
 Unity 竖屏时间策略与人生卡牌游戏。**Master Product Specification v0.4.2 是唯一开发基线**，旧版本文档保留为历史参考。最新开发基础为 `codex/playable-feedback-3d@ac2d359`，本轮开发分支为 `feat/horizon-v0.4.2`。
 
-当前是**可玩的规则与体验原型，尚未完整实现 53 章产品方案**。已接入时间回声、预测、CauseGraph、截止日 Boss、Decision Lock、想象失败与恢复、Future Memory、模式、奖励和现实桥梁等基础机制；部分系统仍只有有限规则与内容。规则版本 10、牌池版本 9；旧存档沿用原牌池与规则。
+当前是**可玩的规则与体验原型，尚未完整实现 53 章产品方案**。已接入时间回声、预测、CauseGraph、截止日 Boss、Decision Lock、想象失败与恢复、Future Memory、模式、奖励和现实桥梁等基础机制；部分系统仍只有有限规则与内容。规则版本 11、牌池版本 9；旧存档沿用原牌池，新故事挑战按明确命令重放。
+
+**这轮建议从首页「故事挑战」开始试玩**：选择面试、D10 过期邀约或交出作品，先看胜利锚点，再回到今天搭路。D3 的准备选择会真实消耗资源；D5 必须经历反馈，准备方法改变挫折成本。实际恢复或求助后，再做一次成长行动，才能选择最终抵达路线。「先试玩」保留原人生与近期行为模型。因果页默认逐条阅读真实连接，完整网络按需展开；时间地图移除密集侧边线。手机渲染增加逐帧背景清理和明确的 Bloom 视口，避免旧设置残留与场景重复缩放。详见 [故事挑战与手机修复](docs/STORY_CHALLENGES_V042.md)。
 
 先看 [试玩与跑通审计](docs/PLAYABILITY_AUDIT_V042.md)、[逐章验收与缺口](docs/SPEC_ACCEPTANCE_V042.md)、[产品基线](docs/MASTER_PRODUCT_SPEC_V0.4.2.md) 与 [实现和验证](docs/IMPLEMENTATION_V042.md)。首局直接开始三张宽卡的选择，可主动查看说明或进入保留原档案的隔离练习；主界面显示状态与自己安排的回声日期。第 3 天起，成长卡可直接预演失败、回到原选择并锁定执行；第 5 天起默认模式逐步出现新家族。在线 AI 支持 [DeepSeek / Azure / Microsoft Foundry](docs/ONLINE_AI.md)，从「设置 → 在线 AI」配置；无凭据时使用本地内容。Parallel Lives 当前是本地重演，自定义目标/现实生活的完整对照、在线社交、多 Boss 和最终演出品质仍未完成。
 
@@ -61,7 +63,7 @@ Linux 无显示器时需 Xvfb 和图形设备，渲染测试不能使用 `-nogra
 Unity -batchmode -force-glcore -projectPath . -runTests -testPlatform EditMode -testResults TestResults.xml
 ```
 
-`.github/workflows/android-apk.yml` 在 PR 更新时先执行上述测试与 63 张竖屏画面，再通过 `Horizon.Editor.AndroidBuild.Build` 构建 IL2CPP Android APK，包含 ARMv7 与 ARM64，并校验两种架构的原生库。产物 `HORIZON-EditMode-Results`、`HORIZON-Unity-Portrait-Previews`、`HORIZON-Android-APK` 保留 14 天。试玩 APK 使用固定 QA 签名，可覆盖升级同签名试玩版；正式发布使用独立签名。
+`.github/workflows/android-apk.yml` 在 PR 更新时先执行上述测试与 73 张竖屏画面（含两张 1080×2400），再通过 `Horizon.Editor.AndroidBuild.Build` 构建 IL2CPP Android APK，包含 ARMv7 与 ARM64，并校验两种架构的原生库。产物 `HORIZON-EditMode-Results`、`HORIZON-Unity-Portrait-Previews`、`HORIZON-Android-APK` 保留 14 天。试玩 APK 使用固定 QA 签名，可覆盖升级同签名试玩版；正式发布使用独立签名。
 
 工作流使用仓库已有 Unity 授权密钥。首次配置时 Personal 需要 UNITY_LICENSE、UNITY_EMAIL、UNITY_PASSWORD；Pro 需要 UNITY_SERIAL、UNITY_EMAIL、UNITY_PASSWORD。
 

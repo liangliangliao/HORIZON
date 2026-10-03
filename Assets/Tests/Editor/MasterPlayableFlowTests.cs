@@ -336,21 +336,105 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
 
-        private static IEnumerator Capture(HorizonApp app, string name)
+        [UnityTest]
+        public IEnumerator StoryChallengeConnectsPreparationFailureRecoveryBossAndReadableCause()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Story challenge audit").AddComponent<HorizonApp>();
+            yield return null;
+            var originalLife = GameSession.StartMasterLife(2, 17, RunMode.Quick);
+            var original = new ArchiveData { active = originalLife.Snapshot(), nextRareRun = 99, seenSecondLife = true,
+                preferences = new PlayerPreferences { reducedMotion = true, sound = false } }; original.Repair();
+            Set(app, "archive", original); Set(app, "session", originalLife); Call(app, "ApplyPreferences"); Call(app, "ShowHome"); yield return null;
+            yield return Capture(app, "71-story-home");
+            Button(app, "Story chapters").onClick.Invoke(); yield return null; yield return Capture(app, "64-story-selection");
+            string model = JsonUtility.ToJson(original.me), active = JsonUtility.ToJson(original.active);
+            Button(app, "Practice story chapter").onClick.Invoke(); yield return null; yield return Capture(app, "65-story-victory-anchor");
+            Button(app, "Build chapter path").onClick.Invoke(); yield return null;
+            GameSession life = Get<GameSession>(app, "session"); ArchiveData practice = Get<ArchiveData>(app, "archive");
+            bool recovered = false, restarted = false;
+            for (int day = 1; day <= 12; day++)
+            {
+                if (life.HasPredictionReview) { Button(app, "Continue").onClick.Invoke(); yield return null; }
+                if (life.CanPredict) { Button(app, "Lock prediction").onClick.Invoke(); yield return null; }
+                if (life.ChapterNeedsPreparation)
+                { yield return Capture(app, "66-story-preparation"); Button(app, "Chapter route help").onClick.Invoke(); yield return null; }
+                if (day == 5)
+                { yield return Capture(app, "67-story-setback"); Button(app, "Recover chapter setback").onClick.Invoke(); yield return null; }
+                if (life.ChapterNeedsBoss)
+                { yield return Capture(app, "68-story-boss"); Assert.IsTrue(life.CanResolveChapter("help")); Button(app, "Chapter route help").onClick.Invoke(); yield return null; }
+                CardSpec chosen = life.Hand[2];
+                if (day != 5 && life.Energy >= 4 && life.Hand[1].Id != "imagine" && life.CanPlay(life.Hand[1])) chosen = life.Hand[1];
+                Call(app, "CardTapped", Card(app, chosen.Id)); yield return null; Button(app, "Use card").onClick.Invoke();
+                if (day < 12) yield return FinishDailyFeedback(app, day);
+                else
+                {
+                    float until = Time.realtimeSinceStartup + 20;
+                    while (Time.realtimeSinceStartup < until)
+                    {
+                        if (!Get<bool>(app, "busy") && Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Try another timeline")) break;
+                        var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.interactable &&
+                            (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Next station beat"));
+                        if (next != null) next.onClick.Invoke(); yield return new WaitForSecondsRealtime(0.15f);
+                    }
+                    Assert.Less(Time.realtimeSinceStartup, until);
+                }
+                recovered |= !string.IsNullOrEmpty(life.Master.chapter.recoveryNode); restarted |= !string.IsNullOrEmpty(life.Master.chapter.returnNode);
+            }
+            Assert.IsTrue(recovered); Assert.IsTrue(restarted); Assert.AreEqual(ChapterOutcome.Arrived, life.CompletedRun.master.chapter.outcome);
+            Assert.AreEqual(1, practice.runs.Count); yield return Capture(app, "69-story-arrived");
+            Button(app, "Inspect timeline").onClick.Invoke(); yield return null; yield return Capture(app, "70-readable-causal-story");
+            Assert.IsNotNull(Get<RectTransform>(app, "root").GetComponentsInChildren<ScrollRect>().Single(s => s.name == "Story path window"));
+            Assert.AreEqual(model, JsonUtility.ToJson(original.me)); Assert.AreEqual(active, JsonUtility.ToJson(original.active));
+            Call(app, "ExitPractice"); yield return null; Assert.AreSame(original, Get<ArchiveData>(app, "archive"));
+            Call(app, "BuildBoard"); yield return null; yield return Capture(app, "72-tall-phone-board", 2400);
+            Call(app, "ShowSettings"); yield return null; Call(app, "ShowHome"); yield return null; yield return Capture(app, "73-tall-phone-home", 2400);
+            Assert.IsFalse(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Any(t => t.name == "Settings title"));
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator PartialViewportBloomAndFrameClearDoNotLeaveStalePixels()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Viewport audit").AddComponent<HorizonApp>();
+            yield return null;
+            HorizonWorld3D world = Get<HorizonWorld3D>(app, "world"); var target = new RenderTexture(200, 400, 24); target.Create();
+            var source = new RenderTexture(200, 200, 0); source.Create(); var pixels = new Texture2D(200, 400, TextureFormat.RGB24, false);
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = target; GL.Clear(true, true, Color.magenta);
+            world.BackgroundCamera.targetTexture = target; world.BackgroundCamera.Render();
+            RenderTexture.active = source; GL.Clear(false, true, Color.blue);
+            var cameraObject = new GameObject("Retained viewport", typeof(Camera)); Camera view = cameraObject.GetComponent<Camera>();
+            view.enabled = false; view.rect = new Rect(0, 0.4f, 1, 0.5f);
+            HorizonBloom bloom = cameraObject.AddComponent<HorizonBloom>(); bloom.Initialize(Resources.Load<Shader>("HorizonBloom")); Assert.IsTrue(bloom.IsSupported);
+            Material material = (Material)typeof(HorizonBloom).GetField("material", Private).GetValue(bloom); material.SetFloat("_Intensity", 0); material.SetFloat("_Echo", 0);
+            Graphics.SetRenderTarget(target); GL.Viewport(new Rect(0, 160, 200, 200));
+            typeof(HorizonBloom).GetMethod("DrawInViewport", Private).Invoke(bloom, new object[] { source, target });
+            RenderTexture.active = target; pixels.ReadPixels(new Rect(0, 0, 200, 400), 0, 0); pixels.Apply();
+            Assert.Greater(pixels.GetPixel(100, 180).b, 0.5f, "The lower part of the scene must fill its intended viewport.");
+            Assert.Greater(pixels.GetPixel(100, 330).b, 0.5f);
+            Color outside = pixels.GetPixel(100, 30); Assert.Less(outside.r, 0.1f); Assert.Less(outside.b, 0.2f, "Previous-frame magenta must be cleared outside the world viewport.");
+            world.BackgroundCamera.targetTexture = null; RenderTexture.active = previous;
+            source.Release(); target.Release(); Object.Destroy(source); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(cameraObject);
+            yield return new ExitPlayMode();
+        }
+
+        private static IEnumerator Capture(HorizonApp app, string name, int height = 1920)
         {
             var world = Get<HorizonWorld3D>(app, "world"); Canvas canvas = Get<RectTransform>(app, "root").GetComponentInParent<Canvas>();
-            var image = new RenderTexture(1080, 1920, 24); image.Create();
+            var image = new RenderTexture(1080, height, 24); image.Create();
             var cameraObject = new GameObject("Master portrait capture", typeof(Camera)); Camera camera = cameraObject.GetComponent<Camera>();
             camera.clearFlags = CameraClearFlags.Depth; camera.cullingMask = 1 << 5; camera.nearClipPlane = 0.1f; camera.farClipPlane = 20; camera.targetTexture = image;
             camera.depth = 20;
             foreach (Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer = 5;
             canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = camera; canvas.planeDistance = 5;
-            world.WorldCamera.targetTexture = image; world.SnapCamera(); yield return null; yield return null;
-            Canvas.ForceUpdateCanvases(); View.RefreshText(canvas.transform); world.WorldCamera.Render(); camera.Render();
+            world.BackgroundCamera.targetTexture = image; world.WorldCamera.targetTexture = image; world.SnapCamera(); yield return null; yield return null;
+            Canvas.ForceUpdateCanvases(); View.RefreshText(canvas.transform); world.BackgroundCamera.Render(); world.WorldCamera.Render(); camera.Render();
             RenderTexture previous = RenderTexture.active; RenderTexture.active = image;
-            var pixels = new Texture2D(1080, 1920, TextureFormat.RGB24, false); pixels.ReadPixels(new Rect(0, 0, 1080, 1920), 0, 0); pixels.Apply();
+            var pixels = new Texture2D(1080, height, TextureFormat.RGB24, false); pixels.ReadPixels(new Rect(0, 0, 1080, height), 0, 0); pixels.Apply();
             string directory = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals"); Directory.CreateDirectory(directory); File.WriteAllBytes(Path.Combine(directory, name + ".png"), pixels.EncodeToPNG());
-            RenderTexture.active = previous; canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.worldCamera = null; world.WorldCamera.targetTexture = null;
+            RenderTexture.active = previous; canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.worldCamera = null; world.WorldCamera.targetTexture = null; world.BackgroundCamera.targetTexture = null;
             image.Release(); Object.Destroy(image); Object.Destroy(pixels); Object.Destroy(cameraObject);
             yield return null; yield return null;
         }

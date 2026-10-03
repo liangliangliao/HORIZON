@@ -256,19 +256,21 @@ namespace Horizon
             View.Label(root, "Logo", "H O R I Z O N", 57, Palette.Text,
                 TextAnchor.MiddleCenter, 0.08f, 0.82f, 0.92f, 0.91f);
             View.Label(root, "Home line", "你走过的路，还在发光。", 35, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.12f, 0.39f, 0.88f, 0.47f);
-            View.Button(root, "Continue", "继续一生", ContinueRun, 0.12f, 0.265f, 0.88f, 0.335f,
+                TextAnchor.MiddleCenter, 0.12f, 0.595f, 0.88f, 0.648f);
+            View.Button(root, "Continue", "继续一生", ContinueRun, 0.12f, 0.245f, 0.88f, 0.317f,
                 Palette.Mint, Palette.Ink, 37);
-            View.Button(root, "Map", "时间地图", () => ShowMap(false), 0.12f, 0.178f, 0.49f, 0.247f,
+            View.Button(root, "Map", "时间地图", () => ShowMap(false), 0.12f, 0.154f, 0.49f, 0.23f,
                 Palette.Panel, Palette.Text);
-            View.Button(root, "Station", "未来站", ShowStation, 0.51f, 0.178f, 0.88f, 0.247f,
+            View.Button(root, "Station", "未来站", ShowStation, 0.51f, 0.154f, 0.88f, 0.23f,
                 Palette.Panel, Palette.Text);
-            View.Button(root, "Echoes", "回声档案", ShowEchoArchive, 0.12f, 0.09f, 0.88f, 0.159f,
+            View.Button(root, "Echoes", "回声档案", ShowEchoArchive, 0.12f, 0.066f, 0.88f, 0.139f,
                 Palette.Panel, Palette.Text);
             View.Button(root, "Journey", "时间视野 · " + JourneyProgress.Name(archive.journey.Chapter), ShowJourney,
                 0.14f, 0.763f, 0.86f, 0.804f, Palette.Deep, Palette.Muted, 24);
             BuildMasterHome();
             AddPracticeEntry(root, true);
+            View.Button(root, "Story chapters", "故事挑战 · 穿过困难，走向未来", ShowChapterSelection,
+                0.12f, 0.413f, 0.88f, 0.496f, Palette.Mint, Palette.Ink, 35);
         }
 
         private void BuildBoard()
@@ -286,6 +288,7 @@ namespace Horizon
             HandRegion();
             BuildMasterBoard();
             world.SetTimeline(session.Actions, session.Deadline);
+            if (ShowChapterMoment()) return;
             if (TryRareMoment()) return;
             if (session.RunNumber == 2 && session.CatalogVersion >= 2 && session.Day == 1 && !archive.seenSecondLife)
                 ShowSecondLife();
@@ -338,6 +341,7 @@ namespace Horizon
 
         private void ShowGoal()
         {
+            if (session?.Master?.chapter != null) { ShowChapterProgress(); return; }
             if (busy || overlay != null || session == null) return;
             overlay = View.Rect(root, "How to play", 0, 0, 1, 1);
             View.Fill(overlay, "Goal shade", new Color(0.01f, 0.028f, 0.048f, 0.97f), 0, 0, 1, 1, true);
@@ -581,7 +585,7 @@ namespace Horizon
             View.Label(root, "Vision", "HORIZON " + Roman(session.UsesMasterRules ? Vision.MasterLevel : Vision.Level), 23, Palette.Mint,
                 TextAnchor.MiddleLeft, 0.055f, 0.92f, 0.46f, 0.949f);
             WalletButton(root);
-            View.Button(root, "Goal", "第" + session.Deadline + "天展示 · 准备 " + ProductExperience.ReadyGates(session) + "/3", ShowGoal,
+            View.Button(root, "Goal", session.Master?.chapter != null ? session.Master.chapter.Goal : "第" + session.Deadline + "天展示 · 准备 " + ProductExperience.ReadyGates(session) + "/3", ShowGoal,
                 0.50f, 0.914f, 0.945f, 0.949f, Palette.Panel, Palette.Gold, 23);
             View.Button(root, "Future plans", "未来安排 · " + PlayGuide.Scheduled(session).Count + " 个回声", () => { schedulePage = 0; ShowFutureSchedule(); },
                 0.075f, 0.875f, 0.49f, 0.911f, Palette.Panel, Palette.Mint, 22);
@@ -1150,6 +1154,7 @@ namespace Horizon
 
         private IEnumerator BossSequence(RunRecord run)
         {
+            if (run.master?.chapter != null) { ShowDeadlineResult(run); yield break; }
             Clear();
             busy = true;
             world.SetTimeline(run.actions, GameSession.RunLength(run));
@@ -1181,6 +1186,7 @@ namespace Horizon
             if (archive.pendingFeedback != null && !archive.ghostOpen && TryMasterSpectacle(() => ShowDeadlineResult(run))) return;
             bool animateReward = archive.pendingFeedback != null && !archive.pendingFeedback.presented;
             if (archive.pendingFeedback != null) { archive.pendingFeedback.presented = true; Save(); }
+            if (run.master?.chapter != null) { RenderChapterFinale(run); return; }
             Clear();
             world.SetTimeline(run.actions, GameSession.RunLength(run));
             world.ShowDeadline();

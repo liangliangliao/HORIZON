@@ -169,6 +169,16 @@ jobs:
           test -s artifacts/visuals/61-imagination-actual-divergence.png
           test -s artifacts/visuals/62-isolated-practice-life.png
           test -s artifacts/visuals/63-playable-life-complete.png
+          test -s artifacts/visuals/64-story-selection.png
+          test -s artifacts/visuals/65-story-victory-anchor.png
+          test -s artifacts/visuals/66-story-preparation.png
+          test -s artifacts/visuals/67-story-setback.png
+          test -s artifacts/visuals/68-story-boss.png
+          test -s artifacts/visuals/69-story-arrived.png
+          test -s artifacts/visuals/70-readable-causal-story.png
+          test -s artifacts/visuals/71-story-home.png
+          test -s artifacts/visuals/72-tall-phone-board.png
+          test -s artifacts/visuals/73-tall-phone-home.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash

@@ -278,7 +278,7 @@ namespace Horizon.Game
     {
         public const int LastDay = 12;
         public const int ResourceCap = 10;
-        public const int RulesVersion = 10;
+        public const int RulesVersion = 11;
         public const int AbilityGate = 6;
         public const int RelationGate = 6;
         public const int MoneyGate = 2;
@@ -1014,7 +1014,7 @@ namespace Horizon.Game
                     else replay.LockPrediction(new ResourceDelta(prediction.energy, prediction.mood, prediction.insight,
                         prediction.relation, prediction.money, prediction.ability), prediction.dueDay - prediction.sourceDay);
                 }
-                if (day == stopDay && !chooseLast) return replay;
+                if (day == stopDay && !chooseLast) { replay.ReplayMasterCommands(original, day, true); return replay; }
                 replay.ReplayMasterCommands(original, day);
                 ActionRecord recorded = original.actions[day - 1];
                 if (recorded == null) return null;

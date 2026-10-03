@@ -117,7 +117,7 @@ namespace Horizon.Game
                 CatalogVersion >= 9 ? new ResourceDelta(insight: -1) : null); if (CatalogVersion >= 9) RecordResourceSample(); return true;
         }
         private bool MasterAllows(CardSpec card)
-        { return !UsesMasterRules || !InExecutionMode || Master.decision.cardId == card.Id && Master.decision.status == DecisionStatus.Ready; }
+        { return !UsesMasterRules || !ChapterNeedsChoice && (!InExecutionMode || Master.decision.cardId == card.Id && Master.decision.status == DecisionStatus.Ready); }
         public bool NeedsImagination(CardSpec card)
         {
             return CatalogVersion >= 8 && card?.Id == "imagine" && !Master.commands.Any(c =>
@@ -232,7 +232,7 @@ namespace Horizon.Game
                 if (CatalogVersion >= 9) foreach (CausalNode trigger in CausalNodes.Where(x => x.type == CausalNodeKind.Trigger &&
                     x.parentId != n.id && Master.triggers.Contains(x.cardId) && TriggerEquipment.Supports(x.cardId, card))) CausalGraph.Link(n, trigger.id);
                 ObservePattern("decision-reopen", true, n); ChargeOverdrive(10, n); }
-            if (Master.awaitingComeback && (card.Kind == CardKind.Growth || card.Kind == CardKind.Recovery))
+            if (Master.chapter == null && Master.awaitingComeback && (card.Kind == CardKind.Growth || card.Kind == CardKind.Recovery))
             {
                 Master.awaitingComeback = false; Master.insightPoints += Master.resilienceChain;
                 if (!string.IsNullOrEmpty(Master.lastFailureNode)) CausalGraph.Link(n, Master.lastFailureNode);
@@ -261,6 +261,7 @@ namespace Horizon.Game
             { skill.simulationNodeId = n.id; skill.simulationRun = RunNumber; }
             foreach (OpportunityWindow w in Master.windows.Where(w => !w.taken && !w.expired && w.cardId == card.Id && w.expiresDay >= Day))
             { w.taken = true; CausalGraph.Link(n, w.nodeId); if (Day <= w.momentumUntilDay) ChargeOverdrive(8, n); }
+            ChapterAfterChoice(action, card);
             action.parentNodeId = n.parentId; action.parentNodeIds = CausalGraph.Parents(n);
             Master.insightPoints++; RefreshEngine(); RecordResourceSample(); Emit(DomainEventKind.ActionTaken, n, card.Name);
         }
@@ -293,6 +294,7 @@ namespace Horizon.Game
         private void MasterAfterAdvance(List<PendingEcho> due)
         {
             if (!UsesMasterRules) return;
+            ChapterAfterAdvance();
             foreach (OpportunityWindow w in Master.windows.Where(w => !w.taken && !w.expired && w.expiresDay < Day))
             { w.expired = true; CausalNode n = MasterNode(CausalNodeKind.Opportunity, "机会窗口已关闭", w.nodeId);
                 Emit(DomainEventKind.MomentumExpired, n, "MOMENTUM 已消退", "动机也有时间窗口。准备下一次更容易开始的环境。");
@@ -322,17 +324,22 @@ namespace Horizon.Game
         private void MasterComplete(BossResult boss)
         {
             if (!UsesMasterRules) return;
+            if (Master.chapter != null) return;
             CausalNode gate = CausalNodes.FindLast(n => n.type == CausalNodeKind.Gate);
             if (boss.passed == 3) { ActivateOrbit(7, gate); Emit(DomainEventKind.Victory, gate, "LIVE THE FUTURE", "成长、状态与支援一起抵达截止日。"); }
             else { if (gate != null) ObservePattern("setback", false, gate); Emit(DomainEventKind.FailAndAgain, gate, "FAIL & AGAIN", "这条人生留下了来路，下一条可以从这里继续探索。"); }
         }
-        private void ReplayMasterCommands(RunRecord original, int day)
+        private void ReplayMasterCommands(RunRecord original, int day, bool chapterOnly = false)
         {
             if (!UsesMasterRules || original.master == null) return;
             foreach (MasterCommand c in original.master.commands.Where(c => c.day == day))
             {
+                if (chapterOnly && c.operation != "chapter" && c.operation != "chapter-prepare" && c.operation != "chapter-boss") continue;
                 switch (c.operation)
                 {
+                    case "chapter": if (Master.chapter == null) BeginChapter(c.argument); break;
+                    case "chapter-prepare": if (!PrepareChapter(c.argument)) PrepareChapter("delay"); break;
+                    case "chapter-boss": if (!ResolveChapter(c.argument)) ResolveChapter("leave"); break;
                     case "lock": if (!InExecutionMode && Array.Exists(Hand, card => card.Id == c.argument && CanPlay(card))) LockDecision(c.argument); break;
                     case "unlock": if (InExecutionMode) UnlockDecision(); break;
                     case "step": if (InExecutionMode && Master.decision.status != DecisionStatus.Ready) ExecuteDecisionStep(); break;

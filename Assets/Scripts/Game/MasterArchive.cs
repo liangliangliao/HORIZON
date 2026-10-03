@@ -11,6 +11,7 @@ namespace Horizon
         public PlayerBehavioralModel me = new PlayerBehavioralModel();
         public RealityConstellation reality = new RealityConstellation();
         public List<FutureMemory> futureMemories = new List<FutureMemory>();
+        public List<string> chapterSeenSetbacks = new List<string>();
         public ImagineRun imagination;
         public List<ImagineRun> imaginedLives = new List<ImagineRun>();
         public List<string> worldview = new List<string>();
@@ -24,6 +25,7 @@ namespace Horizon
             if (me == null) me = new PlayerBehavioralModel(); me.Repair();
             if (reality == null) reality = new RealityConstellation(); reality.Repair();
             if (futureMemories == null) futureMemories = new List<FutureMemory>();
+            if (chapterSeenSetbacks == null) chapterSeenSetbacks = new List<string>();
             if (imaginedLives == null) imaginedLives = new List<ImagineRun>();
             if (imaginationComparisons == null) imaginationComparisons = new List<ImaginationCalibration>();
             imaginationComparisons.RemoveAll(c => c == null || c.run < 1 || c.plannedDay < 1 || c.plannedDay > 30);
@@ -53,7 +55,8 @@ namespace Horizon
             {
                 life.CompletedRun.master = life.Master.Copy();
                 if (!me.observedRuns.Contains(life.RunNumber))
-                { me.observedRuns.Add(life.RunNumber); me.failedRuns = life.CompletedRun.boss.passed < 3 ? Math.Min(9, me.failedRuns + 1) : 0; }
+                { me.observedRuns.Add(life.RunNumber); bool failed = life.Master.chapter != null ? life.Master.chapter.outcome != ChapterOutcome.Arrived : life.CompletedRun.boss.passed < 3;
+                    me.failedRuns = failed ? Math.Min(9, me.failedRuns + 1) : 0; }
             }
         }
         public void KeepImagination(ImagineRun run)

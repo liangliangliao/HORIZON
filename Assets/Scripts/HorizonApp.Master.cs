@@ -20,7 +20,7 @@ namespace Horizon
         private void BuildMasterHome()
         {
             View.Button(root, "Master hub", "HORIZON ME · 想象与现实", ShowMasterHub,
-                0.12f, 0.66f, 0.88f, 0.72f, Palette.Panel, Palette.Mint, 28);
+                0.12f, 0.532f, 0.88f, 0.58f, Palette.Panel, Palette.Mint, 28);
             View.Label(root, "Master version", "v" + MasterSpecification.Version + "  ·  SEE FARTHER. IMAGINE DEEPER.", 20,
                 Palette.Muted, TextAnchor.MiddleCenter, 0.05f, 0.018f, 0.95f, 0.06f);
         }

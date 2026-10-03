@@ -45,6 +45,9 @@ groups = {
     47: [], 48: ["PlayableFlowTests"], 49: ["BusinessRuleTests", "MasterInvariantTests"],
     51: ["MasterInvariantTests", "OnlineAITests"],
 }
+for chapter in (3, 8, 14, 22, 23, 24, 35, 37, 45):
+    groups.setdefault(chapter, []).extend(["StoryChapterTests", "StoryChallengeConnects"])
+groups[41].extend(["PartialViewportBloomAndFrameClear", "StoryChallengeConnects"])
 files = [args.results] if args.results.is_file() else sorted(args.results.rglob("*.xml"))
 cases = {}
 for file in files:
