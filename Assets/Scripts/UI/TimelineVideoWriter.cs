@@ -11,9 +11,15 @@ namespace Horizon.UI
         // the Unity main thread before this method receives its directory.
         public static Task<string> EncodeAsync(string frames, string pcm, string output)
         {
-            return Task.Run(() => Encode(frames, pcm, output));
+            string executable = null;
+#if UNITY_EDITOR
+            // Unity application properties must be read before leaving its thread.
+            string bundled = Path.GetFullPath(Path.Combine(Application.dataPath, "../tools/media/ffmpeg"));
+            executable = File.Exists(bundled) ? bundled : "ffmpeg";
+#endif
+            return Task.Run(() => Encode(frames, pcm, output, executable));
         }
-        private static string Encode(string frames, string pcm, string output)
+        private static string Encode(string frames, string pcm, string output, string executable)
         {
             try
             {
@@ -28,8 +34,7 @@ namespace Horizon.UI
 #elif UNITY_EDITOR
                 string temporary = output + ".tmp.mp4";
                 string Quote(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
-                string bundled = Path.GetFullPath(Path.Combine(Application.dataPath, "../tools/media/ffmpeg"));
-                var start = new System.Diagnostics.ProcessStartInfo(File.Exists(bundled) ? bundled : "ffmpeg",
+                var start = new System.Diagnostics.ProcessStartInfo(executable,
                     "-loglevel error -y -framerate 6 -i " + Quote(Path.Combine(frames, "frame-%03d.png")) +
                     " -f s16le -ar 22050 -ac 1 -i " + Quote(pcm) +
                     " -t 10 -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart " + Quote(temporary))
