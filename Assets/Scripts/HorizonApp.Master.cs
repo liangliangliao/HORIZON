@@ -67,8 +67,9 @@ namespace Horizon
             string[] names = { "想象演练 · IMAGINE", "行动发动机 · EXECUTE", "内在议会 · COUNCIL", "知识熔炉 · FORGE", "未来轨道 · ORBIT", "现实桥梁 · REALITY", "世界观卡组", "人生模式与平行比较" };
             Action[] callbacks = { () => { archive.playGuide.imagineFromBoard = false; ShowImagineSetup(); }, ShowExecution, ShowCouncil, ShowForge, ShowOrbit, ShowReality, ShowWorldviews, ShowModes };
             for (int i = 0; i < names.Length; i++)
-            { float y = 0.63f - (i / 2) * 0.13f, x = i % 2 == 0 ? 0.07f : 0.52f;
+            { float y = 0.63f - (i / 2) * 0.12f, x = i % 2 == 0 ? 0.07f : 0.52f;
                 View.Button(overlay, "Master feature " + i, names[i], callbacks[i], x, y, x + 0.41f, y + 0.1f, Palette.Panel, Palette.Text, 25); }
+            View.Button(overlay, "Imagination comparisons", "预演与实际对照", ShowImaginationComparison, 0.07f, 0.205f, 0.93f, 0.26f, Palette.Deep, Palette.Gold, 28);
             View.Button(overlay, "Behavior trends", "近期行为模式", ShowMe, 0.07f, 0.125f, 0.49f, 0.2f, Palette.Deep, Palette.Gold, 26);
             View.Button(overlay, "AI future self dialogue", "AI · 未来自己", ShowFutureSelfDialogue, 0.51f, 0.125f, 0.93f, 0.2f, Palette.Deep, Palette.Mint, 26);
         }
@@ -93,29 +94,35 @@ namespace Horizon
                 {
                     float y = 0.685f - i * 0.055f;
                     string status = i < decision.step ? "完成" : i == decision.step ? "现在" : "稍后";
-                    View.Label(overlay, "Execution step " + i, status + " · " + (i + 1) + ". " + decision.steps[i], 28,
+                    View.Label(overlay, "Execution step " + i, status + " · " + (i + 1) + ". " + decision.steps[i], 32,
                         i == decision.step ? Palette.Mint : i < decision.step ? Palette.Muted : Palette.Text,
                         TextAnchor.MiddleLeft, 0.09f, y, 0.91f, y + 0.052f);
                 }
             }
             else View.Label(overlay, "Engine invitation", "已经想做，仍然没有开始？\n先选一张行动牌，再把决定锁定。\n之后只处理执行步骤。", 33, Palette.Text,
                 TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.84f);
-            View.Button(overlay, "Action factors", "行动条件 · 提示 " + e.trigger + " / 摩擦 " + e.friction + " / 疲劳 " + e.fatigue + " · 查看", ShowActionFactors,
+            CardSpec locked = session.InExecutionMode ? CardCatalog.FindById(session.Master.decision.cardId) : null;
+            string cost = locked == null ? "查看行动条件与来源" : "执行成本 · " + PlayExperience.NowLabel(session.ImmediateEffect(locked)) +
+                (session.PreparationWillSave(locked) ? " · 准备可省1精力" : " · 查看准备条件");
+            View.Button(overlay, "Action factors", cost, ShowActionFactors,
                 0.075f, 0.455f, 0.925f, 0.515f, Palette.Deep, Palette.Muted, 24);
-            View.Button(overlay, "Lower friction", "删掉一步准备", () => { session.LowerFriction(); PersistMasterAction(); ShowExecution(); }, 0.07f, 0.37f, 0.49f, 0.435f, Palette.Panel, Palette.Text, 25);
+            View.Button(overlay, "Lower friction", session.CatalogVersion >= 9 ? "缩小准备 · 专注-1" : "删掉一步准备", () => { session.LowerFriction(); PersistMasterAction(); ShowExecution(); }, 0.07f, 0.37f, 0.49f, 0.435f, Palette.Panel, Palette.Text, 25);
             View.Button(overlay, "Equip triggers", "设置行动提示  " + session.Master.triggers.Count + "/3", ShowTriggers, 0.51f, 0.37f, 0.93f, 0.435f, Palette.Panel, Palette.Mint, 25);
             ThoughtMonster monster = ThoughtMonsters.Current(e, session.Master.decision?.reopens ?? 0);
             View.Label(overlay, "Thought monster", "念头 · " + monster.name + "\n" + monster.reasonablePart + "\n" + monster.tradeoff, 25, Palette.Muted, TextAnchor.UpperLeft, 0.075f, 0.21f, 0.925f, 0.355f);
             if (session.InExecutionMode)
             {
                 DecisionRecord d = session.Master.decision;
-                string step = d.status == DecisionStatus.Ready ? "完成「" + CardCatalog.FindById(d.cardId).Name + "」" : (d.step + 1) + "/4 · " + d.steps[d.step];
+                string step = d.status == DecisionStatus.Ready ? "今天就做「" + CardCatalog.FindById(d.cardId).Name + "」" :
+                    session.CatalogVersion >= 9 ? "按这个计划准备 · 不再重新比较" : (d.step + 1) + "/4 · " + d.steps[d.step];
                 View.Button(overlay, "Execute next step", step, () => {
                     if (!CanPrepareMaster) return;
                     if (session.Master.decision.status == DecisionStatus.Ready)
                     { string id = session.Master.decision.cardId; CloseMasterPage();
                         HorizonCardDrag drag = cards.FirstOrDefault(pair => pair.Value.Id == id).Key; if (drag != null) CardPlayed(drag); }
-                    else { session.ExecuteDecisionStep(); PersistMasterAction(); ShowExecution(); }
+                    else { session.ExecuteDecisionStep();
+                        if (session.CatalogVersion >= 9) while (session.Master.decision.status != DecisionStatus.Ready) session.ExecuteDecisionStep();
+                        PersistMasterAction(); ShowExecution(); }
                 }, 0.07f, 0.132f, 0.72f, 0.205f, Palette.Mint, Palette.Ink, 27);
                 View.Button(overlay, "Unlock decision", "解锁", () => { session.UnlockDecision(); PersistMasterAction(); CloseMasterPage(); BuildBoard(); }, 0.745f, 0.132f, 0.93f, 0.205f, Palette.Deep, Palette.Coral, 24);
             }
@@ -137,7 +144,7 @@ namespace Horizon
             for (int i = 0; i < names.Length; i++)
             { float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.71f - (i / 2) * 0.105f;
                 View.Label(overlay, "Engine variable " + i, names[i] + "  " + values[i] + "/10", 29, Palette.Text, TextAnchor.MiddleLeft, x, y, x + 0.4f, y + 0.08f); }
-            View.Label(overlay, "Factors meaning", "这些是当前情境的线索。疲劳高时可以休息；摩擦高时可以缩小准备；提示帮助你记住开始。", 29, Palette.Muted,
+            View.Label(overlay, "Factors meaning", "备妥条件 = 动机+能力+提示+情绪+承诺-摩擦-其他奖励-疲劳。完成准备后至少6，且有匹配提示时，执行省1精力。", 29, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.215f, 0.925f, 0.375f);
             View.Button(overlay, "Explain motives", "看看不同动机的来源", ShowCouncil, 0.075f, 0.125f, 0.925f, 0.2f, Palette.Panel, Palette.Mint, 28);
         }
@@ -145,16 +152,16 @@ namespace Horizon
         {
             if (!CanPrepareMaster) return;
             MasterPage("Trigger equipment", "T R I G G E R", ShowExecution);
-            View.Label(overlay, "Equipment limit", "最多装备三个。环境结构可以支持行动。", 27, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.79f, 0.925f, 0.855f);
+            View.Label(overlay, "Equipment limit", "最多三个提示。匹配行动并备妥条件，执行最多省1精力。", 27, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.79f, 0.925f, 0.855f);
             for (int i = 0; i < TriggerEquipment.Ids.Length; i++)
             {
                 int index = i; string id = TriggerEquipment.Ids[i]; bool equipped = session.Master.triggers.Contains(id);
                 float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.675f - (i / 2) * 0.106f;
-                View.Button(overlay, "Trigger " + id, TriggerEquipment.Names[index] + (equipped ? " · 已装备" : ""), () => {
+                View.Button(overlay, "Trigger " + id, TriggerEquipment.Names[index] + (equipped ? " · 已装备" : TriggerEquipment.Cost(id) > 0 && session.CatalogVersion >= 9 ? " · 金钱-1" : " · 免费") + "\n" + TriggerEquipment.Effect(id), () => {
                     session.EquipTrigger(id); PersistMasterAction(); ShowTriggers();
                 }, x, y, x + 0.4f, y + 0.08f, Palette.Panel, equipped ? Palette.Mint : Palette.Text, 27);
             }
-            View.Label(overlay, "Trigger observation", "有效性来自近期执行记录；提示并不保证结果。", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.15f, 0.925f, 0.22f);
+            View.Label(overlay, "Trigger observation", "选择与行动相符的提示。其作用会进入实际成本与因果图。", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.15f, 0.925f, 0.22f);
         }
         private void ShowCouncil()
         {
@@ -200,7 +207,7 @@ namespace Horizon
                 if (string.IsNullOrWhiteSpace(imagineGoal)) return;
                 string goalId = archive.playGuide.imagineFromBoard && archive.playGuide.preparedRun == session?.RunNumber && archive.playGuide.preparedDay == session?.Day ?
                     archive.playGuide.preparedCardId : imagineGoal.Trim().ToLowerInvariant();
-                archive.imagination = ImaginationEngine.Begin(Guid.NewGuid().ToString("N"), goalId ?? imagineGoal.Trim().ToLowerInvariant(), imagineGoal, imagineDifficulty);
+                archive.imagination = ImaginationEngine.Begin(Guid.NewGuid().ToString("N"), goalId ?? imagineGoal.Trim().ToLowerInvariant(), imagineGoal, imagineDifficulty, 1);
                 Save(); ShowImagineRun();
             }, 0.075f, 0.125f, 0.925f, 0.2f, Palette.Mint, Palette.Ink, 29);
         }
@@ -219,9 +226,21 @@ namespace Horizon
                 for (int i = 0; i < 4; i++) { RecoveryAction action = (RecoveryAction)i; float x = i % 2 == 0 ? 0.075f : 0.525f, y = 0.235f - (i / 2) * 0.1f;
                     View.Button(overlay, "Recovery action " + i, names[i], () => { ImaginationEngine.Recover(run, action); Save(); ShowImagineRun(); }, x, y, x + 0.4f, y + 0.08f, Palette.Panel, Palette.Mint, 26); }
             }
+            else if (run.phase == ImaginePhase.Preparation && run.pathVersion == 1)
+            {
+                string[] plans = { "缩成两分钟的一步", "固定时间并设置提醒", "约一个人一起准备" };
+                for (int i = 0; i < plans.Length; i++) { PreparationAction action = (PreparationAction)i; float y = 0.245f - i * 0.085f;
+                    View.Button(overlay, "Preparation action " + i, plans[i], () => { ImaginationEngine.Prepare(run, action); Save(); ShowImagineRun(); },
+                        0.075f, y, 0.925f, y + 0.072f, Palette.Panel, Palette.Mint, 31); }
+            }
             else if (run.phase == ImaginePhase.Complete)
                 View.Button(overlay, "Keep future memory", "留下 FUTURE MEMORY", () => {
-                    if (CanPrepareMaster) session.AttachImagination(run);
+                    if (CanPrepareMaster)
+                    {
+                        session.AttachImagination(run);
+                        string cardId = archive.playGuide.imagineFromBoard && archive.playGuide.preparedRun == session.RunNumber && archive.playGuide.preparedDay == session.Day ? archive.playGuide.preparedCardId : null;
+                        archive.TrackImagination(run, session, cardId);
+                    }
                     archive.KeepImagination(run); archive.imagination = null; PersistMasterAction(); ReturnFromImagination();
                 }, 0.075f, 0.15f, 0.925f, 0.235f, Palette.Mint, Palette.Ink, 28);
             else View.Button(overlay, "Continue imagination", run.phase == ImaginePhase.VictoryAnchor ? "时间倒退 · 回到今天" : run.phase == ImaginePhase.Failure ? "失败以后怎么办？" : "经历下一步", () => {

@@ -107,6 +107,8 @@ namespace Horizon.Tests
                 destinationDay = 1, delta = new ResourceDelta(1), meaning = "第二条" });
             Set(app,"session",session); Set(app,"archive",archive); Call(app,"ShowFeedback");
             yield return new WaitForSecondsRealtime(0.35f);
+            ButtonNamed(app,"Review echo details").onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.35f);
             Button next = ButtonNamed(app,"Continue result");
             Assert.That(next.GetComponentInChildren<Text>().text, Does.Contain("下一条回声"));
             next.onClick.Invoke(); next.onClick.Invoke(); yield return null;

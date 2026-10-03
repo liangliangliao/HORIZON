@@ -47,7 +47,9 @@ jobs:
         if: always()
         with:
           name: HORIZON-v042-Rule-Results
-          path: artifacts/rules.xml
+          path: |
+            artifacts/rules.xml
+            artifacts/playability/
           retention-days: 14
   test:
     runs-on: ubuntu-latest
@@ -87,6 +89,19 @@ jobs:
           name: HORIZON-EditMode-Results
           path: ${{ steps.tests.outputs.artifactsPath }}
           if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish honest chapter-by-chapter execution evidence
+        if: always()
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}"
+
+      - name: Upload product acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-v042-Product-Acceptance
+          path: artifacts/product-acceptance.json
+          if-no-files-found: error
           retention-days: 14
 
       - name: Verify Unity portrait previews
@@ -148,6 +163,12 @@ jobs:
           test -s artifacts/visuals/55-first-life-prediction.png
           test -s artifacts/visuals/56-first-life-new-family.png
           test -s artifacts/visuals/57-imagine-card-recovery.png
+          test -s artifacts/visuals/58-playable-wide-choices.png
+          test -s artifacts/visuals/59-prepared-execution-cost.png
+          test -s artifacts/visuals/60-grouped-time-echo.png
+          test -s artifacts/visuals/61-imagination-actual-divergence.png
+          test -s artifacts/visuals/62-isolated-practice-life.png
+          test -s artifacts/visuals/63-playable-life-complete.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash

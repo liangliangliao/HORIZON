@@ -4,7 +4,7 @@ from PIL import Image
 import sys
 
 files = sorted(Path(sys.argv[1] if len(sys.argv) > 1 else "artifacts/visuals").glob("[0-9][0-9]-*.png"))
-expected = 57
+expected = 63
 assert len(files) == expected, f"Expected {expected} portrait previews, got {len(files)}"
 assert {int(p.name[:2]) for p in files} == set(range(1, expected + 1))
 for path in files:

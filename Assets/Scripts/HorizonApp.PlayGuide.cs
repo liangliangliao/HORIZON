@@ -61,24 +61,15 @@ namespace Horizon
 
         private void BuildDailyGuide()
         {
-            var panel = View.Panel(root, "Daily direction", new Color(0.014f, 0.046f, 0.068f, 0.94f),
-                0.05f, 0.505f, 0.95f, 0.655f, 25).rectTransform;
-            View.Label(panel, "Today's direction", PlayGuide.Today(session), 27, Palette.Text,
-                TextAnchor.MiddleLeft, 0.035f, 0.785f, 0.85f, 0.98f);
-            View.Button(panel, "How to play", "玩法", ShowPlayGuide, 0.85f, 0.785f, 0.98f, 0.98f, Palette.Panel, Palette.Muted, 22);
-            View.Label(panel, "Next causal step", PlayGuide.Next(session), 23, Palette.Muted,
-                TextAnchor.MiddleLeft, 0.035f, 0.405f, 0.965f, 0.78f);
-            int need = ProductExperience.EvidenceNeeded(session);
-            string[] progress = { "成长回声 " + ProductExperience.GrowthEvidence(session) + "/" + need + "\n能力 " + session.Ability + "/6",
-                "恢复行动 " + ProductExperience.RecoveryEvidence(session) + "/" + need + "\n精力 " + session.Energy + " · 心情 " + session.Mood,
-                "支援行动 " + ProductExperience.SupportEvidence(session) + "/" + need + "\n关系 " + session.Relation + "/6" };
-            for (int i = 0; i < 3; i++)
-            {
-                int gate = i; float x = 0.035f + i * 0.316f;
-                bool ready = ProductExperience.GateReady(session, i);
-                View.Button(panel, "Daily goal " + gate, (ready ? "已准备 · " : "") + progress[i], ShowGoal,
-                    x, 0.065f, x + 0.298f, 0.395f, Palette.Panel, ready ? Palette.Mint : Palette.Gold, 21);
-            }
+            var panel = View.Panel(root, "Daily direction", new Color(0.014f, 0.046f, 0.068f, 0.88f),
+                0.055f, 0.445f, 0.945f, 0.52f, 25).rectTransform;
+            string message = session.Day == 1 ? session.Deadline + "天后，展示你学到的东西。今天先选一个行动。" :
+                session.SocialUnavailableToday ? "状态影响了邀约；恢复能重新打开选择。" :
+                session.Master?.awaitingComeback == true ? "受挫并未结束人生。恢复或再试一次，由你选择。" :
+                session.Situation ?? PlayGuide.Today(session);
+            View.Label(panel, "Today's direction", message, 33, Palette.Text,
+                TextAnchor.MiddleLeft, 0.04f, 0.05f, 0.80f, 0.95f);
+            View.Button(panel, "How to play", "帮助", ShowPlayOptions, 0.82f, 0.15f, 0.97f, 0.85f, Palette.Panel, Palette.Muted, 27);
         }
 
         private void ShowFutureSchedule()

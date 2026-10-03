@@ -25,6 +25,8 @@ namespace Horizon
             if (reality == null) reality = new RealityConstellation(); reality.Repair();
             if (futureMemories == null) futureMemories = new List<FutureMemory>();
             if (imaginedLives == null) imaginedLives = new List<ImagineRun>();
+            if (imaginationComparisons == null) imaginationComparisons = new List<ImaginationCalibration>();
+            imaginationComparisons.RemoveAll(c => c == null || c.run < 1 || c.plannedDay < 1 || c.plannedDay > 30);
             if (worldview == null) worldview = new List<string>();
             if (futureMessages == null) futureMessages = new List<FutureMessage>();
             if (knowledgeSkills == null) knowledgeSkills = new List<KnowledgeSkill>();
@@ -35,6 +37,7 @@ namespace Horizon
         public void CaptureMaster(GameSession life)
         {
             if (life == null || !life.UsesMasterRules) return;
+            ObserveImagination(life);
             me.Observe(life.Master.observations);
             me.foresightPoints = Math.Max(me.foresightPoints, life.Master.insightPoints);
             analytics.Observe(life.RunNumber, life.Master.events);

@@ -6,6 +6,7 @@ namespace Horizon.Game
 {
     public enum ImaginePhase { VictoryAnchor, Preparation, Effort, Failure, Recover, Retry, Adjust, Victory, Complete }
     public enum RecoveryAction { Rest, AskHelp, LowerTarget, ChangeMethod }
+    public enum PreparationAction { SmallStep, FixedTime, WithSupport }
     [Serializable]
     public sealed class ImagineBeat
     {
@@ -27,6 +28,8 @@ namespace Horizon.Game
     {
         public string id, goalId, goal;
         public int difficulty = 1, failures, recovered, multiplier = 1;
+        public int pathVersion;
+        public string preparationKey;
         public ImaginePhase phase;
         public List<ImagineBeat> timeline = new List<ImagineBeat>();
         public List<FutureMemory> memories = new List<FutureMemory>();
@@ -36,7 +39,7 @@ namespace Horizon.Game
         public void Validate()
         {
             if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(goalId) || string.IsNullOrWhiteSpace(goal) || goal.Length > 100 ||
-                difficulty < 1 || difficulty > 3 || failures < 0 || failures > RequiredFailures || recovered < 0 || recovered > failures ||
+                difficulty < 1 || difficulty > 3 || pathVersion < 0 || pathVersion > 1 || failures < 0 || failures > RequiredFailures || recovered < 0 || recovered > failures ||
                 !Enum.IsDefined(typeof(ImaginePhase), phase) || timeline == null || memories == null || timeline.Count > 64 ||
                 memories.Count != recovered || multiplier != 1 + recovered ||
                 timeline.Where((b, i) => b == null || b.index != i).Any() ||
@@ -55,9 +58,9 @@ namespace Horizon.Game
     // A finite state machine: the victory scene is an anchor, never a shortcut past failure.
     public static class ImaginationEngine
     {
-        public static ImagineRun Begin(string id, string goalId, string goal, int difficulty = 1)
+        public static ImagineRun Begin(string id, string goalId, string goal, int difficulty = 1, int pathVersion = 0)
         {
-            var run = new ImagineRun { id = id, goalId = goalId, goal = (goal ?? "").Trim(), difficulty = difficulty };
+            var run = new ImagineRun { id = id, goalId = goalId, goal = (goal ?? "").Trim(), difficulty = difficulty, pathVersion = pathVersion };
             run.Validate(); Append(run, ImaginePhase.VictoryAnchor, "你已抵达「" + run.goal + "」。记住这一瞬，然后让时间倒退。", "anchor"); return run;
         }
         private static void Append(ImagineRun run, ImaginePhase phase, string text, string action)
@@ -68,17 +71,35 @@ namespace Horizon.Game
             switch (run.phase)
             {
                 case ImaginePhase.VictoryAnchor: Append(run, ImaginePhase.Preparation, "回到今天。准备一个最小步骤和一个行动提示。", "prepare"); break;
-                case ImaginePhase.Preparation: Append(run, ImaginePhase.Effort, "你开始努力。过程比胜利画面漫长，诱惑仍在。", "effort"); break;
+                case ImaginePhase.Preparation:
+                    if (run.pathVersion > 0) throw new InvalidOperationException("Choose how to prepare the path.");
+                    Append(run, ImaginePhase.Effort, "你开始努力。过程比胜利画面漫长，诱惑仍在。", "effort"); break;
                 case ImaginePhase.Effort:
                 case ImaginePhase.Adjust:
                     if (run.failures < run.RequiredFailures) { run.failures++; Append(run, ImaginePhase.Failure,
-                        "第 " + run.failures + " 次挫折：你的尝试没有得到预期回应。失败后的明天怎么办？", "failure"); }
+                        "第 " + run.failures + " 次挫折：" + (run.pathVersion > 0 ? DifficultyFor(run) : "你的尝试没有得到预期回应。") + "失败后的明天怎么办？", "failure"); }
                     else Append(run, ImaginePhase.Victory, "困难仍然存在，但你已经学会恢复、求助与调整。现在抵达你的未来。", "victory"); break;
                 case ImaginePhase.Failure: Append(run, ImaginePhase.Recover, "允许失败。选择一个具体恢复动作，再重新开始。", "recover"); break;
                 case ImaginePhase.Retry: Append(run, ImaginePhase.Adjust, "再次行动：保留有效的部分，改变一个方法。", "adjust"); break;
                 case ImaginePhase.Victory: Append(run, ImaginePhase.Complete, "想象已留下未来记忆。下一次相似困难到来时，你有一条见过的路。", "complete"); break;
                 default: throw new InvalidOperationException("Choose a recovery action or finish this run.");
             }
+        }
+        public static void Prepare(ImagineRun run, PreparationAction action)
+        {
+            if (run == null || run.phase != ImaginePhase.Preparation || run.pathVersion != 1 || !Enum.IsDefined(typeof(PreparationAction), action))
+                throw new InvalidOperationException("Preparation belongs at the beginning of the imagined path.");
+            run.Validate(); run.preparationKey = action.ToString();
+            string[] paths = { "你把「" + run.goal + "」缩成两分钟能开始的一步。开始更容易，但今天的进展较小。",
+                "你为「" + run.goal + "」留出固定时间并设置提醒。时间到了，其他诱惑也可能出现。",
+                "你约好一个人一起准备「" + run.goal + "」。有了支持，也要面对对方暂时没空的可能。" };
+            Append(run, ImaginePhase.Effort, paths[(int)action], "prepare:" + action);
+        }
+        private static string DifficultyFor(ImagineRun run)
+        {
+            if (run.preparationKey == "WithSupport") return "约好的人今天没空，你独自停在开始之前。";
+            if (run.preparationKey == "FixedTime") return "提醒响起时你已经疲惫，想把「" + run.goal + "」推到明天。";
+            return "你完成了小步骤，但「" + run.goal + "」的下一步仍比预想困难。";
         }
         public static FutureMemory Recover(ImagineRun run, RecoveryAction action)
         {

@@ -18,6 +18,7 @@ namespace Horizon
             if (receipt == null) { BuildBoard(); return; }
             if (receipt.kind == FeedbackKind.Deadline)
             { ShowDeadlineResult(archive.runs[archive.runs.Count - 1]); return; }
+            if (RenderEchoSummary()) return;
             Clear();
             world.ShowBoard();
             world.SetTimeline(session.Actions, session.Deadline);
@@ -29,7 +30,7 @@ namespace Horizon
             bool newPage = firstPresentation || receipt.page > 0 && (receipt.presentedPages & (1 << receipt.page)) == 0;
             receipt.presentedPages |= 1 << receipt.page;
             FeedbackBeat beat = hasBeats ? beats[receipt.page] : null;
-            Save();
+            PresentLocalMasterFeedback(); Save();
             bool action = receipt.kind == FeedbackKind.Choice;
             bool difficult = !action && beat != null && PlayExperience.IsDifficult(beat.delta);
             bool quiet = action && beat != null && beat.intent == CardKind.Growth;

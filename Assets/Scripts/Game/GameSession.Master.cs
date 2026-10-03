@@ -73,6 +73,7 @@ namespace Horizon.Game
             int reopens = Master.decision?.day == Day ? Master.decision.reopens : 0;
             CausalNode n = MasterNode(CausalNodeKind.Decision, "LOCK · " + card.Name, Master.decision?.day == Day ? Master.decision.nodeId : null);
             Master.decision = new DecisionRecord { day = Day, cardId = cardId, nodeId = n.id, reopens = reopens, status = DecisionStatus.Locked };
+            if (CatalogVersion >= 9) Master.decision.steps = ExecutionPlan.For(card);
             Command("lock", cardId); ChargeOverdrive(8, n); Emit(DomainEventKind.DecisionLocked, n, "DECISION LOCK", "决定已完成。现在只处理下一步执行。");
         }
         public void UnlockDecision()
@@ -96,14 +97,24 @@ namespace Horizon.Game
         {
             RequireMasterChoice(); if (!TriggerEquipment.Ids.Contains(id)) throw new ArgumentException("Unknown trigger.");
             if (Master.triggers.Contains(id) || Master.triggers.Count >= 3) return false;
+            int cost = CatalogVersion >= 9 ? TriggerEquipment.Cost(id) : 0;
+            if (Money < cost) return false;
+            ResourceDelta before = Values();
+            if (cost > 0) Apply(new ResourceDelta(money: -cost));
             Master.triggers.Add(id); RefreshEngine(); Command("trigger", id);
-            CausalNode n = MasterNode(CausalNodeKind.Trigger, "Trigger · " + TriggerEquipment.Names[Array.IndexOf(TriggerEquipment.Ids, id)], InExecutionMode ? Master.decision.nodeId : null);
+            CausalNode n = MasterNode(CausalNodeKind.Trigger, "Trigger · " + TriggerEquipment.Names[Array.IndexOf(TriggerEquipment.Ids, id)], InExecutionMode ? Master.decision.nodeId : null,
+                CatalogVersion >= 9 ? new ResourceDelta(money: Money - before.money) : null);
+            if (CatalogVersion >= 9) { n.cardId = id; RecordResourceSample(); }
             Emit(DomainEventKind.TriggerEquipped, n, "行动提示已装备"); return true;
         }
         public bool LowerFriction()
         {
             RequireMasterChoice(); if (Master.engine.friction <= 1) return false;
-            Master.engine.friction--; Command("friction"); MasterNode(CausalNodeKind.Execution, "删去一个准备步骤", InExecutionMode ? Master.decision.nodeId : null); return true;
+            if (CatalogVersion >= 9 && Insight < 1) return false;
+            if (CatalogVersion >= 9) Apply(new ResourceDelta(insight: -1));
+            Master.engine.friction = Math.Max(1, Master.engine.friction - (CatalogVersion >= 9 ? 2 : 1));
+            Command("friction"); MasterNode(CausalNodeKind.Execution, CatalogVersion >= 9 ? "缩小准备步骤" : "删去一个准备步骤", InExecutionMode ? Master.decision.nodeId : null,
+                CatalogVersion >= 9 ? new ResourceDelta(insight: -1) : null); if (CatalogVersion >= 9) RecordResourceSample(); return true;
         }
         private bool MasterAllows(CardSpec card)
         { return !UsesMasterRules || !InExecutionMode || Master.decision.cardId == card.Id && Master.decision.status == DecisionStatus.Ready; }
@@ -122,7 +133,21 @@ namespace Horizon.Game
             ResourceDelta effect = ResourceMath.Copy(card.Now);
             if (UsesMasterRules && Master.windows.Any(w => !w.taken && !w.expired && w.cardId == card.Id && Day <= w.momentumUntilDay) && effect.energy < 0)
                 effect.energy++;
+            if (CatalogVersion >= 9 && PreparationSaving(card) > 0 && effect.energy < 0) effect.energy++;
             return effect;
+        }
+
+        public int PreparationSaving(CardSpec card)
+        {
+            if (CatalogVersion < 9 || !InExecutionMode || Master.decision.cardId != card?.Id ||
+                Master.decision.status != DecisionStatus.Ready || card.Now.energy >= 0) return 0;
+            return Master.engine.ReadyScore >= 6 && Master.triggers.Any(id => TriggerEquipment.Supports(id, card)) ? 1 : 0;
+        }
+        public bool PreparationWillSave(CardSpec card)
+        {
+            return CatalogVersion >= 9 && InExecutionMode && Master.decision.cardId == card?.Id && card.Now.energy < 0 &&
+                Master.engine.ReadyScore + Math.Min(Master.decision.steps.Count - Master.decision.step, Master.engine.friction) >= 6 &&
+                Master.triggers.Any(id => TriggerEquipment.Supports(id, card));
         }
 
         public void AttachImagination(ImagineRun run)
@@ -200,9 +225,12 @@ namespace Horizon.Game
             {
                 Master.triggers.Add(card.Traits.trigger);
                 CausalNode equipment = MasterNode(CausalNodeKind.Trigger, "行动环境 · 闹钟提示已准备", n.id);
+                if (CatalogVersion >= 9) equipment.cardId = card.Traits.trigger;
                 Emit(DomainEventKind.TriggerEquipped, equipment, "行动提示已装备", "这次准备留下了一个可继续使用的环境提示。");
             }
             if (InExecutionMode) { CausalGraph.Link(n, Master.decision.nodeId); Master.decision.status = DecisionStatus.Completed;
+                if (CatalogVersion >= 9) foreach (CausalNode trigger in CausalNodes.Where(x => x.type == CausalNodeKind.Trigger &&
+                    x.parentId != n.id && Master.triggers.Contains(x.cardId) && TriggerEquipment.Supports(x.cardId, card))) CausalGraph.Link(n, trigger.id);
                 ObservePattern("decision-reopen", true, n); ChargeOverdrive(10, n); }
             if (Master.awaitingComeback && (card.Kind == CardKind.Growth || card.Kind == CardKind.Recovery))
             {
@@ -240,7 +268,7 @@ namespace Horizon.Game
         {
             if (!UsesMasterRules) return;
             CausalNode n = CausalNodes.Find(x => x.id == echo.nodeId);
-            int chain = CausalGraph.Ancestors(CausalNodes, echo.nodeId).Count;
+            int chain = EchoChainSize(echo);
             Emit(DomainEventKind.TimeEcho, n, "TIME ECHO", "D" + echo.sourceDay + " 的「" + echo.cardName + "」回来了。", chain);
             if (chain >= 5) { Master.insightPoints += 2; Emit(chain >= 9 ? DomainEventKind.CausalSingularity : DomainEventKind.Cascade, n,
                 chain >= 9 ? "CAUSAL SINGULARITY" : "CASCADE ×" + chain, "过去多个选择形成了真实因果路径。", chain); }
@@ -255,6 +283,12 @@ namespace Horizon.Game
             if (echo.replacementId == "opportunity" || echo.replacementId == "together")
                 Master.windows.Add(new OpportunityWindow { id = echo.nodeId, nodeId = echo.nodeId, cardId = echo.replacementId,
                     openedDay = Day, expiresDay = Day, momentumUntilDay = Day });
+        }
+        public int EchoChainSize(PendingEcho echo)
+        {
+            var ancestors = CausalGraph.Ancestors(CausalNodes, echo.nodeId);
+            if (CatalogVersion >= 9 && ancestors.Count(n => n.type == CausalNodeKind.Action) < 2) return 0;
+            return ancestors.Count;
         }
         private void MasterAfterAdvance(List<PendingEcho> due)
         {

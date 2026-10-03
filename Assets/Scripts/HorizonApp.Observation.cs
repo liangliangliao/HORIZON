@@ -95,9 +95,9 @@ namespace Horizon
                 ResourceOrbitGraphic orbit = View.Rect(root, "Resource orbit " + names[i], x + 0.012f, 0.367f,
                     x + 0.064f, 0.398f).gameObject.AddComponent<ResourceOrbitGraphic>();
                 orbit.Value = values[i]; orbit.color = values[i] <= 2 ? Palette.Coral : Palette.Mint; orbit.raycastTarget = false;
-                View.Label(root, "Resource name", names[i], values.Length == 3 ? 24 : 20,
+                View.Label(root, "Resource name", names[i], values.Length == 3 ? 31 : 25,
                     Palette.Text, TextAnchor.MiddleCenter, x + 0.064f, 0.382f, x + width - 0.018f, 0.407f);
-                resourceNumbers.Add(View.Label(root, "Resource number", values[i] + "/10", 21,
+                resourceNumbers.Add(View.Label(root, "Resource number", values[i] + "/10", 29,
                     values[i] <= 2 ? Palette.Coral : Palette.Muted, TextAnchor.MiddleCenter,
                     x + 0.064f, 0.356f, x + width - 0.018f, 0.383f));
                 resourceValues.Add(values[i]);

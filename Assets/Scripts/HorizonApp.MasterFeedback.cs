@@ -13,8 +13,7 @@ namespace Horizon
         private bool TryMasterSpectacle(Action resume)
         {
             MasterRunState state = CurrentMaster; if (state == null) return false;
-            DomainEvent e = state.events.FirstOrDefault(x => !x.acknowledged && (x.tier >= RewardTier.Epic ||
-                x.kind == DomainEventKind.Comeback || x.kind == DomainEventKind.DejaVu));
+            DomainEvent e = state.events.FirstOrDefault(x => !x.acknowledged && x.tier == RewardTier.Mythic);
             if (e == null) return false;
             PlayMasterSpectacle(e, () => { if (!TryMasterSpectacle(resume)) resume(); }); return true;
         }

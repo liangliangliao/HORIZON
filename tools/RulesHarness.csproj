@@ -19,5 +19,6 @@
     <Compile Include="../Assets/Tests/Editor/MasterInvariantTests.cs" />
     <Compile Include="../Assets/Tests/Editor/OnlineAITests.cs" />
     <Compile Include="../Assets/Tests/Editor/PlayGuideTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/PlayabilityAuditTests.cs" />
   </ItemGroup>
 </Project>

@@ -65,5 +65,30 @@ namespace Horizon.Game
     {
         public static readonly string[] Ids = { "alarm", "appointment", "friend", "promise", "deposit", "route", "ticket", "place", "deadline", "environment" };
         public static readonly string[] Names = { "闹钟", "预约", "朋友提醒", "公开承诺", "押金", "路线准备", "已买好的票", "固定地点", "Deadline", "环境限制" };
+        public static int Cost(string id) { return id == "deposit" || id == "ticket" || id == "appointment" ? 1 : 0; }
+        public static bool Supports(string id, CardSpec card)
+        {
+            if (card == null || card.Kind == CardKind.Temptation) return false;
+            if (id == "friend" || id == "promise" || id == "appointment") return card.GivesSupport;
+            if (id == "alarm" || id == "environment") return card.Kind == CardKind.Recovery || card.Kind == CardKind.Growth;
+            if (id == "route" || id == "ticket") return (card.Traits.families & (CardFamily.Exploration | CardFamily.Relationship)) != 0;
+            return card.Kind == CardKind.Growth;
+        }
+        public static string Effect(string id)
+        {
+            if (id == "friend" || id == "promise" || id == "appointment") return "支持关系行动";
+            if (id == "route" || id == "ticket") return "支持探索与关系";
+            return id == "alarm" || id == "environment" ? "支持成长与恢复" : "支持成长行动";
+        }
+    }
+    public static class ExecutionPlan
+    {
+        public static List<string> For(CardSpec card)
+        {
+            if (card.GivesSupport) return new List<string> { "选一个愿意联系的人", "约好时间，留下提醒", "开始交流或共同完成一步", "把这次连接留下" };
+            if (card.Kind == CardKind.Recovery) return new List<string> { "停下当前消耗", "移开干扰，留出恢复时间", "开始休息或轻量活动", "带着恢复后的状态返回" };
+            if ((card.Traits.families & CardFamily.Exploration) != 0) return new List<string> { "选一个想尝试的方向", "准备路线和最小成本", "亲自尝试一次", "记录发现，决定下一步" };
+            return new List<string> { "打开「" + card.Name + "」要用的材料", "只留一个能开始的小步骤", "动手练习，不再重新比较", "保存这次练习的结果" };
+        }
     }
 }

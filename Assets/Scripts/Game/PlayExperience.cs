@@ -34,6 +34,7 @@ namespace Horizon.Game
         public bool presented;
         public int presentedPages;
         public int preparedGates;
+        public bool detailed;
     }
 
     [Serializable]

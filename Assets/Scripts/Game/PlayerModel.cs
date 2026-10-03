@@ -29,6 +29,15 @@ namespace Horizon.Game
         public List<PatternRecord> patterns = new List<PatternRecord>();
         public int failedRuns, foresightPoints;
         public List<int> observedRuns = new List<int>();
+        public List<string> calibratedEvidence = new List<string>();
+        public int imaginationMatches, imaginationDifferences;
+        public void ObserveCalibration(string id, bool matched)
+        {
+            if (calibratedEvidence == null) calibratedEvidence = new List<string>();
+            if (calibratedEvidence.Contains(id)) return;
+            calibratedEvidence.Add(id);
+            if (matched) imaginationMatches++; else imaginationDifferences++;
+        }
         public int HorizonLevel { get { return new[] { 0, 4, 12, 22, 36, 50, 70, 90 }.Count(v => foresightPoints >= v); } }
         public void Observe(IEnumerable<BehaviorObservation> observations)
         {
