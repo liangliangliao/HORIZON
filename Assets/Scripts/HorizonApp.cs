@@ -175,8 +175,10 @@ namespace Horizon
             View.Fill(root, "Black", Color.black, 0, 0, 1, 1);
             View.Label(root, "First question", "你想看看未来的自己吗？", 51, Palette.Text,
                 TextAnchor.MiddleCenter, 0.08f, 0.48f, 0.92f, 0.59f);
-            View.Button(root, "Look", "看看", () => StartCoroutine(IntroSequence()),
-                0.37f, 0.36f, 0.63f, 0.415f, Palette.Panel, Palette.Mint, 30);
+            View.Button(root, "Intro story chapters", "开始故事挑战", ShowChapterSelection,
+                0.14f, 0.36f, 0.86f, 0.44f, Palette.Mint, Palette.Ink, 36);
+            View.Button(root, "Look", "自由探索一生", () => StartCoroutine(IntroSequence()),
+                0.25f, 0.255f, 0.75f, 0.325f, Palette.Panel, Palette.Text, 30);
         }
 
         private IEnumerator IntroSequence()

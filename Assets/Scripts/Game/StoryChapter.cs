@@ -70,8 +70,8 @@ namespace Horizon.Game
             if (chapter == null || chapter.outcome != ChapterOutcome.InProgress || chapter.setbackOccurred || Day < chapter.failureDay) return;
             ResourceDelta before = Values();
             Apply(chapter.response == "help" ? new ResourceDelta(-1) : chapter.response == "step" ? new ResourceDelta(-1, -1) : new ResourceDelta(-2, -2));
-            CausalNode node = MasterNode(CausalNodeKind.Thought, "第一次反馈：作品还需要修改", string.IsNullOrEmpty(chapter.preparationNode) ? chapter.originNode : chapter.preparationNode, Difference(before));
             ActionRecord attempt = Actions.LastOrDefault(a => a.kind == CardKind.Growth);
+            CausalNode node = MasterNode(CausalNodeKind.Thought, attempt != null ? "第一次反馈：准备还需要修改" : "第一次受阻：还没有开始准备", string.IsNullOrEmpty(chapter.preparationNode) ? chapter.originNode : chapter.preparationNode, Difference(before));
             if (attempt != null) CausalGraph.Link(node, attempt.nodeId);
             chapter.setbackOccurred = true; chapter.failureNode = node.id;
             Master.resilienceChain = Math.Min(10, Master.resilienceChain + 1); Master.awaitingComeback = true; Master.lastFailureNode = node.id;

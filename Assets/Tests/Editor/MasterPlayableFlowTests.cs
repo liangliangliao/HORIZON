@@ -337,6 +337,26 @@ namespace Horizon.Tests
         }
 
         [UnityTest]
+        public IEnumerator FirstLaunchCanStartAStoryAndResumeItsPersistentTarget()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("First story entry").AddComponent<HorizonApp>();
+            yield return null;
+            var archive = new ArchiveData { nextRareRun = 99, preferences = new PlayerPreferences { reducedMotion = true, sound = false } }; archive.Repair();
+            Set(app, "archive", archive); Set(app, "session", null); Call(app, "ApplyPreferences"); Call(app, "ShowIntro"); yield return null;
+            Button(app, "Intro story chapters").onClick.Invoke(); yield return null;
+            Button(app, "Begin story chapter").onClick.Invoke(); yield return null;
+            Assert.AreEqual("uncertainty", archive.active.master.chapter.id);
+            Assert.AreEqual(1, archive.active.day); Assert.AreEqual(0, archive.active.actions.Count);
+            Button(app, "Build chapter path").onClick.Invoke(); yield return null;
+            var saved = JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(archive)); saved.Repair();
+            Set(app, "archive", saved); Call(app, "ContinueRun"); yield return null;
+            GameSession life = Get<GameSession>(app, "session"); Assert.AreEqual("uncertainty", life.Master.chapter.id);
+            Assert.IsNull(Get<RectTransform>(app, "overlay")); Assert.AreEqual(0, life.Actions.Count);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator StoryChallengeConnectsPreparationFailureRecoveryBossAndReadableCause()
         {
             yield return new EnterPlayMode();

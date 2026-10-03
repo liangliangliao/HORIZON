@@ -139,5 +139,15 @@ namespace Horizon.Tests
             Day(s); Assert.IsNotEmpty(s.Master.chapter.returnNode);
             Assert.IsTrue(s.Master.events.Any(e => e.kind == DomainEventKind.PatternBroken));
         }
+
+        [Test]
+        public void NoAttemptProducesAnUnstartedPreparationSetbackInsteadOfFictitiousWorkFeedback()
+        {
+            var s = GameSession.StartMasterLife(2, 41, RunMode.Quick); s.BeginChapter("uncertainty");
+            while (s.Day < 5) Day(s, true);
+            CausalNode node = s.CausalNodes.Single(n => n.id == s.Master.chapter.failureNode);
+            Assert.That(node.label, Does.Contain("还没有开始"));
+            Assert.IsFalse(CausalGraph.Ancestors(s.CausalNodes, node.id).Any(n => n.type == CausalNodeKind.Action));
+        }
     }
 }

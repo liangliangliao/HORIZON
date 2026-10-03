@@ -67,7 +67,7 @@ namespace Horizon
             Action acknowledge = () => { archive.chapterSeenSetbacks.Add(key); Save(); CloseMasterPage(); BuildBoard(); };
             MasterPage("Chapter setback", "第一次没有做好", acknowledge);
             CausalNode node = session.CausalNodes.Find(n => n.id == c.failureNode);
-            View.Label(overlay, "Chapter setback cause", "作品收到反馈：还需要修改。\n" + PlayExperience.NowLabel(node.effect), 38, Palette.Coral,
+            View.Label(overlay, "Chapter setback cause", node.label + "\n" + PlayExperience.NowLabel(node.effect), 38, Palette.Coral,
                 TextAnchor.MiddleLeft, 0.075f, 0.64f, 0.925f, 0.82f);
             View.Label(overlay, "Chapter recovery instruction", "这条人生还没有结束。\n\n先选一张恢复或支持牌。\n然后，再做一次成长行动。\n\n这两步会留下真实的恢复与再战节点。", 34, Palette.Text,
                 TextAnchor.UpperLeft, 0.075f, 0.29f, 0.925f, 0.615f);
@@ -88,7 +88,7 @@ namespace Horizon
             for (int i = 0; i < routes.Length; i++)
             {
                 string route = routes[i]; bool can = preparation ? session.CanPrepareChapter(route) : session.CanResolveChapter(route);
-                string detail = preparation ? route == "step" ? "Insight -1 · 挫折时精力-1、心情-1" : route == "help" ?
+                string detail = preparation ? route == "step" ? "专注 -1 · 挫折时精力-1、心情-1" : route == "help" ?
                     "金钱-1、关系+1 · 挫折时精力-1" : "现在无消耗 · 挫折时精力-2、心情-2" : session.ChapterRouteCondition(route);
                 float y = 0.4f - i * 0.125f;
                 UnityEngine.UI.Button button = View.Button(overlay, "Chapter route " + route, labels[i] + "\n" + detail, () => {
