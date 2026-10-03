@@ -11,16 +11,19 @@ namespace Horizon.Game
         public readonly string Goal, RecentPattern;
         public readonly string[] Evidence;
         public NarrativeContext(string goal, string pattern, IEnumerable<string> evidence)
-        { Goal = (goal ?? "").Trim(); RecentPattern = pattern ?? ""; Evidence = evidence.TakeLastPortable(6).ToArray(); }
+        { Goal = AIText.Bound(goal, 300); RecentPattern = AIText.Bound(pattern, 400);
+            Evidence = (evidence ?? Array.Empty<string>()).TakeLastPortable(6).Select(x => AIText.Bound(x, 180)).ToArray(); }
         public static NarrativeContext From(GameSession life, string goal = "")
         { return new NarrativeContext(goal, life.Master?.patterns.LastOrDefault()?.description,
             CausalGraph.ObservedGraph(life.CausalNodes).Where(n => n.resolved && n.type != CausalNodeKind.Imagination).Select(n => "D" + n.day + " · " + n.label)); }
     }
+    [Serializable]
     public sealed class PersonalContent
     {
         // No resource, probability, victory, or rule mutation is present in the content contract.
         public string futureSelfLine, quest, patternExplanation;
         public bool generatedByAI;
+        public string source, status;
     }
     public interface IAIAdapter
     { Task<PersonalContent> Personalize(NarrativeContext context, CancellationToken cancellation); }
@@ -29,7 +32,7 @@ namespace Horizon.Game
         public Task<PersonalContent> Personalize(NarrativeContext context, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
-            return Task.FromResult(new PersonalContent { generatedByAI = false,
+            return Task.FromResult(new PersonalContent { generatedByAI = false, source = "本地内容", status = "离线模式",
                 futureSelfLine = context.Evidence.Length == 0 ? "我还在形成。今天的选择会留下我的来路。" : "我记得：" + context.Evidence.Last() + "。下一次，你准备怎样继续？",
                 quest = string.IsNullOrEmpty(context.Goal) ? "站起来，开始一个两分钟的小步骤" : "为「" + context.Goal + "」准备并开始一个最小步骤",
                 patternExplanation = string.IsNullOrEmpty(context.RecentPattern) ? "近期记录还不足以说明重复模式。" : "最近观察到「" + context.RecentPattern + "」。它可以被新的选择改变。" });

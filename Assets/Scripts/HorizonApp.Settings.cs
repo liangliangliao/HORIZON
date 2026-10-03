@@ -59,11 +59,12 @@ namespace Horizon
 
         private void OnApplicationPause(bool paused)
         {
-            if (paused) PersistLiveLife();
+            if (paused) { CancelAIRequest(); PersistLiveLife(); }
             if (world != null) world.SetPaused(paused || userPaused);
         }
 
-        private void OnApplicationQuit() { PersistLiveLife(); }
+        private void OnApplicationQuit() { CancelAIRequest(); aiSecrets.Clear(); PersistLiveLife(); }
+        private void OnDestroy() { CancelAIRequest(); aiSecrets.Clear(); }
 
         private void HandleBack()
         {
@@ -87,6 +88,7 @@ namespace Horizon
 
         private RectTransform SettingsPanel(string title, string subtitle)
         {
+            CancelAIRequest();
             if (overlay != null) Destroy(overlay.gameObject);
             overlay = View.Rect(root, "Product settings", 0, 0, 1, 1);
             View.Fill(overlay, "Settings shade", new Color(0.008f, 0.022f, 0.04f, 0.985f), 0, 0, 1, 1, true);
@@ -108,7 +110,9 @@ namespace Horizon
             SettingRow(3, "减弱动效", "关闭闪屏与镜头抖动，减少粒子", p.reducedMotion, () => p.reducedMotion = !p.reducedMotion);
             SettingRow(4, "省电画质", "30帧，关闭光晕与实时阴影", p.batterySaver, () => p.batterySaver = !p.batterySaver);
             View.Button(overlay, "Life backups", "备份 / 导入人生", RenderBackupTools,
-                0.075f, 0.269f, 0.925f, 0.332f, Palette.Panel, Palette.Text, 28);
+                0.075f, 0.269f, 0.49f, 0.332f, Palette.Panel, Palette.Text, 24);
+            View.Button(overlay, "Online AI settings", "在线 AI", () => { aiSettingsReturnToFuture = false; ShowAISettings(); },
+                0.51f, 0.269f, 0.925f, 0.332f, Palette.Panel, Palette.Mint, 26);
             string status = saveStore.Notice ?? "自动保留当前与上一份安全存档。";
             View.Label(overlay, "Storage status", status, 22, Palette.Muted,
                 TextAnchor.MiddleLeft, 0.075f, 0.183f, 0.925f, 0.25f);
@@ -139,6 +143,7 @@ namespace Horizon
 
         private void CloseSettings()
         {
+            CancelAIRequest();
             if (overlay != null) Destroy(overlay.gameObject);
             overlay = null; settingsVisible = false; SetPaused(false); ApplyPreferences();
         }

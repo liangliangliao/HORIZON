@@ -21,7 +21,7 @@
 | Opportunity / Momentum | 因果机会当日有效；立即接住减一点精力成本；次日关闭并记录消退 | OpportunityWindow、ImmediateEffect |
 | Reality Bridge / Constellation | 每日本地日期一个自愿小动作；完成不可重领；三种证据齐备连接现实星座并触发 Convergence | RealityBridge |
 | Parallel Lives / Future Message | 相同起点的本地反事实重演与对比；经验保存、剪贴板导出/导入，重复消息去重 | ParallelLives、MasterJourney |
-| 内容与统计隔离 | IAIAdapter 仅返回内容字段，默认本地规则内容，明确 generatedByAI=false；本地事件计数不包含玩家文本 | AIAdapter、AnalyticsLedger |
+| 在线 AI 与统计隔离 | DeepSeek / Azure OpenAI 直接接入与服务端代理、连接测试、会话密钥、取消/超时/离线回退；IAIAdapter 仅返回内容；本地事件计数不包含玩家文本 | AIAdapter、OnlineAI、UnityAITransport、AI 配置与未来自己对话、AnalyticsLedger |
 | 保存与重演 | 新系统随快照持久化；初始模式、模式证据、未来记忆、理解点与知识版本随人生保存；准备操作按日期重演 | MasterRunState、MasterCommand |
 
 ## 运行
@@ -38,13 +38,13 @@
 dotnet run --project tools/RulesHarness.csproj -- --workers=0 --result=artifacts/rules.xml
 ```
 
-此 runner 使用 NUnitLite 和 Unity 公共字段 JSON 契约的兼容实现，只验证领域规则；不能替代 Unity JsonUtility、渲染、生命周期或 Android 设备测试。旧规则回归与新 Master 规则共 83 项；覆盖 8 模式 × 8 种子、存档重载、命令重演、强制恢复、跨局模式证据、奖励幂等、真实图父节点、积累兑现、机会窗口和现实证据要求。
+此 runner 使用 NUnitLite 和 Unity 公共字段 JSON 契约的兼容实现，只验证领域规则；不能替代 Unity JsonUtility、渲染、生命周期或 Android 设备测试。旧规则回归、新 Master 规则与在线 AI 契约共 102 项；覆盖 8 模式 × 8 种子、存档重载、命令重演、强制恢复、跨局模式证据、奖励幂等、真实图父节点、积累兑现、机会窗口、现实证据要求和服务商请求边界。代理另有 10 项模拟上游测试。
 
-`MasterPlayableFlowTests` 在真正 Unity Play Mode 操作 LOCK、Trigger、四步执行、目标输入、想象失败恢复、保存记忆、轨道、现实任务与星座，生成 `40`–`44` 号竖屏截图。原 39 张画面和全部旧 EditMode/Play Mode 回归继续执行。CI 分别上传规则 XML、Unity 结果、竖屏图、GIF 与 ARMv7/ARM64 APK；必须看当前提交的结果，不能沿用旧提交的成功状态。
+`MasterPlayableFlowTests` 在真正 Unity Play Mode 操作 LOCK、Trigger、四步执行、目标输入、想象失败恢复、保存记忆、轨道、现实任务与星座，生成 `40`–`44` 号竖屏截图；AI 配置、测试连接、未来自己对话和建议接受生成 `45`–`47` 号截图。原 39 张画面和全部旧 EditMode/Play Mode 回归继续执行。CI 分别上传规则 XML、Unity 结果、竖屏图、GIF 与 ARMv7/ARM64 APK；必须看当前提交的结果，不能沿用旧提交的成功状态。
 
 ## 尚未宣称完成的生产能力
 
-- 在线 AI 尚未接入。没有 API 密钥，也没有调用外部模型；接口与可运行的本地内容独立存在。需要凭证选择后再配置受保护的服务端代理，不能把 API 密钥放进 Unity/Android 客户端。
+- 在线 AI 已接入 DeepSeek 和 Azure OpenAI，支持直接接入及自有私有代理，详见 [接入说明](ONLINE_AI.md)。本环境没有服务商密钥，验证使用模拟上游；实际模型连通与代理部署仍需要运行方配置。密钥不打包到客户端、不写入存档。
 - Parallel Lives 当前为本地同起点重演；Future Message 通过玩家主动复制/导入交换，尚无在线多人会话、帐号或同步服务。
 - Long Run 当前为 30 天长期内容变体；没有无限局。十种 Boss 状态还需要逐个设计独立内容与平衡，当前可玩 Boss 保留截止日三道门，并在行动发动机中展示思维怪物。
 - 想象与真实时间线的自动语义匹配尚需扩展，当前比较接口按动作序列寻找第一处分歧；无法据此宣称现实问题已被系统理解。

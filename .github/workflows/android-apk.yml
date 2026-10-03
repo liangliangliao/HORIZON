@@ -20,6 +20,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ai-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify DeepSeek and Azure gateway with mocked providers
+        working-directory: services/ai-gateway
+        run: npm test
   rules:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -124,6 +135,9 @@ jobs:
           test -s artifacts/visuals/42-imagine-recovery.png
           test -s artifacts/visuals/43-future-orbit.png
           test -s artifacts/visuals/44-reality-constellation.png
+          test -s artifacts/visuals/45-ai-deepseek.png
+          test -s artifacts/visuals/46-ai-azure.png
+          test -s artifacts/visuals/47-ai-future-self.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -143,7 +157,7 @@ jobs:
           retention-days: 14
 
   build:
-    needs: [rules, test]
+    needs: [rules, test, ai-gateway]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

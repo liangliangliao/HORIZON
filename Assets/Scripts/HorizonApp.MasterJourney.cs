@@ -82,7 +82,7 @@ namespace Horizon
             FutureMemory memory = archive.futureMemories.OrderByDescending(m => !string.IsNullOrEmpty(m.simulationNodeId)).ThenByDescending(m => m.value).FirstOrDefault();
             View.Label(overlay, "Reality intention", "每天最多一个现实小动作。\n由你亲自完成并确认，它会留下不可重复领取的现实节点。", 30, Palette.Text, TextAnchor.UpperLeft, 0.075f, 0.69f, 0.925f, 0.85f);
             string title = quest?.title ?? (memory?.actionKey == "AskHelp" ? "向一个人发出求助消息" : memory?.actionKey == "ChangeMethod" ? "用另一种方法尝试一个小步骤" : memory?.actionKey == "LowerTarget" ? "把一件事缩成两分钟的一步并开始" : "站起来，给自己五分钟恢复");
-            View.Label(overlay, "Reality quest title", title, 39, Palette.Mint, TextAnchor.MiddleCenter, 0.1f, 0.5f, 0.9f, 0.67f);
+            View.Label(overlay, "Reality quest title", title, 39, Palette.Mint, TextAnchor.MiddleCenter, 0.1f, 0.5f, 0.9f, 0.67f).supportRichText = false;
             if (quest == null)
                 View.Button(overlay, "Accept reality quest", "选择今天的现实行动", () => {
                     archive.reality.Offer(DateTime.Now, memory?.goalId ?? "small-recovery", title, memory?.id); Save(); ShowReality();

@@ -3,6 +3,8 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Horizon.Game;
 using Horizon.UI;
 using NUnit.Framework;
@@ -96,6 +98,61 @@ namespace Horizon.Tests
             string directory = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals"); Directory.CreateDirectory(directory); File.WriteAllBytes(Path.Combine(directory, name + ".png"), pixels.EncodeToPNG());
             RenderTexture.active = previous; canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.worldCamera = null; world.WorldCamera.targetTexture = null;
             image.Release(); Object.Destroy(image); Object.Destroy(pixels); Object.Destroy(cameraObject);
+        }
+
+        private sealed class TestAITransport : IAITransport
+        {
+            public AIRequest last;
+            public Task<AIResponse> Send(AIRequest request, CancellationToken cancellation)
+            {
+                cancellation.ThrowIfCancellationRequested(); last = request;
+                string content = JsonUtility.ToJson(new PersonalContent { futureSelfLine = "你已经练过失败后的下一步。现在想怎样继续？",
+                    quest = "打开一份材料并读两分钟", patternExplanation = "近期模式可以被新的选择改变。" });
+                string escaped = content.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                return Task.FromResult(new AIResponse(200, "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"" + escaped + "\"}}]}"));
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator OnlineAISettingsAndFutureSelfUseActualUIWithoutPersistingCredentials()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("AI product flow").AddComponent<HorizonApp>();
+            yield return null;
+            var life = GameSession.StartMasterLife(2, 15, RunMode.Quick);
+            var archive = new ArchiveData { active = life.Snapshot(), nextRareRun = 99 };
+            archive.preferences.reducedMotion = true; archive.preferences.sound = false;
+            var transport = new TestAITransport(); Set(app, "aiTransport", transport);
+            Set(app, "session", life); Set(app, "archive", archive); Call(app, "BuildBoard"); Call(app, "ShowSettings"); yield return null;
+            Button(app, "Online AI settings").onClick.Invoke(); yield return null;
+            Button(app, "AI provider 1").onClick.Invoke(); yield return null;
+            InputField key = Get<RectTransform>(app, "root").GetComponentsInChildren<InputField>().Single(x => x.name == "AI provider key");
+            Assert.AreEqual(InputField.ContentType.Password, key.contentType); key.text = "dummy-deepseek-session-key";
+            yield return Capture(app, "45-ai-deepseek");
+            Button(app, "Test AI connection").onClick.Invoke(); yield return null;
+            Assert.That(transport.last.Url, Does.Contain("api.deepseek.com"));
+            Button(app, "AI provider 2").onClick.Invoke(); yield return null;
+            foreach (InputField field in Get<RectTransform>(app, "root").GetComponentsInChildren<InputField>())
+            {
+                if (field.name == "AI Azure endpoint") field.text = "https://example.openai.azure.com";
+                if (field.name == "AI Azure deployment") field.text = "test-deployment";
+                if (field.name == "AI provider key") field.text = "dummy-azure-session-key";
+            }
+            yield return Capture(app, "46-ai-azure");
+            Button(app, "Save AI settings").onClick.Invoke(); yield return null;
+            Assert.AreEqual(AIProvider.AzureOpenAI, archive.ai.provider);
+            Assert.That(ArchiveStore.Encode(archive), Does.Not.Contain("dummy-azure-session-key").And.Not.Contain("dummy-deepseek-session-key"));
+            Button(app, "Close settings").onClick.Invoke(); yield return null;
+            Call(app, "ShowFutureSelfDialogue"); yield return null;
+            string before = JsonUtility.ToJson(life.Snapshot());
+            Button(app, "Generate personal content").onClick.Invoke(); yield return null;
+            Assert.That(transport.last.Url, Does.Contain("/deployments/test-deployment/"));
+            Assert.AreEqual(before, JsonUtility.ToJson(life.Snapshot())); Assert.AreEqual(0, archive.reality.quests.Count);
+            yield return Capture(app, "47-ai-future-self");
+            Button(app, "Accept AI reality suggestion").onClick.Invoke(); yield return null;
+            Assert.AreEqual(1, archive.reality.quests.Count); Assert.IsFalse(archive.reality.quests[0].completed);
+            Assert.IsTrue(string.IsNullOrEmpty(archive.reality.quests[0].memoryId), "Generated suggestions cannot invent a convergence.");
+            yield return new ExitPlayMode();
         }
     }
 }

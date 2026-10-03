@@ -41,7 +41,7 @@ namespace Horizon
             }
         }
         private void CloseMasterPage()
-        { if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } }
+        { CancelAIRequest(); if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } }
         private RectTransform MasterPage(string name, string title, Action back = null)
         {
             CloseMasterPage(); overlay = View.Rect(root, name, 0, 0, 1, 1);
@@ -63,7 +63,8 @@ namespace Horizon
             for (int i = 0; i < names.Length; i++)
             { float y = 0.63f - (i / 2) * 0.13f, x = i % 2 == 0 ? 0.07f : 0.52f;
                 View.Button(overlay, "Master feature " + i, names[i], callbacks[i], x, y, x + 0.41f, y + 0.1f, Palette.Panel, Palette.Text, 25); }
-            View.Button(overlay, "Behavior trends", "近期资源与行为模式", ShowMe, 0.07f, 0.125f, 0.93f, 0.2f, Palette.Deep, Palette.Gold, 27);
+            View.Button(overlay, "Behavior trends", "近期行为模式", ShowMe, 0.07f, 0.125f, 0.49f, 0.2f, Palette.Deep, Palette.Gold, 26);
+            View.Button(overlay, "AI future self dialogue", "AI · 未来自己", ShowFutureSelfDialogue, 0.51f, 0.125f, 0.93f, 0.2f, Palette.Deep, Palette.Mint, 26);
         }
         private void AddDecisionLockButton(RectTransform panel, CardSpec card)
         {

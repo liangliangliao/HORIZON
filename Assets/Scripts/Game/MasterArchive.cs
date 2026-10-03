@@ -17,6 +17,7 @@ namespace Horizon
         public List<FutureMessage> futureMessages = new List<FutureMessage>();
         public List<KnowledgeSkill> knowledgeSkills = new List<KnowledgeSkill>();
         public AnalyticsLedger analytics = new AnalyticsLedger();
+        public AISettings ai = new AISettings();
         public void RepairMasterArchive()
         {
             productBaseline = MasterSpecification.Version;
@@ -28,6 +29,7 @@ namespace Horizon
             if (futureMessages == null) futureMessages = new List<FutureMessage>();
             if (knowledgeSkills == null) knowledgeSkills = new List<KnowledgeSkill>();
             if (analytics == null || analytics.counts == null) analytics = new AnalyticsLedger();
+            if (ai == null) ai = new AISettings(); ai.Repair();
             if (imagination != null && string.IsNullOrEmpty(imagination.id)) imagination = null;
         }
         public void CaptureMaster(GameSession life)

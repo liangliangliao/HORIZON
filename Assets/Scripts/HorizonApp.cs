@@ -136,6 +136,7 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
+            CancelAIRequest();
             dragJourney = null;
             viewGeneration++;
             settingsVisible = false;

@@ -175,6 +175,9 @@ namespace Horizon.Game
         }
         public void Validate(int today, int deadline)
         {
+            // Unity's inline serializer materializes a null optional class as an empty instance.
+            if (decision != null && decision.day == 0 && decision.step == 0 && decision.reopens == 0 &&
+                decision.status == DecisionStatus.Locked && string.IsNullOrEmpty(decision.cardId) && string.IsNullOrEmpty(decision.nodeId)) decision = null;
             if (schemaVersion != 1 || !Enum.IsDefined(typeof(RunMode), mode) || resilienceChain < 1 || resilienceChain > 10 ||
                 overdriveEnergy < 0 || overdriveEnergy > 100 || mythicCount < 0 || mythicCount > MasterSpecification.MythicLimit ||
                 orbitBits < 0 || orbitBits > 255 || reservoir < 0 || insightPoints < 0 || initialInsightPoints < 0 || events == null || commands == null || engine == null ||
