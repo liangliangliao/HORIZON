@@ -6,6 +6,7 @@
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 *.csproj
+!tools/RulesHarness.csproj
 *.sln
 *.suo
 *.user
@@ -20,3 +21,9 @@
 __pycache__/
 *.pyc
 artifacts/
+tools/bin/
+tools/obj/
+.env
+.env.*
+!.env.example
+node_modules/

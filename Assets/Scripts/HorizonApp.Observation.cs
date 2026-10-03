@@ -79,7 +79,7 @@ namespace Horizon
             int[] values = session.RunNumber == 1 && session.Deadline == 12 ? new[] { session.Energy, session.Mood, session.Ability } :
                 new[] { session.Energy, session.Mood, session.Insight, session.Relation, session.Money, session.Ability };
             string[] names = session.RunNumber == 1 && session.Deadline == 12 ? new[] { "精力", "心情", "能力" } :
-                new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+                new[] { "精力", "心情", "专注", "关系", "金钱", "能力" };
             View.Label(root, "State heading", "此刻的你", 22, Palette.Muted, TextAnchor.MiddleLeft,
                 0.06f, 0.416f, 0.5f, 0.443f);
             View.Button(root, "All resources", "全部状态", ShowGoal, 0.73f, 0.417f, 0.94f, 0.442f,
@@ -95,9 +95,9 @@ namespace Horizon
                 ResourceOrbitGraphic orbit = View.Rect(root, "Resource orbit " + names[i], x + 0.012f, 0.367f,
                     x + 0.064f, 0.398f).gameObject.AddComponent<ResourceOrbitGraphic>();
                 orbit.Value = values[i]; orbit.color = values[i] <= 2 ? Palette.Coral : Palette.Mint; orbit.raycastTarget = false;
-                View.Label(root, "Resource name", names[i], values.Length == 3 ? 24 : 20,
+                View.Label(root, "Resource name", names[i], values.Length == 3 ? 31 : 25,
                     Palette.Text, TextAnchor.MiddleCenter, x + 0.064f, 0.382f, x + width - 0.018f, 0.407f);
-                resourceNumbers.Add(View.Label(root, "Resource number", values[i] <= 2 ? values[i].ToString() : "", 21,
+                resourceNumbers.Add(View.Label(root, "Resource number", values[i] + "/10", 29,
                     values[i] <= 2 ? Palette.Coral : Palette.Muted, TextAnchor.MiddleCenter,
                     x + 0.064f, 0.356f, x + width - 0.018f, 0.383f));
                 resourceValues.Add(values[i]);
@@ -107,7 +107,7 @@ namespace Horizon
         private void RevealResourceNumbers(bool reveal)
         {
             for (int i = 0; i < resourceNumbers.Count; i++)
-                if (resourceNumbers[i] != null) resourceNumbers[i].text = reveal || resourceValues[i] <= 2 ? resourceValues[i].ToString() : "";
+                if (resourceNumbers[i] != null) resourceNumbers[i].text = resourceValues[i] + "/10";
         }
 
         private void ShowPredictionWhy()

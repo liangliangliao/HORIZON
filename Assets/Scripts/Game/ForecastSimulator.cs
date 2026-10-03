@@ -51,6 +51,11 @@ namespace Horizon.Game
                 {
                     while (fork.HasPredictionReview) fork.MarkPredictionReviewed();
                     if (fork.CanPredict) fork.SkipPrediction();
+                    if (fork.InExecutionMode)
+                    {
+                        if (fork.Day == firstDay && !string.IsNullOrEmpty(firstCard) && firstCard != fork.Master.decision.cardId) fork.UnlockDecision();
+                        else while (fork.Master.decision.status != DecisionStatus.Ready) fork.ExecuteDecisionStep();
+                    }
                     CardSpec[] available = fork.Hand.Where(fork.CanPlay).ToArray();
                     CardSpec choice = fork.Day == firstDay && !string.IsNullOrEmpty(firstCard) ?
                         available.FirstOrDefault(c => c.Id == firstCard) : null;

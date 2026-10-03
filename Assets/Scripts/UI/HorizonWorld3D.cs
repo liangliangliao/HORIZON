@@ -11,6 +11,7 @@ namespace Horizon.UI
     public sealed partial class HorizonWorld3D : MonoBehaviour
     {
         public Camera WorldCamera { get; private set; }
+        public Camera BackgroundCamera { get; private set; }
         public Transform Avatar { get; private set; }
         private Transform futureSelf, bench, gates, environment, companions;
         private readonly Transform[] props = new Transform[3];
@@ -28,6 +29,14 @@ namespace Horizon.UI
         public void Initialize()
         {
             if (WorldCamera != null) return;
+            var backdrop = new GameObject("HORIZON full-frame clear", typeof(Camera));
+            backdrop.transform.SetParent(transform, false);
+            BackgroundCamera = backdrop.GetComponent<Camera>();
+            BackgroundCamera.depth = -100;
+            BackgroundCamera.clearFlags = CameraClearFlags.SolidColor;
+            BackgroundCamera.backgroundColor = Palette.Ink;
+            BackgroundCamera.cullingMask = 0;
+            BackgroundCamera.allowHDR = BackgroundCamera.allowMSAA = false;
             floor = Lit(new Color(0.09f, 0.18f, 0.25f));
             dark = Lit(new Color(0.04f, 0.09f, 0.15f));
             teal = Lit(new Color(0.15f, 0.65f, 0.63f), new Color(0.04f, 0.18f, 0.16f));
@@ -41,6 +50,7 @@ namespace Horizon.UI
             var cameraObject = new GameObject("HORIZON 3D Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             WorldCamera = cameraObject.GetComponent<Camera>();
+            WorldCamera.depth = 0;
             WorldCamera.clearFlags = CameraClearFlags.SolidColor;
             WorldCamera.nearClipPlane = 0.1f;
             WorldCamera.farClipPlane = 80;

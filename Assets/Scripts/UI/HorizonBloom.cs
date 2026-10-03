@@ -56,6 +56,10 @@ namespace Horizon.UI
             int height = destination != null ? destination.height : view.targetTexture != null ?
                 view.targetTexture.height : Screen.height;
             Graphics.SetRenderTarget(destination);
+            // GLES can retain the camera's partial viewport when binding the
+            // backbuffer. Pixel coordinates below already include that viewport.
+            // Reset it explicitly so the scene is not scaled a second time.
+            GL.Viewport(new Rect(0, 0, width, height));
             GL.PushMatrix();
             try
             {
@@ -63,7 +67,7 @@ namespace Horizon.UI
                 Graphics.DrawTexture(new Rect(bounds.x * width,(1 - bounds.yMax) * height,
                     bounds.width * width,bounds.height * height),source,material,2);
             }
-            finally { GL.PopMatrix(); RenderTexture.active = destination; }
+            finally { GL.PopMatrix(); RenderTexture.active = destination; GL.Viewport(new Rect(0, 0, width, height)); }
         }
 
         private void OnDestroy()

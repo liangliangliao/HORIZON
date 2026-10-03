@@ -18,6 +18,7 @@ namespace Horizon
             if (receipt == null) { BuildBoard(); return; }
             if (receipt.kind == FeedbackKind.Deadline)
             { ShowDeadlineResult(archive.runs[archive.runs.Count - 1]); return; }
+            if (RenderEchoSummary()) return;
             Clear();
             world.ShowBoard();
             world.SetTimeline(session.Actions, session.Deadline);
@@ -29,7 +30,7 @@ namespace Horizon
             bool newPage = firstPresentation || receipt.page > 0 && (receipt.presentedPages & (1 << receipt.page)) == 0;
             receipt.presentedPages |= 1 << receipt.page;
             FeedbackBeat beat = hasBeats ? beats[receipt.page] : null;
-            Save();
+            PresentLocalMasterFeedback(); Save();
             bool action = receipt.kind == FeedbackKind.Choice;
             bool difficult = !action && beat != null && PlayExperience.IsDifficult(beat.delta);
             bool quiet = action && beat != null && beat.intent == CardKind.Growth;
@@ -146,7 +147,7 @@ namespace Horizon
         {
             int[] values = delta == null ? new int[6] : new[] {
                 delta.energy, delta.mood, delta.insight, delta.relation, delta.money, delta.ability };
-            string[] names = { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+            string[] names = { "精力", "心情", "专注", "关系", "金钱", "能力" };
             int count = 0;
             for (int i = 0; i < values.Length; i++)
             {

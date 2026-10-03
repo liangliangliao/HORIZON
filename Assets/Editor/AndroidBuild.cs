@@ -25,7 +25,8 @@ namespace Horizon.Editor
             PlayerSettings.productName = release ? "HORIZON" : "HORIZON 试玩";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android,
                 release ? "com.liangliangliao.horizon" : "com.liangliangliao.horizon.preview");
-            PlayerSettings.bundleVersion = Argument("-horizonVersion") ?? "0.6.0";
+            PlayerSettings.bundleVersion = Argument("-horizonVersion") ?? "0.4.2";
+            PlayerSettings.Android.forceInternetPermission = true;
             if (int.TryParse(Argument("-horizonBuildNumber") ?? Argument("-androidVersionCode"), out int versionCode))
                 PlayerSettings.Android.bundleVersionCode = versionCode;
             else PlayerSettings.Android.bundleVersionCode = 1;

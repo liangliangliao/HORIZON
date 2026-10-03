@@ -280,6 +280,8 @@ namespace Horizon.Game
 
         public static string ShareLine(RunRecord run)
         {
+            DomainEvent pattern = run?.master?.events.LastOrDefault(e => e.kind == DomainEventKind.PatternBroken);
+            if (pattern != null) return "Day " + pattern.day + " · 我走过了以前停下的节点。PATTERN BROKEN。";
             if (run?.boss != null && run.actions?.Count == GameSession.RunLength(run))
                 foreach (ActionRecord source in run.actions)
                     foreach (CardSpec card in GameSession.AlternativesForDay(run, source.day))

@@ -113,27 +113,12 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.075f, 0.856f, 0.925f, 0.915f);
             View.Label(overlay, "Tap a day", "点开一天，看看它怎样回到你身边。", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.813f, 0.92f, 0.852f);
-            foreach (CausalNode node in graph)
-            {
-                foreach (string id in CausalGraph.Parents(node))
-                {
-                    CausalNode parent = graph.Find(n => n.id == id);
-                    if (parent == null || parent.day > 12 || node.day > 12) continue;
-                    Vector2 from = new Vector2(0.775f + (graph.IndexOf(parent) % 3) * 0.055f,
-                        0.801f - (parent.day - 1) * 0.047f);
-                    Vector2 to = new Vector2(0.775f + (graph.IndexOf(node) % 3) * 0.055f,
-                        0.801f - (node.day - 1) * 0.047f);
-                    Color color = NodeColor(node); color.a = node.resolved ? 0.58f : 0.22f;
-                    TimeThreadGraphic thread = View.Rect(overlay, "A causal connection", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
-                    thread.From = from; thread.To = to; thread.color = color; thread.raycastTarget = false;
-                }
-            }
             for (int day = 1; day <= 12; day++)
             {
                 ActionRecord action = actions.Find(a => a.day == day);
                 float y = 0.779f - (day - 1) * 0.047f;
                 Button row = View.Button(overlay, "Inspect day " + day, "", () => ShowActionDetail(action, graph, actions),
-                    0.055f, y, 0.735f, y + 0.041f, Palette.Panel, Palette.Text);
+                    0.055f, y, 0.945f, y + 0.041f, Palette.Panel, Palette.Text);
                 row.interactable = action != null;
                 View.Label(row.transform, "Day", day.ToString("00"), 26, Palette.Muted,
                     TextAnchor.MiddleCenter, 0.015f, 0.09f, 0.105f, 0.9f);
@@ -146,7 +131,7 @@ namespace Horizon
             }
             if (run != null)
             {
-                View.Button(overlay, "Causal network", "展开因果网络", () => ShowCausalNetwork(run, duringRun),
+                View.Button(overlay, "Causal network", "看这条未来怎样形成", () => ShowCausalNetwork(run, duringRun),
                     0.07f, 0.169f, 0.93f, 0.224f, Palette.Panel, Palette.Mint, 28);
                 if (!duringRun)
                 {
@@ -218,7 +203,7 @@ namespace Horizon
             View.RefreshText(modal);
         }
 
-        private void ShowCausalNetwork(RunRecord run, bool duringRun)
+        private void ShowCausalNetworkOverview(RunRecord run, bool duringRun)
         {
             ArchiveSurface("Causal network");
             List<CausalNode> graph = CausalGraph.ObservedGraph(GameSession.GraphForRun(run));

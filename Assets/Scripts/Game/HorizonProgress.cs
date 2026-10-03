@@ -10,20 +10,20 @@ namespace Horizon.Game
     // Time scale and clarity describe information, never change a life's rules.
     public sealed class HorizonProgress
     {
-        public readonly int Stage, Calibrations;
+        public readonly int Stage, Calibrations, MasterLevel;
         public int Level { get { return Stage >= 6 ? 3 : Stage >= 2 ? 2 : 1; } }
-        public int Days { get { return Stage >= 7 ? 30 : Stage >= 5 ? 7 : Stage >= 3 ? 3 : Stage >= 2 ? 1 : 0; } }
+        public int Days { get { return MasterLevel > 0 ? MasterLevel >= 4 ? 7 : MasterLevel >= 3 ? 3 : MasterLevel >= 2 ? 1 : 0 : Stage >= 7 ? 30 : Stage >= 5 ? 7 : Stage >= 3 ? 3 : Stage >= 2 ? 1 : 0; } }
         public int VisibleTypes { get { return Stage >= 6 ? int.MaxValue : Stage >= 4 ? 2 : Stage >= 2 ? 1 : 0; } }
-        public bool SecondOrder { get { return Stage >= 4 || Calibrations >= 10; } }
-        public bool Probability { get { return Stage >= 5; } }
-        public bool Compare { get { return Stage >= 6; } }
+        public bool SecondOrder { get { return MasterLevel > 0 ? MasterLevel >= 5 : Stage >= 4 || Calibrations >= 10; } }
+        public bool Probability { get { return MasterLevel > 0 ? MasterLevel >= 4 : Stage >= 5; } }
+        public bool Compare { get { return MasterLevel > 0 ? MasterLevel >= 6 : Stage >= 6; } }
         public bool ThirtyDays { get { return Stage >= 7; } }
         public bool Direction { get { return Calibrations >= 1; } }
         public bool Strength { get { return Calibrations >= 3; } }
         public bool Origin { get { return Calibrations >= 10; } }
 
-        public HorizonProgress(int stage, int calibrations)
-        { Stage = Math.Max(1, Math.Min(7, stage)); Calibrations = Math.Max(0, calibrations); }
+        public HorizonProgress(int stage, int calibrations, int masterLevel = 0)
+        { Stage = Math.Max(1, Math.Min(7, stage)); Calibrations = Math.Max(0, calibrations); MasterLevel = masterLevel; }
 
         public static int LifeStage(GameSession life)
         {
@@ -36,7 +36,8 @@ namespace Horizon.Game
         }
 
         public static HorizonProgress Resolve(GameSession life, JourneyProgress journey, int calibrations = 0)
-        { return new HorizonProgress(Math.Max(LifeStage(life), Math.Max(journey?.Chapter ?? 1,
+        { if (life != null && life.UsesMasterRules) { int level = Math.Max(life.MasterHorizon, Math.Max(journey?.learnedStage ?? 1, journey?.Chapter ?? 1)); return new HorizonProgress(level, calibrations, level); }
+          return new HorizonProgress(Math.Max(LifeStage(life), Math.Max(journey?.Chapter ?? 1,
             journey?.learnedStage ?? 1)), calibrations); }
 
         public bool Sees(PendingEcho echo, int index, int today)
@@ -53,7 +54,7 @@ namespace Horizon.Game
             if (!Direction || echo.delta == null) return clue;
             int[] effects = { echo.delta.energy, echo.delta.mood, echo.delta.insight,
                 echo.delta.relation, echo.delta.money, echo.delta.ability };
-            string[] names = { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+            string[] names = { "精力", "心情", "专注", "关系", "金钱", "能力" };
             int axis = -1;
             for (int i = 0; i < effects.Length; i++)
                 if (effects[i] != 0 && (axis < 0 || Math.Abs(effects[i]) > Math.Abs(effects[axis]))) axis = i;
@@ -61,7 +62,7 @@ namespace Horizon.Game
                 (Strength && Math.Abs(effects[axis]) >= 2 ? "明显" : "") + (effects[axis] > 0 ? "↑" : "↓");
         }
 
-        public string Caption { get { return Days == 0 ? "未来 · 先看今天留下了什么" :
+        public string Caption { get { return MasterLevel > 0 ? "HORIZON " + MasterLevel + " · " + MasterSpecification.HorizonNames[MasterLevel - 1] : Days == 0 ? "未来 · 先看今天留下了什么" :
             "视野 " + Days + " 天 · " + Clarity; } }
         public string Clarity { get { return Origin ? "二阶来路" : Strength ? "影响强度" : Direction ? "变化方向" : "节点类型"; } }
         public string Next { get { return Stage >= 7 ? "三十天的路，仍由每一天的选择写成。" :
