@@ -138,6 +138,9 @@ namespace Horizon
             try
             {
                 AndroidSmoke.Require(frame!=null && frame.width>100 && frame.height>200,"The phone did not produce a frame.");
+                // Retain the normal backbuffer frame even if the visibility
+                // assertion fails, so the actual rendering failure is reviewable.
+                File.WriteAllBytes(Path.Combine(AndroidSmoke.DirectoryPath,name+".png"),frame.EncodeToPNG());
                 Vector3 point=world.WorldCamera.WorldToScreenPoint(actor.position+Vector3.up*1.3f);
                 AndroidSmoke.Require(point.z>0 && point.x>0 && point.x<frame.width && point.y>0 && point.y<frame.height,"The scene actor is outside the phone viewport.");
                 float minimum=1,maximum=0;
@@ -146,7 +149,6 @@ namespace Horizon
                     for(int x=Mathf.Max(0,(int)point.x-radius);x<Mathf.Min(frame.width,(int)point.x+radius);x+=3)
                     { Color c=frame.GetPixel(x,y); float light=Mathf.Max(c.r,c.g,c.b); minimum=Mathf.Min(minimum,light); maximum=Mathf.Max(maximum,light); }
                 AndroidSmoke.Require(maximum-minimum>.045f && maximum>.12f,"The Android 3D viewport is blank or uniformly gray: "+name);
-                File.WriteAllBytes(Path.Combine(AndroidSmoke.DirectoryPath,name+".png"),frame.EncodeToPNG());
                 AndroidSmoke.Frames.Add(name); AndroidSmoke.Write("running");
             }
             finally { if (frame!=null) Destroy(frame); }

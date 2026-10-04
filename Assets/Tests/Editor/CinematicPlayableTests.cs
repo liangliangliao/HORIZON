@@ -60,7 +60,8 @@ namespace Horizon.Tests
             for(int visit=0;visit<2;visit++)
             {
                 typeof(HorizonApp).GetMethod("ShowImagineSetup",flags).Invoke(app,null);
-                root.GetComponentsInChildren<Button>().Single(b=>b.name=="Start imagination").onClick.Invoke();
+                root.GetComponentsInChildren<Button>().Single(b=>b.name==
+                    (archive.imagination==null?"Start imagination":"Resume imagination")).onClick.Invoke();
                 yield return null;
                 for(int step=0;step<16;step++)
                 {

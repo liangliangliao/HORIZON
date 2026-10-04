@@ -18,6 +18,9 @@ def adb(*args, check=True):
 
 def collect():
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    screen = adb("exec-out", "screencap", "-p", check=False)
+    if screen.returncode == 0 and screen.stdout.startswith(b"\x89PNG\r\n\x1a\n"):
+        (OUTPUT / "device-final-screen.png").write_bytes(screen.stdout)
     packed = adb("exec-out", "run-as", PACKAGE, "tar", "-cf", "-", "-C", DEVICE_PATH, ".", check=False)
     if packed.returncode == 0:
         with tarfile.open(fileobj=io.BytesIO(packed.stdout)) as archive:
