@@ -28,6 +28,7 @@ namespace Horizon.Tests
 
         private static HorizonCardDrag Card(HorizonApp app, string id)
         { return Get<RectTransform>(app, "root").GetComponentsInChildren<HorizonCardDrag>().Single(x => x.name == id); }
+        private static void ReturnToTestHome() { Call(Object.FindObjectOfType<HorizonApp>(), "ShowHome"); }
 
         private static IEnumerator FinishDailyFeedback(HorizonApp app, int fromDay)
         {
@@ -59,7 +60,9 @@ namespace Horizon.Tests
             Vector2 press = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
             var pointer = new PointerEventData(EventSystem.current) { pointerId = 0, position = press, pressPosition = press, button = PointerEventData.InputButton.Left };
             var hits = new List<RaycastResult>(); EventSystem.current.RaycastAll(pointer, hits);
-            GameObject hit = hits.FirstOrDefault(x => x.gameObject.GetComponentInParent<HorizonCardDrag>() == card).gameObject;
+            GameObject hit = null;
+            foreach (RaycastResult candidate in hits)
+                if (candidate.gameObject.GetComponentInParent<HorizonCardDrag>() == card) { hit = candidate.gameObject; break; }
             Assert.IsNotNull(hit, "A physical finger must hit the card, not only a direct method call.");
             Assert.AreEqual(hit, hits[0].gameObject, "No decorative overlay may steal the card touch.");
             pointer.pointerPressRaycast = hits[0]; pointer.pointerDrag = ExecuteEvents.GetEventHandler<IDragHandler>(hit);
@@ -511,8 +514,43 @@ namespace Horizon.Tests
             Assert.AreEqual(2, archive.imagination.RequiredFailures); Assert.AreEqual(2, archive.imagination.pathVersion);
             yield return Capture(app, "84-goal-specific-imagination");
             Call(app, "PlayMasterSpectacle", new DomainEvent { kind = DomainEventKind.PatternBroken, tier = RewardTier.Mythic,
-                title = "PATTERN\nBROKEN", detail = "过去的路停在这里。这次，你继续了。", multiplier = 3 }, (Action)(() => Call(app, "ShowHome")));
+                title = "PATTERN\nBROKEN", detail = "过去的路停在这里。这次，你继续了。", multiplier = 3 }, (Action)ReturnToTestHome);
             yield return new WaitForSecondsRealtime(1.5f); yield return Capture(app, "85-pattern-broken-timelines");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator CompletedFutureStationHasActualMemoriesOrbitAndSelectableTimelines()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app = Object.FindObjectOfType<HorizonApp>(); if (app == null) app = new GameObject("Actual future gallery").AddComponent<HorizonApp>();
+            yield return null;
+            var life = GameSession.StartMasterLife(1, 15, RunMode.Quick);
+            while (life.CompletedRun == null)
+            {
+                while (life.HasPredictionReview) life.MarkPredictionReviewed(); if (life.CanPredict) life.SkipPrediction();
+                life.Choose(life.Hand.Last(life.CanPlay).Id); if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance();
+            }
+            var archive = new ArchiveData(); archive.runs.Add(life.CompletedRun); archive.preferences.reducedMotion = true; archive.preferences.sound = false; archive.Repair();
+            Set(app, "archive", archive); Set(app, "session", life); Call(app, "ApplyPreferences"); Call(app, "ShowStation", 0);
+            yield return new WaitForSecondsRealtime(0.4f);
+            var world = Get<HorizonWorld3D>(app, "world");
+            Assert.AreEqual(8, world.GetComponentsInChildren<Transform>().Count(t => t.name.StartsWith("Future orbit ")));
+            Assert.Greater(world.GetComponentsInChildren<Transform>().Count(t => t.name.StartsWith("Memory node ")), 0);
+            string question = Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Single(t => t.name == "Future question").text;
+            StationSwipe swipe = Get<RectTransform>(app, "root").GetComponentInChildren<StationSwipe>(); Assert.IsNotNull(swipe);
+            var pointer = new PointerEventData(EventSystem.current) { position = Vector2.zero };
+            ExecuteEvents.Execute(swipe.gameObject, pointer, ExecuteEvents.beginDragHandler);
+            pointer.position = new Vector2(0, Screen.height * 0.2f); ExecuteEvents.Execute(swipe.gameObject, pointer, ExecuteEvents.endDragHandler);
+            yield return null;
+            Assert.AreNotEqual(question, Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Single(t => t.name == "Future question").text);
+            string identity = Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Single(t => t.name == "Future identity").text;
+            Button(app, "Previous future self").onClick.Invoke(); yield return null;
+            Assert.AreNotEqual(identity, Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Single(t => t.name == "Future identity").text);
+            yield return Capture(app, "88-future-self-memory-space");
+            Button(app, "Explore future timeline").onClick.Invoke(); yield return null;
+            Assert.Greater(Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Count(b => b.name.StartsWith("Inspect node ")), 0);
+            yield return Capture(app, "89-future-self-causal-fragment");
             yield return new ExitPlayMode();
         }
 
@@ -525,10 +563,10 @@ namespace Horizon.Tests
             var life = GameSession.StartMasterLife(1, 15, RunMode.Quick);
             while (life.CompletedRun == null)
             { while (life.HasPredictionReview) life.MarkPredictionReviewed(); if (life.CanPredict) life.SkipPrediction();
-                life.Choose(life.Hand.Last(c => life.CanPlay(c)).Id); if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance(); }
+                life.Choose(life.Hand.Last(life.CanPlay).Id); if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance(); }
             var archive = new ArchiveData(); archive.runs.Add(life.CompletedRun); archive.preferences.sound = false;
             Set(app, "archive", archive); Set(app, "session", life);
-            Call(app, "ShowShareStory", life.CompletedRun, (Action)(() => Call(app, "ShowHome"))); yield return null;
+            Call(app, "ShowShareStory", life.CompletedRun, (Action)ReturnToTestHome); yield return null;
             Button(app, "Save share video").onClick.Invoke();
             float until = Time.realtimeSinceStartup + 100;
             while (Get<string>(app, "lastSharePath") == null || !Get<string>(app, "lastSharePath").EndsWith(".mp4"))
@@ -640,8 +678,8 @@ namespace Horizon.Tests
             Button(app, "Test AI connection").onClick.Invoke(); yield return null;
             Assert.AreEqual(2, transport.calls.Count); Assert.AreEqual("GET", transport.calls[0].Method);
             Assert.That(transport.last.Body, Does.Contain("auto-coach"));
-            // All four options are real settings; switching preserves draft fields and session credentials.
-            for (int i = 0; i < 4; i++) { Button(app, "AI Azure access mode").onClick.Invoke(); yield return null; }
+            // Every supported route is selectable without losing the draft or key.
+            for (int i = 0; i < Enum.GetValues(typeof(AzureAccessMode)).Length; i++) { Button(app, "AI Azure access mode").onClick.Invoke(); yield return null; }
             Assert.AreEqual(AzureAccessMode.Auto, Get<AISettings>(app, "aiDraft").azureAccessMode);
             foreach (InputField field in Get<RectTransform>(app, "root").GetComponentsInChildren<InputField>())
                 if (field.name == "AI Azure deployment") field.text = "coach, review-coach";

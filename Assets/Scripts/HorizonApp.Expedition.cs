@@ -61,11 +61,12 @@ namespace Horizon
             MasterPage("Mirror encounter", "你又来到相似的节点");
             View.Label(overlay, "Mirror pattern", PatternEngine.Description(session.Master.expedition.mirrorKey) + "\n\n最近的记录被带到这一条人生。\n接下来，亲自走一次不同的路。", 35, Palette.Text, TextAnchor.MiddleLeft, 0.075f, 0.55f, 0.925f, 0.84f);
             string[] ids = { "continue", "recover", "compare" };
-            string[] labels = { "保留决定 · 专注-1，接着实际行动", "先恢复，再选择一次成长行动", "重新比较 · 保留这一次的模式记录" };
+            string[] labels = { "保留决定 · 专注-1，再恢复并行动", "先恢复，再选择一次成长行动", "重新比较 · 保留这一次的模式记录" };
             for (int i = 0; i < ids.Length; i++)
             { string id = ids[i]; float y = 0.41f - i * 0.11f;
-                View.Button(overlay, "Mirror response " + id, labels[i], () => { if (session.ResolveMirror(id)) PersistMasterAction(); CloseMasterPage(); BuildBoard(); },
-                    0.075f, y, 0.925f, y + 0.09f, Palette.Panel, Palette.Mint, 29); }
+                Button response = View.Button(overlay, "Mirror response " + id, labels[i], () => { if (session.ResolveMirror(id)) PersistMasterAction(); CloseMasterPage(); BuildBoard(); },
+                    0.075f, y, 0.925f, y + 0.09f, Palette.Panel, Palette.Mint, 29);
+                response.interactable = id != "continue" || session.Insight >= 1; }
             return true;
         }
         private void ShowExpandedForge()

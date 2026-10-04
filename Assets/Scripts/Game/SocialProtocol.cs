@@ -40,7 +40,8 @@ namespace Horizon.Game
         public void Validate()
         {
             if (members != null) foreach (SharedMember member in members)
-                if (member?.timeline != null && member.timeline.worldSeed == 0 && member.timeline.resources == null && (member.timeline.actions == null || member.timeline.actions.Count == 0)) member.timeline = null;
+                if (member?.timeline != null && member.timeline.worldSeed == 0 && (member.timeline.resources == null || member.timeline.resources.Length == 0) &&
+                    (member.timeline.actions == null || member.timeline.actions.Count == 0)) member.timeline = null;
             if (string.IsNullOrEmpty(code) || code.Length != 10 || catalogVersion != 10 || days != 12 || runNumber != 1 || members == null || members.Length < 1 || members.Length > 2 || messages == null || messages.Length > 16 ||
                 members.Any(m => m == null || string.IsNullOrWhiteSpace(m.id) || (m.name ?? "").Length > 30 || m.timeline != null && m.timeline.actions != null &&
                     (m.timeline.actions.Count > 12 || m.timeline.worldSeed != worldSeed)) || messages.Any(m => m == null || (m.text ?? "").Length > 200)) throw new AIException(AIError.InvalidContent);

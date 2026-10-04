@@ -48,6 +48,8 @@ ALIASES = {
  'horizon8': ['HiddenCauseRequiresInsightAndRevealsARealParentWithoutChangingResources'],
  'horizon': ['OneObservationContractControlsDistanceTypesAndCapabilities'],
  'station': ['ActualStationNetworkAndMemoryPagesResumeAndNeverAwardResources'],
+ 'gallery': ['CompletedFutureStationHasActualMemoriesOrbitAndSelectableTimelines'],
+ 'selves': ['FutureSelfVersionsUseActualCompletedLivesAndKeepTheirEvidence'],
  'masterui': ['MasterFeaturesCanBePlayed'],
  'first': ['FirstLifeTeachesTimeAndPreparesAChoiceWithoutVisitingTheFeatureHub'],
  'families': ['NewQuickLifeGraduallyIntroducesFamiliesWithoutRemovingGrowthOrRecovery'],
@@ -111,7 +113,7 @@ chapter(9,'LOCK PREDICTION / SYNCHRONIZED / SURPRISE',G+'CampaignRules.cs,'+A+'H
  '接近与惊讶保持公平，资源不按对错奖励|no_power','校准理解保留在后续人生|compare')
 chapter(10,'八级信息视野',G+'HorizonProgress.cs,'+A+'HorizonApp.ContentStudio.cs',
  '现在、一天、三天的可见范围|horizon,first','概率与二阶影响受到信息能力约束|forecast,prediction6',
- '平行未来和不同未来自己可查看|station,modes','VIII 或 Overdrive 揭示真实隐藏来路|horizon8,ui')
+ '平行未来和不同未来自己可查看|station,modes,gallery','VIII 或 Overdrive 揭示真实隐藏来路|horizon8,ui')
 chapter(11,'Decision Lock 与 Execution Mode',G+'GameSession.Master.cs',
  '锁定已选行动并切换为具体执行步骤|lock,life','未完成准备时不能偷换成其他决定|lock',
  '允许主动解锁并记录重开决策|unlock','执行、因果与锁定断点保存和回放|lock,replay')
@@ -164,7 +166,7 @@ chapter(26,'HORIZON OVERDRIVE',G+'GameSession.Master.cs,'+U+'HorizonWorld3D.Mast
 chapter(27,'Future Orbit / ALL LINKED',G+'GameSession.Master.cs,'+U+'HorizonWorld3D.Identity.cs',
  '八个未来方向由实际行为与结果激活|replay,boss','重大因果链可连续点亮多个节点|cascade',
  'ALL LINKED 是八位真实完成且去重的事件|reward|0.5|八位条件存在，尚未记录自然玩家完成全部八位的实玩证据',
- '未来自己获得实体轨道与外观升级|masterui,ui')
+ '未来自己获得实体轨道与外观升级|masterui,ui,gallery')
 chapter(28,'Causal Reservoir / BREAKTHROUGH',G+'GameSession.Expedition.cs',
  '学习、训练、恢复和关系分别积累真实来源|reservoir','能力、状态、关系等复合条件成熟后兑现|reservoir',
  '大奖连接真实投资来源且保存后不重复支付|reservoir,replay','玩家能查看储备进度与兑现条件|ui')
@@ -172,12 +174,12 @@ chapter(29,'CASCADE / CAUSAL SINGULARITY',G+'GameSession.Master.cs,'+U+'MasterSp
  '至少两次实际行动合流才形成大因果链|cascade','连续爆亮且加速的节点演出|ui,cascade',
  '更长的实际因果链触发 Singularity|cascade','准备按钮与单独一个行为不能制造超级Combo|cascade')
 chapter(30,'多版本 Future Self',G+'ExpeditionSystems.cs,'+U+'HorizonWorld3D.Identity.cs',
- '疲惫、富有、孤独、平静、再战、平行和老人版本|ui,station',
- '提问与回忆来自真实行为，不替玩家决定|station,role','身份、颜色和轨道产生不同空间形象|masterui,ui',
- '平行自己与另一条真实重演连接|modes,station')
+ '疲惫、富有、孤独、平静、再战、平行和老人版本|ui,station,gallery,selves|0.5|七种映射已实现，固定完整人生样本已自然验证五类；全部版本的自然出现仍待验证',
+ '提问与回忆来自真实行为，不替玩家决定|station,gallery,role','身份、颜色和轨道产生不同空间形象|masterui,ui,gallery',
+ '平行自己与另一条真实重演连接|modes,station,gallery')
 chapter(31,'Future Station 空间停顿',U+'HorizonWorld3D.Causality.cs,'+A+'HorizonApp.Expedition.cs',
- '阶段结尾离开刺激主局进入空间与未来自己|life,station','实际因果记忆成为空间中的时间线|station',
- '靠近、选一段回忆并读取片段|station,ui','低音量、慢节奏与断点恢复|station')
+ '阶段结尾离开刺激主局进入空间与未来自己|life,station,gallery','实际因果记忆成为空间中的时间线|station,gallery',
+ '靠近、选一段回忆并读取片段|station,gallery,ui','低音量、慢节奏与断点恢复|station,gallery')
 chapter(32,'Reality Bridge',G+'RealityBridge.cs',
  '每天最多一个自愿小任务|reality','本人主动确认并创建持久Reality Node|reality,masterui',
  '现实行动不能由游戏币购买或重复刷同日领取|reality,cosmetic','现实动作确实发生的独立证据||0|目前依赖本人报告，软件不能证明本人真实完成')
@@ -225,7 +227,7 @@ chapter(45,'第一小时循序学习',A+'HorizonApp.Playability.cs,'+A+'HorizonA
  '初始只做选择并理解行为会回来|first,life','预测、准备与失败再战逐步进入主流程|first,story',
  '复杂系统可选，旧人生可隔离练习|life,ui','首次玩家无帮助完成与真实第一小时测量||0|自动全局执行不证明初次玩家理解和用时')
 chapter(46,'长期留存',G+'PlayerModel.cs,'+A+'HorizonApp.Expedition.cs',
- '同起点换选择、回忆与时间线重演|modes,station','个人节点重现、不同未来自己和现实星座|mirror,reality,ui',
+ '同起点换选择、回忆与时间线重演|modes,station','个人节点重现、不同未来自己和现实星座|mirror,reality,ui,gallery',
  '30/60天与十种故事提供多局内容|long,boss','真实回访、留存和自发再挑战||0|尚未做真实玩家留存实验')
 chapter(47,'在线Parallel Lives / Future Messages',G+'SocialProtocol.cs,services/parallel-lives/server.mjs',
  '两个匿名成员从同一种子和规则开始|social,socialclient','邀请、同步、分歧比较与服务端断点持久化|social,socialsave',

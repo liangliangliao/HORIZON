@@ -88,7 +88,9 @@ namespace Horizon.Game
                 new FutureSelfVersion { id = "again", name = "失败但继续的自己", question = "如果再来到这里，你准备怎样恢复并重新开始？", memory = memory, appearance = 4 });
             if (run.finalEnergy <= 3) versions.Add(new FutureSelfVersion { id = "tired", name = "疲惫的自己", question = "下一条路，哪里可以给恢复留一个位置？", memory = memory, appearance = 0 });
             if (run.finalMoney >= 7) versions.Add(new FutureSelfVersion { id = "wealthy", name = "富有的自己", question = "获得的时间与资源，你想用来靠近什么？", memory = memory, appearance = 1 });
-            if (run.finalRelation <= 3) versions.Add(new FutureSelfVersion { id = "lonely", name = "孤独的自己", question = "如果重新走一次，你想把哪一个人带进来？", memory = memory, appearance = 2 });
+            bool relationshipsDeclined = run.master?.resources != null && run.master.resources.Count > 1 &&
+                run.master.resources[0].values != null && run.finalRelation < run.master.resources[0].values.relation;
+            if (run.finalRelation <= 3 || relationshipsDeclined) versions.Add(new FutureSelfVersion { id = "lonely", name = "孤独的自己", question = "关系的来路正在变化。如果重新走一次，你想把哪一个人带进来？", memory = memory, appearance = 2 });
             return versions.ToArray();
         }
     }

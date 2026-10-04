@@ -195,7 +195,8 @@ namespace Horizon.UI
             origin = rect.position;
             homeRotation = rect.localRotation; homeScale = rect.localScale;
             parent = rect.parent as RectTransform; eventCamera = eventData.pressEventCamera;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.pressPosition, eventCamera, out down);
+            if (parent != null) RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.pressPosition, eventCamera, out down);
+            else down = eventData.pressPosition;
             group = GetComponent<CanvasGroup>(); if (group != null) group.blocksRaycasts = false;
             dragged = true;
             rect.SetAsLastSibling();
@@ -204,8 +205,9 @@ namespace Horizon.UI
         public void OnDrag(PointerEventData eventData)
         {
             if (!Available || !dragging || eventData.pointerId != pointerId) return;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.position, eventCamera, out Vector2 point);
-            rect.position = origin + parent.TransformVector(point - down);
+            Vector2 point = eventData.position;
+            if (parent != null) RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.position, eventCamera, out point);
+            rect.position = origin + (parent != null ? parent.TransformVector(point - down) : (Vector3)(point - down));
             rect.localScale = homeScale * 1.06f;
             rect.localRotation = Quaternion.Euler(-8, Mathf.Clamp((point.x - down.x) * 0.05f, -18, 18), -3);
             Dragged?.Invoke(this, eventData.position);

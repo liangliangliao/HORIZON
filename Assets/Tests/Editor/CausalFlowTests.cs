@@ -23,7 +23,9 @@ namespace Horizon.Tests
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
             if (app == null) app = new GameObject("Test actual station chains").AddComponent<HorizonApp>();
             yield return null;
-            var life = new GameSession(3, 15);
+            // This regression exercises the preserved v0.3 station and calendar
+            // progression; catalog 10 unlocks information through actual insight.
+            var life = new GameSession(3, 15, 9);
             while (life.Day < 3) {
                 CausalReady(life); life.Choose(life.Day == 1 ? life.Hand[1].Id : life.Hand[2].Id); life.Advance();
             }

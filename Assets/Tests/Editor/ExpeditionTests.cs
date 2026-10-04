@@ -175,5 +175,31 @@ namespace Horizon.Tests
             Assert.AreEqual(events, life.Master.events.Count(e => e.kind == DomainEventKind.Breakthrough));
             Assert.IsTrue(life.Master.expedition.pools.All(p => p.sources.All(id => life.CausalNodes.Any(n => n.id == id && n.type == CausalNodeKind.Action))));
         }
+
+        [Test]
+        public void FutureSelfVersionsUseActualCompletedLivesAndKeepTheirEvidence()
+        {
+            var identities = new System.Collections.Generic.HashSet<string>();
+            for (int strategy = 0; strategy < 4; strategy++)
+                for (int seed = 0; seed < 8; seed++)
+                {
+                    var life = GameSession.StartMasterLife(1, seed, RunMode.Quick);
+                    if (strategy == 3) life.ChooseLifeRoute("income");
+                    while (life.CompletedRun == null)
+                    {
+                        while (life.HasPredictionReview) life.MarkPredictionReviewed(); if (life.CanPredict) life.SkipPrediction();
+                        CardSpec[] playable = life.Hand.Where(life.CanPlay).ToArray();
+                        CardSpec chosen = life.Energy <= 3 ? playable.Where(c => c.Kind == CardKind.Recovery).OrderBy(c => c.Now.relation + c.Later.relation).FirstOrDefault() :
+                            strategy == 1 || strategy >= 3 ? playable.FirstOrDefault(c => c.Kind == CardKind.Temptation) :
+                            strategy == 2 && life.Relation < 7 ? playable.FirstOrDefault(c => c.GivesSupport) : playable.FirstOrDefault(c => c.Kind == CardKind.Growth);
+                        Advance(life, (chosen ?? playable.Last()).Id);
+                    }
+                    string unchanged = JsonUtility.ToJson(life.CompletedRun);
+                    foreach (FutureSelfVersion self in FutureSelfGallery.From(life.CompletedRun))
+                    { identities.Add(self.id); Assert.IsTrue(life.CompletedRun.actions.Any(a => a.cardName == self.memory)); }
+                    Assert.AreEqual(unchanged, JsonUtility.ToJson(life.CompletedRun));
+                }
+            Assert.IsTrue(new[] { "elder", "parallel", "again", "peaceful", "wealthy" }.All(identities.Contains), "Played outcomes must retain distinct identities and actual memories.");
+        }
     }
 }

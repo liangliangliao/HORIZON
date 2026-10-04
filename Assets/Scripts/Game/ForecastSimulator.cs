@@ -26,7 +26,7 @@ namespace Horizon.Game
         {
             if (source == null ||
                 targetDay <= source.Day || targetDay > 60 || samples < 3 || samples > 96)
-                throw new ArgumentException("A future horizon up to thirty days is required.");
+                throw new ArgumentException("A future horizon up to sixty days is required.");
             string frozen = JsonUtility.ToJson(source.Snapshot());
             var result = new ForecastRange { targetDay = targetDay, samples = samples,
                 sourceRun = source.RunNumber, sourceDay = source.Day,
