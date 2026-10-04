@@ -500,11 +500,13 @@ namespace Horizon.Tests
             Assert.IsNull(archive.active);
             Assert.AreEqual(FeedbackKind.Deadline, archive.pendingFeedback.kind);
             balance = archive.wallet.stardust;
+            yield return CausalWaitForButton(app, "Inspect timeline");
             yield return Capture(app, "05-deadline");
             Call(app, "ContinueRun");
             yield return new WaitForSecondsRealtime(0.4f);
             Assert.AreEqual(balance, archive.wallet.stardust);
             Assert.IsNotNull(archive.pendingFeedback);
+            yield return CausalWaitForButton(app, "Inspect timeline");
             ButtonNamed(app, "Inspect timeline").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.35f);
             if (session.CompletedRun.boss.passed < 3)

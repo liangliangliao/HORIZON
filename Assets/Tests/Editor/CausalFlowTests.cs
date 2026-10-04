@@ -94,6 +94,9 @@ namespace Horizon.Tests
             Set(app, "session", life); Set(app, "archive", archive);
             Call(app, "ShowDeadlineResult", original); yield return null;
             yield return CausalWaitForButton(app, "Inspect timeline");
+            // Reward acknowledgement is presentation state. Freeze the archive
+            // after those earned events, before opening the read-only ghost.
+            frozen = JsonUtility.ToJson(original);
             ButtonNamed(app, "Inspect timeline").onClick.Invoke();
             yield return CausalWaitForButton(app, "Next ghost beat", "Restart from ghost");
             Assert.IsTrue(archive.ghostOpen); Assert.AreEqual(0, archive.ghostBeat);

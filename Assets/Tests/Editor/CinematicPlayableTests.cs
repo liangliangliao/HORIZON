@@ -15,16 +15,19 @@ namespace Horizon.Tests
 {
     public sealed class CinematicPlayableTests
     {
-        private static HorizonWorld3D LiveWorld()
+        // EnterPlayMode reloads the test's iterator. Compiler-generated local
+        // closures are not restored; create an explicit probe after that yield.
+        private sealed class CueProbe
         {
-            var app=Object.FindObjectOfType<HorizonApp>();
-            if(app==null) app=new GameObject("Cinematic contract app").AddComponent<HorizonApp>();
-            const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
-            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
-            Assert.IsNotNull(world,"The running app must create its 3D world.");
-            Assert.IsNotNull(world.WorldCamera);
-            Assert.IsNotNull(world.Cinematics);
-            return world;
+            public int Completions, Impacts;
+            public readonly List<CinematicPhase> Phases = new List<CinematicPhase>();
+            public void Completed() { Completions++; }
+            public void Cue(CinematicCue cue)
+            {
+                if (cue.NodeHit) return;
+                Phases.Add(cue.Phase);
+                if (cue.Phase == CinematicPhase.Impact) Impacts++;
+            }
         }
         private static DomainEvent Pattern()
         {
@@ -41,47 +44,47 @@ namespace Horizon.Tests
             yield return new EnterPlayMode();
             // Let the app's Start finish before manually advancing its timeline.
             yield return null;
-            var world=LiveWorld();
+            var world=new GameObject("Cinematic contract world").AddComponent<HorizonWorld3D>(); world.Initialize();
             world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,reducedMotion=true,batterySaver=true });
             world.ShowBoard(); world.SnapCamera(); Rect rect=world.WorldCamera.rect; float fov=world.WorldCamera.fieldOfView;
-            DomainEvent e=Pattern(); string before=JsonUtility.ToJson(e); int completed=0,impacts=0;
+            DomainEvent e=Pattern(); string before=JsonUtility.ToJson(e); var probe=new CueProbe();
             var director=world.Cinematics; director.enabled=false;
-            director.Cue+=cue=> { if(cue.Phase==CinematicPhase.Impact && !cue.NodeHit) impacts++; };
-            Assert.IsTrue(director.Enqueue(e,true,()=>completed++)); Assert.IsFalse(director.Enqueue(e,true,()=>completed++));
+            director.Cue+=probe.Cue;
+            Assert.IsTrue(director.Enqueue(e,true,probe.Completed)); Assert.IsFalse(director.Enqueue(e,true,probe.Completed));
             float stop=director.Current.Cues.Single(c=>c.Phase==CinematicPhase.HitStop).Time;
             director.Advance(stop); Vector3 position=world.WorldCamera.transform.position;
             director.SetPaused(true);
             var actor=world.GetComponentsInChildren<HorizonActor>().Single(x=>x.name=="Cinematic player");
             Quaternion head=actor.Head.localRotation; yield return null; Assert.AreEqual(head,actor.Head.localRotation);
             director.Advance(10); Assert.AreEqual(stop,director.Elapsed);
-            Assert.AreEqual(position,world.WorldCamera.transform.position); Assert.AreEqual(0,impacts);
-            director.SetPaused(false); director.Advance(.5f); Assert.AreEqual(1,impacts);
-            director.Skip(); director.Skip(); Assert.AreEqual(1,completed); Assert.AreEqual(rect,world.WorldCamera.rect); Assert.AreEqual(fov,world.WorldCamera.fieldOfView);
+            Assert.AreEqual(position,world.WorldCamera.transform.position); Assert.AreEqual(0,probe.Impacts);
+            director.SetPaused(false); director.Advance(.5f); Assert.AreEqual(1,probe.Impacts);
+            director.Skip(); director.Skip(); Assert.AreEqual(1,probe.Completions); Assert.AreEqual(rect,world.WorldCamera.rect); Assert.AreEqual(fov,world.WorldCamera.fieldOfView);
             Assert.AreEqual(before,JsonUtility.ToJson(e));
-            Assert.IsTrue(director.Enqueue(e,true,()=>completed++)); director.CancelAll(); Assert.AreEqual(1,completed); Assert.AreEqual(rect,world.WorldCamera.rect);
+            Assert.IsTrue(director.Enqueue(e,true,probe.Completed)); director.CancelAll(); Assert.AreEqual(1,probe.Completions); Assert.AreEqual(rect,world.WorldCamera.rect);
             director.SetPaused(true); Assert.IsTrue(director.Enqueue(e,true)); Assert.AreEqual(0,actor.MotionRate);
             director.CancelAll(); director.SetPaused(false);
-            yield return new ExitPlayMode();
+            Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }
         [UnityTest]
         public IEnumerator LowQualityKeepsAllShotsObjectsAndCopyWithBoundedParticles()
         {
             yield return new EnterPlayMode();
             yield return null;
-            var world=LiveWorld();
+            var world=new GameObject("Low quality cinema").AddComponent<HorizonWorld3D>(); world.Initialize();
             world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,batterySaver=true });
             DomainEvent e=Pattern(); var director=world.Cinematics; director.enabled=false;
-            var phases=new List<CinematicPhase>(); director.Cue+=cue=> { if(!cue.NodeHit) phases.Add(cue.Phase); };
+            var probe=new CueProbe(); director.Cue+=probe.Cue;
             director.Enqueue(e,true); float impact=director.Current.Cues.Single(c=>c.Phase==CinematicPhase.Impact).Time;
             director.Advance(impact); Assert.LessOrEqual(world.GetComponentsInChildren<ParticleSystem>().Sum(p=>p.particleCount),12);
             Assert.AreEqual(2,world.GetComponentsInChildren<LineRenderer>().Count(x=>x.name.Contains("曾在这里停下")));
             Assert.IsTrue(world.GetComponentsInChildren<HorizonActor>().Any(x=>x.name=="Cinematic player"));
-            director.Advance(20); CollectionAssert.AreEqual(Enum.GetValues(typeof(CinematicPhase)),phases);
+            director.Advance(20); CollectionAssert.AreEqual(Enum.GetValues(typeof(CinematicPhase)),probe.Phases);
             director.Enqueue(new DomainEvent { id="reservoir-reuse",kind=DomainEventKind.Breakthrough,tier=RewardTier.Major }); director.Advance(20);
             world.ShowReservoirScene(new List<InvestmentPool>());
             Transform core=world.GetComponentsInChildren<Transform>().Single(x=>x.name==RewardObjectKind.ReservoirCore.ToString());
             Assert.AreEqual(.55f,core.Find("Storage lid").localPosition.y,.001f,"Inspecting saved energy must not inherit an open reward core.");
-            yield return new ExitPlayMode();
+            Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }
         [UnityTest]
         public IEnumerator RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos()

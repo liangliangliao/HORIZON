@@ -90,7 +90,9 @@ namespace Horizon.UI
                 case RewardObjectKind.ReservoirCore:
                     Shape(item,"Transparent reservoir",PrimitiveType.Cylinder,Vector3.zero,new Vector3(.67f,.55f,.67f),glass);
                     Ring(item,"Storage base",new Vector3(0,-.55f,0),.37f,ivory,false);
-                    Ring(item,"Storage lid",new Vector3(0,.55f,0),.37f,gold,false);
+                    // The animated transform owns the lid's height; keep its
+                    // vertices centred so reuse does not apply that offset twice.
+                    Ring(item,"Storage lid",Vector3.zero,.37f,gold,false);
                     Shape(item,"Accumulated cause energy",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.4f,portalLight); break;
                 case RewardObjectKind.OrbitNode:
                     Sculpt(item,"Orbit carrier",rewardRing,Vector3.zero,Vector3.one,gold);
