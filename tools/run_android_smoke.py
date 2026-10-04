@@ -10,6 +10,7 @@ import time
 PACKAGE = "com.liangliangliao.horizon.smoke"
 DEVICE_PATH = f"/sdcard/Android/data/{PACKAGE}/files/android-smoke"
 OUTPUT = Path("artifacts/android-smoke/device")
+DEVICE_PREFIX = ("run-as", PACKAGE)
 
 
 def adb(*args, check=True):
@@ -18,10 +19,12 @@ def adb(*args, check=True):
 
 def collect():
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    logs = adb("logcat", "-d", "-s", "Unity", "AndroidRuntime", check=False)
+    (OUTPUT / "logcat.txt").write_bytes(logs.stdout)
     screen = adb("exec-out", "screencap", "-p", check=False)
     if screen.returncode == 0 and screen.stdout.startswith(b"\x89PNG\r\n\x1a\n"):
         (OUTPUT / "device-final-screen.png").write_bytes(screen.stdout)
-    packed = adb("exec-out", "run-as", PACKAGE, "tar", "-cf", "-", "-C", DEVICE_PATH, ".", check=False)
+    packed = adb("exec-out", *DEVICE_PREFIX, "tar", "-cf", "-", "-C", DEVICE_PATH, ".", check=False)
     if packed.returncode == 0:
         with tarfile.open(fileobj=io.BytesIO(packed.stdout)) as archive:
             for member in archive.getmembers():
@@ -29,13 +32,23 @@ def collect():
                 if member.isfile() and not path.is_absolute() and ".." not in path.parts:
                     data = archive.extractfile(member)
                     (OUTPUT / path.name).write_bytes(data.read())
-    logs = adb("logcat", "-d", "-s", "Unity", "AndroidRuntime", check=False)
-    (OUTPUT / "logcat.txt").write_bytes(logs.stdout)
+    else:
+        print("Could not collect native report: " + packed.stderr.decode(errors="replace")[:1000], flush=True)
 
 
 def main():
+    global DEVICE_PREFIX
     apk = Path(sys.argv[1] if len(sys.argv) > 1 else "artifacts/android-smoke/HORIZON-Smoke.apk")
     assert apk.is_file(), "Native smoke APK is missing"
+    # Fail before launching if the host output directory is not writable.
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    # run-as can lack access to Android 10's emulated external storage. The
+    # disposable Google APIs emulator supports root adbd; the app still runs
+    # with its normal UID and permissions.
+    adb("root", check=False)
+    adb("wait-for-device")
+    if adb("shell", "id", "-u").stdout.strip() == b"0":
+        DEVICE_PREFIX = ()
     adb("install", "-r", str(apk))
     resolved = adb("shell", "cmd", "package", "resolve-activity", "--brief", PACKAGE).stdout.decode().splitlines()
     activity = next((line.strip() for line in reversed(resolved) if "/" in line), None)
@@ -48,10 +61,15 @@ def main():
     backgrounded = False
     back_pressed = False
     previous = None
+    previous_read_error = None
     try:
         while time.monotonic() < deadline:
-            read = adb("shell", "run-as", PACKAGE, "cat", f"{DEVICE_PATH}/report.json", check=False)
+            read = adb("shell", *DEVICE_PREFIX, "cat", f"{DEVICE_PATH}/report.json", check=False)
             if read.returncode:
+                message = read.stderr.decode(errors="replace").strip()[:1000]
+                if message != previous_read_error:
+                    print("Native report read: " + message, flush=True)
+                    previous_read_error = message
                 time.sleep(2)
                 continue
             try:
@@ -80,7 +98,10 @@ def main():
                 assert report["graphics"] == "OpenGLES3", "The tested Android backend differs from the preview"
                 return
             time.sleep(2)
-        raise AssertionError("Native Android flow timed out; inspect the collected Unity logcat")
+        process = adb("shell", "pidof", PACKAGE, check=False).stdout.decode(errors="replace").strip()
+        raise AssertionError("Native Android flow timed out; app PID=" + (process or "missing") +
+                             "; last report read=" + (previous_read_error or "no read error") +
+                             "; inspect the collected Unity logcat")
     finally:
         collect()
 
