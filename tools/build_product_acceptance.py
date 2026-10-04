@@ -49,10 +49,16 @@ percentage=sum(c['score'] for c in chapters)/53*100
 pending=[{'id':c['id'],'requirement':c['requirement'],'credit':c['earned_credit'],'known_limit':c['known_limit']}
          for chapter in chapters for c in chapter['criteria'] if c['earned_credit']<1]
 counts=dict(Counter(c['result'] for c in cases.values()))
+tracked_changes=subprocess.check_output(['git','diff','--name-only','HEAD'],text=True).splitlines()
+code_paths=subprocess.check_output(['git','ls-files','Assets/Scripts','Assets/Tests','Assets/Plugins','Assets/Resources','tools/acceptance_catalog.py'],text=True).splitlines()
+code_paths=[p for p in code_paths if Path(p).suffix in ('.cs','.java','.shader','.xml','.py','.asmdef')]
+source_changes=[p for p in tracked_changes if p in code_paths]
 report={'baseline':'0.4.2','commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
         'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
         'checklist_sha256':hashlib.sha256(Path('tools/acceptance_catalog.py').read_bytes()).hexdigest(),
         'working_tree_dirty':bool(subprocess.check_output(['git','status','--porcelain'],text=True).strip()),
+        'tracked_changes':tracked_changes, 'tracked_source_changes':source_changes,
+        'source_sha256':{p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in code_paths if Path(p).is_file()},
         'assessment':'53 equally weighted chapters; named checks equally weighted inside each chapter; unverified checks score zero',
         'chapters_audited':53,'checks_audited':sum(len(c['criteria']) for c in chapters),
         'comprehensive_engineering_percent':round(percentage,4), 'threshold':'strictly greater than 85%',
@@ -63,7 +69,7 @@ report={'baseline':'0.4.2','commit':subprocess.check_output(['git','rev-parse','
 args.output.parent.mkdir(parents=True,exist_ok=True)
 args.output.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print(json.dumps({k:report[k] for k in ['chapters_audited','checks_audited','comprehensive_engineering_percent','threshold_met','test_results']},ensure_ascii=False))
-if args.enforce and (percentage<=85 or any(v for k,v in counts.items() if k!='Passed')):
+if args.enforce and (percentage<=85 or source_changes or any(v for k,v in counts.items() if k!='Passed')):
     for c in pending:
         if not c['known_limit']: print('Missing execution evidence:',c['id'],c['requirement'])
     raise SystemExit('Specification gate has not passed; continue implementation or verification.')
