@@ -49,12 +49,15 @@ namespace Horizon.Editor
             if (pipeline == null)
             {
                 pipeline = UniversalRenderPipelineAsset.Create(renderer); pipeline.name = "HORIZON cinematic URP";
-                pipeline.supportsHDR = true; pipeline.msaaSampleCount = 2; pipeline.renderScale = 1;
+                pipeline.supportsHDR = true; pipeline.renderScale = 1;
                 pipeline.supportsCameraDepthTexture = false; pipeline.supportsCameraOpaqueTexture = false;
                 // URP creates per-pixel lights by default; its mode setters are internal.
                 pipeline.maxAdditionalLightsCount = 2; pipeline.shadowDistance = 22;
                 AssetDatabase.CreateAsset(pipeline, pipelinePath);
             }
+            // Start safely on GLES before player preferences are applied;
+            // desktop preferences can enable multisampling on their own clone.
+            pipeline.msaaSampleCount = 1;
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
             EditorUtility.SetDirty(pipeline); AssetDatabase.SaveAssets();

@@ -56,7 +56,7 @@ namespace Horizon.UI
             WorldCamera.farClipPlane = 80;
             WorldCamera.fieldOfView = 43;
             WorldCamera.allowHDR = false;
-            WorldCamera.allowMSAA = true;
+            WorldCamera.allowMSAA = SceneMsaaEnabled;
             WorldCamera.cullingMask = ~(1 << 5);
             key = new GameObject("Warm key light", typeof(Light)).GetComponent<Light>();
             key.transform.SetParent(transform, false);
@@ -67,7 +67,7 @@ namespace Horizon.UI
             key.shadowStrength = 0.6f;
             QualitySettings.shadowDistance = 22;
             QualitySettings.shadows = ShadowQuality.All;
-            QualitySettings.antiAliasing = 2;
+            QualitySettings.antiAliasing = SceneMsaaEnabled ? 2 : 0;
             RenderSettings.ambientLight = new Color(0.23f, 0.29f, 0.39f);
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.fog = true;

@@ -18,6 +18,12 @@ namespace Horizon.UI
         private UniversalRenderPipelineAsset runtimePipeline;
         private RenderPipelineAsset priorPipeline;
 
+        // The GLES backbuffer shared by the clear camera, partial scene
+        // viewport and overlay canvas must use a single sample. URP's native
+        // RenderGraph passes otherwise request 2x attachments from a 1x target.
+        private bool SceneMsaaEnabled => !preferences.batterySaver &&
+            SystemInfo.graphicsDeviceType != GraphicsDeviceType.OpenGLES3;
+
         public void ApplyPreferences(PlayerPreferences value)
         {
             preferences = value ?? new PlayerPreferences();
@@ -32,7 +38,7 @@ namespace Horizon.UI
             {
                 if (runtimePipeline == null)
                 { priorPipeline = QualitySettings.renderPipeline; runtimePipeline = Instantiate(source); runtimePipeline.name = "HORIZON runtime quality"; QualitySettings.renderPipeline = runtimePipeline; }
-                runtimePipeline.msaaSampleCount = preferences.batterySaver ? 1 : 2;
+                runtimePipeline.msaaSampleCount = SceneMsaaEnabled ? 2 : 1;
                 runtimePipeline.renderScale = preferences.batterySaver ? .85f : 1;
                 runtimePipeline.shadowDistance = preferences.batterySaver ? 0 : 22;
                 runtimePipeline.supportsHDR = !preferences.batterySaver;
@@ -42,9 +48,9 @@ namespace Horizon.UI
                 bloom.enabled = !preferences.batterySaver && bloom.IsSupported;
                 if (preferences.reducedMotion) bloom.Echo = 0;
             }
-            WorldCamera.allowMSAA = !preferences.batterySaver;
+            WorldCamera.allowMSAA = SceneMsaaEnabled;
             WorldCamera.allowHDR = !preferences.batterySaver && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.DefaultHDR);
-            QualitySettings.antiAliasing = preferences.batterySaver ? 0 : 2;
+            QualitySettings.antiAliasing = SceneMsaaEnabled ? 2 : 0;
             QualitySettings.shadows = preferences.batterySaver ? UnityEngine.ShadowQuality.Disable : UnityEngine.ShadowQuality.All;
             UpdateAudio();
         }

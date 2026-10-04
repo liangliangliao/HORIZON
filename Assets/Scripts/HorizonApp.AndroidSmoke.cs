@@ -83,6 +83,8 @@ namespace Horizon
             AndroidSmoke.Require(root.GetComponentInParent<Canvas>().renderMode==RenderMode.ScreenSpaceOverlay,
                 "Smoke must exercise the normal phone canvas.");
             AndroidSmoke.Require(world.WorldCamera.targetTexture==null,"Smoke must render to the phone backbuffer.");
+            AndroidSmoke.Require(!world.WorldCamera.allowMSAA && QualitySettings.antiAliasing==0,
+                "GLES scene/backbuffer multisampling is inconsistent.");
             session=GameSession.StartMasterLife(2,41,RunMode.Quick);
             archive=new ArchiveData { active=session.Snapshot(),seenSecondLife=true,nextRareRun=99 };
             archive.Repair(); archive.preferences.sound=false; archive.preferences.haptics=false;
