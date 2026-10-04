@@ -53,6 +53,7 @@ namespace Horizon.Game
             }
             CausalNode action = node.type == CausalNodeKind.Action ? node : causes.LastOrDefault(n => n.type == CausalNodeKind.Action);
             receipt.action = action?.label ?? node.label; receipt.sourceDay = action?.day ?? node.day;
+            if (node.originHidden) { receipt.sourceDay = 0; receipt.action = "暂未显现的来路"; }
             return receipt;
         }
     }
@@ -148,7 +149,7 @@ namespace Horizon.Game
             {
                 cues.Add(new CinematicCue(0, CinematicPhase.Anticipation, "TIME ECHO"));
                 cues.Add(new CinematicCue(.12f, CinematicPhase.Charge, "沿时间线，回到原来的行动。"));
-                cues.Add(new CinematicCue(.35f, CinematicPhase.Escalation, "D" + r.sourceDay + " · " + r.action));
+                cues.Add(new CinematicCue(.35f, CinematicPhase.Escalation, r.sourceDay > 0 ? "D" + r.sourceDay + " · " + r.action : e.detail));
                 cues.Add(new CinematicCue(.8f, CinematicPhase.HitStop, r.sourceDay > 0 ? "这个结果来自 D" + r.sourceDay + " 的行动。" : e.detail));
                 cues.Add(new CinematicCue(1.05f, CinematicPhase.HeroMoment, e.detail));
                 cues.Add(new CinematicCue(2.15f, CinematicPhase.Impact, string.Join(" · ", objects.Select(o => o.Copy))));

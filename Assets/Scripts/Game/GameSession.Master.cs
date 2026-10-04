@@ -10,8 +10,9 @@ namespace Horizon.Game
         public bool UsesMasterRules { get { return CatalogVersion >= 7; } }
         public event Action<DomainEvent> DomainEventRaised;
         public int MasterHorizon
-        { get { if (!UsesMasterRules) return HorizonLevel; int[] thresholds = { 0, 4, 12, 22, 36, 50, 70, 90 };
-            int level = thresholds.Count(v => Master.insightPoints >= v); return Math.Min(8, level + (Day <= Master.overdriveUntilDay ? 2 : 0)); } }
+        { get { return Math.Min(8, BaseMasterHorizon + (UsesMasterRules && Day <= Master.overdriveUntilDay ? 2 : 0)); } }
+        private int BaseMasterHorizon
+        { get { if (!UsesMasterRules) return HorizonLevel; int[] thresholds = { 0, 4, 12, 22, 36, 50, 70, 90 }; return thresholds.Count(v => Master.insightPoints >= v); } }
         public bool InExecutionMode { get { return UsesMasterRules && Master.decision != null && Master.decision.day == Day &&
             Master.decision.status != DecisionStatus.Unlocked && Master.decision.status != DecisionStatus.Completed; } }
 
@@ -37,7 +38,7 @@ namespace Horizon.Game
             KnowledgeSkill learned = knowledge?.FirstOrDefault(k => k.id == "face"); if (learned != null) Master.knowledge[0] = learned.Copy();
             Master.initialKnowledge = Master.knowledge.Select(k => k.Copy()).ToList();
             Master.resources.Add(new ResourceSample { day = Day, values = Values() });
-            Master.presentationHorizon = MasterHorizon;
+            Master.presentationHorizon = BaseMasterHorizon;
             RefreshEngine();
             InitializeExpedition();
             if (UsesExpedition && knowledge != null)
@@ -61,19 +62,21 @@ namespace Horizon.Game
         private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null)
         {
             RewardReceipt receipt = RewardReceipt.Capture(kind, node, CausalNodes, Master.orbitBits, MasterHorizon, Master.triggers.LastOrDefault());
-            if (sourceDay > 0) receipt.sourceDay = sourceDay;
-            if (actionText != null) receipt.action = actionText;
+            if (sourceDay > 0 && node?.originHidden != true) receipt.sourceDay = sourceDay;
+            if (actionText != null && node?.originHidden != true) receipt.action = actionText;
+            if (kind == DomainEventKind.TimeEcho && node?.originHidden == true) detail = "一条回声已经抵达，来路暂未清晰。";
+            if (kind == DomainEventKind.HorizonChanged) receipt.horizonLevel = BaseMasterHorizon;
             if (kind == DomainEventKind.OrbitActivated) receipt.orbitIndex = Array.FindIndex(MasterSpecification.OrbitNames, name => title.EndsWith(name, StringComparison.Ordinal));
             DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain, receipt);
             // Optional observers cannot alter a transaction or prevent a choice from completing.
             var handlers = DomainEventRaised;
             if (handlers != null) foreach (Action<DomainEvent> handler in handlers.GetInvocationList())
                 try { handler(e.Copy()); } catch (Exception) { /* Presentation failure does not change rules. */ }
-            if (kind != DomainEventKind.HorizonChanged && MasterHorizon > Master.presentationHorizon)
+            if (kind != DomainEventKind.HorizonChanged && BaseMasterHorizon > Master.presentationHorizon)
             {
-                Master.presentationHorizon = MasterHorizon;
-                Emit(DomainEventKind.HorizonChanged, node, "HORIZON " + MasterHorizon,
-                    "你现在可以看见：" + MasterSpecification.HorizonNames[MasterHorizon - 1] + "。视野成长扩大信息范围。");
+                Master.presentationHorizon = BaseMasterHorizon;
+                Emit(DomainEventKind.HorizonChanged, node, "HORIZON " + BaseMasterHorizon,
+                    "你现在可以看见：" + MasterSpecification.HorizonNames[BaseMasterHorizon - 1] + "。视野成长扩大信息范围。");
             }
             return e;
         }

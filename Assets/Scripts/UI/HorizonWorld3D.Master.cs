@@ -1,4 +1,3 @@
-using System.Collections;
 using Horizon.Game;
 using UnityEngine;
 
@@ -6,7 +5,6 @@ namespace Horizon.UI
 {
     public sealed partial class HorizonWorld3D
     {
-        private AudioClip masterGrowthTone, masterEchoTone, masterMythicTone, masterRecoveryTone;
         private float insightTarget, insightAmount;
         public void SetInsightState(int energy, bool active)
         { insightTarget = active ? 1 : Mathf.Clamp01((energy - 55) / 45f) * 0.65f; }
@@ -21,41 +19,6 @@ namespace Horizon.UI
         {
             if (e == null) return;
             Cinematics.Enqueue(e, fullscreen, completed);
-        }
-        private IEnumerator MasterEventSound(DomainEvent e)
-        {
-            bool mythic = e.tier == RewardTier.Mythic;
-            if (mythic)
-            {
-                audioSource.Stop(); if (ambience != null) ambience.mute = true;
-                yield return new WaitForSecondsRealtime(0.45f);
-                if (paused || !preferences.sound) { UpdateAudio(); yield break; }
-            }
-            if (masterEchoTone == null) masterEchoTone = LanguageClip("Past returning", DomainEventKind.TimeEcho);
-            if (masterGrowthTone == null) masterGrowthTone = LanguageClip("Future unfolding", DomainEventKind.FutureMemory);
-            if (masterMythicTone == null) masterMythicTone = LanguageClip("Pattern breakthrough", DomainEventKind.PatternBroken);
-            if (masterRecoveryTone == null) masterRecoveryTone = LanguageClip("Room to recover", DomainEventKind.FailAndAgain);
-            audioSource.pitch = 1;
-            audioSource.PlayOneShot(mythic ? masterMythicTone : e.kind == DomainEventKind.TimeEcho ? masterEchoTone : e.kind == DomainEventKind.FailAndAgain ? masterRecoveryTone : masterGrowthTone, 0.4f);
-            if (mythic) { yield return new WaitForSecondsRealtime(3.0f); UpdateAudio(); }
-        }
-        private AudioClip LanguageClip(string name, DomainEventKind kind)
-        {
-            float[] samples = SoundLanguage.Render(kind); AudioClip clip = AudioClip.Create(name, samples.Length, 1, 22050, false);
-            clip.SetData(samples, 0); sounds.Add(clip); return clip;
-        }
-        private static AudioClip CreateMasterTone(string name, float frequency, bool mythic)
-        {
-            const int rate = 22050; float duration = mythic ? 1.5f : 0.8f; int count = (int)(rate * duration);
-            var samples = new float[count];
-            for (int i = 0; i < count; i++)
-            {
-                float t = i / (float)rate, x = t / duration;
-                float envelope = Mathf.Sin(Mathf.PI * x) * 0.22f;
-                float beat = mythic && t < 0.55f ? Mathf.Exp(-((t % 0.25f) * 24)) : 1;
-                samples[i] = (Mathf.Sin(2 * Mathf.PI * frequency * t) + 0.25f * Mathf.Sin(2 * Mathf.PI * frequency * 1.5f * t)) * envelope * beat;
-            }
-            AudioClip clip = AudioClip.Create(name, count, 1, rate, false); clip.SetData(samples, 0); return clip;
         }
     }
     public static class MasterHaptics

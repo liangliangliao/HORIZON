@@ -7,18 +7,24 @@ namespace Horizon.UI
 {
     public sealed partial class HorizonWorld3D
     {
-        private readonly Dictionary<RewardObjectKind, List<Transform>> rewardPool = new Dictionary<RewardObjectKind, List<Transform>>();
+        private readonly Dictionary<string, List<Transform>> rewardPool = new Dictionary<string, List<Transform>>();
         private readonly List<Transform> movieObjects = new List<Transform>();
         private readonly List<MaterialReward> movieObjectReceipts = new List<MaterialReward>();
         private Mesh rewardRing;
         private Transform RewardObject(RewardObjectKind kind, int index)
         {
-            if (!rewardPool.TryGetValue(kind, out List<Transform> pool))
-            { pool = new List<Transform>(); rewardPool.Add(kind, pool); }
-            while (pool.Count <= index) pool.Add(BuildRewardObject(kind));
-            Transform item = pool[index]; item.gameObject.SetActive(true); return item;
+            bool ticket = moviePlan?.Event.receipt?.triggerId == "ticket" || moviePlan?.Event.receipt?.triggerId == "appointment";
+            string key = kind.ToString() + (kind == RewardObjectKind.TriggerObject ? ticket ? ":ticket" : ":clock" : "");
+            if (!rewardPool.TryGetValue(key, out List<Transform> pool))
+            { pool = new List<Transform>(); rewardPool.Add(key, pool); }
+            while (pool.Count <= index) pool.Add(BuildRewardObject(kind, ticket));
+            Transform item = pool[index]; item.localRotation = Quaternion.identity;
+            ResetMovieColor(item);
+            if (kind == RewardObjectKind.ToolKit) item.Find("Tool shaft").localPosition = new Vector3(-.17f,.3f,0);
+            if (kind == RewardObjectKind.ReservoirCore) item.Find("Storage lid").localPosition = new Vector3(0,.55f,0);
+            item.gameObject.SetActive(true); return item;
         }
-        private Transform BuildRewardObject(RewardObjectKind kind)
+        private Transform BuildRewardObject(RewardObjectKind kind, bool ticket)
         {
             Transform item = Group(kind.ToString(), cinematicStage);
             if (rewardRing == null) rewardRing = Own(HorizonSculpt.Torus(.42f, .065f));
@@ -68,7 +74,7 @@ namespace Horizon.UI
                     Sculpt(item,"Lock shackle",rewardRing,new Vector3(0,.08f,0),Vector3.one*.5f,ivory);
                     Box(item,"Keyhole",new Vector3(0,-.16f,-.115f),new Vector3(.05f,.13f,.025f),dark); break;
                 case RewardObjectKind.TriggerObject:
-                    if(moviePlan?.Event.receipt?.triggerId=="ticket" || moviePlan?.Event.receipt?.triggerId=="appointment")
+                    if(ticket)
                     { Box(item,"Appointment ticket",Vector3.zero,new Vector3(.68f,.36f,.06f),ivory); Box(item,"Ticket date",new Vector3(0,0,-.04f),new Vector3(.36f,.12f,.02f),teal); }
                     else { Shape(item,"Alarm clock",PrimitiveType.Cylinder,Vector3.zero,new Vector3(.52f,.09f,.52f),ivory).localRotation=Quaternion.Euler(90,0,0);
                         Box(item,"Clock minute hand",new Vector3(0,.09f,-.1f),new Vector3(.025f,.18f,.025f),dark); Box(item,"Clock hour hand",new Vector3(.06f,0,-.1f),new Vector3(.15f,.025f,.025f),dark);
@@ -124,7 +130,7 @@ namespace Horizon.UI
                 {
                     indices.TryGetValue(reward.Kind,out int index); indices[reward.Kind]=index+1;
                     Transform item=RewardObject(reward.Kind,index); movieObjects.Add(item); movieObjectReceipts.Add(reward);
-                    foreach (Renderer renderer in item.GetComponentsInChildren<Renderer>()) renderer.SetPropertyBlock(null);
+                    ResetMovieColor(item);
                     item.localPosition=new Vector3((movieObjects.Count%5-2)*.62f,2.7f,1.1f);
                     item.localRotation=Quaternion.identity; item.localScale=Vector3.one*.05f;
                 }

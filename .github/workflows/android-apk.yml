@@ -222,6 +222,8 @@ jobs:
           test -s artifacts/visuals/71-story-home.png
           test -s artifacts/visuals/72-tall-phone-board.png
           test -s artifacts/visuals/73-tall-phone-home.png
+          test -s artifacts/visuals/90-pattern-3d.png
+          test -s artifacts/visuals/91-reality-convergence-3d.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -255,6 +257,15 @@ jobs:
             artifacts/visuals/8*.png
             artifacts/visuals/*.mp4
             artifacts/visuals/*.pcm
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload cinematic reward portrait previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Cinematic-Reward-Previews
+          path: artifacts/visuals/9[01]-*.png
           if-no-files-found: ignore
           retention-days: 14
 

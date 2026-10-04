@@ -45,7 +45,9 @@ namespace Horizon.UI
             var scripted = ScriptPlayable<CinematicTrack>.Create(graph); scripted.GetBehaviour().World = world;
             track = scripted; track.SetDuration(active.plan.Duration);
             var output = ScriptPlayableOutput.Create(graph, "Synchronized cinematic frame"); output.SetSourcePlayable(track); graph.Play();
-            world.BeginCinematic(active.plan, active.fullscreen); Started?.Invoke(active.plan);
+            world.BeginCinematic(active.plan, active.fullscreen);
+            if (paused) world.PauseCinematic(true);
+            Started?.Invoke(active.plan);
         }
         public void SetPaused(bool value) { paused = value; clock?.Pause(value); world?.PauseCinematic(value); }
         private void Update()

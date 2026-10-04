@@ -487,6 +487,7 @@ namespace Horizon.UI
 
         private void OnDestroy()
         {
+            RestoreRenderQuality();
             foreach (Material material in materials) Dispose(material);
             foreach (AudioClip sound in sounds) Dispose(sound);
             foreach (Mesh mesh in sculptures) Dispose(mesh);

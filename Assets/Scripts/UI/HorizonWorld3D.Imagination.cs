@@ -34,6 +34,7 @@ namespace Horizon.UI
             if(task!=null) task.gameObject.SetActive(run.goalFamily=="career" || run.goalFamily=="learning");
             movieLight.intensity=.7f; movieLight.color=Palette.Mint;
             moviePlayer.GetComponent<HorizonActor>().SetNeutral();
+            moviePlayer.GetComponent<HorizonActor>().TiredUntil=0;
             if(run.phase==ImaginePhase.Effort || run.phase==ImaginePhase.Adjust) moviePlayer.GetComponent<HorizonActor>().SetIntent(CardKind.Growth);
             if(run.phase==ImaginePhase.Recover || run.phase==ImaginePhase.Retry)
             { Transform kit=RewardObject(RewardObjectKind.RepairKit,0); kit.localPosition=new Vector3(.8f,.4f,1.2f); kit.localScale=Vector3.one*.6f; movieObjects.Add(kit); }
@@ -41,7 +42,7 @@ namespace Horizon.UI
             {
                 string actual=run.memories.Count>0?run.memories[run.memories.Count-1].actionKey:"";
                 movieFriend.gameObject.SetActive(actual=="AskHelp" || run.preparationKey=="WithSupport");
-                if(actual=="ChangeMethod" || run.preparationKey=="FixedTime") { Transform trigger=RewardObject(RewardObjectKind.TriggerObject,0); trigger.localPosition=new Vector3(.7f,.8f,1.4f); trigger.localScale=Vector3.one*.55f; movieObjects.Add(trigger); }
+                if(actual=="ChangeMethod" || run.preparationKey=="FixedTime") { Transform trigger=RewardObject(actual=="ChangeMethod"?RewardObjectKind.ToolKit:RewardObjectKind.TriggerObject,0); trigger.localPosition=new Vector3(.7f,.8f,1.4f); trigger.localScale=Vector3.one*.55f; movieObjects.Add(trigger); }
             }
             if(run.phase==ImaginePhase.Complete) { Transform film=RewardObject(RewardObjectKind.MemoryFilm,0); film.localPosition=new Vector3(0,1.4f,4.7f); film.localScale=Vector3.one*.8f; movieObjects.Add(film); }
             SampleImaginationScene();

@@ -26,9 +26,9 @@ Unity 6 LTS **6000.0.62f1**，URP **17.0.4**，Cinemachine **3.1.3**，Timeline 
 
 ## 验证
 
-- `CinematicRewardTests`：六资源映射、符号、实际截断后的数量、快照隔离、旧事件兼容、真实模式证据、三线现实证据、十一段导演语法、递进节点节奏、150ms 停顿、暂停/慢帧/跳过一次性语义、收藏迁移与去重。
-- `CinematicPlayableTests`：真实 Unity 场景中的暂停/跳过/取消、相机恢复、省电粒子预算、主体与旧线保留，以及真实 Pattern Broken、Reality Convergence 的竖屏渲染。新增产物 `90-pattern-3d.png`、`91-reality-convergence-3d.png`。
-- 原 223 项便携规则回归、完整 Unity EditMode/可玩流程、竖屏预览及 Android ARMv7/ARM64 构建仍由同一提交 CI 验证。
+- 本地已通过 **244/244** 项便携测试，包括原 223 项规则回归与新增 21 项奖励测试：六资源映射、符号、实际截断后的数量、快照隔离、旧事件兼容、真实模式证据、三线现实证据、十一段导演语法、递进节点节奏、150ms 停顿、暂停/慢帧/跳过一次性语义、收藏迁移与去重、Overdrive 临时视野隔离和未揭晓因果来源保护。
+- `CinematicPlayableTests` 已编写，尚未执行：真实 Unity 场景中的暂停/跳过/取消、相机恢复、省电粒子预算、主体与旧线保留、储备核心复用后的关闭状态、纪念物序列化恢复，以及真实 Pattern Broken、Reality Convergence 的竖屏渲染。预期产物 `90-pattern-3d.png`、`91-reality-convergence-3d.png` 已接入 CI 检查与上传。
+- 全部 C# 文件已通过 Roslyn 语法检查；这不等于 Unity 类型编译通过。本地 Unity 编辑器镜像因 Docker 存储空间不足未能安装，且没有可用的本地 Unity 激活凭据。完整 Unity EditMode/可玩流程、实际竖屏预览及 Android ARMv7/ARM64 构建仍待仓库 CI 验证。
 
 本地便携测试可以使用 `dotnet run --project tools/RulesHarness.csproj -- --workers=0`。图形测试必须使用 Unity 6 和图形设备，不能用 `-nographics`。
 

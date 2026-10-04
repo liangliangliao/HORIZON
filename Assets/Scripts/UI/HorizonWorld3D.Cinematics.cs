@@ -22,7 +22,10 @@ namespace Horizon.UI
         private Rect savedCameraRect;
         private float savedFov, savedFog;
         private AudioClip impactTone, nodeTone, heartbeatTone;
+        private readonly Dictionary<DomainEventKind, AudioClip> cinematicTones = new Dictionary<DomainEventKind, AudioClip>();
         private MaterialPropertyBlock movieProperties;
+        private readonly Dictionary<Transform, Renderer[]> movieRenderers = new Dictionary<Transform, Renderer[]>();
+        private readonly Dictionary<Transform, Color> movieColors = new Dictionary<Transform, Color>();
         private bool movieMuted;
         private CinemachineBrain cinematicBrain;
         private CinemachineCamera cinematicCamera;
@@ -93,17 +96,21 @@ namespace Horizon.UI
             movieAnchor.Find("Future work desk").gameObject.SetActive(true); movieAnchor.Find("Future open task").gameObject.SetActive(true);
             moviePlayer.gameObject.SetActive(true); moviePlayer.localPosition=new Vector3(0,0,-.5f); moviePlayer.localRotation=Quaternion.Euler(0,180,0);
             moviePlayer.GetComponent<HorizonActor>().SetNeutral(); moviePlayer.GetComponent<HorizonActor>().Walking=false;
+            moviePlayer.GetComponent<HorizonActor>().TiredUntil=0; moviePlayer.GetComponent<HorizonActor>().Pointing=false;
             movieFuture.gameObject.SetActive(false); movieFriend.gameObject.SetActive(plan.Objects.Any(o=>o.Kind==RewardObjectKind.ConnectionRing));
             movieAnchor.gameObject.SetActive(plan.Event.kind==DomainEventKind.VictoryAnchor || plan.Event.kind==DomainEventKind.Victory);
             movieBarrier.gameObject.SetActive(plan.Event.kind==DomainEventKind.PatternBroken);
             foreach(Transform x in movieFragments) x.gameObject.SetActive(false);
             foreach(LineRenderer x in pastLines) x.gameObject.SetActive(false);
             foreach(Transform x in movieOrbit) x.gameObject.SetActive(false);
-            foreach(Transform x in movieNodes) x.gameObject.SetActive(false);
-            foreach(LineRenderer x in movieLines) x.gameObject.SetActive(false);
+            foreach(Transform x in movieNodes) { x.gameObject.SetActive(false); x.localScale=Vector3.one*.16f; }
+            foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene();
-            movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear); SampleCinematic(0);
+            movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
+            var budget = movieParticles.main; budget.maxParticles = preferences.batterySaver ? 12 : 64;
+            movieParticles.Play();
+            SampleCinematic(0);
         }
         private void PrepareCausalScene()
         {
@@ -149,7 +156,7 @@ namespace Horizon.UI
                 movieParticles.Pause(); movieMuted=true;
                 audioSource.Stop(); if(ambience!=null) ambience.mute=true;
             }
-            if(cue.Phase==CinematicPhase.HeroMoment && movieMuted) { movieMuted=false; UpdateAudio(); moviePlayer.GetComponent<HorizonActor>().MotionRate=1; }
+            if(cue.Phase==CinematicPhase.HeroMoment && movieMuted) { movieMuted=false; UpdateAudio(); moviePlayer.GetComponent<HorizonActor>().MotionRate=1; movieParticles.Play(); }
             if(cue.Phase==CinematicPhase.Impact)
             {
                 movieMuted=false; UpdateAudio();
@@ -157,28 +164,44 @@ namespace Horizon.UI
                 movieParticles.Play();
                 Vector3 hit=cinematicStage.TransformPoint(new Vector3(0,1.3f,2));
                 MovieBurst(hit,moviePlan.Event.tier>=RewardTier.Epic?64:16);
-                CueSound(impactTone,moviePlan.Event.tier>=RewardTier.Epic?1:.45f);
+                CueSound(ImpactVoice(moviePlan.Event.kind),moviePlan.Event.tier>=RewardTier.Epic?1:.45f);
                 MasterHaptics.Impact(moviePlan.Event,preferences);
                 if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.11f:.025f; if(bloom!=null) bloom.Echo=.6f; }
-                if(moviePlan.Event.kind!=DomainEventKind.FailAndAgain) moviePlayer.GetComponent<HorizonActor>().Celebrate();
-                foreach(Transform node in movieNodes.Where(n=>n.gameObject.activeSelf)) SetMovieColor(node,Palette.Mint);
+                bool losing = moviePlan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount < 0);
+                if (losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
+                else if(moviePlan.Event.kind!=DomainEventKind.FailAndAgain) moviePlayer.GetComponent<HorizonActor>().Celebrate();
+                foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) SetMovieColor(node,Palette.Mint);
             }
             if(cue.Phase==CinematicPhase.SecondReveal && moviePlan.Event.tier>=RewardTier.Epic)
             { movieFuture.gameObject.SetActive(true); movieFuture.GetComponent<HorizonActor>().Pointing=true; }
         }
         private void CueSound(AudioClip clip,float volume)
         { if(!paused && preferences.sound && !movieMuted) { audioSource.pitch=1; audioSource.PlayOneShot(clip,volume); } }
+        private AudioClip ImpactVoice(DomainEventKind kind)
+        {
+            if(kind==DomainEventKind.PatternBroken || kind==DomainEventKind.RealityConvergence || kind==DomainEventKind.CausalSingularity) return impactTone;
+            if(cinematicTones.TryGetValue(kind,out AudioClip clip)) return clip;
+            float frequency=kind==DomainEventKind.TimeEcho?174:kind==DomainEventKind.FailAndAgain || kind==DomainEventKind.Comeback?85:110;
+            clip=ShortCueTone(kind+" impact voice",frequency,kind==DomainEventKind.FailAndAgain?.6f:.25f); cinematicTones.Add(kind,clip); return clip;
+        }
         private void MovieBurst(Vector3 position,int requested)
         {
             if(preferences.reducedMotion) return;
             movieParticles.transform.position=position;
-            movieParticles.Emit(Mathf.Min(requested,preferences.batterySaver?12:64));
+            int remaining = Mathf.Max(0, (preferences.batterySaver ? 12 : 64) - movieParticles.particleCount);
+            movieParticles.Emit(Mathf.Min(requested, remaining));
         }
         private void SetMovieColor(Transform item,Color tint)
         {
-            foreach(Renderer renderer in item.GetComponentsInChildren<Renderer>())
+            if (movieColors.TryGetValue(item, out Color prior) && prior == tint) return;
+            movieColors[item] = tint;
+            foreach(Renderer renderer in MovieRenderers(item))
             { movieProperties.Clear(); movieProperties.SetColor("_Color",tint); movieProperties.SetColor("_BaseColor",tint); movieProperties.SetColor("_Emission",tint*.25f); renderer.SetPropertyBlock(movieProperties); }
         }
+        private Renderer[] MovieRenderers(Transform item)
+        { if (!movieRenderers.TryGetValue(item, out Renderer[] bindings)) { bindings=item.GetComponentsInChildren<Renderer>(true); movieRenderers.Add(item,bindings); } return bindings; }
+        private void ResetMovieColor(Transform item)
+        { foreach(Renderer renderer in MovieRenderers(item)) renderer.SetPropertyBlock(null); movieColors.Remove(item); }
         private static void MovieLine(LineRenderer line,Vector3 from,Vector3 to)
         { for(int i=0;i<line.positionCount;i++) { float p=i/(float)(line.positionCount-1); line.SetPosition(i,Vector3.Lerp(from,to,p)+Vector3.up*Mathf.Sin(p*Mathf.PI)*.16f); } }
         private static float Smooth(float a,float b,float t) { return Mathf.SmoothStep(0,1,Mathf.InverseLerp(a,b,t)); }
@@ -197,7 +220,7 @@ namespace Horizon.UI
             }
             if(kind==DomainEventKind.TimeEcho)
             {
-                Vector3 source=movieNodes.FirstOrDefault(n=>n.gameObject.activeSelf)?.localPosition??new Vector3(0,1,-1);
+                Vector3 source=new Vector3(0,1,-1); foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) { source=node.localPosition; break; }
                 look=Vector3.Lerp(new Vector3(0,1,2),source,Smooth(.35f,.8f,time));
                 look=Vector3.Lerp(look,new Vector3(0,1,2),Smooth(1.05f,2.15f,time));
                 int count=receipt?.causes.Count??0;
@@ -236,16 +259,18 @@ namespace Horizon.UI
             if(kind==DomainEventKind.Synchronized || kind==DomainEventKind.Surprise)
             {
                 float merge=Smooth(.15f,.55f,progress); float divergence=kind==DomainEventKind.Surprise?1:-1;
-                MovieLine(movieLines[1],new Vector3(.5f,.1f,-1),new Vector3(Mathf.Lerp(1.5f,divergence*1.5f,merge),.3f,5));
+                Vector3 start = Vector3.Lerp(new Vector3(.5f,.1f,-1), new Vector3(-.55f,.1f,-1), kind==DomainEventKind.Synchronized?merge:0);
+                MovieLine(movieLines[1],start,new Vector3(Mathf.Lerp(1.5f,divergence*1.5f,merge),.3f,5));
                 SetMovieColor(movieLines[1].transform,kind==DomainEventKind.Surprise?Palette.Gold:Palette.Mint);
             }
             if(kind==DomainEventKind.DecisionLocked) { SetMovieColor(movieLines[1].transform,Palette.Muted*.15f); SetMovieColor(movieLines[0].transform,Palette.Mint); moviePlayer.localPosition=new Vector3(0,0,impact*1.8f); }
             if(kind==DomainEventKind.FailAndAgain) { moviePlayer.localPosition=new Vector3(0,-impact*.75f,impact*.5f); moviePlayer.localRotation=Quaternion.Euler(impact*18,180,0); for(int i=10;i<15;i++) movieTiles[i].gameObject.SetActive(false); }
             if(kind==DomainEventKind.Comeback) { moviePlayer.localPosition=new Vector3(0,Mathf.Lerp(-.75f,0,Smooth(.1f,.5f,progress)),impact*2); moviePlayer.GetComponent<HorizonActor>().Walking=impact>0 && impact<1; }
             if(kind==DomainEventKind.Overdrive || kind==DomainEventKind.HorizonChanged)
-            { RenderSettings.fogDensity=Mathf.Lerp(.045f,.004f,impact); foreach(Transform node in movieNodes.Where(n=>n.gameObject.activeSelf)) SetMovieColor(node,Color.Lerp(Palette.Muted*.15f,Palette.Mint,impact)); }
+            { RenderSettings.fogDensity=Mathf.Lerp(.045f,.004f,impact); foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) SetMovieColor(node,Color.Lerp(Palette.Muted*.15f,Palette.Mint,impact)); }
             SampleRewardObjects(time,impact);
-            movieLight.color=moviePlan.Objects.Any(o=>o.Kind==RewardObjectKind.WarmLamp)?new Color(1,.64f,.3f):Palette.Mint;
+            MaterialReward mood = moviePlan.Objects.FirstOrDefault(o=>o.Kind==RewardObjectKind.WarmLamp);
+            movieLight.color=mood!=null?Color.Lerp(new Color(.3f,.48f,.8f),new Color(1,.64f,.3f),mood.Amount>0?impact:1-impact):Palette.Mint;
             movieLight.intensity=impact*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
@@ -263,7 +288,9 @@ namespace Horizon.UI
             for(int i=0;i<movieObjects.Count;i++)
             {
                 Transform item=movieObjects[i]; MaterialReward reward=movieObjectReceipts[i];
-                float arrival=Smooth(movieImpactTime+i*.035f,movieImpactTime+.65f+i*.035f,time);
+                float available=Mathf.Max(.06f,moviePlan.Duration-movieImpactTime-.06f);
+                float stagger=Mathf.Min(i*.035f,available*.15f), span=Mathf.Min(.65f,Mathf.Max(.04f,available-stagger));
+                float arrival=Smooth(movieImpactTime+stagger,movieImpactTime+stagger+span,time);
                 float angle=(i%5)*Mathf.PI*.4f+progress*2;
                 Vector3 start=new Vector3(Mathf.Cos(angle)*1.5f,2.3f+Mathf.Sin(angle)*.25f,1+Mathf.Sin(angle)*.7f);
                 Vector3 target=new Vector3(0,1.1f,1.1f);
@@ -278,9 +305,9 @@ namespace Horizon.UI
                 float size=Smooth(0,movieImpactTime,time)*(.45f+reward.Scale*.18f);
                 if(reward.Kind==RewardObjectKind.EnergyCell && reward.Amount>0) { item.localPosition=Vector3.Lerp(start,moviePlayer.localPosition+Vector3.up*1.1f,arrival); size*=1-arrival*.95f; }
                 item.localScale=Vector3.one*Mathf.Max(.001f,size); item.localRotation=Quaternion.Euler(0,Mathf.Lerp(progress*160,0,arrival),0);
-                if(reward.Kind==RewardObjectKind.ToolKit && item.childCount>2) { Transform tool=item.GetChild(2); tool.localPosition=new Vector3(-.17f,.3f+(1-arrival)*.7f,0); }
+                if(reward.Kind==RewardObjectKind.ToolKit && item.childCount>2) { Transform tool=item.GetChild(2); tool.localPosition=new Vector3(-.17f,.3f+(reward.Amount>0?1-arrival:arrival)*.7f,0); }
                 if(reward.Kind==RewardObjectKind.ConnectionRing)
-                { movieLines[3].gameObject.SetActive(true); MovieLine(movieLines[3],moviePlayer.localPosition+Vector3.up,movieFriend.localPosition+Vector3.up); movieLines[3].widthMultiplier=.025f+impact*.04f; }
+                { movieLines[3].gameObject.SetActive(true); MovieLine(movieLines[3],moviePlayer.localPosition+Vector3.up,movieFriend.localPosition+Vector3.up); movieLines[3].widthMultiplier=reward.Amount>0?.025f+impact*.04f:.065f-impact*.055f; }
                 if(reward.Kind==RewardObjectKind.ReservoirCore)
                 { Transform lid=item.Find("Storage lid"); if(lid!=null) lid.localPosition=new Vector3(0,.55f+impact*.75f,0); }
             }
@@ -289,7 +316,8 @@ namespace Horizon.UI
         {
             if(moviePlan==null) return;
             foreach(HorizonActor actor in cinematicStage.GetComponentsInChildren<HorizonActor>(true)) actor.MotionRate=value?0:moviePhase==CinematicPhase.HitStop?0:1;
-            if(value) movieParticles.Pause(); else movieParticles.Play();
+            if(value || moviePhase==CinematicPhase.HitStop) movieParticles.Pause(); else movieParticles.Play();
+            if(value) audioSource.Pause(); else audioSource.UnPause();
         }
         public void EndCinematic()
         {

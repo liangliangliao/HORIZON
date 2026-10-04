@@ -129,5 +129,24 @@ namespace Horizon.Tests
             ActionRecord action=life.Choose(life.Hand[2].Id);
             Assert.AreEqual(action.actualNow.energy,life.Master.events.Single(x=>x.kind==DomainEventKind.ActionTaken).receipt.resources.energy);
         }
+        [Test]
+        public void TemporaryOverdriveDoesNotInventPermanentHorizonGrowth()
+        {
+            var life=new GameSession(2,15); int before=life.MasterHorizon; life.Master.overdriveEnergy=99;
+            life.LockDecision(life.Hand[1].Id); Assert.Greater(life.MasterHorizon,before);
+            Assert.IsTrue(life.Master.events.Any(x=>x.kind==DomainEventKind.Overdrive));
+            Assert.IsFalse(life.Master.events.Any(x=>x.kind==DomainEventKind.HorizonChanged));
+            Assert.AreEqual(before,life.Master.presentationHorizon);
+        }
+        [Test]
+        public void HiddenProvenanceStaysHiddenInRewardMovies()
+        {
+            var origin=new CausalNode { id="unknown",type=CausalNodeKind.Action,day=9,label="未揭晓的行动" };
+            var hidden=new CausalNode { id="hidden",type=CausalNodeKind.Echo,day=6,label="一份未见来路的回声",parentId=origin.id,originHidden=true };
+            RewardReceipt receipt=RewardReceipt.Capture(DomainEventKind.TimeEcho,hidden,new[] { origin,hidden },0,1,null);
+            Assert.AreEqual(0,receipt.sourceDay); Assert.IsFalse(receipt.causes.Any(x=>x.id==origin.id));
+            var plan=RewardDirector.Direct(new DomainEvent { id="hidden",kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,detail="来路暂未清晰。",receipt=receipt });
+            Assert.IsFalse(plan.Cues.Any(x=>x.Copy.Contains("D9") || x.Copy.Contains("D0")));
+        }
     }
 }

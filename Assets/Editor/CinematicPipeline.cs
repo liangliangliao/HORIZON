@@ -23,8 +23,9 @@ namespace Horizon.Editor
             // Import them once so runtime-created Chinese captions survive stripping.
             if (Resources.Load<TMPro.TMP_Settings>("TMP Settings") == null)
             {
-                string essentials = "Packages/com.unity.ugui/Package Resources/TMP Essential Resources.unitypackage";
-                if (File.Exists(essentials)) AssetDatabase.ImportPackage(essentials, false);
+                var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(TMPro.TMP_Text).Assembly);
+                string essentials = package == null ? null : Path.Combine(package.resolvedPath, "Package Resources", "TMP Essential Resources.unitypackage");
+                if (essentials != null && File.Exists(essentials)) AssetDatabase.ImportPackage(essentials, false);
             }
             const string directory = "Assets/Settings";
             const string rendererPath = directory + "/HorizonRenderer.asset";
@@ -37,6 +38,12 @@ namespace Horizon.Editor
                 renderer.name = "HORIZON mobile forward renderer";
                 renderer.renderingMode = RenderingMode.Forward;
                 AssetDatabase.CreateAsset(renderer, rendererPath);
+            }
+            if (renderer.postProcessData == null)
+            {
+                renderer.postProcessData = AssetDatabase.LoadAssetAtPath<PostProcessData>(
+                    "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset");
+                EditorUtility.SetDirty(renderer);
             }
             var pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(pipelinePath);
             if (pipeline == null)

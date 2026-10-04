@@ -16,13 +16,14 @@ namespace Horizon.UI
             cinematicStage.gameObject.SetActive(true); WorldCamera.rect=viewport;
             moviePlayer.gameObject.SetActive(true); moviePlayer.localPosition=Vector3.zero; moviePlayer.localRotation=Quaternion.identity;
             moviePlayer.GetComponent<HorizonActor>().SetNeutral(); moviePlayer.GetComponent<HorizonActor>().Walking=false;
+            moviePlayer.GetComponent<HorizonActor>().TiredUntil=0; moviePlayer.GetComponent<HorizonActor>().Pointing=false;
             movieFuture.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false); movieAnchor.gameObject.SetActive(false); movieBarrier.gameObject.SetActive(false);
             foreach(Transform x in movieObjects) x.gameObject.SetActive(false); movieObjects.Clear(); movieObjectReceipts.Clear();
             foreach(Transform x in movieFragments) x.gameObject.SetActive(false);
             foreach(LineRenderer x in pastLines) x.gameObject.SetActive(false);
             foreach(LineRenderer x in movieLines) x.gameObject.SetActive(false);
             foreach(Transform x in movieOrbit) x.gameObject.SetActive(false);
-            foreach(Transform x in movieNodes) x.gameObject.SetActive(false);
+            foreach(Transform x in movieNodes) { x.gameObject.SetActive(false); x.localScale=Vector3.one*.16f; }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); }
             movieLight.color=Palette.Mint; movieLight.intensity=.55f;
             WorldCamera.transform.position=cinematicStage.TransformPoint(new Vector3(4.4f,3.8f,-5.8f));
@@ -74,7 +75,7 @@ namespace Horizon.UI
         {
             BeginSystemScene("memento",new Rect(0,.44f,1,.36f)); moviePlayer.gameObject.SetActive(false);
             Transform item=RewardObject(kind,0); item.localPosition=new Vector3(0,1.3f,2); item.localScale=Vector3.one*1.7f;
-            foreach(Renderer renderer in item.GetComponentsInChildren<Renderer>()) renderer.SetPropertyBlock(null); movieObjects.Add(item);
+            ResetMovieColor(item); movieObjects.Add(item);
         }
         private void SampleSystemScene()
         {
