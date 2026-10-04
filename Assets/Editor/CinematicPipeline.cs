@@ -51,9 +51,8 @@ namespace Horizon.Editor
                 pipeline = UniversalRenderPipelineAsset.Create(renderer); pipeline.name = "HORIZON cinematic URP";
                 pipeline.supportsHDR = true; pipeline.msaaSampleCount = 2; pipeline.renderScale = 1;
                 pipeline.supportsCameraDepthTexture = false; pipeline.supportsCameraOpaqueTexture = false;
-                pipeline.mainLightRenderingMode = LightRenderingMode.PerPixel;
-                pipeline.additionalLightsRenderingMode = LightRenderingMode.PerPixel;
-                pipeline.additionalLightsPerObjectLimit = 2; pipeline.shadowDistance = 22;
+                // URP creates per-pixel lights by default; its mode setters are internal.
+                pipeline.maxAdditionalLightsCount = 2; pipeline.shadowDistance = 22;
                 AssetDatabase.CreateAsset(pipeline, pipelinePath);
             }
             GraphicsSettings.defaultRenderPipeline = pipeline;
