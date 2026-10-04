@@ -43,9 +43,21 @@ namespace Horizon.Editor
                 target = BuildTarget.Android,
                 options = BuildOptions.None
             });
+            // Game-CI validates this stdout summary after Unity exits. Keep it
+            // tied to the real BuildReport so custom builds report failures too.
+            Console.WriteLine(string.Join(Environment.NewLine, new[]
+            {
+                "", "###########################", "#      Build results      #",
+                "###########################", "",
+                "Duration: " + report.summary.totalTime,
+                "Warnings: " + report.summary.totalWarnings,
+                "Errors: " + report.summary.totalErrors,
+                "Size: " + report.summary.totalSize + " bytes", ""
+            }));
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException("Android build failed: " + report.summary.result);
             Debug.Log("HORIZON APK: ARMv7 + ARM64, " + report.summary.totalSize + " bytes, " + output);
+            Console.WriteLine("Build succeeded!");
         }
 
         private static void ConfigureSigning(bool release)
