@@ -103,13 +103,14 @@ namespace Horizon
         {
             RunRecord run = archive.runs.LastOrDefault(); var versions = FutureSelfGallery.From(run);
             futureSelfPage = Mathf.Clamp(futureSelfPage, 0, versions.Length - 1); FutureSelfVersion self = versions[futureSelfPage];
-            Clear(true); world.ShowStation(2, true); world.SetFutureIdentity(self.appearance, run?.master?.orbitBits ?? 0);
+            Clear(true); world.ShowStation(1, true); world.SetFutureIdentity(self.appearance, run?.master?.orbitBits ?? 0);
             var memories = run == null ? new System.Collections.Generic.List<MemoryChain>() : run.actions
                 .OrderByDescending(a => CausalGraph.Descendants(GameSession.GraphForRun(run), a.nodeId).Count).Take(3)
                 .Select(a => new MemoryChain(a, GameSession.GraphForRun(run))).ToList();
-            if (memories.Count > 0) world.ShowCausalMemories(memories);
+            if (memories.Count > 0) world.ShowCausalMemories(memories, true);
             int selected = 0;
             View.Label(root, "Future identity", self.name, 44, Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.84f, 0.94f, 0.94f);
+            View.Panel(root, "Future reflection backing", new Color(0.025f, 0.055f, 0.08f, 0.90f), 0.055f, 0.185f, 0.945f, 0.38f);
             Text question = View.Label(root, "Future question", self.question + "\n\n我记得：" + self.memory, 32, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.19f, 0.925f, 0.38f);
             if (memories.Count > 0)
             {
@@ -117,7 +118,8 @@ namespace Horizon
                 StationSwipe swipe = touch.gameObject.AddComponent<StationSwipe>(); swipe.ReadyAt = Time.unscaledTime + 0.25f;
                 swipe.Advanced = () => { selected = (selected + 1) % memories.Count; world.TouchMemory(selected);
                     question.text = memories[selected].Summary + "\n" + memories[selected].Reflection; };
-                View.Label(root, "Station spatial hint", "向前滑动，靠近一段真实回忆", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.06f, 0.39f, 0.94f, 0.432f);
+                View.Panel(root, "Memory hint backing", new Color(0.025f, 0.055f, 0.08f, 0.90f), 0.12f, 0.389f, 0.88f, 0.435f);
+                View.Label(root, "Station spatial hint", "向前滑动，靠近一段真实回忆", 24, Palette.Text, TextAnchor.MiddleCenter, 0.14f, 0.39f, 0.86f, 0.432f);
             }
             View.Button(root, "Previous future self", "另一位自己", () => { futureSelfPage = (futureSelfPage + 1) % versions.Length; ShowFutureGallery(); }, 0.075f, 0.105f, 0.49f, 0.175f, Palette.Panel, Palette.Gold, 28);
             View.Button(root, "Explore future timeline", "看看这段未来", () => {

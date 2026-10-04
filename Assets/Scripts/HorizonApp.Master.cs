@@ -59,7 +59,8 @@ namespace Horizon
         {
             CloseMasterPage(); overlay = View.Rect(root, name, 0, 0, 1, 1);
             View.Fill(overlay, "Master shade", new Color(0.009f, 0.023f, 0.04f, 0.985f), 0, 0, 1, 1, true);
-            View.Label(overlay, "Master title", title, 43, Palette.Mint, TextAnchor.MiddleLeft, 0.07f, 0.87f, 0.93f, 0.95f);
+            View.Label(overlay, "Master title", title, 43, Palette.Mint, TextAnchor.MiddleLeft, 0.07f, 0.87f, 0.73f, 0.95f);
+            View.Button(overlay, "Back master", "返回", back ?? CloseMasterPage, 0.765f, 0.882f, 0.93f, 0.939f, Palette.Panel, Palette.Text, 26);
             View.Button(overlay, "Master back", "返回", back ?? CloseMasterPage, 0.18f, 0.035f, 0.82f, 0.095f, Palette.Panel, Palette.Text, 28);
             return overlay;
         }

@@ -496,6 +496,10 @@ namespace Horizon.Tests
             Call(app, "ShowExecution"); Button(app, "Adjust action environment").onClick.Invoke(); yield return null;
             int focus = life.Insight; Button(app, "Environment two-minutes").onClick.Invoke(); yield return null;
             Assert.AreEqual(focus - 1, life.Insight); yield return Capture(app, "77-action-environment");
+            Assert.IsTrue(Button(app, "Back master").gameObject.activeInHierarchy);
+            Button(app, "Back master").onClick.Invoke(); yield return null;
+            Assert.IsNotNull(Button(app, "Adjust action environment"));
+            Button(app, "Adjust action environment").onClick.Invoke(); yield return null;
             Button(app, "Understand active thought").onClick.Invoke(); yield return null; yield return Capture(app, "78-thought-monster");
             Button(app, "Thought dialogue").onClick.Invoke(); yield return null;
             Button(app, "Generate studio content").onClick.Invoke(); yield return null; yield return null;
@@ -537,6 +541,8 @@ namespace Horizon.Tests
             var world = Get<HorizonWorld3D>(app, "world");
             Assert.AreEqual(8, world.GetComponentsInChildren<Transform>().Count(t => t.name.StartsWith("Future orbit ")));
             Assert.Greater(world.GetComponentsInChildren<Transform>().Count(t => t.name.StartsWith("Memory node ")), 0);
+            Assert.LessOrEqual(world.GetComponentsInChildren<Transform>().Count(t => t.name.StartsWith("Memory node ")), 9,
+                "The emotional pause must not expand the entire dense cause graph.");
             string question = Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Single(t => t.name == "Future question").text;
             StationSwipe swipe = Get<RectTransform>(app, "root").GetComponentInChildren<StationSwipe>(); Assert.IsNotNull(swipe);
             var pointer = new PointerEventData(EventSystem.current) { position = Vector2.zero };
