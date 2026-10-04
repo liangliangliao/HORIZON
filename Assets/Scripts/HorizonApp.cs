@@ -138,6 +138,7 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
+            RestoreCinematicUI();
             if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); }
             CancelAIRequest();
             dragJourney = null;

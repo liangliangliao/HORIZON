@@ -18,7 +18,7 @@
 
 Unity 6 LTS **6000.0.62f1**，URP **17.0.4**，Cinemachine **3.1.3**，Timeline **1.8.7**，Animation Rigging **1.3.0**。人物动作仍以项目内程序化关节动画制作；本次未声称已制作完整角色 Animator Controller、Rig 资产或 Shader Graph 美术资产。电影相机由 Cinemachine 手动更新，PlayableGraph 与一个可暂停的纯规则时钟控制整个感官时间线。字幕使用 TMP 与原项目已授权的中文字体。
 
-编辑器自动创建移动端 Forward URP 配置；构建前也会检查该配置。LitColor 保留旧渲染 SubShader 并添加 URP 光照与阴影；Bloom 使用 URP Volume。竖屏导出通过真实 URP 场景纹理和完整 Canvas 合成，解决 URP Base Camera 清屏覆盖部分 viewport 的问题。
+编辑器自动创建移动端 Forward URP 配置；构建前也会检查该配置。LitColor 保留旧渲染 SubShader 并添加 URP 光照与阴影；阴影及深度通道在本着色器内编译，避免 Unity 6 对跨着色器 UsePass 的关键字空间断言。Bloom 使用 URP Volume。竖屏导出通过真实 URP 场景纹理和完整 Canvas 合成，解决 URP Base Camera 清屏覆盖部分 viewport 的问题。全屏演出暂时隐藏原页面的按钮、文字及背景，退出时恢复。
 
 三维舞台、物件和冲击粒子复用。普通冲击最多 64 粒子，省电画质最多 12；时间碎片省电画质由 32 降为 8。省电模式保留全部镜头分镜、主体、文字、真实倍率和结算。减弱动效使用固定宽镜头，关闭白闪、相机震动和粒子，保留核心动作和意义。
 
@@ -27,8 +27,8 @@ Unity 6 LTS **6000.0.62f1**，URP **17.0.4**，Cinemachine **3.1.3**，Timeline 
 ## 验证
 
 - 本地已通过 **244/244** 项便携测试，包括原 223 项规则回归与新增 21 项奖励测试：六资源映射、符号、实际截断后的数量、快照隔离、旧事件兼容、真实模式证据、三线现实证据、十一段导演语法、递进节点节奏、150ms 停顿、暂停/慢帧/跳过一次性语义、收藏迁移与去重、Overdrive 临时视野隔离和未揭晓因果来源保护。
-- `CinematicPlayableTests` 已编写，尚未执行：真实 Unity 场景中的暂停/跳过/取消、相机恢复、省电粒子预算、主体与旧线保留、储备核心复用后的关闭状态、纪念物序列化恢复，以及真实 Pattern Broken、Reality Convergence 的竖屏渲染。预期产物 `90-pattern-3d.png`、`91-reality-convergence-3d.png` 已接入 CI 检查与上传。
-- 全部 C# 文件已通过 Roslyn 语法检查；这不等于 Unity 类型编译通过。本地 Unity 编辑器镜像因 Docker 存储空间不足未能安装，且没有可用的本地 Unity 激活凭据。完整 Unity EditMode/可玩流程、实际竖屏预览及 Android ARMv7/ARM64 构建仍待仓库 CI 验证。
+- `CinematicPlayableTests` 在仓库 CI 的真实 Unity 场景中验证暂停/跳过/取消、相机恢复、省电粒子预算、主体与旧线保留、储备核心复用后的关闭状态、纪念物序列化恢复，以及真实 Pattern Broken、Reality Convergence 的竖屏渲染。预期产物 `90-pattern-3d.png`、`91-reality-convergence-3d.png` 已接入 CI 检查与上传；结果以该提交的 Actions 日志及测试 XML 为准。
+- 全部 C# 文件已通过 Roslyn 语法检查，仓库 CI 已成功完成 Unity 6 类型编译并运行图形测试。本地 Unity 编辑器镜像因 Docker 存储空间不足未能安装，且没有可用的本地 Unity 激活凭据。完整 Unity EditMode/可玩流程、实际竖屏预览及 Android ARMv7/ARM64 构建由仓库 CI 验证；编译通过不代表这些验收全部通过。
 
 本地便携测试可以使用 `dotnet run --project tools/RulesHarness.csproj -- --workers=0`。图形测试必须使用 Unity 6 和图形设备，不能用 `-nographics`。
 

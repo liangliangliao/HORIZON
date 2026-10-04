@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
@@ -9,6 +10,12 @@ namespace Horizon
 {
     public sealed partial class HorizonApp
     {
+        private readonly List<GameObject> cinematicHiddenUI = new List<GameObject>();
+        private void RestoreCinematicUI()
+        {
+            foreach (GameObject item in cinematicHiddenUI) if (item != null) item.SetActive(true);
+            cinematicHiddenUI.Clear();
+        }
         private bool TryMasterSpectacle(Action resume)
         {
             MasterRunState state = CurrentMaster; if (state == null) return false;
@@ -22,8 +29,12 @@ namespace Horizon
             Action finish = () => { if (finished) return; finished = true; e.acknowledged = true; busy = false;
                 PersistMasterAction(); CloseMasterPage(); resume(); };
             MasterPage("Master reward spectacle", "H O R I Z O N", finish);
+            foreach (Transform child in root)
+                if (child != overlay && child.gameObject.activeSelf)
+                { cinematicHiddenUI.Add(child.gameObject); child.gameObject.SetActive(false); }
             overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f,.023f,.04f,.06f);
             overlay.Find("Master back").gameObject.SetActive(false);
+            overlay.Find("Back master").gameObject.SetActive(false);
             Color accent = e.tier == RewardTier.Mythic ? Palette.Gold : Palette.Mint;
             View.Panel(overlay, "Movie title safe area", new Color(.008f,.02f,.04f,.86f), .025f,.735f,.975f,.865f,20);
             View.Panel(overlay, "Movie copy safe area", new Color(.008f,.02f,.04f,.94f), .035f,.195f,.965f,.39f,24);

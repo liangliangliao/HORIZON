@@ -93,6 +93,7 @@ namespace Horizon.Tests
             archive.wallet.Claim("earned before observation", 40);
             Set(app, "session", life); Set(app, "archive", archive);
             Call(app, "ShowDeadlineResult", original); yield return null;
+            yield return CausalWaitForButton(app, "Inspect timeline");
             ButtonNamed(app, "Inspect timeline").onClick.Invoke();
             yield return CausalWaitForButton(app, "Next ghost beat", "Restart from ghost");
             Assert.IsTrue(archive.ghostOpen); Assert.AreEqual(0, archive.ghostBeat);
@@ -166,9 +167,17 @@ namespace Horizon.Tests
         {
             float beginning = Time.realtimeSinceStartup;
             while (true) {
-                Button button = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>()
-                    .FirstOrDefault(b => names.Contains(b.name) && b.interactable);
+                Button[] buttons = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>();
+                Button button = buttons.FirstOrDefault(b => names.Contains(b.name) && b.interactable);
                 if (button != null) yield break;
+                // A completed life now presents each earned epic before its
+                // causal timeline. Follow the real skip/continue controls.
+                Button next = buttons.FirstOrDefault(b => b.name == "Continue master event" && b.interactable);
+                if (next != null) next.onClick.Invoke();
+                else {
+                    Button skip = buttons.FirstOrDefault(b => b.name == "Skip cinematic" && b.interactable);
+                    if (skip != null) skip.onClick.Invoke();
+                }
                 Assert.Less(Time.realtimeSinceStartup - beginning, 4, "The causal result must settle and remain available.");
                 yield return null;
             }

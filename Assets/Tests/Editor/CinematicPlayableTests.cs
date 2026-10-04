@@ -15,6 +15,17 @@ namespace Horizon.Tests
 {
     public sealed class CinematicPlayableTests
     {
+        private static HorizonWorld3D LiveWorld()
+        {
+            var app=Object.FindObjectOfType<HorizonApp>();
+            if(app==null) app=new GameObject("Cinematic contract app").AddComponent<HorizonApp>();
+            const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
+            Assert.IsNotNull(world,"The running app must create its 3D world.");
+            Assert.IsNotNull(world.WorldCamera);
+            Assert.IsNotNull(world.Cinematics);
+            return world;
+        }
         private static DomainEvent Pattern()
         {
             var model=new PlayerBehavioralModel(); model.Observe(new[] {
@@ -28,7 +39,9 @@ namespace Horizon.Tests
         public IEnumerator PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched()
         {
             yield return new EnterPlayMode();
-            var world=new GameObject("Cinematic contract world").AddComponent<HorizonWorld3D>(); world.Initialize();
+            // Let the app's Start finish before manually advancing its timeline.
+            yield return null;
+            var world=LiveWorld();
             world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,reducedMotion=true,batterySaver=true });
             world.ShowBoard(); world.SnapCamera(); Rect rect=world.WorldCamera.rect; float fov=world.WorldCamera.fieldOfView;
             DomainEvent e=Pattern(); string before=JsonUtility.ToJson(e); int completed=0,impacts=0;
@@ -48,13 +61,14 @@ namespace Horizon.Tests
             Assert.IsTrue(director.Enqueue(e,true,()=>completed++)); director.CancelAll(); Assert.AreEqual(1,completed); Assert.AreEqual(rect,world.WorldCamera.rect);
             director.SetPaused(true); Assert.IsTrue(director.Enqueue(e,true)); Assert.AreEqual(0,actor.MotionRate);
             director.CancelAll(); director.SetPaused(false);
-            Object.Destroy(world.gameObject); yield return new ExitPlayMode();
+            yield return new ExitPlayMode();
         }
         [UnityTest]
         public IEnumerator LowQualityKeepsAllShotsObjectsAndCopyWithBoundedParticles()
         {
             yield return new EnterPlayMode();
-            var world=new GameObject("Low quality cinema").AddComponent<HorizonWorld3D>(); world.Initialize();
+            yield return null;
+            var world=LiveWorld();
             world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,batterySaver=true });
             DomainEvent e=Pattern(); var director=world.Cinematics; director.enabled=false;
             var phases=new List<CinematicPhase>(); director.Cue+=cue=> { if(!cue.NodeHit) phases.Add(cue.Phase); };
@@ -67,7 +81,7 @@ namespace Horizon.Tests
             world.ShowReservoirScene(new List<InvestmentPool>());
             Transform core=world.GetComponentsInChildren<Transform>().Single(x=>x.name==RewardObjectKind.ReservoirCore.ToString());
             Assert.AreEqual(.55f,core.Find("Storage lid").localPosition.y,.001f,"Inspecting saved energy must not inherit an open reward core.");
-            Object.Destroy(world.gameObject); yield return new ExitPlayMode();
+            yield return new ExitPlayMode();
         }
         [UnityTest]
         public IEnumerator RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos()

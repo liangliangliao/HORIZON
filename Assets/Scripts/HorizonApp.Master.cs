@@ -54,7 +54,7 @@ namespace Horizon
             }
         }
         private void CloseMasterPage()
-        { CancelAIRequest(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } }
+        { CancelAIRequest(); RestoreCinematicUI(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } }
         private RectTransform MasterPage(string name, string title, Action back = null)
         {
             CloseMasterPage(); overlay = View.Rect(root, name, 0, 0, 1, 1);
