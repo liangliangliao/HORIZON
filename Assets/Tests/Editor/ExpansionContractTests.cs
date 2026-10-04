@@ -130,7 +130,9 @@ namespace Horizon.Tests
             Assert.AreEqual("GET", transport.last.Method); Assert.AreEqual("Bearer opaque-membership", transport.last.Headers["Authorization"]);
             Assert.AreEqual(0, room.DivergenceDay());
             Assert.Throws<AIException>(() => new SocialClient("http://social.example.test", transport));
-            Assert.ThrowsAsync<OperationCanceledException>(async () => await client.ReadRoom("ABCDEF0123", "opaque-membership", new CancellationToken(true)));
+            var previousRequest = transport.last;
+            Assert.CatchAsync<OperationCanceledException>(async () => await client.ReadRoom("ABCDEF0123", "opaque-membership", new CancellationToken(true)));
+            Assert.AreSame(previousRequest, transport.last, "A pre-cancelled request must never reach the transport.");
         }
         [Test]
         public void OverdriveBuildsFromActualExecutionHasADailyCapAndExpires()
