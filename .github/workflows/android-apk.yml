@@ -10,17 +10,25 @@ on:
       - codex/unity-prototype-v0-3
       - codex/playable-feedback-3d
   workflow_dispatch:
+    inputs:
+      native_check_run:
+        description: 'Retained native APK run ID for diagnosis; leaves ordinary APK publication to the full workflow'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
   checks: write
+  actions: read
 
 concurrency:
-  group: android-apk-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: android-apk-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ inputs.native_check_run || 'full' }}
   cancel-in-progress: true
 
 jobs:
   parallel-lives:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -39,6 +47,7 @@ jobs:
           name: HORIZON-Parallel-Service-Results
           path: artifacts/services/parallel-lives.xml
   ai-gateway:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -57,6 +66,7 @@ jobs:
           name: HORIZON-Gateway-Service-Results
           path: artifacts/services/ai-gateway.xml
   rules:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -77,6 +87,7 @@ jobs:
             artifacts/playability/
           retention-days: 14
   test:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     needs: [ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -273,6 +284,7 @@ jobs:
           retention-days: 14
 
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     needs: [rules, test, ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -391,5 +403,59 @@ jobs:
         with:
           name: HORIZON-Android-APK
           path: build/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  native-recheck:
+    if: github.event_name == 'workflow_dispatch' && inputs.native_check_run != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify retained APK source and previous checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_SOURCE_RUN: ${{ inputs.native_check_run }}
+        run: python3 tools/verify_native_recheck_source.py "$NATIVE_SOURCE_RUN"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: HORIZON-Internal-Native-Check-APK
+          path: artifacts/android-smoke
+          run-id: ${{ inputs.native_check_run }}
+          github-token: ${{ github.token }}
+
+      - name: Enable Android emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify actual Android display and navigation
+        uses: ReactiveCircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed # v2.34.0
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 tools/run_android_smoke.py
+
+      - name: Decode native Android screen captures
+        run: |
+          python3 -m venv /tmp/horizon-native-verification
+          /tmp/horizon-native-verification/bin/python -m pip install pillow==12.3.0
+          /tmp/horizon-native-verification/bin/python tools/verify_android_smoke.py
+
+      - name: Upload native Android recheck evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Native-Android-Recheck
+          path: artifacts/android-smoke/device/
           if-no-files-found: error
           retention-days: 14

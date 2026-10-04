@@ -14,7 +14,7 @@ DEVICE_PREFIX = ("run-as", PACKAGE)
 
 
 def adb(*args, check=True):
-    return subprocess.run(["adb", *args], check=check, capture_output=True)
+    return subprocess.run(["adb", *args], check=check, capture_output=True, timeout=60)
 
 
 def collect():
@@ -26,12 +26,15 @@ def collect():
         (OUTPUT / "device-final-screen.png").write_bytes(screen.stdout)
     packed = adb("exec-out", *DEVICE_PREFIX, "tar", "-cf", "-", "-C", DEVICE_PATH, ".", check=False)
     if packed.returncode == 0:
-        with tarfile.open(fileobj=io.BytesIO(packed.stdout)) as archive:
-            for member in archive.getmembers():
-                path = Path(member.name)
-                if member.isfile() and not path.is_absolute() and ".." not in path.parts:
-                    data = archive.extractfile(member)
-                    (OUTPUT / path.name).write_bytes(data.read())
+        try:
+            with tarfile.open(fileobj=io.BytesIO(packed.stdout)) as archive:
+                for member in archive.getmembers():
+                    path = Path(member.name)
+                    if member.isfile() and not path.is_absolute() and ".." not in path.parts:
+                        data = archive.extractfile(member)
+                        (OUTPUT / path.name).write_bytes(data.read())
+        except tarfile.TarError as error:
+            print("Native report archive is unavailable: " + str(error), flush=True)
     else:
         print("Could not collect native report: " + packed.stderr.decode(errors="replace")[:1000], flush=True)
 
@@ -49,6 +52,9 @@ def main():
     adb("wait-for-device")
     if adb("shell", "id", "-u").stdout.strip() == b"0":
         DEVICE_PREFIX = ()
+    # The first immersive-mode education window steals focus and prevents
+    # Unity's initial scene from running until someone presses "Got it".
+    adb("shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed")
     adb("install", "-r", str(apk))
     resolved = adb("shell", "cmd", "package", "resolve-activity", "--brief", PACKAGE).stdout.decode().splitlines()
     activity = next((line.strip() for line in reversed(resolved) if "/" in line), None)
