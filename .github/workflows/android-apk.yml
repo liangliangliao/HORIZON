@@ -337,13 +337,6 @@ jobs:
           PY
           python3 tools/verify_preview_apk.py build
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: HORIZON-Android-APK
-          path: build/**/*.apk
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Enable Android emulator acceleration
         shell: bash
@@ -377,4 +370,12 @@ jobs:
           name: HORIZON-Native-Android-Display
           path: artifacts/android-smoke/
           if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Android-APK
+          path: build/**/*.apk
+          if-no-files-found: error
           retention-days: 14
