@@ -42,8 +42,9 @@ namespace Horizon.Tests
         public IEnumerator TransparentMasterPagesHideHomeAndRestoreItAfterRepeatedNavigation()
         {
             yield return new EnterPlayMode();
-            yield return null;
             var app=Object.FindObjectOfType<HorizonApp>();
+            if(app==null) app=new GameObject("Transparent page navigation").AddComponent<HorizonApp>();
+            yield return null;
             const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
             var life=GameSession.StartMasterLife(2,41,RunMode.Quick);
             var archive=new ArchiveData { active=life.Snapshot(),seenSecondLife=true,nextRareRun=99 };
@@ -60,8 +61,12 @@ namespace Horizon.Tests
             for(int visit=0;visit<2;visit++)
             {
                 typeof(HorizonApp).GetMethod("ShowImagineSetup",flags).Invoke(app,null);
-                root.GetComponentsInChildren<Button>().Single(b=>b.name==
-                    (archive.imagination==null?"Start imagination":"Resume imagination")).onClick.Invoke();
+                // Keep the archive outside a captured lambda. EnterPlayMode
+                // reloads the iterator but cannot restore its generated closure.
+                Button entry=archive.imagination==null
+                    ? root.GetComponentsInChildren<Button>().Single(b=>b.name=="Start imagination")
+                    : root.GetComponentsInChildren<Button>().Single(b=>b.name=="Resume imagination");
+                entry.onClick.Invoke();
                 yield return null;
                 for(int step=0;step<16;step++)
                 {
