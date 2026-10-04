@@ -39,6 +39,60 @@ namespace Horizon.Tests
             return life.Master.events.Single(x=>x.kind==DomainEventKind.PatternBroken);
         }
         [UnityTest]
+        public IEnumerator TransparentMasterPagesHideHomeAndRestoreItAfterRepeatedNavigation()
+        {
+            yield return new EnterPlayMode();
+            yield return null;
+            var app=Object.FindObjectOfType<HorizonApp>();
+            const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+            var life=GameSession.StartMasterLife(2,41,RunMode.Quick);
+            var archive=new ArchiveData { active=life.Snapshot(),seenSecondLife=true,nextRareRun=99 };
+            archive.Repair(); archive.preferences.sound=false; archive.preferences.haptics=false;
+            typeof(HorizonApp).GetField("archive",flags).SetValue(app,archive);
+            typeof(HorizonApp).GetField("session",flags).SetValue(app,life);
+            typeof(HorizonApp).GetMethod("ApplyPreferences",flags).Invoke(app,null);
+            typeof(HorizonApp).GetMethod("ShowHome",flags).Invoke(app,null);
+            yield return null;
+            var root=(RectTransform)typeof(HorizonApp).GetField("root",flags).GetValue(app);
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
+            GameObject[] home=root.Cast<Transform>().Where(t=>t.gameObject.activeSelf).Select(t=>t.gameObject).ToArray();
+            Rect original=world.WorldCamera.rect;
+            for(int visit=0;visit<2;visit++)
+            {
+                typeof(HorizonApp).GetMethod("ShowImagineSetup",flags).Invoke(app,null);
+                root.GetComponentsInChildren<Button>().Single(b=>b.name=="Start imagination").onClick.Invoke();
+                yield return null;
+                for(int step=0;step<16;step++)
+                {
+                    RectTransform page=(RectTransform)typeof(HorizonApp).GetField("overlay",flags).GetValue(app);
+                    Assert.AreEqual("Imagination run",page.name);
+                    Assert.IsTrue(page.gameObject.activeInHierarchy);
+                    Assert.IsTrue(home.All(g=>g!=null && !g.activeInHierarchy),"A transparent movie page must hide the home buttons and headings.");
+                    Assert.AreEqual(1,root.Cast<Transform>().Count(t=>t.gameObject.activeInHierarchy));
+                    Assert.IsTrue(world.WorldCamera.enabled);
+                    if(archive.imagination.phase==ImaginePhase.Complete) break;
+                    Button action=page.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.interactable &&
+                        (b.name=="Continue imagination" || b.name=="Preparation action 0" || b.name=="Recovery action 0"));
+                    Assert.IsNotNull(action); action.onClick.Invoke(); yield return null;
+                }
+                Assert.AreEqual(ImaginePhase.Complete,archive.imagination.phase);
+                typeof(HorizonApp).GetMethod("CloseMasterPage",flags).Invoke(app,null);
+                yield return null;
+                Assert.IsTrue(home.All(g=>g.activeInHierarchy)); Assert.AreEqual(original,world.WorldCamera.rect);
+                Assert.IsNotNull(root.GetComponentsInChildren<Button>().Single(b=>b.name=="Continue"));
+            }
+            typeof(HorizonApp).GetMethod("ShowSettings",flags).Invoke(app,null);
+            yield return null;
+            Vector3 position=world.WorldCamera.transform.position;
+            Assert.IsTrue(VisualPreferences.Paused); Assert.IsTrue(world.WorldCamera.enabled);
+            yield return null; Assert.AreEqual(position,world.WorldCamera.transform.position);
+            typeof(HorizonApp).GetMethod("CloseSettings",flags).Invoke(app,null);
+            yield return null;
+            Assert.IsTrue(home.All(g=>g.activeInHierarchy)); Assert.IsFalse(VisualPreferences.Paused);
+            Assert.AreEqual(original,world.WorldCamera.rect);
+            yield return new ExitPlayMode();
+        }
+        [UnityTest]
         public IEnumerator PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched()
         {
             yield return new EnterPlayMode();

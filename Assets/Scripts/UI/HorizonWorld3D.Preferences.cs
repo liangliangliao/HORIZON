@@ -15,7 +15,6 @@ namespace Horizon.UI
     {
         private PlayerPreferences preferences = new PlayerPreferences();
         private bool paused;
-        private bool pausedCameraWasEnabled;
         private UniversalRenderPipelineAsset runtimePipeline;
         private RenderPipelineAsset priorPipeline;
 
@@ -53,11 +52,9 @@ namespace Horizon.UI
         public void SetPaused(bool value)
         {
             if (paused == value) return;
-            if (WorldCamera != null)
-            {
-                if (value) { pausedCameraWasEnabled = WorldCamera.enabled; WorldCamera.enabled = false; }
-                else WorldCamera.enabled = pausedCameraWasEnabled;
-            }
+            // Pause simulation and actors while continuing to draw the last
+            // scene. Disabling the base camera leaves URP's clear camera behind
+            // and turns the phone's 3D viewport blank during settings/backgrounding.
             paused = value;
             foreach (HorizonActor actor in GetComponentsInChildren<HorizonActor>(true))
                 actor.MotionRate = value ? 0 : 1;

@@ -10,11 +10,17 @@ namespace Horizon
 {
     public sealed partial class HorizonApp
     {
-        private readonly List<GameObject> cinematicHiddenUI = new List<GameObject>();
-        private void RestoreCinematicUI()
+        private readonly List<GameObject> masterHiddenUI = new List<GameObject>();
+        private void HideMasterBackground()
         {
-            foreach (GameObject item in cinematicHiddenUI) if (item != null) item.SetActive(true);
-            cinematicHiddenUI.Clear();
+            foreach (Transform child in root)
+                if (child != overlay && child.gameObject.activeSelf)
+                { masterHiddenUI.Add(child.gameObject); child.gameObject.SetActive(false); }
+        }
+        private void RestoreMasterBackground()
+        {
+            foreach (GameObject item in masterHiddenUI) if (item != null) item.SetActive(true);
+            masterHiddenUI.Clear();
         }
         private bool TryMasterSpectacle(Action resume)
         {
@@ -29,9 +35,6 @@ namespace Horizon
             Action finish = () => { if (finished) return; finished = true; e.acknowledged = true; busy = false;
                 PersistMasterAction(); CloseMasterPage(); resume(); };
             MasterPage("Master reward spectacle", "H O R I Z O N", finish);
-            foreach (Transform child in root)
-                if (child != overlay && child.gameObject.activeSelf)
-                { cinematicHiddenUI.Add(child.gameObject); child.gameObject.SetActive(false); }
             overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f,.023f,.04f,.06f);
             overlay.Find("Master back").gameObject.SetActive(false);
             overlay.Find("Back master").gameObject.SetActive(false);

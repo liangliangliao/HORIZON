@@ -59,6 +59,9 @@ namespace Horizon
 
         private void OnApplicationPause(bool paused)
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            AndroidSmoke.NotePause(paused);
+#endif
             if (paused) { CancelAIRequest(); PersistLiveLife(); }
             if (world != null) world.SetPaused(paused || userPaused);
         }

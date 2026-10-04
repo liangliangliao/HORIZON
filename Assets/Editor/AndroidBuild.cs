@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Horizon.Editor
 {
@@ -18,6 +19,10 @@ namespace Horizon.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output)));
 
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            // Use the same mobile graphics backend for the preview and its
+            // native emulator check, instead of choosing an untested Vulkan driver.
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.OpenGLES3 });
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             bool release = string.Equals(Argument("-horizonChannel"), "release", StringComparison.OrdinalIgnoreCase);
@@ -57,6 +62,22 @@ namespace Horizon.Editor
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException("Android build failed: " + report.summary.result);
             Debug.Log("HORIZON APK: ARMv7 + ARM64, " + report.summary.totalSize + " bytes, " + output);
+            if (string.Equals(Argument("-horizonSmoke"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                if (release) throw new BuildFailedException("Android smoke is restricted to preview builds.");
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.X86_64;
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.liangliangliao.horizon.smoke");
+                const string smokePath = "artifacts/android-smoke/HORIZON-Smoke.apk";
+                Directory.CreateDirectory(Path.GetDirectoryName(smokePath));
+                BuildReport smoke = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = scenes, locationPathName = smokePath, target = BuildTarget.Android,
+                    options = BuildOptions.Development
+                });
+                if (smoke.summary.result != BuildResult.Succeeded)
+                    throw new BuildFailedException("Native Android smoke build failed: " + smoke.summary.result);
+                Debug.Log("HORIZON native smoke APK: " + smokePath);
+            }
             Console.WriteLine("Build succeeded!");
         }
 

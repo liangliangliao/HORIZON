@@ -41,7 +41,8 @@ namespace Horizon.Tests
             string frozen = JsonUtility.ToJson(life.Snapshot());
             ButtonNamed(app, "Settings").onClick.Invoke(); yield return null;
             Assert.IsTrue(VisualPreferences.Paused);
-            Assert.IsFalse(Get<HorizonWorld3D>(app, "world").WorldCamera.enabled);
+            Assert.IsTrue(Get<HorizonWorld3D>(app, "world").WorldCamera.enabled,
+                "Pausing must retain the visible scene instead of revealing only the clear camera.");
             ButtonNamed(app, "Toggle 0").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Toggle 3").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Toggle 4").onClick.Invoke(); yield return null;

@@ -39,6 +39,9 @@ namespace Horizon
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            AndroidSmoke.Begin();
+#endif
             if (FindObjectOfType<HorizonApp>() == null)
                 new GameObject("HORIZON Runtime").AddComponent<HorizonApp>();
         }
@@ -78,6 +81,9 @@ namespace Horizon
 
         private void Start()
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            if (AndroidSmoke.Active) { StartCoroutine(RunAndroidSmoke()); return; }
+#endif
             if (archive.pendingFeedback != null) { ContinueRun(); return; }
             if (archive.runs.Count == 0)
             {
@@ -138,7 +144,7 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
-            RestoreCinematicUI();
+            RestoreMasterBackground();
             if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); }
             CancelAIRequest();
             dragJourney = null;
