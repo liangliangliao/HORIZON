@@ -800,9 +800,7 @@ namespace Horizon.Tests
             // dynamic font atlas. Rebuild all active text meshes after every
             // character request, before reading the rendered pixels.
             View.RefreshText(canvas.transform);
-            world.BackgroundCamera.Render();
-            world.WorldCamera.Render();
-            ui.Render();
+            HorizonPortraitRenderer.Render(world, ui, canvas, image);
             RenderTexture old = RenderTexture.active;
             RenderTexture.active = image;
             var pixels = new Texture2D(1080, 1920, TextureFormat.RGB24, false);

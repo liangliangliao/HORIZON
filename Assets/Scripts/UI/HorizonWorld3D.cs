@@ -111,6 +111,7 @@ namespace Horizon.UI
             sounds.Add(Tone("Impact", new[] { 160f, 110f, 70f }, 0.25f));
             sounds.Add(Tone("Cascade", new[] { 440f, 554f, 660f, 880f, 1108f, 1320f }, 0.7f));
             InitializeAtmosphere();
+            InitializeCinematics();
             SetTheme(0);
             ShowBoard();
             SnapCamera();
@@ -239,6 +240,7 @@ namespace Horizon.UI
 
         public void SnapCamera()
         {
+            if (moviePlan != null || imaginationSceneActive) return;
             WorldCamera.transform.position = cameraPosition;
             WorldCamera.transform.LookAt(cameraLook);
         }
@@ -246,6 +248,7 @@ namespace Horizon.UI
         private void Update()
         {
             if (WorldCamera == null || paused) return;
+            if (Cinematics != null && Cinematics.IsPlaying || imaginationSceneActive) return;
             UpdateInsight();
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
@@ -453,6 +456,7 @@ namespace Horizon.UI
             var material = new Material(Resources.Load<Shader>("HorizonLit"));
             material.SetColor("_Color", color);
             material.SetColor("_Emission", emission);
+            material.enableInstancing = true;
             materials.Add(material);
             return material;
         }
@@ -460,6 +464,7 @@ namespace Horizon.UI
         {
             var material = new Material(Resources.Load<Shader>("HorizonGlow"));
             material.SetColor("_Color", color);
+            material.enableInstancing = true;
             materials.Add(material);
             return material;
         }

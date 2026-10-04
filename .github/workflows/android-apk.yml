@@ -118,7 +118,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          unityVersion: 2022.3.22f1
+          unityVersion: 6000.0.62f1
           testMode: EditMode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           customParameters: -force-glcore
@@ -298,7 +298,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          unityVersion: 2022.3.22f1
+          unityVersion: 6000.0.62f1
           targetPlatform: Android
           buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage

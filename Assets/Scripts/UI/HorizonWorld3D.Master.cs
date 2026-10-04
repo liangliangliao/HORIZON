@@ -17,17 +17,10 @@ namespace Horizon.UI
             if (ambience != null) ambience.pitch = 1 + insightAmount * 0.16f;
             if (bloom != null && !preferences.reducedMotion && !preferences.batterySaver) bloom.Echo = Mathf.Max(bloom.Echo, insightAmount * 0.22f);
         }
-        public void PresentMasterEvent(DomainEvent e)
+        public void PresentMasterEvent(DomainEvent e, System.Action completed = null, bool fullscreen = false)
         {
             if (e == null) return;
-            if (!preferences.reducedMotion)
-            {
-                pulse = e.tier >= RewardTier.Epic ? 1 : 0.4f;
-                if (e.tier >= RewardTier.Epic) Burst(Avatar.position + Vector3.up * 1.5f, Palette.Mint, 40);
-                if (e.kind == DomainEventKind.DejaVu || e.kind == DomainEventKind.AllLinked) ShowStation(2, true);
-            }
-            if (preferences.sound) StartCoroutine(MasterEventSound(e));
-            MasterHaptics.Play(e, preferences);
+            Cinematics.Enqueue(e, fullscreen, completed);
         }
         private IEnumerator MasterEventSound(DomainEvent e)
         {
@@ -67,11 +60,24 @@ namespace Horizon.UI
     }
     public static class MasterHaptics
     {
+        public static void Impact(DomainEvent e, PlayerPreferences preferences)
+        {
+            // No delayed preamble here: the director already performed the silence
+            // and hit-stop. Start vibration on the same frame as body/VFX/audio.
+            if (e.kind == DomainEventKind.TimeEcho) PlayPhrase(new HapticPhrase(new long[] { 0,25,90,35 }, new[] { 0,90,0,120 }), preferences);
+            else Cue(e.tier >= RewardTier.Epic ? 90 : 25, e.tier >= RewardTier.Epic ? 220 : 90, preferences);
+        }
+        public static void Cue(long duration, int amplitude, PlayerPreferences preferences)
+        { PlayPhrase(new HapticPhrase(new long[] { 0,duration }, new[] { 0,amplitude }), preferences); }
         public static void Play(DomainEvent e, PlayerPreferences preferences)
+        {
+            PlayPhrase(HapticLanguage.For(e.kind, e.tier), preferences);
+        }
+        private static void PlayPhrase(HapticPhrase phrase, PlayerPreferences preferences)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!preferences.haptics) return;
-            HapticPhrase phrase = HapticLanguage.For(e.kind, e.tier); if (phrase == null) return;
+            if (phrase == null) return;
             try
             {
                 using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))

@@ -41,13 +41,14 @@ namespace Horizon.UI
             paused = value;
             foreach (HorizonActor actor in GetComponentsInChildren<HorizonActor>(true))
                 actor.MotionRate = value ? 0 : 1;
+            Cinematics?.SetPaused(value);
             UpdateAudio();
         }
 
         private void UpdateAudio()
         {
             if (audioSource != null) audioSource.mute = paused || !preferences.sound;
-            if (ambience != null) ambience.mute = paused || !preferences.sound || !preferences.ambience;
+            if (ambience != null) ambience.mute = paused || movieMuted || !preferences.sound || !preferences.ambience;
         }
     }
 }

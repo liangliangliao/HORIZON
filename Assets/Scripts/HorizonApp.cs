@@ -118,6 +118,7 @@ namespace Horizon
         private void Save()
         {
             if (archive == null) return;
+            foreach (DomainEvent e in archive.reality.events) archive.rewardCollection.Capture(e, 0);
             if (session != null && (archive.active?.runNumber == session.RunNumber || archive.runs.Contains(session.CompletedRun)))
                 archive.CaptureMaster(session);
             if (session != null && (archive.active?.runNumber == session.RunNumber ||
@@ -137,6 +138,7 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
+            if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); }
             CancelAIRequest();
             dragJourney = null;
             viewGeneration++;
@@ -383,6 +385,7 @@ namespace Horizon
         private void ContinueFeedback()
         {
             if (busy || archive.pendingFeedback == null) return;
+            world.Cinematics.SkipPending();
             FeedbackRecord receipt = archive.pendingFeedback;
             if (receipt.kind == FeedbackKind.Echoes && receipt.beats != null &&
                 receipt.beats.Exists(b => b.sourceDay > 0 && b.sourceDay < receipt.day))

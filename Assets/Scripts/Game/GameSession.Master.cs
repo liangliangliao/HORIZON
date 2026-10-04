@@ -37,6 +37,7 @@ namespace Horizon.Game
             KnowledgeSkill learned = knowledge?.FirstOrDefault(k => k.id == "face"); if (learned != null) Master.knowledge[0] = learned.Copy();
             Master.initialKnowledge = Master.knowledge.Select(k => k.Copy()).ToList();
             Master.resources.Add(new ResourceSample { day = Day, values = Values() });
+            Master.presentationHorizon = MasterHorizon;
             RefreshEngine();
             InitializeExpedition();
             if (UsesExpedition && knowledge != null)
@@ -57,13 +58,23 @@ namespace Horizon.Game
             Master.engine.socialPressure = Master.triggers.Contains("promise") || Master.triggers.Contains("friend") ? 2 : 0;
             RefreshExpeditionEngine();
         }
-        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0)
+        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null)
         {
-            DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain);
+            RewardReceipt receipt = RewardReceipt.Capture(kind, node, CausalNodes, Master.orbitBits, MasterHorizon, Master.triggers.LastOrDefault());
+            if (sourceDay > 0) receipt.sourceDay = sourceDay;
+            if (actionText != null) receipt.action = actionText;
+            if (kind == DomainEventKind.OrbitActivated) receipt.orbitIndex = Array.FindIndex(MasterSpecification.OrbitNames, name => title.EndsWith(name, StringComparison.Ordinal));
+            DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain, receipt);
             // Optional observers cannot alter a transaction or prevent a choice from completing.
             var handlers = DomainEventRaised;
             if (handlers != null) foreach (Action<DomainEvent> handler in handlers.GetInvocationList())
                 try { handler(e.Copy()); } catch (Exception) { /* Presentation failure does not change rules. */ }
+            if (kind != DomainEventKind.HorizonChanged && MasterHorizon > Master.presentationHorizon)
+            {
+                Master.presentationHorizon = MasterHorizon;
+                Emit(DomainEventKind.HorizonChanged, node, "HORIZON " + MasterHorizon,
+                    "你现在可以看见：" + MasterSpecification.HorizonNames[MasterHorizon - 1] + "。视野成长扩大信息范围。");
+            }
             return e;
         }
         private CausalNode MasterNode(CausalNodeKind kind, string label, string parent = null, ResourceDelta effect = null)
@@ -286,7 +297,7 @@ namespace Horizon.Game
             if (!UsesMasterRules) return;
             CausalNode n = CausalNodes.Find(x => x.id == echo.nodeId);
             int chain = EchoChainSize(echo);
-            Emit(DomainEventKind.TimeEcho, n, "TIME ECHO", "D" + echo.sourceDay + " 的「" + echo.cardName + "」回来了。", chain);
+            Emit(DomainEventKind.TimeEcho, n, "TIME ECHO", "D" + echo.sourceDay + " 的「" + echo.cardName + "」回来了。", chain, echo.sourceDay, echo.cardName);
             if (chain >= (UsesExpedition && Day <= Master.overdriveUntilDay ? 4 : 5)) { Master.insightPoints += 2; Emit(chain >= 9 ? DomainEventKind.CausalSingularity : DomainEventKind.Cascade, n,
                 chain >= 9 ? "CAUSAL SINGULARITY" : "CASCADE ×" + chain, "过去多个选择形成了真实因果路径。", chain); }
             if (UsesExpedition && Day <= Master.overdriveUntilDay && chain >= 4)

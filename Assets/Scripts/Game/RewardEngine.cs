@@ -8,19 +8,22 @@ namespace Horizon.Game
         public static RewardTier Tier(DomainEventKind kind, int chain = 0)
         {
             if (kind == DomainEventKind.PatternBroken || kind == DomainEventKind.RealityConvergence) return RewardTier.Mythic;
+            if (kind == DomainEventKind.CausalSingularity && chain >= 9) return RewardTier.Mythic;
             if (kind == DomainEventKind.Cascade || kind == DomainEventKind.CausalSingularity || kind == DomainEventKind.Overdrive ||
                 kind == DomainEventKind.Breakthrough || kind == DomainEventKind.Victory || kind == DomainEventKind.AllLinked) return RewardTier.Epic;
-            if (kind == DomainEventKind.TimeEcho || kind == DomainEventKind.VictoryAnchor || kind == DomainEventKind.Comeback || kind == DomainEventKind.FutureMemory) return RewardTier.Major;
+            if (kind == DomainEventKind.TimeEcho || kind == DomainEventKind.VictoryAnchor || kind == DomainEventKind.Comeback || kind == DomainEventKind.FutureMemory ||
+                kind == DomainEventKind.Synchronized || kind == DomainEventKind.Surprise || kind == DomainEventKind.OrbitActivated ||
+                kind == DomainEventKind.RealityNode || kind == DomainEventKind.HorizonChanged) return RewardTier.Major;
             return chain >= 3 ? RewardTier.Combo : kind == DomainEventKind.ActionTaken || kind == DomainEventKind.ExecutionStep ? RewardTier.Micro : RewardTier.Local;
         }
         public static DomainEvent Emit(MasterRunState state, int run, int day, DomainEventKind kind, string node,
-            string title, string detail = "", int chain = 0)
+            string title, string detail = "", int chain = 0, RewardReceipt receipt = null)
         {
             RewardTier tier = Tier(kind, chain);
             if (tier == RewardTier.Mythic && state.mythicCount >= MasterSpecification.MythicLimit) tier = RewardTier.Major;
             else if (tier == RewardTier.Mythic) state.mythicCount++;
             var e = new DomainEvent { id = "run:" + run + ":v42:" + state.events.Count, day = day, kind = kind, tier = tier,
-                nodeId = node, title = title, detail = detail, chainSize = chain, multiplier = state.resilienceChain };
+                nodeId = node, title = title, detail = detail, chainSize = chain, multiplier = state.resilienceChain, receipt = receipt?.Copy() };
             state.events.Add(e); return e;
         }
         public static bool Acknowledge(MasterRunState state, string id)

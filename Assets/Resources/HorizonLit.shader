@@ -6,6 +6,50 @@ Shader "HORIZON/LitColor"
         _Smoothness ("Smoothness", Range(0,1)) = 0.32
     }
     SubShader {
+        Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
+        Pass {
+            Name "UniversalForward"
+            Tags { "LightMode"="UniversalForward" }
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile_instancing
+            #pragma multi_compile_fog
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            CBUFFER_START(UnityPerMaterial)
+                half4 _Color, _Emission;
+                half _Smoothness;
+            CBUFFER_END
+            struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Varyings { float4 positionCS:SV_POSITION; float3 normalWS:TEXCOORD0; float3 positionWS:TEXCOORD1; half fog:TEXCOORD2; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            Varyings vert(Attributes i) {
+                Varyings o; UNITY_SETUP_INSTANCE_ID(i); UNITY_TRANSFER_INSTANCE_ID(i,o);
+                o.positionWS=TransformObjectToWorld(i.positionOS.xyz); o.positionCS=TransformWorldToHClip(o.positionWS);
+                o.normalWS=TransformObjectToWorldNormal(i.normalOS); o.fog=ComputeFogFactor(o.positionCS.z); return o;
+            }
+            half4 frag(Varyings i):SV_Target {
+                UNITY_SETUP_INSTANCE_ID(i);
+                half3 normal=normalize(i.normalWS), view=GetWorldSpaceNormalizeViewDir(i.positionWS);
+                Light light=GetMainLight(TransformWorldToShadowCoord(i.positionWS));
+                half3 color=_Color.rgb*(SampleSH(normal)+light.color*saturate(dot(normal,light.direction))*light.shadowAttenuation);
+                half spec=pow(saturate(dot(normal,normalize(light.direction+view))),lerp(8,64,_Smoothness));
+                color+=spec*light.color*.18h+_Emission.rgb;
+                #ifdef _ADDITIONAL_LIGHTS
+                uint count=GetAdditionalLightsCount();
+                for(uint n=0;n<count;n++) { Light extra=GetAdditionalLight(n,i.positionWS); color+=_Color.rgb*extra.color*saturate(dot(normal,extra.direction))*extra.distanceAttenuation; }
+                #endif
+                return half4(MixFog(color,i.fog),1);
+            }
+            ENDHLSL
+        }
+        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
+        UsePass "Universal Render Pipeline/Lit/DepthOnly"
+    }
+    SubShader {
         Tags { "RenderType"="Opaque" }
         LOD 200
         CGPROGRAM

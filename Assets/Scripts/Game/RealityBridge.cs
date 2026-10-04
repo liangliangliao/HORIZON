@@ -48,7 +48,9 @@ namespace Horizon.Game
             quest.completed = true; quest.completedAt = stamp;
             nodes.Add(real);
             events.Add(new DomainEvent { id = real.id + ":event", kind = DomainEventKind.RealityNode, tier = RewardTier.Major,
-                day = 1, nodeId = real.id, title = "REALITY NODE", detail = "一次亲自确认的现实行动已进入星座。" });
+                day = 1, nodeId = real.id, title = "REALITY NODE", detail = "Reality Node 已建立。一次亲自确认的现实行动已进入星座。",
+                receipt = new RewardReceipt { action = quest.title, causes = new List<RewardEvidence> {
+                    new RewardEvidence { id = real.id, label = quest.title, kind = CausalNodeKind.Reality } } } });
             if (m != null && !string.IsNullOrEmpty(m.imaginationNodeId) && !string.IsNullOrEmpty(m.simulationNodeId) && !convergenceMemories.Contains(m.id))
             {
                 string imagineId = "imagination:" + m.imaginationRun + ":" + m.imaginationNodeId, simulateId = "simulation:" + m.simulationRun + ":" + m.simulationNodeId;
@@ -56,7 +58,11 @@ namespace Horizon.Game
                 if (!nodes.Any(n => n.id == simulateId)) nodes.Add(new RealityNode { id = simulateId, label = "D" + m.simulationDay + " · 游戏中的再行动", kind = CausalNodeKind.Action, parents = new List<string> { imagineId }, memoryId = m.id });
                 real.parents.Add(simulateId); convergenceMemories.Add(m.id);
                 events.Add(new DomainEvent { id = real.id + ":convergence", kind = DomainEventKind.RealityConvergence, tier = RewardTier.Mythic,
-                    day = 1, nodeId = real.id, title = "REALITY CONVERGENCE", detail = "IMAGINATION → SIMULATION → REALITY\n想象、模拟与现实第一次连在一起。" });
+                    day = 1, nodeId = real.id, title = "REALITY CONVERGENCE", detail = "你曾经想象。你曾经预演。现在，它真实发生了。",
+                    receipt = new RewardReceipt { action = quest.title, causes = new List<RewardEvidence> {
+                        new RewardEvidence { id = imagineId, label = m.text, kind = CausalNodeKind.Imagination },
+                        new RewardEvidence { id = simulateId, day = m.simulationDay, label = "D" + m.simulationDay + " · 游戏中的再行动", kind = CausalNodeKind.Action },
+                        new RewardEvidence { id = real.id, label = quest.title, kind = CausalNodeKind.Reality } } } });
             }
             return true;
         }

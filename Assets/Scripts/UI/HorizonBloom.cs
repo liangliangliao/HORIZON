@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace Horizon.UI
 {
@@ -9,17 +11,32 @@ namespace Horizon.UI
         public float Echo;
         private Material material;
         private Camera view;
-        public bool IsSupported { get { return material != null; } }
+        private Volume volume;
+        private Bloom universalBloom;
+        private VolumeProfile profile;
+        public bool IsSupported { get { return material != null || universalBloom != null; } }
 
         public void Initialize(Shader shader)
         {
             view = GetComponent<Camera>();
+            if (GraphicsSettings.currentRenderPipeline != null)
+            {
+                volume = gameObject.AddComponent<Volume>(); volume.isGlobal = true; volume.priority = 100;
+                profile = ScriptableObject.CreateInstance<VolumeProfile>(); volume.sharedProfile = profile;
+                universalBloom = profile.Add<Bloom>(true); universalBloom.threshold.Override(1.1f);
+                universalBloom.intensity.Override(Intensity); universalBloom.scatter.Override(.55f);
+                view.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+                return;
+            }
             if (shader != null && shader.isSupported && SystemInfo.supportsImageEffects)
                 material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
             else enabled = false;
         }
 
-        private void Update() { Echo = Mathf.MoveTowards(Echo, 0, Time.unscaledDeltaTime * 1.4f); }
+        private void Update()
+        { if (VisualPreferences.Paused) return; Echo = Mathf.MoveTowards(Echo, 0, Time.unscaledDeltaTime * 1.4f); if (universalBloom != null) universalBloom.intensity.value = Intensity + Echo; }
+        private void OnEnable() { if (volume != null) volume.enabled = true; }
+        private void OnDisable() { if (volume != null) volume.enabled = false; }
 
         private void OnRenderImage(RenderTexture source, RenderTexture destination)
         {
@@ -72,6 +89,7 @@ namespace Horizon.UI
 
         private void OnDestroy()
         {
+            if (profile != null) { if (Application.isPlaying) Destroy(profile); else DestroyImmediate(profile); }
             if (material == null) return;
             if (Application.isPlaying) Destroy(material); else DestroyImmediate(material);
         }
