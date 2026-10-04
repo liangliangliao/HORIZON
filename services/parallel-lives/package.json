@@ -1,0 +1,1 @@
+{"name":"horizon-parallel-lives","private":true,"type":"module","scripts":{"test":"node --test server.test.mjs","start":"node server.mjs"},"engines":{"node":">=20"}}

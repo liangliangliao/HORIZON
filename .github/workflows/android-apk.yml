@@ -1,0 +1,333 @@
+name: Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - codex/unity-prototype-v0-3
+      - codex/playable-feedback-3d
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: android-apk-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  parallel-lives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify two actual HTTP clients, invitations, persistence and messages
+        working-directory: services/parallel-lives
+        run: |
+          mkdir -p ../../artifacts/services
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../artifacts/services/parallel-lives.xml server.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-Parallel-Service-Results
+          path: artifacts/services/parallel-lives.xml
+  ai-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify DeepSeek and Azure gateway with mocked providers
+        working-directory: services/ai-gateway
+        run: |
+          mkdir -p ../../artifacts/services
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../artifacts/services/ai-gateway.xml server.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-Gateway-Service-Results
+          path: artifacts/services/ai-gateway.xml
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run portable rules and legacy regressions
+        run: |
+          mkdir -p artifacts
+          dotnet run --project tools/RulesHarness.csproj -- --workers=0 --result=artifacts/rules.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-v042-Rule-Results
+          path: |
+            artifacts/rules.xml
+            artifacts/playability/
+          retention-days: 14
+  test:
+    needs: [ai-gateway, parallel-lives]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: HORIZON-*-Service-Results
+          merge-multiple: true
+          path: artifacts/services
+
+      - name: Free disk space for Unity test image
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          dotnet: true
+          haskell: true
+          tool-cache: true
+          large-packages: false
+          docker-images: false
+          swap-storage: true
+
+      - name: Prepare pinned editor video codec
+        shell: bash
+        run: |
+          curl -fL --retry 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          echo 'abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67  /tmp/horizon-ffmpeg.tar.xz' | sha256sum -c -
+          mkdir -p tools/media
+          tar -xJf /tmp/horizon-ffmpeg.tar.xz -C /tmp --wildcards '*/ffmpeg' '*/ffprobe'
+          cp /tmp/ffmpeg-*-amd64-static/ffmpeg /tmp/ffmpeg-*-amd64-static/ffprobe tools/media/
+
+      - name: Run rules and playable UX tests with visual capture
+        id: tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 2022.3.22f1
+          testMode: EditMode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          customParameters: -force-glcore
+
+      - name: Upload EditMode results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-EditMode-Results
+          path: |
+            ${{ steps.tests.outputs.artifactsPath }}/**/*.xml
+            ${{ steps.tests.outputs.artifactsPath }}/**/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish honest chapter-by-chapter execution evidence
+        if: always()
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
+
+      - name: Upload product acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-v042-Product-Acceptance
+          path: ${{ runner.temp }}/HORIZON-product-acceptance.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify Unity portrait previews
+        shell: bash
+        run: |
+          test -s artifacts/visuals/01-board.png
+          test -s artifacts/visuals/02-action-result.png
+          test -s artifacts/visuals/03-echo-result.png
+          test -s artifacts/visuals/04-future-station.png
+          test -s artifacts/visuals/05-deadline.png
+          test -s artifacts/visuals/07-archive-detail.png
+          test -s artifacts/visuals/08-branch-planner.png
+          test -s artifacts/visuals/09-causal-network.png
+          test -s artifacts/visuals/10-share-story.png
+          test -s artifacts/visuals/11-rare-moment.png
+          test -s artifacts/visuals/12-range-forecast.png
+          test -s artifacts/visuals/13-cascade-merge.png
+          test -s artifacts/visuals/14-future-self-reveal.png
+          test -s artifacts/visuals/15-prediction-why.png
+          test -s artifacts/visuals/16-probability-focus.png
+          test -s artifacts/visuals/17-thirty-day-self.png
+          test -s artifacts/visuals/18-chapter-lesson.png
+          test -s artifacts/visuals/19-cross-life-echoes.png
+          test -s artifacts/visuals/20-boss-constellation.png
+          test -s artifacts/visuals/21-mystery-first.png
+          test -s artifacts/visuals/22-mystery-reveal.png
+          test -s artifacts/visuals/23-settings.png
+          test -s artifacts/visuals/24-new-life-deck.png
+          test -s artifacts/visuals/25-backup-confirmation.png
+          test -s artifacts/visuals/26-expanded-prediction.png
+          test -s artifacts/visuals/27-six-axis-result.png
+          test -s artifacts/visuals/28-seventh-story.png
+          test -s artifacts/visuals/29-long-life-board.png
+          test -s artifacts/visuals/30-long-life-deadline.png
+          test -s artifacts/visuals/31-long-life-map.png
+          test -s artifacts/visuals/32-long-life-network.png
+          test -s artifacts/visuals/33-long-life-share.png
+          test -s artifacts/visuals/34-unified-time-vision.png
+          test -s artifacts/visuals/35-personal-causal-memory.png
+          test -s artifacts/visuals/36-memory-resumed.png
+          test -s artifacts/visuals/37-ghost-original-choice.png
+          test -s artifacts/visuals/38-ghost-returning-consequence.png
+          test -s artifacts/visuals/39-ghost-deadline.png
+          test -s artifacts/visuals/40-master-execution.png
+          test -s artifacts/visuals/41-victory-anchor.png
+          test -s artifacts/visuals/42-imagine-recovery.png
+          test -s artifacts/visuals/43-future-orbit.png
+          test -s artifacts/visuals/44-reality-constellation.png
+          test -s artifacts/visuals/45-ai-deepseek.png
+          test -s artifacts/visuals/46-ai-azure.png
+          test -s artifacts/visuals/47-ai-future-self.png
+          test -s artifacts/visuals/48-ai-foundry-resource.png
+          test -s artifacts/visuals/49-ai-azure-deployments.png
+          test -s artifacts/visuals/50-first-life-goal.png
+          test -s artifacts/visuals/51-first-life-choice.png
+          test -s artifacts/visuals/52-first-life-board.png
+          test -s artifacts/visuals/53-first-life-future-schedule.png
+          test -s artifacts/visuals/54-first-life-decision.png
+          test -s artifacts/visuals/55-first-life-prediction.png
+          test -s artifacts/visuals/56-first-life-new-family.png
+          test -s artifacts/visuals/57-imagine-card-recovery.png
+          test -s artifacts/visuals/58-playable-wide-choices.png
+          test -s artifacts/visuals/59-prepared-execution-cost.png
+          test -s artifacts/visuals/60-grouped-time-echo.png
+          test -s artifacts/visuals/61-imagination-actual-divergence.png
+          test -s artifacts/visuals/62-isolated-practice-life.png
+          test -s artifacts/visuals/63-playable-life-complete.png
+          test -s artifacts/visuals/64-story-selection.png
+          test -s artifacts/visuals/65-story-victory-anchor.png
+          test -s artifacts/visuals/66-story-preparation.png
+          test -s artifacts/visuals/67-story-setback.png
+          test -s artifacts/visuals/68-story-boss.png
+          test -s artifacts/visuals/69-story-arrived.png
+          test -s artifacts/visuals/70-readable-causal-story.png
+          test -s artifacts/visuals/71-story-home.png
+          test -s artifacts/visuals/72-tall-phone-board.png
+          test -s artifacts/visuals/73-tall-phone-home.png
+
+      - name: Decode and verify actual Unity GIF exports
+        shell: bash
+        run: |
+          python -m venv /tmp/horizon-gif-verification
+          /tmp/horizon-gif-verification/bin/python -m pip install pillow==12.3.0
+          /tmp/horizon-gif-verification/bin/python tools/verify_timeline_exports.py
+          /tmp/horizon-gif-verification/bin/python tools/verify_v03_previews.py
+          python3 tools/verify_video_exports.py --ffprobe tools/media/ffprobe
+
+      - name: Upload Unity portrait previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Unity-Portrait-Previews
+          path: |
+            artifacts/visuals/[0-6]*.png
+            artifacts/visuals/7[0-3]*.png
+            artifacts/visuals/*.gif
+            artifacts/visuals/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload expedition phone previews and actual MP4
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-v042-Expedition-Previews
+          path: |
+            artifacts/visuals/7[4-9]*.png
+            artifacts/visuals/8*.png
+            artifacts/visuals/*.mp4
+            artifacts/visuals/*.pcm
+          if-no-files-found: ignore
+          retention-days: 14
+
+  build:
+    needs: [rules, test, ai-gateway, parallel-lives]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Check Unity activation secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -z "$UNITY_EMAIL" || -z "$UNITY_PASSWORD" || ( -z "$UNITY_LICENSE" && -z "$UNITY_SERIAL" ) ]]; then
+            echo '::error title=Unity activation required::Set UNITY_EMAIL and UNITY_PASSWORD, plus UNITY_LICENSE (Personal) or UNITY_SERIAL (Pro), in repository Actions secrets.'
+            exit 1
+          fi
+
+      - name: Free disk space for Unity Android image
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          dotnet: true
+          haskell: true
+          tool-cache: true
+          large-packages: false
+          docker-images: false
+          swap-storage: true
+
+      - name: Build Android APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 2022.3.22f1
+          targetPlatform: Android
+          buildMethod: Horizon.Editor.AndroidBuild.Build
+          androidExportType: androidPackage
+          customParameters: -horizonChannel preview -horizonVersion 0.4.2 -horizonBuildNumber ${{ github.run_number }}
+
+      - name: Verify APK output
+        shell: bash
+        run: |
+          find build -type f -name '*.apk' -printf '%p (%s bytes)\n' | tee /tmp/horizon-apks.txt
+          test -s /tmp/horizon-apks.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          apks = list(Path('build').rglob('*.apk'))
+          assert apks, 'No APK produced'
+          for apk in apks:
+              with zipfile.ZipFile(apk) as archive:
+                  entries = set(archive.namelist())
+                  for abi in ('armeabi-v7a', 'arm64-v8a'):
+                      for library in ('libunity.so', 'libil2cpp.so'):
+                          assert f'lib/{abi}/{library}' in entries, f'{apk}: missing {abi}/{library}'
+              print(f'{apk}: ARMv7 and ARM64 verified')
+          PY
+          python3 tools/verify_preview_apk.py build
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Android-APK
+          path: build/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
