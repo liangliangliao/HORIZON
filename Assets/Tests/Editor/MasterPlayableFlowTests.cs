@@ -532,7 +532,7 @@ namespace Horizon.Tests
                 life.Choose(life.Hand.Last(life.CanPlay).Id); if (life.NeedsStation) life.VisitStation(); if (life.CompletedRun == null) life.Advance();
             }
             var archive = new ArchiveData(); archive.runs.Add(life.CompletedRun); archive.preferences.reducedMotion = true; archive.preferences.sound = false; archive.Repair();
-            Set(app, "archive", archive); Set(app, "session", life); Call(app, "ApplyPreferences"); Call(app, "ShowStation", 0);
+            Set(app, "archive", archive); Set(app, "session", life); Call(app, "ApplyPreferences"); Call(app, "ShowStation");
             yield return new WaitForSecondsRealtime(0.4f);
             var world = Get<HorizonWorld3D>(app, "world");
             Assert.AreEqual(8, world.GetComponentsInChildren<Transform>().Count(t => t.name.StartsWith("Future orbit ")));
