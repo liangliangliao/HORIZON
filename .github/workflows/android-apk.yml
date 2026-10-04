@@ -114,17 +114,20 @@ jobs:
         id: tests
         uses: game-ci/unity-test-runner@v4
         env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           unityVersion: 6000.0.62f1
+          cliVersion: v0.1.72
           testMode: EditMode
+          coverageEnabled: false
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           customParameters: -force-glcore
 
       - name: Upload EditMode results
-        if: always()
+        if: always() && steps.tests.outputs.artifactsPath != ''
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-EditMode-Results
@@ -136,7 +139,7 @@ jobs:
 
       - name: Publish honest chapter-by-chapter execution evidence
         if: always()
-        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath || 'artifacts' }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
 
       - name: Upload product acceptance report
         if: always()
