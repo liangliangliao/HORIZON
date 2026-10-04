@@ -368,7 +368,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Native-Android-Display
-          path: artifacts/android-smoke/
+          path: artifacts/android-smoke/device/
           if-no-files-found: ignore
           retention-days: 14
 
