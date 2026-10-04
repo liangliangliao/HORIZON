@@ -1,4 +1,4 @@
-"""Verify preview identity and the committed QA certificate in APK v2 signing."""
+"""Verify preview identity, signing, native ABIs and Android media integration."""
 from hashlib import sha256
 from pathlib import Path
 import struct
@@ -54,7 +54,15 @@ def verify(apk):
         for abi in ('armeabi-v7a', 'arm64-v8a'):
             for library in ('libunity.so', 'libil2cpp.so'):
                 assert f'lib/{abi}/{library}' in archive.namelist(), f'Missing {abi}/{library}'
-    print(f'{apk.name}: both ABIs, preview identity, stable signer {sha256(certificate(apk)).hexdigest()} verified')
+        dex_files = [archive.read(name) for name in archive.namelist()
+                     if name.startswith('classes') and name.endswith('.dex')]
+        assert dex_files, f'{apk}: missing DEX files'
+        for name in ('TimelineEncoder', 'TimelineShareBridge', 'TimelineShareProvider'):
+            descriptor = f'Lcom/horizon/media/{name};'.encode('ascii')
+            assert any(descriptor in dex for dex in dex_files), f'{apk}: missing Android class {name}'
+        provider = 'com.horizon.media.TimelineShareProvider'
+        assert any(provider.encode(e) in manifest for e in ('utf-8', 'utf-16le')), 'Missing timeline share provider'
+    print(f'{apk.name}: both ABIs, media DEX classes, preview identity, stable signer {sha256(certificate(apk)).hexdigest()} verified')
 
 
 if __name__ == '__main__':

@@ -51,7 +51,7 @@ pending=[{'id':c['id'],'requirement':c['requirement'],'credit':c['earned_credit'
 counts=dict(Counter(c['result'] for c in cases.values()))
 tracked_changes=subprocess.check_output(['git','diff','--name-only','HEAD'],text=True).splitlines()
 code_paths=subprocess.check_output(['git','ls-files','Assets/Scripts','Assets/Tests','Assets/Plugins','Assets/Resources','tools/acceptance_catalog.py'],text=True).splitlines()
-code_paths=[p for p in code_paths if Path(p).suffix in ('.cs','.java','.shader','.xml','.py','.asmdef')]
+code_paths=[p for p in code_paths if Path(p).suffix in ('.cs','.java','.shader','.xml','.py','.asmdef','.gradle','.pro','.properties')]
 source_changes=[p for p in tracked_changes if p in code_paths]
 report={'baseline':'0.4.2','commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
         'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
