@@ -46,7 +46,7 @@ namespace Horizon.UI
             WorldCamera.allowMSAA = !preferences.batterySaver;
             WorldCamera.allowHDR = !preferences.batterySaver && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.DefaultHDR);
             QualitySettings.antiAliasing = preferences.batterySaver ? 0 : 2;
-            QualitySettings.shadows = preferences.batterySaver ? ShadowQuality.Disable : ShadowQuality.All;
+            QualitySettings.shadows = preferences.batterySaver ? UnityEngine.ShadowQuality.Disable : UnityEngine.ShadowQuality.All;
             UpdateAudio();
         }
 
