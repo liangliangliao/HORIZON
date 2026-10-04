@@ -39,6 +39,37 @@ namespace Horizon.Tests
             return life.Master.events.Single(x=>x.kind==DomainEventKind.PatternBroken);
         }
         [UnityTest]
+        public IEnumerator CompletedRewardUsesNormalContinuationWhenAndroidBackIsPressed()
+        {
+            yield return new EnterPlayMode();
+            var app=Object.FindObjectOfType<HorizonApp>();
+            if(app==null) app=new GameObject("Reward back navigation").AddComponent<HorizonApp>();
+            yield return null;
+            const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+            var life=GameSession.StartMasterLife(2,41,RunMode.Quick);
+            var archive=new ArchiveData { active=life.Snapshot(),seenSecondLife=true,nextRareRun=99 };
+            archive.Repair(); archive.preferences.sound=false; archive.preferences.haptics=false;
+            typeof(HorizonApp).GetField("archive",flags).SetValue(app,archive);
+            typeof(HorizonApp).GetField("session",flags).SetValue(app,life);
+            typeof(HorizonApp).GetMethod("ApplyPreferences",flags).Invoke(app,null);
+            typeof(HorizonApp).GetMethod("ShowHome",flags).Invoke(app,null);
+            yield return null;
+            var root=(RectTransform)typeof(HorizonApp).GetField("root",flags).GetValue(app);
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
+            GameObject[] home=root.Cast<Transform>().Where(t=>t.gameObject.activeSelf).Select(t=>t.gameObject).ToArray();
+            Rect viewport=world.WorldCamera.rect; var probe=new CueProbe(); DomainEvent reward=Pattern();
+            typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { reward,new Action(probe.Completed) });
+            Assert.IsTrue(home.All(g=>!g.activeInHierarchy));
+            world.Cinematics.enabled=false; world.Cinematics.Advance(30); yield return null;
+            Assert.IsTrue(root.GetComponentsInChildren<Button>().Single(b=>b.name=="Continue master event").interactable);
+            typeof(HorizonApp).GetMethod("HandleBack",flags).Invoke(app,null); yield return null;
+            Assert.AreEqual(1,probe.Completions,"System back must run the reward continuation, rather than just destroy its page.");
+            Assert.IsTrue(reward.acknowledged); Assert.IsNull(typeof(HorizonApp).GetField("overlay",flags).GetValue(app));
+            Assert.IsTrue(home.All(g=>g.activeInHierarchy)); Assert.IsTrue(world.WorldCamera.enabled);
+            Assert.AreEqual(viewport,world.WorldCamera.rect);
+            yield return new ExitPlayMode();
+        }
+        [UnityTest]
         public IEnumerator TransparentMasterPagesHideHomeAndRestoreItAfterRepeatedNavigation()
         {
             yield return new EnterPlayMode();

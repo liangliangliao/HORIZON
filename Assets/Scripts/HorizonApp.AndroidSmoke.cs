@@ -58,6 +58,8 @@ namespace Horizon
 
     public sealed partial class HorizonApp
     {
+        private bool androidSmokeRewardReturned;
+        private void AndroidSmokeFinishReward() { androidSmokeRewardReturned=true; }
         private IEnumerator RunAndroidSmoke()
         {
             IEnumerator flow=AndroidSmokeFlow();
@@ -125,6 +127,27 @@ namespace Horizon
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
             AndroidSmoke.Require(world.WorldCamera.enabled && home.All(g=>g.activeInHierarchy),"Resume left the phone blank.");
             CaptureAndroidFrame("04-resumed-home",world.Avatar);
+            // Reproduce the completed reward's system-back path with a real
+            // generated pattern event, and inject KEYCODE_BACK from the host.
+            var model=new PlayerBehavioralModel(); model.Observe(new[] {
+                new BehaviorObservation { id="native-a",run=1,day=1,key="decision-reopen",nodeId="first" },
+                new BehaviorObservation { id="native-b",run=2,day=1,key="decision-reopen",nodeId="second" } });
+            var rewardLife=GameSession.StartMasterLife(3,41,RunMode.MirrorRun,model);
+            rewardLife.LockDecision(rewardLife.Hand[1].Id);
+            for(int i=0;i<4;i++) rewardLife.ExecuteDecisionStep(); rewardLife.Choose(rewardLife.Master.decision.cardId);
+            DomainEvent reward=rewardLife.Master.events.Single(e=>e.kind==DomainEventKind.PatternBroken);
+            androidSmokeRewardReturned=false; PlayMasterSpectacle(reward,AndroidSmokeFinishReward);
+            yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
+            AndroidSmoke.Require(home.All(g=>!g.activeInHierarchy),"Home leaked through the reward movie.");
+            CaptureAndroidFrame("05-reward-visible",world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Cinematic player").transform);
+            SmokeButton("Skip cinematic"); yield return null;
+            AndroidSmoke.Write("await_back"); deadline=Time.realtimeSinceStartup+30;
+            while (!androidSmokeRewardReturned && Time.realtimeSinceStartup<deadline) yield return null;
+            AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
+                "Android back bypassed the reward continuation and left the interface hidden.");
+            AndroidSmoke.Require(reward.acknowledged && world.WorldCamera.rect==viewport,"Reward back did not restore the scene.");
+            yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
+            CaptureAndroidFrame("06-reward-back-home",world.Avatar);
         }
         private void SmokeButton(string name)
         {

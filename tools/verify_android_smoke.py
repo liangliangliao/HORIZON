@@ -8,7 +8,7 @@ report = json.loads((directory / "report.json").read_text())
 assert report["status"] == "passed" and not report.get("errors"), report
 assert report["graphics"] == "OpenGLES3", report["graphics"]
 frames = report["frames"]
-assert {"01-home", "03-returned-home", "04-resumed-home"}.issubset(frames)
+assert {"01-home", "03-returned-home", "04-resumed-home", "05-reward-visible", "06-reward-back-home"}.issubset(frames)
 assert any(name.endswith("-Complete") for name in frames), "The actual imagination flow did not finish"
 assert any(name.endswith("-Recover") for name in frames), "Recovery was not exercised"
 assert len(frames) >= 9, frames

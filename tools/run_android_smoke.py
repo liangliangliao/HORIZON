@@ -46,6 +46,7 @@ def main():
     adb("shell", "am", "start", "-W", "-n", activity, "--ez", "horizonSmoke", "true")
     deadline = time.monotonic() + 240
     backgrounded = False
+    back_pressed = False
     previous = None
     try:
         while time.monotonic() < deadline:
@@ -69,8 +70,12 @@ def main():
                 time.sleep(2)
                 adb("shell", "am", "start", "-W", "-n", activity, "--activity-single-top")
                 backgrounded = True
+            if status == "await_back" and not back_pressed:
+                adb("shell", "input", "keyevent", "KEYCODE_BACK")
+                back_pressed = True
             if status == "passed":
                 assert backgrounded, "The native background/foreground check was skipped"
+                assert back_pressed, "The native reward system-back check was skipped"
                 assert not report.get("errors"), "Unity reported runtime errors"
                 assert report["graphics"] == "OpenGLES3", "The tested Android backend differs from the preview"
                 return
