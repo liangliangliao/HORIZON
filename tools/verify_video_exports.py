@@ -8,6 +8,7 @@ import subprocess
 parser = argparse.ArgumentParser()
 parser.add_argument('--directory', type=Path, default=Path('artifacts/visuals'))
 parser.add_argument('--ffprobe', default='ffprobe')
+parser.add_argument('--output', type=Path, help='Optional report path outside container-owned export directories')
 args = parser.parse_args()
 path = args.directory / 'HORIZON-run-001.mp4'
 probe = json.loads(subprocess.check_output([args.ffprobe, '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(path)], text=True))
@@ -21,5 +22,7 @@ assert (args.directory / 'HORIZON-run-001.pcm').stat().st_size == 10 * 22050 * 2
 result = {'video': path.name, 'seconds': float(probe['format']['duration']), 'frames': 60,
           'resolution': [540, 960], 'video_codec': 'h264', 'audio_codec': 'aac',
           'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'actual_unity_share_button': True}
-(args.directory / 'video-export-verification.json').write_text(json.dumps(result, indent=2) + '\n')
+if args.output:
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(result, indent=2) + '\n')
 print(json.dumps(result))
