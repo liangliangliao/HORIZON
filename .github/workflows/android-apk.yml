@@ -122,7 +122,6 @@ jobs:
           unityVersion: 6000.0.62f1
           cliVersion: v0.1.72
           testMode: EditMode
-          coverageEnabled: false
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           customParameters: -force-glcore
 
