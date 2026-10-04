@@ -6,17 +6,17 @@ namespace Horizon.Game
 {
     public sealed partial class GameSession
     {
-        public static int RunLength(RunRecord run) { return run?.deadline == 30 ? 30 : LastDay; }
+        public static int RunLength(RunRecord run) { return run != null && (run.deadline == 30 || run.deadline == 60) ? run.deadline : LastDay; }
         public static GameSession StartLongLife(int number, int seed)
         { return new GameSession(number, seed) { Deadline = 30 }; }
-        public bool UsesSixPredictionAxes { get { return CatalogVersion >= 6 && (RunNumber >= 3 || Deadline == 30); } }
+        public bool UsesSixPredictionAxes { get { return CatalogVersion >= 6 && (RunNumber >= 3 || Deadline >= 30); } }
         private bool IsPredictionDay
-        { get { return Day == 4 || CatalogVersion >= 6 && (RunNumber >= 2 || Deadline == 30) &&
-            (Day == 8 || Deadline == 30 && (Day == 14 || Day == 21 || Day == 27)); } }
+        { get { return Day == 4 || CatalogVersion >= 6 && (RunNumber >= 2 || Deadline >= 30) &&
+            (Day == 8 || Deadline >= 30 && (Day == 14 || Day == 21 || Day == 27 || Deadline == 60 && (Day > 30 && Day % 7 == 0 || Day == 57))); } }
         public bool NeedsStation
         { get { return HasChosen && IsStationDay(Day) && !StationDays.Contains(Day) && !(Day == 4 && StationVisited); } }
         private bool IsStationDay(int day)
-        { return day == 4 || Deadline == 30 && (day == 12 || day == 14 || day == 21 || day == 28); }
+        { return day == 4 || Deadline >= 30 && (day == 12 || day == 14 || day == 21 || day == 28 || Deadline == 60 && day > 30 && day % 7 == 0 && day < Deadline); }
 
         public void LockPrediction(ResourceDelta expected, int days)
         {
@@ -35,6 +35,7 @@ namespace Horizon.Game
                 sixAxes = UsesSixPredictionAxes
             };
             Predictions.Add(Prediction);
+            MasterPredictionLocked();
         }
 
         private void RefreshPredictionCursor()
@@ -51,6 +52,7 @@ namespace Horizon.Game
                 int distance = Math.Abs(p.energy - p.actualEnergy) + Math.Abs(p.mood - p.actualMood) + Math.Abs(p.insight - p.actualInsight);
                 if (p.sixAxes) distance += Math.Abs(p.relation - p.actualRelation) + Math.Abs(p.money - p.actualMoney) + Math.Abs(p.ability - p.actualAbility);
                 p.accurate = distance <= (p.sixAxes ? 4 : 2); p.evaluated = true;
+                MasterPredictionEvaluated(p);
             }
             RefreshPredictionCursor();
         }

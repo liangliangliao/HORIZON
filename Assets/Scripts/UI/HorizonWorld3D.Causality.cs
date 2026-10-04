@@ -13,7 +13,7 @@ namespace Horizon.UI
         private int causalAnimation;
         private bool memoryReading;
 
-        public void ShowCausalMemories(List<MemoryChain> chains)
+        public void ShowCausalMemories(List<MemoryChain> chains, bool quietPreview = false)
         {
             touchGeneration++; causalAnimation++;
             if (memoryGroup != null) { memoryGroup.gameObject.SetActive(false); Dispose(memoryGroup.gameObject); }
@@ -25,12 +25,28 @@ namespace Horizon.UI
                 Transform branch = Group("Chain from D" + chain.Origin.day, memoryGroup);
                 branch.localPosition = new Vector3((i - (chains.Count - 1) * 0.5f) * 2.35f, 1.05f, 5.15f);
                 var positions = new Dictionary<string, Transform>(); causalMemories.Add(positions);
-                int first = chain.Nodes.Select(n => n.day).DefaultIfEmpty(chain.Origin.day).Min();
-                int last = chain.Nodes.Select(n => n.day).DefaultIfEmpty(first).Max();
-                foreach (CausalNode node in chain.Nodes)
+                List<CausalNode> shown = chain.Nodes;
+                if (quietPreview)
                 {
-                    int rank = chain.Nodes.Where(n => n.day == node.day).ToList().IndexOf(node);
-                    int count = chain.Nodes.Count(n => n.day == node.day);
+                    // The station pauses on one real path. The full graph remains in its detail view.
+                    shown = new List<CausalNode>();
+                    CausalNode originNode = chain.Nodes.Find(n => n.id == chain.Origin.nodeId);
+                    if (originNode != null) shown.Add(originNode);
+                    while (shown.Count > 0 && shown.Count < 3)
+                    {
+                        string parentId = shown[shown.Count - 1].id;
+                        CausalNode next = chain.Nodes.Where(n => !shown.Contains(n) && CausalGraph.ObservedParents(n).Contains(parentId))
+                            .OrderBy(n => n.day).ThenBy(n => n.type == CausalNodeKind.Echo ? 0 : 1).FirstOrDefault();
+                        if (next == null) break;
+                        shown.Add(next);
+                    }
+                }
+                int first = shown.Select(n => n.day).DefaultIfEmpty(chain.Origin.day).Min();
+                int last = shown.Select(n => n.day).DefaultIfEmpty(first).Max();
+                foreach (CausalNode node in shown)
+                {
+                    int rank = shown.Where(n => n.day == node.day).ToList().IndexOf(node);
+                    int count = shown.Count(n => n.day == node.day);
                     Vector3 at = new Vector3((rank - (count - 1) * 0.5f) * 0.48f,
                         last == first ? 0 : (node.day - first) / (float)(last - first) * 1.8f, rank * 0.12f);
                     CardSpec card = CardCatalog.FindById(node.cardId);
@@ -45,7 +61,7 @@ namespace Horizon.UI
                 }
                 if (positions.TryGetValue(chain.Origin.nodeId, out Transform origin)) memoryOrbs.Add(origin);
                 else memoryOrbs.Add(branch);
-                foreach (CausalNode node in chain.Nodes)
+                foreach (CausalNode node in shown)
                     foreach (string parent in CausalGraph.ObservedParents(node))
                         if (positions.ContainsKey(parent))
                             CausalLine(branch, "Actual cause " + parent + " to " + node.id,

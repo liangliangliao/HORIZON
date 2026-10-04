@@ -34,6 +34,7 @@ namespace Horizon.Game
         public bool presented;
         public int presentedPages;
         public int preparedGates;
+        public bool detailed;
     }
 
     [Serializable]
@@ -107,7 +108,7 @@ namespace Horizon.Game
             string label = "";
             Add(ref label, "精力", delta.energy);
             Add(ref label, "心情", delta.mood);
-            Add(ref label, "洞察", delta.insight);
+            Add(ref label, "专注", delta.insight);
             Add(ref label, "关系", delta.relation);
             Add(ref label, "金钱", delta.money);
             Add(ref label, "能力", delta.ability);
@@ -142,6 +143,8 @@ namespace Horizon.Game
 
         public static string BlockReason(GameSession session, CardSpec card)
         {
+            if (session.InExecutionMode) return "决定已锁定 · 点「继续执行」完成下一步，或主动解锁。";
+            if (session.NeedsImagination(card)) return "先走完一次失败与恢复的预演，再把未来记忆带回今天。";
             if (session.Energy + card.Now.energy < 0) return "精力不足，先选一张恢复牌。";
             if (session.Money + card.Now.money < 0) return "金钱不足，换一个不花钱的行动。";
             return "此刻的状态无法支持这张牌，试试恢复。";

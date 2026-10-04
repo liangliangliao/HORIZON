@@ -10,58 +10,6 @@ using UnityEngine.UI;
 
 namespace Horizon
 {
-    [Serializable]
-    public sealed partial class ArchiveData
-    {
-        public List<RunRecord> runs = new List<RunRecord>();
-        public RunSnapshot active;
-        public bool seenFirstEcho;
-        public bool seenSecondLife;
-        public int calibrations;
-        public string preferredIntent;
-        public string preferredCardId;
-        public RewardWallet wallet = new RewardWallet();
-        public FeedbackRecord pendingFeedback;
-        public JourneyProgress journey = new JourneyProgress();
-        public RareMoment pendingMoment;
-        public List<RareMoment> moments = new List<RareMoment>();
-        public int nextRareRun = 3;
-        public int stationRun;
-        public int stationBeat;
-        public bool stationMemoryOpen, ghostOpen;
-        public int stationMemoryIndex, stationMemoryBeat, ghostRun, ghostBeat;
-        public PlayerPreferences preferences = new PlayerPreferences();
-
-        public void Repair()
-        {
-            if (runs == null) runs = new List<RunRecord>();
-            if (wallet == null) wallet = new RewardWallet();
-            if (preferences == null || preferences.version < 1) preferences = new PlayerPreferences();
-            wallet.Repair();
-            if (journey == null) journey = new JourneyProgress();
-            journey.Repair();
-            if (runs.Any(r => r != null && r.number >= 3)) journey.learnedStage = Math.Max(6, journey.learnedStage);
-            if (moments == null) moments = new List<RareMoment>();
-            if (nextRareRun < 3) nextRareRun = 3;
-            // Unity can deserialize a null nested class as an empty instance.
-            if (active != null && active.runNumber < 1) active = null;
-            if (pendingMoment != null && (active == null || pendingMoment.runNumber != active.runNumber || pendingMoment.day < 1))
-                pendingMoment = null;
-            if (pendingFeedback != null && (pendingFeedback.runNumber < 1 ||
-                (pendingFeedback.kind == FeedbackKind.Deadline ? runs.Count == 0 : active == null)))
-                pendingFeedback = null;
-            if (active == null || stationRun != active.runNumber || stationBeat != 1) stationMemoryOpen = false;
-            if (pendingFeedback == null || pendingFeedback.kind != FeedbackKind.Deadline ||
-                !runs.Any(r => r != null && r.number == ghostRun)) ghostOpen = false;
-            foreach (RunRecord run in runs)
-            {
-                if (!GameSession.ValidPrediction(run.prediction, GameSession.RunLength(run))) run.prediction = null;
-                if (run.boss != null && run.boss.ghostTimeline != null && run.boss.ghostTimeline.sourceDay < 1)
-                    run.boss.ghostTimeline = null;
-            }
-        }
-    }
-
     public sealed partial class HorizonApp : MonoBehaviour
     {
         private const string SaveKey = "HORIZON.PROTOTYPE.V1";
@@ -170,10 +118,13 @@ namespace Horizon
         private void Save()
         {
             if (archive == null) return;
+            if (session != null && (archive.active?.runNumber == session.RunNumber || archive.runs.Contains(session.CompletedRun)))
+                archive.CaptureMaster(session);
             if (session != null && (archive.active?.runNumber == session.RunNumber ||
                 session.CompletedRun != null && archive.runs.Contains(session.CompletedRun))) archive.journey.Observe(session);
             if (saveStore == null) saveStore = new ArchiveStore(System.IO.Path.Combine(Application.persistentDataPath, "HORIZON.life.json"), SaveKey);
-            saveStore.Save(archive);
+            if (!IsPractice) saveStore.Save(archive);
+            if (parallelPlaying) SaveParallelSession();
         }
 
         private void ApplySafeArea()
@@ -186,6 +137,7 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
+            CancelAIRequest();
             dragJourney = null;
             viewGeneration++;
             settingsVisible = false;
@@ -224,8 +176,10 @@ namespace Horizon
             View.Fill(root, "Black", Color.black, 0, 0, 1, 1);
             View.Label(root, "First question", "你想看看未来的自己吗？", 51, Palette.Text,
                 TextAnchor.MiddleCenter, 0.08f, 0.48f, 0.92f, 0.59f);
-            View.Button(root, "Look", "看看", () => StartCoroutine(IntroSequence()),
-                0.37f, 0.36f, 0.63f, 0.415f, Palette.Panel, Palette.Mint, 30);
+            View.Button(root, "Intro story chapters", "开始故事挑战", ShowChapterSelection,
+                0.14f, 0.36f, 0.86f, 0.44f, Palette.Mint, Palette.Ink, 36);
+            View.Button(root, "Look", "自由探索一生", () => StartCoroutine(IntroSequence()),
+                0.25f, 0.255f, 0.75f, 0.325f, Palette.Panel, Palette.Text, 30);
         }
 
         private IEnumerator IntroSequence()
@@ -247,13 +201,16 @@ namespace Horizon
             archive.pendingFeedback = null;
             archive.pendingMoment = null;
             archive.ghostOpen = archive.stationMemoryOpen = false;
-            session = requestedLifeLength == 30 ? GameSession.StartLongLife(archive.NextRunNumber, Guid.NewGuid().GetHashCode()) :
-                new GameSession(archive.NextRunNumber);
+            session = GameSession.StartMasterLife(archive.NextRunNumber, Guid.NewGuid().GetHashCode(),
+                requestedLifeLength == 30 && requestedMasterMode == RunMode.Quick ? RunMode.ThirtyDays : requestedMasterMode, archive.me, archive.futureMemories, archive.knowledgeSkills);
+            foreach (string tool in archive.worldview.Take(3)) if (session.UsesExpedition) session.SetWorldview(tool, true);
+            requestedMasterMode = RunMode.Quick;
             requestedLifeLength = 12;
             archive.stationRun = archive.stationBeat = 0;
             archive.active = session.Snapshot();
             Save();
             BuildBoard();
+            if (session.RunNumber == 1) { archive.playGuide.completed = true; Save(); }
         }
 
         private void ContinueRun()
@@ -291,6 +248,8 @@ namespace Horizon
                 return;
             }
             BuildBoard();
+            if (!archive.playGuide.completed && archive.playGuide.run == session.RunNumber && session.Day == 1)
+                ShowPlayGuidePage(archive.playGuide.page, true);
         }
 
         private void ShowHome()
@@ -301,17 +260,21 @@ namespace Horizon
             View.Label(root, "Logo", "H O R I Z O N", 57, Palette.Text,
                 TextAnchor.MiddleCenter, 0.08f, 0.82f, 0.92f, 0.91f);
             View.Label(root, "Home line", "你走过的路，还在发光。", 35, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.12f, 0.39f, 0.88f, 0.47f);
-            View.Button(root, "Continue", "继续一生", ContinueRun, 0.12f, 0.265f, 0.88f, 0.335f,
+                TextAnchor.MiddleCenter, 0.12f, 0.595f, 0.88f, 0.648f);
+            View.Button(root, "Continue", "继续一生", ContinueRun, 0.12f, 0.245f, 0.88f, 0.317f,
                 Palette.Mint, Palette.Ink, 37);
-            View.Button(root, "Map", "时间地图", () => ShowMap(false), 0.12f, 0.178f, 0.49f, 0.247f,
+            View.Button(root, "Map", "时间地图", () => ShowMap(false), 0.12f, 0.154f, 0.49f, 0.23f,
                 Palette.Panel, Palette.Text);
-            View.Button(root, "Station", "未来站", ShowStation, 0.51f, 0.178f, 0.88f, 0.247f,
+            View.Button(root, "Station", "未来站", ShowStation, 0.51f, 0.154f, 0.88f, 0.23f,
                 Palette.Panel, Palette.Text);
-            View.Button(root, "Echoes", "回声档案", ShowEchoArchive, 0.12f, 0.09f, 0.88f, 0.159f,
+            View.Button(root, "Echoes", "回声档案", ShowEchoArchive, 0.12f, 0.066f, 0.88f, 0.139f,
                 Palette.Panel, Palette.Text);
             View.Button(root, "Journey", "时间视野 · " + JourneyProgress.Name(archive.journey.Chapter), ShowJourney,
                 0.14f, 0.763f, 0.86f, 0.804f, Palette.Deep, Palette.Muted, 24);
+            BuildMasterHome();
+            AddPracticeEntry(root, true);
+            View.Button(root, "Story chapters", "故事挑战 · 穿过困难，走向未来", ShowChapterSelection,
+                0.12f, 0.413f, 0.88f, 0.496f, Palette.Mint, Palette.Ink, 35);
         }
 
         private void BuildBoard()
@@ -324,10 +287,13 @@ namespace Horizon
             world.ShowBoard();
             FutureRegion();
             PresentRegion();
+            BuildDailyGuide();
             ResourceRegion();
-            TimelineRegion();
             HandRegion();
+            BuildMasterBoard();
             world.SetTimeline(session.Actions, session.Deadline);
+            if (ShowChapterMoment()) return;
+            if (session.UsesExpedition && ShowMirrorEncounter()) return;
             if (TryRareMoment()) return;
             if (session.RunNumber == 2 && session.CatalogVersion >= 2 && session.Day == 1 && !archive.seenSecondLife)
                 ShowSecondLife();
@@ -380,14 +346,15 @@ namespace Horizon
 
         private void ShowGoal()
         {
+            if (session?.Master?.chapter != null) { ShowChapterProgress(); return; }
             if (busy || overlay != null || session == null) return;
             overlay = View.Rect(root, "How to play", 0, 0, 1, 1);
             View.Fill(overlay, "Goal shade", new Color(0.01f, 0.028f, 0.048f, 0.97f), 0, 0, 1, 1, true);
-            View.Label(overlay, "Goal title", "在第 " + session.Deadline + " 天点亮三道门", 43, Palette.Text,
+            View.Label(overlay, "Goal title", "第 " + session.Deadline + " 天 · 带着准备好的自己抵达", 39, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.84f, 0.94f, 0.94f);
-            View.Label(overlay, "Core rule", "每天选一张牌 → 拖进光圈松手\n今天的变化立即发生，回声会在标记的日期回来。", 30,
+            View.Label(overlay, "Core rule", "每天选一张牌 · 可以点牌，也可以向上拖动\n成长、恢复与支援，一起构成截止日的准备。", 30,
                 Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.715f, 0.93f, 0.825f);
-            string[] titles = { "能力门 · 留下成长", "状态门 · 照顾自己", "支援门 · 联系他人" };
+            string[] titles = { "成长准备 · 努力需要时间兑现", "状态准备 · 照顾抵达时的自己", "支持准备 · 留下连接与生活余量" };
             for (int i = 0; i < 3; i++)
             {
                 float y = 0.545f - i * 0.15f;
@@ -397,7 +364,7 @@ namespace Horizon
                 View.Label(overlay, "Gate progress", PlayExperience.GateReason(session, i), 26, Palette.Text,
                     TextAnchor.MiddleLeft, 0.115f, y + 0.01f, 0.885f, y + 0.075f);
             }
-            View.Label(overlay, "All states", "精力 " + session.Energy + "   心情 " + session.Mood + "   洞察 " + session.Insight +
+            View.Label(overlay, "All states", "精力 " + session.Energy + "   心情 " + session.Mood + "   专注 " + session.Insight +
                 "\n关系 " + session.Relation + "   金钱 " + session.Money + "   能力 " + session.Ability + "    / 上限 10", 28,
                 Palette.Gold, TextAnchor.MiddleCenter, 0.07f, 0.145f, 0.93f, 0.235f);
             View.Button(overlay, "Got it", "明白了，回到今天", () => {
@@ -409,6 +376,7 @@ namespace Horizon
 
         private void ShowFeedback()
         {
+            if (TryMasterSpectacle(RenderFeedbackReceipt)) return;
             RenderFeedbackReceipt();
         }
 
@@ -499,9 +467,9 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.1f, 0.88f, 0.9f, 0.94f);
             View.Label(root, "Prediction title", "画下三天后的自己", 47, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.77f, 0.94f, 0.85f);
-            View.Label(root, "Prediction note", "相比今天，三天后会上升还是下降？拖动三个滑块。", 28,
+            View.Label(root, "Prediction note", "现在：精力 " + session.Energy + " · 心情 " + session.Mood + " · 专注 " + session.Insight + "\n三天后会怎样？用 + / - 写下你的预测。", 28,
                 Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.7f, 0.93f, 0.77f);
-            string[] names = { "精力", "心情", "洞察" };
+            string[] names = { "精力", "心情", "专注" };
             for (int i = 0; i < 3; i++)
             {
                 int index = i;
@@ -512,22 +480,26 @@ namespace Horizon
                     x, 0.33f, x + 0.15f, 0.625f, true);
                 View.Fill(track.transform, "Zero", new Color(0.84f, 0.88f, 0.85f, 0.4f),
                     0.12f, 0.498f, 0.88f, 0.502f);
-                View.Label(track.transform, "Up", "+", 25, Palette.Muted,
-                    TextAnchor.MiddleCenter, 0.34f, 0.82f, 0.66f, 0.96f);
-                View.Label(track.transform, "Down", "-", 25, Palette.Muted,
-                    TextAnchor.MiddleCenter, 0.34f, 0.04f, 0.66f, 0.18f);
                 RectTransform marker = View.Panel(track.transform, "Forecast mark", Palette.Mint,
                     0.23f, 0.47f, 0.77f, 0.53f, 23).rectTransform;
                 Text value = View.Label(root, "Forecast value", "不变", 27, Palette.Mint,
                     TextAnchor.MiddleCenter, x - 0.05f, 0.26f, x + 0.2f, 0.32f);
-                track.gameObject.AddComponent<PredictionAxisDrag>().Changed = next =>
+                PredictionAxisDrag axis = track.gameObject.AddComponent<PredictionAxisDrag>();
+                Action<int> change = next =>
                 {
+                    if (generation != viewGeneration) return;
                     forecastOffsets[index] = next;
+                    axis.Initialize(next);
                     float center = 0.1f + (next + 3) / 6f * 0.8f;
                     marker.anchorMin = new Vector2(0.23f, center - 0.03f);
                     marker.anchorMax = new Vector2(0.77f, center + 0.03f);
                     value.text = Direction(next);
                 };
+                axis.Changed = change;
+                View.Button(track.transform, "Prediction increase " + index, "+", () => change(Mathf.Min(3, forecastOffsets[index] + 1)),
+                    0.1f, 0.82f, 0.9f, 0.98f, Palette.Panel, Palette.Text, 30);
+                View.Button(track.transform, "Prediction decrease " + index, "-", () => change(Mathf.Max(-3, forecastOffsets[index] - 1)),
+                    0.1f, 0.02f, 0.9f, 0.18f, Palette.Panel, Palette.Text, 30);
             }
             View.Label(root, "Seal line", "预测不是答案，是你此刻理解世界的方式。", 29,
                 Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.19f, 0.92f, 0.25f);
@@ -569,7 +541,7 @@ namespace Horizon
             View.Label(root, "Verdict line", close ? "你看见了一部分即将到来的自己。" :
                 "这里，与你想的不一样。", 33, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.69f, 0.94f, 0.76f);
-            string[] names = prediction.sixAxes ? new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" } : new[] { "精力", "心情", "洞察" };
+            string[] names = prediction.sixAxes ? new[] { "精力", "心情", "专注", "关系", "金钱", "能力" } : new[] { "精力", "心情", "专注" };
             int[] expected = { prediction.energy, prediction.mood, prediction.insight, prediction.relation, prediction.money, prediction.ability };
             int[] actual = { prediction.actualEnergy, prediction.actualMood, prediction.actualInsight, prediction.actualRelation, prediction.actualMoney, prediction.actualAbility };
             View.Label(root, "Legend", "琥珀 · 你的预测       薄荷 · 真实结果", 24, Palette.Muted,
@@ -615,24 +587,19 @@ namespace Horizon
             hit.gameObject.AddComponent<FutureHold>().Activated = ShowFocus;
             View.Label(root, "Day", string.Format("DAY {0:00} / {1}", session.Day, session.Deadline), 37, Palette.Text,
                 TextAnchor.MiddleLeft, 0.055f, 0.949f, 0.5f, 0.988f);
-            View.Label(root, "Vision", "HORIZON " + Roman(Vision.Level), 23, Palette.Mint,
+            View.Label(root, "Vision", "HORIZON " + Roman(session.UsesMasterRules ? Vision.MasterLevel : Vision.Level), 23, Palette.Mint,
                 TextAnchor.MiddleLeft, 0.055f, 0.92f, 0.46f, 0.949f);
             WalletButton(root);
-            View.Button(root, "Goal", "第" + session.Deadline + "天 · 已准备 " + ProductExperience.ReadyGates(session) + "/3", ShowGoal,
+            View.Button(root, "Goal", session.Master?.chapter != null ? session.Master.chapter.Goal : "第" + session.Deadline + "天展示 · 准备 " + ProductExperience.ReadyGates(session) + "/3", ShowGoal,
                 0.50f, 0.914f, 0.945f, 0.949f, Palette.Panel, Palette.Gold, 23);
-            View.Label(root, "Future caption", Vision.Caption, 24, Palette.Muted,
-                TextAnchor.MiddleLeft, 0.075f, 0.875f, 0.49f, 0.91f);
-            View.Fill(root, "Future rail", new Color(0.55f, 0.90f, 0.80f, 0.40f),
-                0.12f, 0.843f, 0.88f, 0.844f);
-            DrawObservedFuture();
-            View.Label(root, "Focus hint", session.RunNumber == 1 && session.Deadline == 12 ? ExperienceContent.NextStep(session) :
-                session.FocusUses == 0 ? FingerHint : "今天已经凝视过未来",
-                21, Palette.Muted, TextAnchor.MiddleCenter, 0.11f, 0.785f, 0.89f, 0.814f);
+            View.Button(root, "Future plans", "未来安排 · " + PlayGuide.Scheduled(session).Count + " 个回声", () => { schedulePage = 0; ShowFutureSchedule(); },
+                0.075f, 0.875f, 0.49f, 0.911f, Palette.Panel, Palette.Mint, 22);
+            DrawPlayableFuture();
             View.Button(root, "Map", "时间地图", () => ShowMap(true), 0.745f, 0.877f,
                 0.95f, 0.911f, new Color(0.09f, 0.20f, 0.23f, 0.8f), Palette.Text, 20);
         }
 
-        private static string Roman(int value) { return value == 1 ? "I" : value == 2 ? "II" : "III"; }
+        private static string Roman(int value) { return new[] { "I", "II", "III", "IV", "V", "VI", "VII", "VIII" }[Mathf.Clamp(value - 1, 0, 7)]; }
 
         private void PresentRegion()
         {
@@ -640,21 +607,16 @@ namespace Horizon
             ActionRecord recent = session.Actions.FindLast(a => a.day < session.Day);
             View.Label(root, "Scene time", weekdays[(session.Day - 1) % 7] + " · " +
                 (recent?.kind == CardKind.Temptation ? "夜" : recent?.kind == CardKind.Growth ? "午后" : "清晨"),
-                23, Palette.Muted, TextAnchor.MiddleCenter, 0.12f, 0.754f, 0.88f, 0.778f);
-            View.Panel(root, "Present caption plate", new Color(0.012f, 0.03f, 0.047f, 0.7f),
-                0.08f, 0.455f, 0.92f, 0.49f, 23);
-            View.Label(root, "Scene line", session.SocialUnavailableToday ?
-                "疲惫让邀约改变了，今天还有其他选择。" : session.Situation ?? "今天，你想做什么？", 30,
-                Palette.Text, TextAnchor.MiddleCenter, 0.1f, 0.455f, 0.9f, 0.49f);
+                23, Palette.Muted, TextAnchor.MiddleCenter, 0.065f, 0.754f, 0.49f, 0.788f);
             destinationBeacon = View.Rect(root, "Play destination", 0.075f, 0.665f, 0.925f, 0.75f);
             View.Panel(destinationBeacon, "Drop interior", new Color(0.012f, 0.08f, 0.11f, 0.16f),
                 0.02f, 0.07f, 0.98f, 0.93f, 75);
             dropRing = destinationBeacon.gameObject.AddComponent<DropRingGraphic>();
             dropRing.color = Palette.Gold;
             dropRing.raycastTarget = false;
-            dropTitle = View.Label(destinationBeacon, "Drop title", "把卡牌拖到这里", 32,
+            dropTitle = View.Label(destinationBeacon, "Drop title", "选一张牌，送进未来", 32,
                 Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.46f, 0.92f, 0.87f);
-            dragHint = View.Label(destinationBeacon, "Destination", "圈变亮 → 松手 → 行动生效", 24,
+            dragHint = View.Label(destinationBeacon, "Destination", "点牌查看 / 拖到这里行动", 24,
                 Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.13f, 0.94f, 0.48f);
             destinationBeacon.gameObject.AddComponent<GuidePulse>();
         }
@@ -686,93 +648,30 @@ namespace Horizon
             }
         }
 
-        private void HandRegion()
-        {
-            boardHint = View.Label(root, "Drag hint", ProductExperience.Coach(session), 23, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.045f, 0.008f, 0.955f, 0.074f);
-            trail = View.Fill(root, "Causal light", new Color(0.53f, 1f, 0.83f, 0.76f),
-                0.5f, 0.5f, 0.5f, 0.5f).rectTransform;
-            trail.gameObject.SetActive(false);
-            CardSpec[] hand = session.Hand;
-            for (int i = 0; i < hand.Length; i++)
-            {
-                CardSpec card = hand[i];
-                float x = 0.043f + i * 0.308f;
-                RectTransform rect = View.Rect(root, card.Id, x, 0.08f, x + 0.298f, 0.305f);
-                bool available = session.CanPlay(card);
-                var panel = rect.gameObject.AddComponent<RoundedGraphic>();
-                panel.color = available ? new Color(0.037f, 0.09f, 0.127f, 0.95f) :
-                    new Color(0.045f, 0.067f, 0.08f, 0.84f);
-                panel.radius = 31f;
-                panel.raycastTarget = true;
-                Color accent = card.Kind == CardKind.Growth ? Palette.Mint :
-                    card.Kind == CardKind.Temptation ? Palette.Coral : Palette.Gold;
-                View.Fill(rect, "Card accent", accent, 0.095f, 0.92f, 0.55f, 0.926f);
-                ActionIconGraphic icon = View.Rect(rect, "Action symbol", 0.68f, 0.76f, 0.91f, 0.9f)
-                    .gameObject.AddComponent<ActionIconGraphic>();
-                icon.Kind = card.Kind; icon.Support = card.GivesSupport;
-                icon.color = accent; icon.raycastTarget = false;
-                View.Label(rect, "Type", card.Kind == CardKind.Growth ? "积累未来" :
-                    card.Kind == CardKind.Temptation ? "开心一下" : "照顾自己", 23, accent,
-                    TextAnchor.MiddleLeft, 0.105f, 0.75f, 0.7f, 0.89f);
-                View.Label(rect, "Name", card.Name, 33, Palette.Text,
-                    TextAnchor.MiddleLeft, 0.105f, 0.48f, 0.91f, 0.71f);
-                View.Fill(rect, "Now divider", new Color(accent.r, accent.g, accent.b, 0.3f),
-                    0.105f, 0.445f, 0.895f, 0.448f);
-                View.Label(rect, "Now", available ? PlayExperience.NowLabel(card.Now) : "资源不足 · 点开查看",
-                    25, available ? Palette.Text : Palette.Coral,
-                    TextAnchor.MiddleLeft, 0.105f, 0.278f, 0.91f, 0.43f);
-                string futureLabel = card.Delay > 0 && session.Day + card.Delay > session.Deadline ?
-                    "D" + (session.Day + card.Delay) + " · 超过截止日" :
-                    card.Delay == 0 ? "立即恢复" : "D" + (session.Day + card.Delay) + " · " + PlayExperience.FutureMeaning(card);
-                View.Label(rect, "Future", futureLabel, 22, Palette.Muted,
-                    TextAnchor.MiddleLeft, 0.105f, 0.075f, 0.91f, 0.23f);
-                var drag = rect.gameObject.AddComponent<HorizonCardDrag>();
-                drag.Available = available;
-                drag.Dragged = CardDragged;
-                drag.Played = CardPlayed;
-                drag.Tapped = CardTapped;
-                drag.IsOverTarget = IsInsideDropZone;
-                drag.CanBegin = item => !busy && overlay == null && (activeDrag == null || activeDrag == item);
-                drag.Began = item => activeDrag = item;
-                drag.Rejected = item =>
-                {
-                    activeDrag = null;
-                    if (boardHint != null) boardHint.text = "卡牌已归位 · 拖到上方金色圈，圈变亮后松手";
-                };
-                cards.Add(drag, card);
-                CanvasGroup group = rect.gameObject.AddComponent<CanvasGroup>();
-                StartCoroutine(RiseCard(rect, group, i * 0.08f));
-            }
-            if (session.RunNumber == 1 && session.Day == 1)
-            {
-                handGuide = View.Rect(root, "First action guide", 0, 0, 1, 1);
-                RectTransform handMark = View.Panel(handGuide, "Guiding palm", new Color(0.95f, 0.97f, 0.94f, 0.65f),
-                    0.49f, 0.29f, 0.535f, 0.318f, 24).rectTransform;
-                View.Panel(handMark, "Index finger", new Color(0.95f, 0.97f, 0.94f, 0.8f),
-                    0.17f, 0.6f, 0.48f, 1.5f, 8);
-                handGuide.gameObject.AddComponent<TutorialHand>().Hand = handMark;
-            }
-        }
+        private void HandRegion() { BuildReadableHand(); }
 
         private IEnumerator RiseCard(RectTransform rect, CanvasGroup group, float delay)
         {
+            int generation = viewGeneration;
+            if (rect == null || group == null) yield break;
             group.alpha = 0;
             rect.localScale = Vector3.one * 0.94f;
             yield return new WaitForSeconds(delay);
-            if (rect == null || group == null) yield break;
+            if (generation != viewGeneration || rect == null || group == null) yield break;
             float elapsed = 0;
             while (elapsed < 0.22f)
             {
-                if (rect == null || group == null) yield break;
+                if (generation != viewGeneration || rect == null || group == null) yield break;
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / 0.22f);
                 group.alpha = t;
-                rect.localScale = Vector3.one * Mathf.Lerp(0.94f, 1f, t);
+                if (rect.GetComponent<HorizonCardDrag>()?.IsDragging != true)
+                    rect.localScale = Vector3.one * Mathf.Lerp(0.94f, 1f, t);
                 yield return null;
             }
+            if (generation != viewGeneration || rect == null || group == null) yield break;
             group.alpha = 1;
-            rect.localScale = Vector3.one;
+            if (rect.GetComponent<HorizonCardDrag>()?.IsDragging != true) rect.localScale = Vector3.one;
         }
 
         private void CardDragged(HorizonCardDrag drag, Vector2 pointer)
@@ -829,38 +728,48 @@ namespace Horizon
             overlay = View.Rect(root, "Card explanation", 0, 0, 1, 1);
             View.Fill(overlay, "Block touches", new Color(0.008f, 0.024f, 0.04f, 0.64f), 0, 0, 1, 1, true);
             RectTransform panel = View.Panel(overlay, "Card details", Palette.Panel,
-                0.06f, 0.16f, 0.94f, 0.69f, 38).rectTransform;
+                0.06f, 0.105f, 0.94f, 0.85f, 38).rectTransform;
             panel.gameObject.AddComponent<PanelEntrance>();
             View.Label(panel, "Name", card.Name, 48, Palette.Text, TextAnchor.MiddleLeft,
-                0.075f, 0.8f, 0.925f, 0.95f);
-            View.Label(panel, "Today", "今天\n" + PlayExperience.NowLabel(card.Now), 32, Palette.Mint,
-                TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.8f);
+                0.075f, 0.865f, 0.925f, 0.97f);
+            View.Label(panel, "Today", "今天\n" + PlayExperience.NowLabel(session.ImmediateEffect(card)), 32, Palette.Mint,
+                TextAnchor.MiddleLeft, 0.075f, 0.73f, 0.925f, 0.87f);
             View.Label(panel, "Later", card.Delay == 0 ? "现在就能得到恢复。" :
                 "第 " + (session.Day + card.Delay) + " 天\n" + PlayExperience.FutureMeaning(card) +
                 (session.Day + card.Delay > session.Deadline ? "（超过本局截止日）" : ""),
-                30, Palette.Gold, TextAnchor.MiddleLeft, 0.075f, 0.35f, 0.925f, 0.59f);
+                30, Palette.Gold, TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.73f);
             bool available = session.CanPlay(card);
+            bool canImagine = session.CanPrepareImagination(card);
             View.Label(panel, "Rule", available ? ExperienceContent.CardPurpose(card, session.Day, session.Deadline) :
                 PlayExperience.BlockReason(session, card), 25, available ? Palette.Muted : Palette.Coral,
-                TextAnchor.MiddleLeft, 0.075f, 0.23f, 0.925f, 0.35f);
+                TextAnchor.MiddleLeft, 0.075f, 0.445f, 0.925f, 0.58f);
             View.Button(panel, "Cancel", "再想想", () => { Destroy(overlay.gameObject); overlay = null; },
                 0.075f, 0.055f, 0.43f, 0.19f, Palette.Deep, Palette.Text, 29);
-            Button confirm = View.Button(panel, "Use card", available ? "使用这张牌" : "暂时无法使用", () =>
+            Button confirm = View.Button(panel, "Use card", canImagine ? "先走一次失败预演" : available ? "就选它 · 今天行动" : "暂时无法使用", () =>
             {
+                if (canImagine) { PrepareCardImagination(card); return; }
                 Destroy(overlay.gameObject);
                 overlay = null;
                 CardPlayed(drag);
             }, 0.46f, 0.055f, 0.925f, 0.19f, Palette.Mint, Palette.Ink, 29);
-            confirm.interactable = available;
+            confirm.interactable = available || canImagine;
+            AddDecisionLockButton(panel, card);
+            if (CanPrepareMaster && available && !session.InExecutionMode && (session.Day >= 3 || session.RunNumber >= 2) && card.Kind == CardKind.Growth)
+                View.Button(panel, "Imagine this choice", "行动前 · 预演一次失败与恢复", () => PrepareCardImagination(card),
+                    0.075f, 0.335f, 0.925f, 0.415f, Palette.Panel, Palette.Mint, 26);
+            View.RefreshText(overlay);
         }
 
         private void CardPlayed(HorizonCardDrag drag)
         {
-            if (busy || !cards.TryGetValue(drag, out CardSpec card) || !session.CanPlay(card)) return;
+            if (busy || !cards.TryGetValue(drag, out CardSpec card)) return;
+            if (session.CanPrepareImagination(card)) { PrepareCardImagination(card); return; }
+            if (!session.CanPlay(card)) return;
             busy = true;
             foreach (HorizonCardDrag item in cards.Keys) item.Available = false;
             RunSnapshot before = session.Snapshot();
             ActionRecord action = session.Choose(card.Id);
+            session.RecordChoiceDuration((int)Mathf.Clamp((Time.unscaledTime - choiceVisibleSince) * 1000, 0, 300000));
             int stars = archive.wallet.Claim("run:" + session.RunNumber + ":action:" + session.Day, 1);
             ResourceDelta change = new ResourceDelta(session.Energy - before.energy, session.Mood - before.mood,
                 session.Insight - before.insight, session.Relation - before.relation,
@@ -972,7 +881,7 @@ namespace Horizon
                         delta = echo.actualDelta ?? echo.delta, support = CardCatalog.FindById(echo.cardId)?.GivesSupport ?? false,
                         meaning = "D" + echo.sourceDay + " 的「" + echo.cardName + "」，在今天留下了这些变化。" +
                             (string.IsNullOrEmpty(echo.replacementId) ? "" : "\n今天的选择也改变了：" + CardCatalog.FindById(echo.replacementId)?.Name),
-                        stardust = collected, chainSize = CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count });
+                        stardust = collected, chainSize = session.EchoChainSize(echo) });
                     description += (description.Length == 0 ? "" : "\n\n") +
                         "D" + echo.sourceDay + "「" + echo.cardName + "」 → 今天\n" +
                         echo.echoName + " · " + PlayExperience.NowLabel(echo.actualDelta ?? echo.delta);
@@ -985,10 +894,11 @@ namespace Horizon
                 };
             }
             Save();
-            foreach (PendingEcho echo in transition.Echos)
+            PendingEcho strongest = transition.Echos.OrderByDescending(e => CausalGraph.Ancestors(session.CausalNodes, e.nodeId).Count).FirstOrDefault();
+            if (strongest != null)
             {
-                if (echo.depth >= 2 || CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count >= 3) yield return CascadeSequence(echo);
-                else yield return EchoSequence(echo);
+                if (session.EchoChainSize(strongest) >= 3) yield return CascadeSequence(strongest);
+                else yield return EchoSequence(strongest);
             }
             if (archive.pendingFeedback != null) ShowFeedback();
             else if (session.HasPredictionReview) ShowPredictionReview();
@@ -1006,7 +916,7 @@ namespace Horizon
             busy = true;
             Haptic();
             if (stationStage < 2) ShowInRunStation(stationStage + 1);
-            else if (session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) ShowInRunStation(3);
+            else if (session.RunNumber == 3 || session.Deadline >= 30 && session.Day >= 14) ShowInRunStation(3);
             else FinishStation();
         }
 
@@ -1086,7 +996,7 @@ namespace Horizon
 
         private IEnumerator CascadeSequence(PendingEcho echo)
         {
-            int chainSize = CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count;
+            int chainSize = session.EchoChainSize(echo);
             List<CausalNode> path = CausalGraph.Ancestors(CausalGraph.ObservedGraph(session.CausalNodes), echo.nodeId);
             if (path.Count < 3) yield break;
             Clear();
@@ -1231,7 +1141,7 @@ namespace Horizon
             View.Label(panel, "Path detail", future.Available ?
                 "DAY " + future.TargetDay + "  ·  精力" + Tendency(future.Energy - session.Energy) +
                 "  心情" + Tendency(future.Mood - session.Mood) +
-                "  洞察" + Tendency(future.Insight - session.Insight) + "\n" +
+                "  专注" + Tendency(future.Insight - session.Insight) + "\n" +
                 "关系" + Tendency(future.Relation - session.Relation) +
                 "  金钱" + Tendency(future.Money - session.Money) +
                 "  能力" + Tendency(future.Ability - session.Ability) : "此刻资源不足，这条路暂时走不通。",
@@ -1251,6 +1161,7 @@ namespace Horizon
 
         private IEnumerator BossSequence(RunRecord run)
         {
+            if (run.master?.chapter != null) { ShowDeadlineResult(run); yield break; }
             Clear();
             busy = true;
             world.SetTimeline(run.actions, GameSession.RunLength(run));
@@ -1279,8 +1190,10 @@ namespace Horizon
 
         private void ShowDeadlineResult(RunRecord run)
         {
+            if (archive.pendingFeedback != null && !archive.ghostOpen && TryMasterSpectacle(() => ShowDeadlineResult(run))) return;
             bool animateReward = archive.pendingFeedback != null && !archive.pendingFeedback.presented;
             if (archive.pendingFeedback != null) { archive.pendingFeedback.presented = true; Save(); }
+            if (run.master?.chapter != null) { RenderChapterFinale(run); return; }
             Clear();
             world.SetTimeline(run.actions, GameSession.RunLength(run));
             world.ShowDeadline();
@@ -1430,6 +1343,7 @@ namespace Horizon
 
         private void ShowStation()
         {
+            if (archive.runs.LastOrDefault()?.catalogVersion >= 10) { ShowFutureGallery(); return; }
             Clear(true);
             world.ShowStation(2, archive.runs.Count >= 3);
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 35, Palette.Mint,

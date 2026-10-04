@@ -42,7 +42,7 @@ namespace Horizon
             archive.active = session.Snapshot();
             Save();
             bool reveal = (Vision.Compare || session.RunNumber == 3) && stage >= 2;
-            bool question = (session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) && stage == 3;
+            bool question = (session.RunNumber == 3 || session.Deadline >= 30 && session.Day >= 14) && stage == 3;
             world.ShowStation(stage, reveal);
             List<ActionRecord> memories = ExperienceContent.StationMemories(session);
             world.ShowCausalMemories(CausalPresentation.Station(session));
@@ -96,7 +96,7 @@ namespace Horizon
             else if (stage == 2)
             {
                 View.Panel(root, "Future keepsake", Palette.Panel, 0.075f, 0.18f, 0.925f, 0.322f, 25);
-                View.Label(root, "Future keepsake text", session.Deadline == 30 && session.Day >= 12 ? "已走过 " + session.Day + " 天 · " + CampaignContent.ActName(session.Day) + "\n你留下的选择，还在继续相互连接。" :
+                View.Label(root, "Future keepsake text", session.Deadline >= 30 && session.Day >= 12 ? "已走过 " + session.Day + " 天 · " + CampaignContent.ActName(session.Day) + "\n你留下的选择，还在继续相互连接。" :
                     reveal ? "那个人，就是未来的你。\nHORIZON III · 两条可能未来" :
                     memories.Count == 0 ? "路还没有写完。明天，你仍然可以选择。" :
                     "D" + memories[0].day + "「" + memories[0].cardName + "」\n" +
@@ -106,7 +106,7 @@ namespace Horizon
             }
             if (!question)
             {
-                View.Button(root, "Next station beat", stage == 2 && !(session.RunNumber == 3 || session.Deadline == 30 && session.Day >= 14) ? "回到第 " + (session.Day + 1) + " 天" :
+                View.Button(root, "Next station beat", stage == 2 && !(session.RunNumber == 3 || session.Deadline >= 30 && session.Day >= 14) ? "回到第 " + (session.Day + 1) + " 天" :
                     stage == 0 ? "走向长椅" : "继续靠近", () => { if (stationStage == stage) NextStationStage(); },
                     0.17f, 0.055f, 0.83f, 0.119f, Palette.Mint, Palette.Ink, 30);
                 View.Label(root, "Walk hint", "可以静静看完，也可以点击继续或向前滑动。", 22,
@@ -247,7 +247,7 @@ namespace Horizon
                 28, Palette.Muted, TextAnchor.MiddleCenter, 0.07f, 0.716f, 0.93f, 0.829f);
             string[] rows = { "精力  " + range.energyMin + "–" + range.energyMax,
                 "心情  " + range.moodMin + "–" + range.moodMax,
-                "洞察  " + range.insightMin + "–" + range.insightMax,
+                "专注  " + range.insightMin + "–" + range.insightMax,
                 "关系  " + range.relationMin + "–" + range.relationMax,
                 "金钱  " + range.moneyMin + "–" + range.moneyMax,
                 "能力  " + range.abilityMin + "–" + range.abilityMax };

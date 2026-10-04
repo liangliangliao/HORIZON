@@ -21,7 +21,7 @@ namespace Horizon.Game
         {
             MysteryRecord existing = Mysteries.Find(m => m.day == Day);
             if (existing != null) return CausalNodes.Find(n => n.id == existing.consequenceNodeId);
-            if (CatalogVersion < 4 || Day != 6 || HasChosen || CompletedRun != null) return null;
+            if (CatalogVersion < 4 || (Day != 6 && !(UsesExpedition && Day > 6 && Day % 7 == 0)) || HasChosen || CompletedRun != null) return null;
             ActionRecord source = sourceDay > 0 ? Actions.Find(a => a.day == sourceDay && a.cardId == sourceCardId) :
                 Actions.FindLast(a => a.day < Day && a.echoed) ?? Actions.Find(a => a.day < Day);
             if (source == null || source.day >= Day) return null;
@@ -44,7 +44,7 @@ namespace Horizon.Game
             result.originHidden = true;
             result.effect = Difference(before); result.effectRecorded = true;
             Mysteries.Add(new MysteryRecord { day = Day, sourceDay = source.day, sourceCardId = source.cardId,
-                revealDay = 9, causeNodeId = cause.id, consequenceNodeId = result.id, delta = delta });
+                revealDay = Day + 3, causeNodeId = cause.id, consequenceNodeId = result.id, delta = delta });
             return result;
         }
 

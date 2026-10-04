@@ -89,7 +89,7 @@ namespace Horizon.Tests
         }
 
         [UnityTest]
-        public IEnumerator ObservationChapterSixCannotUnlockThirtyDaysAndStateHoldWorks()
+        public IEnumerator ObservationChapterSixCannotUnlockThirtyDaysAndStateNumbersRemainVisible()
         {
             yield return new EnterPlayMode();
             HorizonApp app = Object.FindObjectOfType<HorizonApp>();
@@ -108,7 +108,7 @@ namespace Horizon.Tests
             Assert.AreEqual(6, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
                 t => t.name == "Resource number" && !string.IsNullOrEmpty(t.text)).Length);
             state.OnPointerUp(pointer); yield return null;
-            Assert.AreEqual(2, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
+            Assert.AreEqual(6, System.Array.FindAll(root.GetComponentsInChildren<Text>(),
                 t => t.name == "Resource number" && !string.IsNullOrEmpty(t.text)).Length);
             string frozen = JsonUtility.ToJson(session.Snapshot());
             Call(app, "ShowJourney"); yield return null;
@@ -363,6 +363,8 @@ namespace Horizon.Tests
             yield return null;
             Set(app, "archive", new ArchiveData());
             Call(app, "StartNewRun");
+            yield return null;
+            Assert.IsNull(Get<RectTransform>(app, "overlay"), "New life begins with actual choices, with help available on demand.");
             yield return new WaitForSecondsRealtime(0.5f);
 
             Assert.AreNotEqual(UnityEngine.Rendering.GraphicsDeviceType.Null, SystemInfo.graphicsDeviceType,
@@ -432,6 +434,11 @@ namespace Horizon.Tests
             Assert.AreEqual(4, session.Day);
             Assert.AreEqual(FeedbackKind.Echoes, archive.pendingFeedback.kind);
             Assert.That(archive.pendingFeedback.description, Does.Contain("D1"));
+            if (archive.pendingFeedback.beats.Count > 1)
+            {
+                ButtonNamed(app, "Review echo details").onClick.Invoke();
+                yield return new WaitForSecondsRealtime(0.4f);
+            }
             yield return Capture(app, "03-echo-result");
             int read = 0;
             int receipts = archive.pendingFeedback.beats.Count;
@@ -605,7 +612,7 @@ namespace Horizon.Tests
             foreach (Text label in Get<RectTransform>(app, "root").GetComponentsInChildren<Text>())
                 if (label.name == "Range value") { rangeRows++; visibleResources += label.text; }
             Assert.AreEqual(6, rangeRows, "The future range must show every resource.");
-            foreach (string name in new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" })
+            foreach (string name in new[] { "精力", "心情", "专注", "关系", "金钱", "能力" })
                 Assert.That(visibleResources, Does.Contain(name));
             yield return Capture(app, "12-range-forecast");
             ButtonNamed(app, "Close future range").onClick.Invoke();
@@ -726,9 +733,11 @@ namespace Horizon.Tests
             Assert.AreEqual(13, s.Day); Assert.IsNull(s.CompletedRun);
             yield return Capture(app, "29-long-life-board");
             int guard = 0; float began = Time.realtimeSinceStartup;
-            while (s.CompletedRun == null || Get<bool>(app, "busy")) {
+            while (s.CompletedRun == null || Get<bool>(app, "busy") || Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Continue master event")) {
                 Assert.Less(Time.realtimeSinceStartup - began, 150, "Long UI flow stalled.");
                 if (Get<bool>(app, "busy")) { yield return null; continue; }
+                Button masterEvent = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.name == "Continue master event");
+                if (masterEvent != null) { if (masterEvent.interactable) masterEvent.onClick.Invoke(); yield return null; continue; }
                 if (a.pendingFeedback != null) {
                     if (a.pendingFeedback.kind == FeedbackKind.Deadline) break;
                     ButtonNamed(app, "Continue result").onClick.Invoke(); yield return null; continue;
@@ -782,6 +791,7 @@ namespace Horizon.Tests
             canvas.worldCamera = ui;
             canvas.planeDistance = 5;
             world.WorldCamera.targetTexture = image;
+            world.BackgroundCamera.targetTexture = image;
             world.SnapCamera();
             yield return null;
             yield return null;
@@ -790,6 +800,7 @@ namespace Horizon.Tests
             // dynamic font atlas. Rebuild all active text meshes after every
             // character request, before reading the rendered pixels.
             View.RefreshText(canvas.transform);
+            world.BackgroundCamera.Render();
             world.WorldCamera.Render();
             ui.Render();
             RenderTexture old = RenderTexture.active;
@@ -804,6 +815,7 @@ namespace Horizon.Tests
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.worldCamera = null;
             world.WorldCamera.targetTexture = null;
+            world.BackgroundCamera.targetTexture = null;
             Object.Destroy(uiObject);
             Object.Destroy(pixels);
             image.Release();

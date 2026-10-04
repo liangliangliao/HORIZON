@@ -25,8 +25,8 @@ namespace Horizon.Game
         public static ForecastRange Sample(GameSession source, string firstCard, int targetDay, int samples = 24)
         {
             if (source == null ||
-                targetDay <= source.Day || targetDay > 30 || samples < 3 || samples > 96)
-                throw new ArgumentException("A future horizon up to thirty days is required.");
+                targetDay <= source.Day || targetDay > 60 || samples < 3 || samples > 96)
+                throw new ArgumentException("A future horizon up to sixty days is required.");
             string frozen = JsonUtility.ToJson(source.Snapshot());
             var result = new ForecastRange { targetDay = targetDay, samples = samples,
                 sourceRun = source.RunNumber, sourceDay = source.Day,
@@ -51,6 +51,11 @@ namespace Horizon.Game
                 {
                     while (fork.HasPredictionReview) fork.MarkPredictionReviewed();
                     if (fork.CanPredict) fork.SkipPrediction();
+                    if (fork.InExecutionMode)
+                    {
+                        if (fork.Day == firstDay && !string.IsNullOrEmpty(firstCard) && firstCard != fork.Master.decision.cardId) fork.UnlockDecision();
+                        else while (fork.Master.decision.status != DecisionStatus.Ready) fork.ExecuteDecisionStep();
+                    }
                     CardSpec[] available = fork.Hand.Where(fork.CanPlay).ToArray();
                     CardSpec choice = fork.Day == firstDay && !string.IsNullOrEmpty(firstCard) ?
                         available.FirstOrDefault(c => c.Id == firstCard) : null;

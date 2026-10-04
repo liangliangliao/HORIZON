@@ -113,27 +113,12 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.075f, 0.856f, 0.925f, 0.915f);
             View.Label(overlay, "Tap a day", "点开一天，看看它怎样回到你身边。", 23, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.813f, 0.92f, 0.852f);
-            foreach (CausalNode node in graph)
-            {
-                foreach (string id in CausalGraph.Parents(node))
-                {
-                    CausalNode parent = graph.Find(n => n.id == id);
-                    if (parent == null || parent.day > 12 || node.day > 12) continue;
-                    Vector2 from = new Vector2(0.775f + (graph.IndexOf(parent) % 3) * 0.055f,
-                        0.801f - (parent.day - 1) * 0.047f);
-                    Vector2 to = new Vector2(0.775f + (graph.IndexOf(node) % 3) * 0.055f,
-                        0.801f - (node.day - 1) * 0.047f);
-                    Color color = NodeColor(node); color.a = node.resolved ? 0.58f : 0.22f;
-                    TimeThreadGraphic thread = View.Rect(overlay, "A causal connection", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
-                    thread.From = from; thread.To = to; thread.color = color; thread.raycastTarget = false;
-                }
-            }
             for (int day = 1; day <= 12; day++)
             {
                 ActionRecord action = actions.Find(a => a.day == day);
                 float y = 0.779f - (day - 1) * 0.047f;
                 Button row = View.Button(overlay, "Inspect day " + day, "", () => ShowActionDetail(action, graph, actions),
-                    0.055f, y, 0.735f, y + 0.041f, Palette.Panel, Palette.Text);
+                    0.055f, y, 0.945f, y + 0.041f, Palette.Panel, Palette.Text);
                 row.interactable = action != null;
                 View.Label(row.transform, "Day", day.ToString("00"), 26, Palette.Muted,
                     TextAnchor.MiddleCenter, 0.015f, 0.09f, 0.105f, 0.9f);
@@ -146,7 +131,7 @@ namespace Horizon
             }
             if (run != null)
             {
-                View.Button(overlay, "Causal network", "展开因果网络", () => ShowCausalNetwork(run, duringRun),
+                View.Button(overlay, "Causal network", "看这条未来怎样形成", () => ShowCausalNetwork(run, duringRun),
                     0.07f, 0.169f, 0.93f, 0.224f, Palette.Panel, Palette.Mint, 28);
                 if (!duringRun)
                 {
@@ -175,12 +160,14 @@ namespace Horizon
         {
             if (action == null) return;
             CausalNode node = graph.Find(n => n.id == action.nodeId);
+            RunRecord sourceRun = archive.runs.Find(r => r.actions == actions);
+            int deadline = sourceRun != null ? GameSession.RunLength(sourceRun) : session != null && session.Actions == actions ? session.Deadline : 12;
             string description = action.actualNowRecorded ? "当时实际变化\n" + PlayExperience.NowLabel(action.actualNow) :
                 "行动牌的效果\n" + PlayExperience.NowLabel(action.now);
             if (action.echoDay > 0)
                 description += "\n\nD" + action.echoDay + (action.echoed ? " · 回声已经回来\n" + action.echoName +
                     "\n" + PlayExperience.NowLabel(action.actualLaterRecorded ? action.actualLater : action.later) :
-                    action.echoDay > (archive.runs.Find(r => r.actions == actions)?.deadline == 30 || session?.Deadline == 30 && session.Actions == actions ? 30 : 12) ? " · 超过本局截止日，尚未兑现" : " · 回声还没有回来");
+                    action.echoDay > deadline ? " · 超过本局截止日，尚未兑现" : " · 回声还没有回来");
             if (node != null)
             {
                 List<CausalNode> parents = CausalGraph.Ancestors(graph, node.id).FindAll(n => n.id != node.id);
@@ -218,7 +205,7 @@ namespace Horizon
             View.RefreshText(modal);
         }
 
-        private void ShowCausalNetwork(RunRecord run, bool duringRun)
+        private void ShowCausalNetworkOverview(RunRecord run, bool duringRun)
         {
             ArchiveSurface("Causal network");
             List<CausalNode> graph = CausalGraph.ObservedGraph(GameSession.GraphForRun(run));

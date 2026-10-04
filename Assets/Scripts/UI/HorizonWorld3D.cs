@@ -11,6 +11,7 @@ namespace Horizon.UI
     public sealed partial class HorizonWorld3D : MonoBehaviour
     {
         public Camera WorldCamera { get; private set; }
+        public Camera BackgroundCamera { get; private set; }
         public Transform Avatar { get; private set; }
         private Transform futureSelf, bench, gates, environment, companions;
         private readonly Transform[] props = new Transform[3];
@@ -28,6 +29,14 @@ namespace Horizon.UI
         public void Initialize()
         {
             if (WorldCamera != null) return;
+            var backdrop = new GameObject("HORIZON full-frame clear", typeof(Camera));
+            backdrop.transform.SetParent(transform, false);
+            BackgroundCamera = backdrop.GetComponent<Camera>();
+            BackgroundCamera.depth = -100;
+            BackgroundCamera.clearFlags = CameraClearFlags.SolidColor;
+            BackgroundCamera.backgroundColor = Palette.Ink;
+            BackgroundCamera.cullingMask = 0;
+            BackgroundCamera.allowHDR = BackgroundCamera.allowMSAA = false;
             floor = Lit(new Color(0.09f, 0.18f, 0.25f));
             dark = Lit(new Color(0.04f, 0.09f, 0.15f));
             teal = Lit(new Color(0.15f, 0.65f, 0.63f), new Color(0.04f, 0.18f, 0.16f));
@@ -41,6 +50,7 @@ namespace Horizon.UI
             var cameraObject = new GameObject("HORIZON 3D Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             WorldCamera = cameraObject.GetComponent<Camera>();
+            WorldCamera.depth = 0;
             WorldCamera.clearFlags = CameraClearFlags.SolidColor;
             WorldCamera.nearClipPlane = 0.1f;
             WorldCamera.farClipPlane = 80;
@@ -236,6 +246,7 @@ namespace Horizon.UI
         private void Update()
         {
             if (WorldCamera == null || paused) return;
+            UpdateInsight();
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
             Vector3 drift = station || preferences.reducedMotion ? Vector3.zero : new Vector3(Mathf.Sin(Time.unscaledTime * 0.28f) * 0.14f, 0, 0);

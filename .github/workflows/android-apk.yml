@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - codex/unity-prototype-v0-3
+      - codex/playable-feedback-3d
   workflow_dispatch:
 
 permissions:
@@ -19,12 +20,75 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  parallel-lives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify two actual HTTP clients, invitations, persistence and messages
+        working-directory: services/parallel-lives
+        run: |
+          mkdir -p ../../artifacts/services
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../artifacts/services/parallel-lives.xml server.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-Parallel-Service-Results
+          path: artifacts/services/parallel-lives.xml
+  ai-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify DeepSeek and Azure gateway with mocked providers
+        working-directory: services/ai-gateway
+        run: |
+          mkdir -p ../../artifacts/services
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../artifacts/services/ai-gateway.xml server.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-Gateway-Service-Results
+          path: artifacts/services/ai-gateway.xml
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run portable rules and legacy regressions
+        run: |
+          mkdir -p artifacts
+          dotnet run --project tools/RulesHarness.csproj -- --workers=0 --result=artifacts/rules.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: HORIZON-v042-Rule-Results
+          path: |
+            artifacts/rules.xml
+            artifacts/playability/
+          retention-days: 14
   test:
+    needs: [ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Check out project
         uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: HORIZON-*-Service-Results
+          merge-multiple: true
+          path: artifacts/services
 
       - name: Free disk space for Unity test image
         uses: jlumbroso/free-disk-space@v1.3.1
@@ -36,6 +100,15 @@ jobs:
           large-packages: false
           docker-images: false
           swap-storage: true
+
+      - name: Prepare pinned editor video codec
+        shell: bash
+        run: |
+          curl -fL --retry 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          echo 'abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67  /tmp/horizon-ffmpeg.tar.xz' | sha256sum -c -
+          mkdir -p tools/media
+          tar -xJf /tmp/horizon-ffmpeg.tar.xz -C /tmp --wildcards '*/ffmpeg' '*/ffprobe'
+          cp /tmp/ffmpeg-*-amd64-static/ffmpeg /tmp/ffmpeg-*-amd64-static/ffprobe tools/media/
 
       - name: Run rules and playable UX tests with visual capture
         id: tests
@@ -55,8 +128,23 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-EditMode-Results
-          path: ${{ steps.tests.outputs.artifactsPath }}
+          path: |
+            ${{ steps.tests.outputs.artifactsPath }}/**/*.xml
+            ${{ steps.tests.outputs.artifactsPath }}/**/*.log
           if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish honest chapter-by-chapter execution evidence
+        if: always()
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
+
+      - name: Upload product acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-v042-Product-Acceptance
+          path: ${{ runner.temp }}/HORIZON-product-acceptance.json
+          if-no-files-found: error
           retention-days: 14
 
       - name: Verify Unity portrait previews
@@ -100,6 +188,40 @@ jobs:
           test -s artifacts/visuals/37-ghost-original-choice.png
           test -s artifacts/visuals/38-ghost-returning-consequence.png
           test -s artifacts/visuals/39-ghost-deadline.png
+          test -s artifacts/visuals/40-master-execution.png
+          test -s artifacts/visuals/41-victory-anchor.png
+          test -s artifacts/visuals/42-imagine-recovery.png
+          test -s artifacts/visuals/43-future-orbit.png
+          test -s artifacts/visuals/44-reality-constellation.png
+          test -s artifacts/visuals/45-ai-deepseek.png
+          test -s artifacts/visuals/46-ai-azure.png
+          test -s artifacts/visuals/47-ai-future-self.png
+          test -s artifacts/visuals/48-ai-foundry-resource.png
+          test -s artifacts/visuals/49-ai-azure-deployments.png
+          test -s artifacts/visuals/50-first-life-goal.png
+          test -s artifacts/visuals/51-first-life-choice.png
+          test -s artifacts/visuals/52-first-life-board.png
+          test -s artifacts/visuals/53-first-life-future-schedule.png
+          test -s artifacts/visuals/54-first-life-decision.png
+          test -s artifacts/visuals/55-first-life-prediction.png
+          test -s artifacts/visuals/56-first-life-new-family.png
+          test -s artifacts/visuals/57-imagine-card-recovery.png
+          test -s artifacts/visuals/58-playable-wide-choices.png
+          test -s artifacts/visuals/59-prepared-execution-cost.png
+          test -s artifacts/visuals/60-grouped-time-echo.png
+          test -s artifacts/visuals/61-imagination-actual-divergence.png
+          test -s artifacts/visuals/62-isolated-practice-life.png
+          test -s artifacts/visuals/63-playable-life-complete.png
+          test -s artifacts/visuals/64-story-selection.png
+          test -s artifacts/visuals/65-story-victory-anchor.png
+          test -s artifacts/visuals/66-story-preparation.png
+          test -s artifacts/visuals/67-story-setback.png
+          test -s artifacts/visuals/68-story-boss.png
+          test -s artifacts/visuals/69-story-arrived.png
+          test -s artifacts/visuals/70-readable-causal-story.png
+          test -s artifacts/visuals/71-story-home.png
+          test -s artifacts/visuals/72-tall-phone-board.png
+          test -s artifacts/visuals/73-tall-phone-home.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -108,18 +230,36 @@ jobs:
           /tmp/horizon-gif-verification/bin/python -m pip install pillow==12.3.0
           /tmp/horizon-gif-verification/bin/python tools/verify_timeline_exports.py
           /tmp/horizon-gif-verification/bin/python tools/verify_v03_previews.py
+          python3 tools/verify_video_exports.py --ffprobe tools/media/ffprobe
 
       - name: Upload Unity portrait previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Unity-Portrait-Previews
-          path: artifacts/visuals/
+          path: |
+            artifacts/visuals/[0-6]*.png
+            artifacts/visuals/7[0-3]*.png
+            artifacts/visuals/*.gif
+            artifacts/visuals/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload expedition phone previews and actual MP4
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-v042-Expedition-Previews
+          path: |
+            artifacts/visuals/7[4-9]*.png
+            artifacts/visuals/8*.png
+            artifacts/visuals/*.mp4
+            artifacts/visuals/*.pcm
           if-no-files-found: ignore
           retention-days: 14
 
   build:
-    needs: test
+    needs: [rules, test, ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -162,7 +302,7 @@ jobs:
           targetPlatform: Android
           buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage
-          customParameters: -horizonChannel preview -horizonVersion 0.6.0 -horizonBuildNumber ${{ github.run_number }}
+          customParameters: -horizonChannel preview -horizonVersion 0.4.2 -horizonBuildNumber ${{ github.run_number }}
 
       - name: Verify APK output
         shell: bash

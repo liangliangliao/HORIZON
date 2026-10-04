@@ -17,7 +17,7 @@ namespace Horizon
 
         private float FutureX(int day)
         {
-            if (session.Deadline != 30) return Mathf.Lerp(0.12f, 0.88f,
+            if (session.Deadline < 30) return Mathf.Lerp(0.12f, 0.88f,
                 Mathf.Clamp01((day - session.Day) / (float)Mathf.Max(1, session.Deadline - session.Day)));
             List<int> days = ObservedFutureDays();
             if (days.Count < 2 || day <= days[0]) return 0.12f;
@@ -31,7 +31,7 @@ namespace Horizon
         {
             var days = new List<int> { session.Day };
             IEnumerable<int> candidates = session.Pending.Select(e => e.dueDay);
-            if (Vision.Probability && session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+            if (Vision.Probability && session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline >= 30))
                 candidates = candidates.Concat(WorldEvents.ForCatalog(session.CatalogVersion).Select(e => e.Day));
             foreach (int day in candidates.Where(d => d > session.Day && d < session.Deadline).Distinct().OrderBy(d => d).Take(2))
                 days.Add(day);
@@ -56,7 +56,7 @@ namespace Horizon
                 string mark = day == session.Day ? "今天" : day == session.Deadline ? "截止日" : "D" + day;
                 string type = known || strain ? ObservationDesign.EchoType(echo) : day == session.Day ? "" : "?";
                 if (echo == null && vision.Probability && day > session.Day && day <= session.Day + vision.Days &&
-                    session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+                    session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline >= 30))
                 {
                     WorldEventSpec potential = WorldEvents.ForCatalog(session.CatalogVersion).FirstOrDefault(e => e.Day == day);
                     if (potential != null) type = "变动 " + potential.Chance + "%";
@@ -79,7 +79,7 @@ namespace Horizon
             int[] values = session.RunNumber == 1 && session.Deadline == 12 ? new[] { session.Energy, session.Mood, session.Ability } :
                 new[] { session.Energy, session.Mood, session.Insight, session.Relation, session.Money, session.Ability };
             string[] names = session.RunNumber == 1 && session.Deadline == 12 ? new[] { "精力", "心情", "能力" } :
-                new[] { "精力", "心情", "洞察", "关系", "金钱", "能力" };
+                new[] { "精力", "心情", "专注", "关系", "金钱", "能力" };
             View.Label(root, "State heading", "此刻的你", 22, Palette.Muted, TextAnchor.MiddleLeft,
                 0.06f, 0.416f, 0.5f, 0.443f);
             View.Button(root, "All resources", "全部状态", ShowGoal, 0.73f, 0.417f, 0.94f, 0.442f,
@@ -95,9 +95,9 @@ namespace Horizon
                 ResourceOrbitGraphic orbit = View.Rect(root, "Resource orbit " + names[i], x + 0.012f, 0.367f,
                     x + 0.064f, 0.398f).gameObject.AddComponent<ResourceOrbitGraphic>();
                 orbit.Value = values[i]; orbit.color = values[i] <= 2 ? Palette.Coral : Palette.Mint; orbit.raycastTarget = false;
-                View.Label(root, "Resource name", names[i], values.Length == 3 ? 24 : 20,
+                View.Label(root, "Resource name", names[i], values.Length == 3 ? 31 : 25,
                     Palette.Text, TextAnchor.MiddleCenter, x + 0.064f, 0.382f, x + width - 0.018f, 0.407f);
-                resourceNumbers.Add(View.Label(root, "Resource number", values[i] <= 2 ? values[i].ToString() : "", 21,
+                resourceNumbers.Add(View.Label(root, "Resource number", values[i] + "/10", 29,
                     values[i] <= 2 ? Palette.Coral : Palette.Muted, TextAnchor.MiddleCenter,
                     x + 0.064f, 0.356f, x + width - 0.018f, 0.383f));
                 resourceValues.Add(values[i]);
@@ -107,7 +107,7 @@ namespace Horizon
         private void RevealResourceNumbers(bool reveal)
         {
             for (int i = 0; i < resourceNumbers.Count; i++)
-                if (resourceNumbers[i] != null) resourceNumbers[i].text = reveal || resourceValues[i] <= 2 ? resourceValues[i].ToString() : "";
+                if (resourceNumbers[i] != null) resourceNumbers[i].text = resourceValues[i] + "/10";
         }
 
         private void ShowPredictionWhy()
@@ -180,7 +180,7 @@ namespace Horizon
                 View.Button(overlay, "Next focus page", ">", () => { focusPage++; RenderFocus(false); },
                     0.73f, 0.342f, 0.92f, 0.398f, Palette.Panel, Palette.Text, 27).interactable = focusPage < pages - 1;
             }
-            if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline == 30))
+            if (session.CatalogVersion >= 3 && (session.RunNumber >= 3 || session.Deadline >= 30))
             {
                 WorldEventSpec next = Array.Find(WorldEvents.ForCatalog(session.CatalogVersion), spec => spec.Day > session.Day);
                 if (next != null) View.Label(overlay, "World chance", vision.Probability ?

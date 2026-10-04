@@ -1,0 +1,8 @@
+{
+  "name": "horizon-ai-gateway",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs", "test": "node --test" }
+}
