@@ -32,6 +32,8 @@ Unity 6 LTS **6000.0.62f1**，URP **17.0.4**，Cinemachine **3.1.3**，Timeline 
 
 本地便携测试可以使用 `dotnet run --project tools/RulesHarness.csproj -- --workers=0`。图形测试必须使用 Unity 6 和图形设备，不能用 `-nographics`。
 
+CI 在临时容器中使用 `UNITY_EMAIL` 与 `UNITY_PASSWORD` 在线激活 Unity；Pro 账号还可提供 `UNITY_SERIAL`。测试与 Android 构建统一使用 Game-CI CLI v0.1.72，Android 构建器固定为 v6.0.0。不向临时容器传入旧的 `UNITY_LICENSE` 文件，避免旧 `.ulf` 的时间戳或机器绑定阻止 Unity 6 启动。仓库中已有的 secret 无需删除，工作流只使用上述账号配置。
+
 ## 验收边界
 
 模型、动作与音效是项目内程序化资产。三份规格中的概念、文字、动作方向和事件证据有工程覆盖；参考视频未随本次附件提供，不能声称已完成逐镜头视频品质对照。60FPS/最低30FPS、真机触控、音画震动的设备级同步、第一小时节奏、成熟美术品质和情绪效果需要真实手机与玩家验收。不得用规则测试或截图代替这些结论。
