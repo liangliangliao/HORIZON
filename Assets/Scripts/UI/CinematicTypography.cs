@@ -15,6 +15,9 @@ namespace Horizon.UI
         public static void Upgrade(Text text)
         {
             if(text==null || text.font==null || text.GetComponent<CinematicTypography>()!=null) return;
+            // Keep the readable source caption when essential TMP resources
+            // are unavailable instead of interrupting the reward continuation.
+            if(TMP_Settings.instance==null) return;
             if(sharedFont==null) sharedFont=TMP_FontAsset.CreateFontAsset(text.font,64,7,GlyphRenderMode.SDFAA,1024,1024,AtlasPopulationMode.Dynamic,true);
             if(sharedFont==null) return;
             var mirror=text.gameObject.AddComponent<CinematicTypography>(); mirror.source=text;

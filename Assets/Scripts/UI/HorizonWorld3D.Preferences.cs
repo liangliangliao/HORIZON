@@ -39,6 +39,8 @@ namespace Horizon.UI
                 if (runtimePipeline == null)
                 { priorPipeline = QualitySettings.renderPipeline; runtimePipeline = Instantiate(source); runtimePipeline.name = "HORIZON runtime quality"; QualitySettings.renderPipeline = runtimePipeline; }
                 runtimePipeline.msaaSampleCount = SceneMsaaEnabled ? 2 : 1;
+                if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3)
+                    runtimePipeline.hdrColorBufferPrecision = HDRColorBufferPrecision._64Bits;
                 runtimePipeline.renderScale = preferences.batterySaver ? .85f : 1;
                 runtimePipeline.shadowDistance = preferences.batterySaver ? 0 : 22;
                 runtimePipeline.supportsHDR = !preferences.batterySaver;

@@ -13,6 +13,9 @@ namespace Horizon.Editor
     {
         public static void Build()
         {
+            // Prepare resources before BuildPipeline starts collecting player
+            // assets; editor delay callbacks do not run during this batch build.
+            CinematicPipeline.Ensure();
             string output = Argument("-customBuildPath") ?? "build/Android/HORIZON.apk";
             var scenes = EditorBuildSettings.scenes.Where(scene => scene.enabled).Select(scene => scene.path).ToArray();
             if (scenes.Length == 0) throw new BuildFailedException("No enabled scenes for the Android build.");

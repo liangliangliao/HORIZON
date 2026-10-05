@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -23,9 +24,15 @@ namespace Horizon.Editor
             // Import them once so runtime-created Chinese captions survive stripping.
             if (Resources.Load<TMPro.TMP_Settings>("TMP Settings") == null)
             {
-                var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(TMPro.TMP_Text).Assembly);
+                var package = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
+                    .FirstOrDefault(p => p.name == "com.unity.ugui");
                 string essentials = package == null ? null : Path.Combine(package.resolvedPath, "Package Resources", "TMP Essential Resources.unitypackage");
-                if (essentials != null && File.Exists(essentials)) AssetDatabase.ImportPackage(essentials, false);
+                if (essentials == null || !File.Exists(essentials))
+                    throw new BuildFailedException("TextMeshPro essential resources are unavailable.");
+                AssetDatabase.ImportPackage(essentials, false);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                if (Resources.Load<TMPro.TMP_Settings>("TMP Settings") == null)
+                    throw new BuildFailedException("TextMeshPro settings were not imported before building.");
             }
             const string directory = "Assets/Settings";
             const string rendererPath = directory + "/HorizonRenderer.asset";
@@ -58,6 +65,9 @@ namespace Horizon.Editor
             // Start safely on GLES before player preferences are applied;
             // desktop preferences can enable multisampling on their own clone.
             pipeline.msaaSampleCount = 1;
+            // GLES 3.0 drivers may advertise half-float targets but corrupt the
+            // packed R11G11B10 HDR target. Keep separate RGBA half-float channels.
+            pipeline.hdrColorBufferPrecision = HDRColorBufferPrecision._64Bits;
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
             EditorUtility.SetDirty(pipeline); AssetDatabase.SaveAssets();

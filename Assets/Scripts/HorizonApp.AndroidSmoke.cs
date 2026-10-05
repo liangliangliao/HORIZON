@@ -129,6 +129,7 @@ namespace Horizon
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
             AndroidSmoke.Require(world.WorldCamera.enabled && home.All(g=>g.activeInHierarchy),"Resume left the phone blank.");
             CaptureAndroidFrame("04-resumed-home",world.Avatar);
+            AndroidSmoke.Require(TMPro.TMP_Settings.instance!=null,"TextMeshPro settings are missing from the APK.");
             // Reproduce the completed reward's system-back path with a real
             // generated pattern event, and inject KEYCODE_BACK from the host.
             var model=new PlayerBehavioralModel(); model.Observe(new[] {
@@ -139,6 +140,8 @@ namespace Horizon
             for(int i=0;i<4;i++) rewardLife.ExecuteDecisionStep(); rewardLife.Choose(rewardLife.Master.decision.cardId);
             DomainEvent reward=rewardLife.Master.events.Single(e=>e.kind==DomainEventKind.PatternBroken);
             androidSmokeRewardReturned=false; PlayMasterSpectacle(reward,AndroidSmokeFinishReward);
+            AndroidSmoke.Require(overlay.GetComponentsInChildren<TMPro.TextMeshProUGUI>().Length>=4,
+                "The reward did not create its cinematic captions.");
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
             AndroidSmoke.Require(home.All(g=>!g.activeInHierarchy),"Home leaked through the reward movie.");
             CaptureAndroidFrame("05-reward-visible",world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Cinematic player").transform);
@@ -166,6 +169,13 @@ namespace Horizon
                 // Retain the normal backbuffer frame even if the visibility
                 // assertion fails, so the actual rendering failure is reviewable.
                 File.WriteAllBytes(Path.Combine(AndroidSmoke.DirectoryPath,name+".png"),frame.EncodeToPNG());
+                if (name=="01-home")
+                {
+                    Rect sky=world.WorldCamera.rect;
+                    Color sample=frame.GetPixel((int)(frame.width*.04f),(int)(frame.height*(sky.yMax-.02f)));
+                    AndroidSmoke.Require(sample.b>sample.r && sample.b>.025f,
+                        "The Android night sky lost its blue channel: "+sample);
+                }
                 Vector3 point=world.WorldCamera.WorldToScreenPoint(actor.position+Vector3.up*1.3f);
                 AndroidSmoke.Require(point.z>0 && point.x>0 && point.x<frame.width && point.y>0 && point.y<frame.height,"The scene actor is outside the phone viewport.");
                 float minimum=1,maximum=0;
