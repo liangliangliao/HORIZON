@@ -192,11 +192,13 @@ namespace Horizon
             world.ShowCouncilScene(voices);
             for (int i = 0; i < voices.Count; i++)
             {
-                CouncilVoice voice = voices[i]; float y = 0.66f - i * (voices.Count > 4 ? 0.085f : 0.12f);
+                CouncilVoice voice = voices[i]; float y = 0.52f - i * (voices.Count > 4 ? 0.065f : 0.10f);
                 View.Button(overlay, "Council voice " + voice.name, voice.name + "  " + voice.weight + "%", () => {
                     MasterPage("Council sources", voice.name + " · " + voice.weight + "%", ShowCouncil);
-                    View.Label(overlay, "Voice sources", string.Join("\n\n", voice.sources), 32, Palette.Text, TextAnchor.UpperLeft, 0.09f, 0.35f, 0.91f, 0.78f);
-                }, 0.075f, y, 0.925f, y + (voices.Count > 4 ? 0.075f : 0.095f), Palette.Panel, Palette.Text, 31);
+                    overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.1f);
+                    world.ShowCouncilScene(voices,voice.name);
+                    View.Label(overlay, "Voice sources", string.Join("\n\n", voice.sources), 29, Palette.Text, TextAnchor.UpperLeft, 0.09f, 0.26f, 0.91f, 0.55f);
+                }, 0.075f, y, 0.925f, y + (voices.Count > 4 ? 0.06f : 0.085f), Palette.Panel, Palette.Text, 31);
             }
         }
         private void ShowMasterUnavailable(string title, string message)
@@ -248,7 +250,8 @@ namespace Horizon
             world.ShowImaginationScene(run);
             View.Panel(overlay, "Imagine readable copy", new Color(.009f,.023f,.04f,.94f), .045f,.43f,.955f,.56f,20);
             View.Label(overlay, "Imagine goal title", run.goal, 33, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.77f, 0.925f, 0.86f);
-            View.Label(overlay, "Imagine beat", run.timeline.Last().text, 30, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.438f, 0.925f, 0.552f);
+            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 25, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.438f, 0.925f, 0.552f);
+            var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=run.timeline.Last().text;
             View.Label(overlay, "Imagine resilience", "挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  RECOVERY " + run.recovered + "  ·  ×" + run.multiplier, 26, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.345f, 0.925f, 0.415f);
             if (run.pathVersion >= 2)
                 View.Label(overlay, "Imagine resources", "预演中的状态 · 精力 " + run.energy + " / 专注 " + run.focus + " / 支援 " + run.support,

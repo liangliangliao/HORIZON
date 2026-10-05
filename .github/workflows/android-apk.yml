@@ -161,6 +161,19 @@ jobs:
         if: always()
         run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath || 'artifacts' }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
 
+      - name: Verify reward and cinematic specifications independently
+        if: always()
+        run: python3 tools/report_cinematic_acceptance.py --results "${{ steps.tests.outputs.artifactsPath || 'artifacts' }}" --output "${{ runner.temp }}/HORIZON-cinematic-acceptance.json" --enforce
+
+      - name: Upload reward and cinematic requirement evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Cinematic-Specification-Acceptance
+          path: ${{ runner.temp }}/HORIZON-cinematic-acceptance.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload product acceptance report
         if: always()
         uses: actions/upload-artifact@v4
@@ -288,7 +301,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Cinematic-Reward-Previews
-          path: artifacts/visuals/9[01]-*.png
+          path: |
+            artifacts/visuals/9[01]-*.png
+            artifacts/cinematics/
           if-no-files-found: ignore
           retention-days: 14
 

@@ -27,6 +27,7 @@ namespace Horizon.UI
         public RewardPlan Current { get { return active?.plan; } }
         public bool IsPlaying { get { return active != null; } }
         public float Elapsed { get { return clock?.Elapsed ?? 0; } }
+        public bool IsPaused { get { return paused; } }
         public event Action<CinematicCue> Cue;
         public event Action<RewardPlan> Started;
         public event Action<RewardPlan> Completed;
@@ -55,9 +56,17 @@ namespace Horizon.UI
         public void Advance(float delta)
         {
             if (active == null || paused) return;
-            clock.Advance(delta, cue => { world.ApplyCinematicCue(cue); Cue?.Invoke(cue); });
-            if (graph.IsValid()) { track.SetTime(clock.Elapsed); graph.Evaluate(0); }
-            if (clock.Finished) Finish();
+            // A UI cue observer may skip/cancel or enqueue another movie. Keep the
+            // sampled request and clock together so a reentrant observer cannot
+            // deliver old effects into the next movie or dereference its clock.
+            Request playing=active; CinematicClock advancing=clock;
+            advancing.Advance(delta, cue => {
+                if (active!=playing) return;
+                world.ApplyCinematicCue(cue); Cue?.Invoke(cue);
+            });
+            if (active!=playing) return;
+            if (graph.IsValid()) { track.SetTime(advancing.Elapsed); graph.Evaluate(0); }
+            if (advancing.Finished) Finish();
         }
         public void Skip()
         {

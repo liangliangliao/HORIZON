@@ -49,6 +49,14 @@ namespace Horizon.UI
             // Everyday scene modules accompany the future, rather than a palace.
             Box(movieAnchor,"Future work desk",new Vector3(1.7f,.9f,6),new Vector3(1.45f,.12f,.7f),wood);
             Box(movieAnchor,"Future open task",new Vector3(1.7f,1.15f,6),new Vector3(.52f,.42f,.07f),teal);
+            Box(movieAnchor,"Living room floor",new Vector3(1.1f,-.15f,6.1f),new Vector3(4,.1f,2.5f),wood);
+            Box(movieAnchor,"Room back wall",new Vector3(1.1f,1.25f,7.3f),new Vector3(4,2.7f,.12f),ivory);
+            Box(movieAnchor,"Window recess",new Vector3(.3f,1.7f,7.2f),new Vector3(1.5f,1.1f,.07f),teal);
+            Box(movieAnchor,"Window mullion",new Vector3(.3f,1.7f,7.14f),new Vector3(.06f,1.1f,.05f),ivory);
+            Box(movieAnchor,"Reading seat",new Vector3(1.8f,.47f,5.25f),new Vector3(.55f,.15f,.55f),teal);
+            Box(movieAnchor,"Reading chair back",new Vector3(1.8f,.86f,5.02f),new Vector3(.55f,.75f,.09f),teal);
+            for(int i=0;i<4;i++) Box(movieAnchor,"Desk support "+i,new Vector3(1.7f+(i%2==0?-.6f:.6f),.42f,6+(i<2?-.26f:.26f)),new Vector3(.07f,.85f,.07f),wood);
+            for(int i=0;i<3;i++) Box(movieAnchor,"Study book "+i,new Vector3(2.1f,1.01f+i*.07f,6),new Vector3(.3f,.05f,.4f),i%2==0?ivory:teal);
             movieBarrier=Box(cinematicStage,"Historical interruption",new Vector3(0,.1f,2),new Vector3(1.7f,.1f,.3f),gold);
             for(int i=0;i<24;i++)
             {
@@ -74,6 +82,7 @@ namespace Horizon.UI
             var emission=movieParticles.emission; emission.enabled=false;
             var shape=movieParticles.shape; shape.shapeType=ParticleSystemShapeType.Sphere; shape.radius=.15f;
             var renderer=movieParticles.GetComponent<ParticleSystemRenderer>(); renderer.sharedMaterial=portalLight; renderer.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
+            InitializeCinematicStaging();
             cinematicStage.gameObject.SetActive(false);
             impactTone=ShortCueTone("Synchronous low impact",65,.24f); nodeTone=ShortCueTone("Causal node hit",220,.12f); heartbeatTone=ShortCueTone("Quiet heartbeat",48,.16f);
         }
@@ -89,12 +98,15 @@ namespace Horizon.UI
             movieImpactTime=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
             savedCameraPosition=cameraPosition; savedCameraLook=cameraLook; savedCameraRect=WorldCamera.rect;
             savedFov=WorldCamera.fieldOfView; savedFog=RenderSettings.fogDensity;
+            if(systemScenery!=null) systemScenery.gameObject.SetActive(false);
             cinematicStage.gameObject.SetActive(true); WorldCamera.rect=fullscreen?new Rect(0,.18f,1,.64f):new Rect(0,.543f,1,.245f);
             cinematicCamera.gameObject.SetActive(true);
             movieFuture.localPosition = new Vector3(0,0,6); movieFuture.localScale = Vector3.one;
             movieAnchor.localPosition = Vector3.zero; SetMovieColor(movieAnchor, Palette.Mint);
+            movieAnchor.Find("Future work desk").localScale=new Vector3(1.45f,.12f,.7f);
             movieAnchor.Find("Future work desk").gameObject.SetActive(true); movieAnchor.Find("Future open task").gameObject.SetActive(true);
             moviePlayer.gameObject.SetActive(true); moviePlayer.localPosition=new Vector3(0,0,-.5f); moviePlayer.localRotation=Quaternion.Euler(0,180,0);
+            moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer); ResetMovieColor(movieFuture); ResetMovieColor(movieFriend);
             moviePlayer.GetComponent<HorizonActor>().SetNeutral(); moviePlayer.GetComponent<HorizonActor>().Walking=false;
             moviePlayer.GetComponent<HorizonActor>().TiredUntil=0; moviePlayer.GetComponent<HorizonActor>().Pointing=false;
             movieFuture.gameObject.SetActive(false); movieFriend.gameObject.SetActive(plan.Objects.Any(o=>o.Kind==RewardObjectKind.ConnectionRing));
@@ -105,8 +117,8 @@ namespace Horizon.UI
             foreach(Transform x in movieOrbit) x.gameObject.SetActive(false);
             foreach(Transform x in movieNodes) { x.gameObject.SetActive(false); x.localScale=Vector3.one*.16f; }
             foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
-            foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); }
-            movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene();
+            foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
+            movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             var budget = movieParticles.main; budget.maxParticles = preferences.batterySaver ? 12 : 64;
             movieParticles.Play();
@@ -149,6 +161,8 @@ namespace Horizon.UI
                 CueSound(nodeTone,.65f); MasterHaptics.Cue(28,80,preferences); return;
             }
             moviePhase=cue.Phase; moviePhaseTime=cue.Time;
+            if(cue.Phase==CinematicPhase.Escalation && moviePlan.Event.kind==DomainEventKind.Overdrive)
+                CueSound(nodeTone,.75f);
             if(cue.Phase==CinematicPhase.Charge && moviePlan.Event.tier==RewardTier.Mythic) CueSound(heartbeatTone,.5f);
             if(cue.Phase==CinematicPhase.HitStop)
             {
@@ -163,8 +177,9 @@ namespace Horizon.UI
                 foreach (HorizonActor actor in cinematicStage.GetComponentsInChildren<HorizonActor>(true)) actor.MotionRate=1;
                 movieParticles.Play();
                 Vector3 hit=cinematicStage.TransformPoint(new Vector3(0,1.3f,2));
-                MovieBurst(hit,moviePlan.Event.tier>=RewardTier.Epic?64:16);
-                CueSound(ImpactVoice(moviePlan.Event.kind),moviePlan.Event.tier>=RewardTier.Epic?1:.45f);
+                float strength=Mathf.Clamp01(Mathf.Log10(Mathf.Max(1,moviePlan.PresentationMultiplier))/2.7f);
+                MovieBurst(hit,Mathf.RoundToInt(8+56*strength));
+                CueSound(ImpactVoice(moviePlan.Event.kind),.25f+.75f*strength);
                 MasterHaptics.Impact(moviePlan.Event,preferences);
                 if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.11f:.025f; if(bloom!=null) bloom.Echo=.6f; }
                 bool losing = moviePlan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount < 0);
@@ -216,7 +231,8 @@ namespace Horizon.UI
             if(moviePlan.Event.tier>=RewardTier.Epic)
             {
                 camera=Vector3.Lerp(new Vector3(4.6f,3.6f,-7.8f),new Vector3(.8f,2.3f,-4.4f),Smooth(.1f,.43f,progress));
-                camera=Vector3.Lerp(camera,new Vector3(6,5.8f,-12),Smooth(.55f,.85f,progress));
+                Vector3 reveal=CinematicStoryboard.AllowsExtremeWide(moviePlan.Event.kind)?new Vector3(6,5.8f,-12):new Vector3(4.6f,3.6f,-7.8f);
+                camera=Vector3.Lerp(camera,reveal,Smooth(.55f,.85f,progress));
             }
             if(kind==DomainEventKind.TimeEcho)
             {
@@ -271,7 +287,9 @@ namespace Horizon.UI
             SampleRewardObjects(time,impact);
             MaterialReward mood = moviePlan.Objects.FirstOrDefault(o=>o.Kind==RewardObjectKind.WarmLamp);
             movieLight.color=mood!=null?Color.Lerp(new Color(.3f,.48f,.8f),new Color(1,.64f,.3f),mood.Amount>0?impact:1-impact):Palette.Mint;
-            movieLight.intensity=impact*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
+            float pulseAtImpact=time>=movieImpactTime?Mathf.Clamp01(1-(time-movieImpactTime)/.25f):0;
+            movieLight.intensity=Mathf.Max(impact,pulseAtImpact)*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
+            SampleCinematicStaging(time,impact,ref camera,ref look);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen) WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*shake;
@@ -298,6 +316,7 @@ namespace Horizon.UI
                 if(reward.Kind==RewardObjectKind.WarmLamp) target=new Vector3((i%3-1)*1.2f,.8f,1.2f);
                 if(reward.Kind==RewardObjectKind.ConnectionRing) target=new Vector3(1.1f,1.2f,1);
                 if(reward.Kind==RewardObjectKind.RealityMilestone) { start=new Vector3(0,4.5f,2); target=new Vector3(0,.55f,2); arrival=Smooth(movieImpactTime-.3f,movieImpactTime,time); }
+                if(reward.Kind==RewardObjectKind.RouteLock) target=new Vector3(-.55f,.55f,1.8f);
                 if(reward.Kind==RewardObjectKind.ConvergencePrism) target=new Vector3(0,1.3f,3);
                 if(reward.Kind==RewardObjectKind.ReservoirCore) target=new Vector3(0,1.2f,2);
                 if(reward.Amount<0) { Vector3 swap=start; start=target; target=swap; SetMovieColor(item,Color.Lerp(Palette.Muted,Palette.Muted*.2f,arrival)); }
@@ -305,7 +324,7 @@ namespace Horizon.UI
                 float size=Smooth(0,movieImpactTime,time)*(.45f+reward.Scale*.18f);
                 if(reward.Kind==RewardObjectKind.EnergyCell && reward.Amount>0) { item.localPosition=Vector3.Lerp(start,moviePlayer.localPosition+Vector3.up*1.1f,arrival); size*=1-arrival*.95f; }
                 item.localScale=Vector3.one*Mathf.Max(.001f,size); item.localRotation=Quaternion.Euler(0,Mathf.Lerp(progress*160,0,arrival),0);
-                if(reward.Kind==RewardObjectKind.ToolKit && item.childCount>2) { Transform tool=item.GetChild(2); tool.localPosition=new Vector3(-.17f,.3f+(reward.Amount>0?1-arrival:arrival)*.7f,0); }
+                SampleRewardDevice(item,reward,arrival);
                 if(reward.Kind==RewardObjectKind.ConnectionRing)
                 { movieLines[3].gameObject.SetActive(true); MovieLine(movieLines[3],moviePlayer.localPosition+Vector3.up,movieFriend.localPosition+Vector3.up); movieLines[3].widthMultiplier=reward.Amount>0?.025f+impact*.04f:.065f-impact*.055f; }
                 if(reward.Kind==RewardObjectKind.ReservoirCore)
@@ -322,6 +341,7 @@ namespace Horizon.UI
         public void EndCinematic()
         {
             if(moviePlan==null) return;
+            ResetCinematicStaging();
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             cinematicCamera.gameObject.SetActive(false);
             cameraPosition=savedCameraPosition; cameraLook=savedCameraLook; WorldCamera.rect=savedCameraRect; WorldCamera.fieldOfView=savedFov;

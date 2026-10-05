@@ -8,6 +8,9 @@ namespace Horizon.Game
         InsightPrism, HorizonLens, PredictionPanel, Projector, RouteLock, TriggerObject, RepairKit,
         MemoryFilm, BrokenLink, RealityMilestone, ConvergencePrism, CausalChain, OrbitNode, ReservoirCore }
     public enum RewardObjectClass { Resource, System, Milestone }
+    public enum RewardObjectForm { Default, Cell, ParallelCells, CellPack, BatteryPack, StorageUnit, EnergyCore,
+        SingleLens, DoubleLens, OpticalDevice, Coin, Wallet, CashBundle, Vault, Tool, ToolBox }
+    public enum TriggerAppearance { Alarm, Key, Appointment, Ticket, Countdown, Reminder, Commitment, Deposit }
     public enum CinematicPhase { Anticipation, Charge, Escalation, HeroMoment, HitStop, Impact,
         Multiplication, SecondReveal, Jackpot, Settlement, ReturnToGame }
 
@@ -25,6 +28,8 @@ namespace Horizon.Game
     public sealed class RewardReceipt
     {
         public bool resourcesRecorded;
+        public bool predictionRecorded, predictionResolved;
+        public ResourceDelta predicted = new ResourceDelta(), actual = new ResourceDelta();
         public ResourceDelta resources = new ResourceDelta();
         public string action, triggerId;
         public int sourceDay, orbitBits, orbitIndex = -1, horizonLevel;
@@ -33,6 +38,7 @@ namespace Horizon.Game
         public RewardReceipt Copy()
         {
             var copy = (RewardReceipt)MemberwiseClone(); copy.resources = ResourceMath.Copy(resources);
+            copy.predicted = ResourceMath.Copy(predicted); copy.actual = ResourceMath.Copy(actual);
             copy.causes = (causes ?? new List<RewardEvidence>()).Select(x => x.Copy()).ToList();
             copy.pastFailures = (pastFailures ?? new List<RewardEvidence>()).Select(x => x.Copy()).ToList(); return copy;
         }
@@ -63,15 +69,37 @@ namespace Horizon.Game
         public readonly RewardObjectKind Kind;
         public readonly RewardObjectClass Class;
         public readonly int Amount, VisualCount, Scale;
+        public readonly RewardObjectForm Form;
         public readonly string Copy;
         public MaterialReward(RewardObjectKind kind, RewardObjectClass category, string copy, int amount = 0)
         {
             Kind = kind; Class = category; Copy = copy; Amount = amount;
             long magnitude = Math.Abs((long)amount);
+            Form = FormFor(kind, magnitude);
             // Large receipts become a device, rather than hundreds of meshes.
             VisualCount = category == RewardObjectClass.Resource ? magnitude <= 5 ? (int)magnitude : magnitude < 20 ? 3 : 1 : 1;
             Scale = magnitude >= 100 ? 4 : magnitude >= 50 ? 3 : magnitude >= 20 ? 2 : magnitude >= 5 ? 1 : 0;
+            if (kind == RewardObjectKind.EnergyCell && magnitude >= 10 ||
+                kind == RewardObjectKind.FocusLens && magnitude >= 5 || kind == RewardObjectKind.MoneyWallet ||
+                kind == RewardObjectKind.ToolKit) VisualCount = magnitude == 0 && category == RewardObjectClass.Resource ? 0 : 1;
+            if (kind == RewardObjectKind.WarmLamp && magnitude >= 5) VisualCount = 5;
         }
+        private static RewardObjectForm FormFor(RewardObjectKind kind, long magnitude)
+        {
+            if (kind == RewardObjectKind.EnergyCell) return magnitude >= 100 ? RewardObjectForm.EnergyCore : magnitude >= 20 ? RewardObjectForm.StorageUnit :
+                magnitude >= 10 ? RewardObjectForm.BatteryPack : magnitude >= 5 ? RewardObjectForm.CellPack : magnitude >= 2 ? RewardObjectForm.ParallelCells : RewardObjectForm.Cell;
+            if (kind == RewardObjectKind.FocusLens) return magnitude >= 5 ? RewardObjectForm.OpticalDevice : magnitude >= 2 ? RewardObjectForm.DoubleLens : RewardObjectForm.SingleLens;
+            if (kind == RewardObjectKind.MoneyWallet) return magnitude >= 20 ? RewardObjectForm.Vault : magnitude >= 5 ? RewardObjectForm.CashBundle : magnitude >= 2 ? RewardObjectForm.Wallet : RewardObjectForm.Coin;
+            if (kind == RewardObjectKind.ToolKit) return magnitude >= 5 ? RewardObjectForm.ToolBox : RewardObjectForm.Tool;
+            return RewardObjectForm.Default;
+        }
+    }
+    public sealed class PresentationBeat
+    {
+        public readonly float Time;
+        public readonly int Multiplier;
+        public string Copy { get { return "演出 ×" + Multiplier; } }
+        public PresentationBeat(float time, int multiplier) { Time = time; Multiplier = multiplier; }
     }
     public sealed class CinematicCue
     {
@@ -90,8 +118,12 @@ namespace Horizon.Game
         public readonly IReadOnlyList<CinematicCue> Cues;
         public readonly float Duration;
         public readonly int PresentationMultiplier;
-        public RewardPlan(DomainEvent e, List<MaterialReward> objects, List<CinematicCue> cues, float duration, int multiplier)
-        { Event = e.Copy(); Objects = objects.AsReadOnly(); Cues = cues.OrderBy(c => c.Time).ToList().AsReadOnly(); Duration = duration; PresentationMultiplier = multiplier; }
+        public readonly IReadOnlyList<PresentationBeat> PresentationBeats;
+        public RewardPlan(DomainEvent e, List<MaterialReward> objects, List<CinematicCue> cues, float duration, int multiplier, List<PresentationBeat> beats = null)
+        { Event = e.Copy(); Objects = objects.AsReadOnly(); Cues = cues.OrderBy(c => c.Time).ToList().AsReadOnly(); Duration = duration; PresentationMultiplier = multiplier;
+            PresentationBeats = (beats ?? new List<PresentationBeat> { new PresentationBeat(0, multiplier) }).AsReadOnly(); }
+        public int PresentationMultiplierAt(float time)
+        { int value = 1; foreach (PresentationBeat beat in PresentationBeats) { if (beat.Time > time) break; value = beat.Multiplier; } return value; }
         public string ResourceCopy { get { return string.Join(" · ", Objects.Where(o => o.Class == RewardObjectClass.Resource).Select(o => o.Copy)); } }
     }
 
@@ -115,15 +147,18 @@ namespace Horizon.Game
             }
             RewardObjectKind? system = ObjectFor(e.kind);
             if (system.HasValue) objects.Add(new MaterialReward(system.Value, IsMilestone(e.kind) ? RewardObjectClass.Milestone : RewardObjectClass.System, e.title));
+            if (e.kind == DomainEventKind.Synchronized || e.kind == DomainEventKind.Surprise)
+                objects.Add(new MaterialReward(RewardObjectKind.PredictionPanel, RewardObjectClass.System, e.detail));
             float duration = Duration(e.tier);
-            int multiplier = e.kind == DomainEventKind.Cascade || e.kind == DomainEventKind.CausalSingularity ? Math.Max(1, e.chainSize) :
-                e.kind == DomainEventKind.Comeback || e.kind == DomainEventKind.PatternBroken ? Math.Max(1, e.multiplier) : 1;
+            int multiplier = PresentationStrength(e);
             var cues = new List<CinematicCue>();
             if (e.tier >= RewardTier.Epic)
             {
                 string[] copy = Story(e, r);
                 float[] fractions = { 0, .09f, .20f, .31f, .43f, .45f, .54f, .63f, .75f, .86f, 1 };
                 for (int i = 0; i < fractions.Length; i++) cues.Add(new CinematicCue(fractions[i] * duration, (CinematicPhase)i, copy[i]));
+                if (e.kind == DomainEventKind.RealityConvergence)
+                { cues.RemoveAll(c => c.Phase == CinematicPhase.HitStop); cues.Add(new CinematicCue(duration * .45f - .2f, CinematicPhase.HitStop, copy[4])); }
                 // One cue fires all senses on the same frame. Hit-stop ends at Impact.
                 if (e.kind == DomainEventKind.Cascade || e.kind == DomainEventKind.CausalSingularity)
                 {
@@ -133,8 +168,8 @@ namespace Horizon.Game
                     { cues.Add(new CinematicCue(time, CinematicPhase.Escalation, r.causes[i].label, i)); time += i == 0 ? .35f : i == 1 ? .28f : i == 2 ? .21f : .15f; }
                     // Final network impact follows the final node and a deliberate 150ms silence.
                     cues.RemoveAll(c => !c.NodeHit && c.Phase >= CinematicPhase.HeroMoment);
-                    float hit = Math.Max(duration * .45f, time);
-                    cues.Add(new CinematicCue(Math.Max(duration * .31f, time - .2f), CinematicPhase.HeroMoment, e.title));
+                    float hit = count == 0 ? duration * .45f : cues.Where(c => c.NodeHit).Max(c => c.Time) + .001f;
+                    cues.Add(new CinematicCue(Math.Max(0, hit - .0005f), CinematicPhase.HeroMoment, e.title));
                     cues.Add(new CinematicCue(hit, CinematicPhase.HitStop, "每一条光，都有真实的来路。"));
                     cues.Add(new CinematicCue(hit + .15f, CinematicPhase.Impact, e.detail));
                     float remaining = duration - hit - .15f;
@@ -153,7 +188,7 @@ namespace Horizon.Game
                 cues.Add(new CinematicCue(.8f, CinematicPhase.HitStop, r.sourceDay > 0 ? "这个结果来自 D" + r.sourceDay + " 的行动。" : e.detail));
                 cues.Add(new CinematicCue(1.05f, CinematicPhase.HeroMoment, e.detail));
                 cues.Add(new CinematicCue(2.15f, CinematicPhase.Impact, string.Join(" · ", objects.Select(o => o.Copy))));
-                cues.Add(new CinematicCue(2.5f, CinematicPhase.Settlement, e.detail));
+                cues.Add(new CinematicCue(2.5f, CinematicPhase.Settlement, r.sourceDay > 0 ? "这个结果来自 Day " + r.sourceDay + " 的行动。\n" + e.detail : e.detail));
                 cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
             }
             else
@@ -164,7 +199,45 @@ namespace Horizon.Game
                 cues.Add(new CinematicCue(duration * .78f, CinematicPhase.Settlement, e.detail));
                 cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
             }
-            return new RewardPlan(e, objects, cues, duration, multiplier);
+            if(e.kind==DomainEventKind.Synchronized && e.tier<RewardTier.Epic)
+                cues.Add(new CinematicCue(duration*.52f-.1f,CinematicPhase.HitStop,"预测与现实，正在重合。"));
+            var beats = new List<PresentationBeat>();
+            if (e.kind == DomainEventKind.PatternBroken && e.tier == RewardTier.Mythic)
+            {
+                beats.Add(new PresentationBeat(duration * .09f, 2)); beats.Add(new PresentationBeat(duration * .20f, 5));
+                beats.Add(new PresentationBeat(duration * .40f, 20)); beats.Add(new PresentationBeat(duration * .54f, 100));
+                if (multiplier > 100) beats.Add(new PresentationBeat(duration * .75f, multiplier));
+            }
+            else { beats.Add(new PresentationBeat(0, 1)); beats.Add(new PresentationBeat(cues.First(c => c.Phase == CinematicPhase.Impact).Time, multiplier)); }
+            return new RewardPlan(e, objects, cues, duration, multiplier, beats);
+        }
+        // These values control sensory intensity only. Never reuse them as causal
+        // depth, resilience, resource amounts, or an input to the rule engine.
+        public static int PresentationStrength(DomainEvent e)
+        {
+            if (e.tier == RewardTier.Mythic)
+            {
+                if (e.kind == DomainEventKind.CausalSingularity && e.chainSize >= 9) return e.chainSize >= 16 ? 500 : 300;
+                if (e.kind == DomainEventKind.PatternBroken && e.chainSize >= 9 && (e.receipt?.pastFailures?.Count ?? 0) >= 5)
+                    return e.chainSize >= 16 && e.receipt.pastFailures.Count >= 8 ? 500 : 300;
+                if (e.kind == DomainEventKind.RealityConvergence && (e.receipt?.causes?.Select(x => x.kind).Distinct().Count() ?? 0) >= 3) return 300;
+                return 100;
+            }
+            return e.tier == RewardTier.Epic ? 50 : e.tier == RewardTier.Major ? 20 : e.tier == RewardTier.Combo ? 5 : e.tier == RewardTier.Local ? 2 : 1;
+        }
+        public static TriggerAppearance TriggerForm(string id)
+        {
+            switch (id)
+            {
+                case "appointment": return TriggerAppearance.Appointment;
+                case "ticket": return TriggerAppearance.Ticket;
+                case "route": case "place": case "environment": return TriggerAppearance.Key;
+                case "deadline": return TriggerAppearance.Countdown;
+                case "friend": return TriggerAppearance.Reminder;
+                case "promise": return TriggerAppearance.Commitment;
+                case "deposit": return TriggerAppearance.Deposit;
+                default: return TriggerAppearance.Alarm;
+            }
         }
         public static float Duration(RewardTier tier)
         { switch (tier) { case RewardTier.Micro: return .24f; case RewardTier.Local: return .75f; case RewardTier.Combo: return 1.6f; case RewardTier.Major: return 3.6f; case RewardTier.Epic: return 6.8f; default: return 11.8f; } }

@@ -15,12 +15,17 @@ namespace Horizon
             MasterPage("Knowledge forge", "K N O W L E D G E  F O R G E", ShowMasterHub);
             KnowledgeSkill k = CanPrepareMaster ? session.Master.knowledge[0] : archive.knowledgeSkills.FirstOrDefault();
             KnowledgeSkill remembered = archive.knowledgeSkills.FirstOrDefault(); if (remembered != null && (k == null || remembered.stage > k.stage)) k = remembered;
+            if (k != null)
+            {
+                overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f, .023f, .04f, .1f);
+                world.ShowForgeScene(k);
+            }
             string[] stages = { "KNOW · 我知道", "RECOGNIZE · 识别情境", "SIMULATE · 游戏中用过", "EXECUTE · 现实中行动", "EXPERIENCE · 形成经验" };
             for (int i = 0; i < stages.Length; i++)
-            { float y = 0.73f - i * 0.095f;
+            { float y = 0.53f - i * 0.063f;
                 View.Label(overlay, "Knowledge stage " + i, (k != null && (int)k.stage >= i ? "● " : "○ ") + stages[i], 31,
-                    k != null && (int)k.stage >= i ? Palette.Mint : Palette.Muted, TextAnchor.MiddleLeft, 0.09f, y, 0.91f, y + 0.075f); }
-            View.Label(overlay, "If then skill", "IF · 遇到不确定，想退出时\nTHEN · 恢复、求助或缩小一步，然后继续", 29, Palette.Text, TextAnchor.MiddleLeft, 0.09f, 0.21f, 0.91f, 0.33f);
+                    k != null && (int)k.stage >= i ? Palette.Mint : Palette.Muted, TextAnchor.MiddleLeft, 0.09f, y, 0.91f, y + 0.06f); }
+            View.Label(overlay, "If then skill", "IF · 遇到不确定，想退出时\nTHEN · 恢复、求助或缩小一步，然后继续", 25, Palette.Text, TextAnchor.MiddleLeft, 0.09f, 0.20f, 0.91f, 0.28f);
             if (CanPrepareMaster && session.Master.knowledge[0].stage == KnowledgeStage.Know)
                 View.Button(overlay, "Recognize knowledge", "我能识别这个节点", () => { session.RecognizeKnowledge(); PersistMasterAction(); ShowForge(); }, 0.075f, 0.12f, 0.925f, 0.19f, Palette.Mint, Palette.Ink, 28);
             else if (k != null && k.stage == KnowledgeStage.Execute)

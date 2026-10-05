@@ -1,5 +1,7 @@
 # 电影式动画与实体奖励 v1.0
 
+当前修复与功能补齐请见 [两份 v1.0 方案独立核对](REWARD_CINEMATIC_ACCEPTANCE_V1.md)。下文的历史 CI 数字不能作为当前功能提交的验收。
+
 基于 main `9527132`，产品规则基线仍为 Master v0.4.2。本次实现依据用户提供的《Master Product Specification v0.4.2》《Reward System Specification v1.0》《Cinematic & Animation Specification v1.0》三份 DOCX。
 
 ## 实现
@@ -16,15 +18,15 @@
 
 ## 工具链与性能
 
-Unity 6 LTS **6000.0.62f1**，URP **17.0.4**，Cinemachine **3.1.3**，Timeline **1.8.7**，Animation Rigging **1.3.0**。人物动作仍以项目内程序化关节动画制作；本次未声称已制作完整角色 Animator Controller、Rig 资产或 Shader Graph 美术资产。电影相机由 Cinemachine 手动更新，PlayableGraph 与一个可暂停的纯规则时钟控制整个感官时间线。字幕使用 TMP 与原项目已授权的中文字体。
+Unity 6 LTS **6000.0.62f1**，URP **17.0.4**，Cinemachine **3.1.3**，Timeline **1.8.7**，Animation Rigging **1.3.0**。人物动作仍以项目内程序化关节动画制作；本次使用 Animator 和运行时 Animation Rigging 视线约束接入导演时钟；未制作完整角色 Animator Controller 或 Shader Graph 美术资产。电影相机由 Cinemachine 手动更新，PlayableGraph 与一个可暂停的纯规则时钟控制整个感官时间线。字幕使用 TMP 与原项目已授权的中文字体。
 
-编辑器自动创建移动端 Forward URP 配置；构建前也会检查该配置。LitColor 保留旧渲染 SubShader 并添加 URP 光照与阴影；阴影及深度通道在本着色器内编译，避免 Unity 6 对跨着色器 UsePass 的关键字空间断言。Bloom 使用 URP Volume。竖屏导出通过真实 URP 场景纹理和完整 Canvas 合成，解决 URP Base Camera 清屏覆盖部分 viewport 的问题。全屏演出暂时隐藏原页面的按钮、文字及背景，退出时恢复。
+编辑器自动创建移动端 Forward URP 配置；构建前也会检查该配置。LitColor 保留旧渲染 SubShader 并添加 URP 光照与阴影；阴影及深度通道在本着色器内编译，避免 Unity 6 对跨着色器 UsePass 的关键字空间断言。Bloom 使用 URP Volume；Android GLES3 禁用不兼容后处理链，保留场景光照和自发光。竖屏导出通过真实 URP 场景纹理和完整 Canvas 合成，解决 URP Base Camera 清屏覆盖部分 viewport 的问题。全屏演出暂时隐藏原页面的按钮、文字及背景，退出时恢复。
 
 三维舞台、物件和冲击粒子复用。普通冲击最多 64 粒子，省电画质最多 12；时间碎片省电画质由 32 降为 8。省电模式保留全部镜头分镜、主体、文字、真实倍率和结算。减弱动效使用固定宽镜头，关闭白闪、相机震动和粒子，保留核心动作和意义。
 
 暂停会冻结时间线、关节、粒子与字幕闪光，Hit Stop 完全静音。跳过丢弃剩余感官 cue，只确认已结算事件；取消页面恢复相机，未完成事件保持待展示。日常收据的“继续”明确结束该批演出，独立确认每个已排队事件。重复播放不产生资源、货币或收藏。
 
-## 验证
+## 原分支历史验证（不代表本提交或两份 v1.0 方案覆盖率）
 
 - 本地已通过 **244/244** 项便携测试，包括原 223 项规则回归与新增 21 项奖励测试：六资源映射、符号、实际截断后的数量、快照隔离、旧事件兼容、真实模式证据、三线现实证据、十一段导演语法、递进节点节奏、150ms 停顿、暂停/慢帧/跳过一次性语义、收藏迁移与去重、Overdrive 临时视野隔离和未揭晓因果来源保护。
 - 源码提交 `4959d79` 的真实 Unity 6 CI 已通过 **307/307** 项测试，包含完整可玩流程及下列动画测试；两个 HTTP 服务检查也通过。原有 53 章、207 项验收报告为 **89.6855%**，通过既有 85% 门槛，未降低门槛或跳过失败测试。

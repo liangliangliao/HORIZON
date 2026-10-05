@@ -66,6 +66,15 @@ namespace Horizon.UI
                 if (action != null && action.echoed)
                     Ring(timelineGroup, "Returned day " + day, DayPoint(day) + Vector3.up * 0.05f, 0.2f, glass, false);
             }
+            if(actions!=null) foreach(ActionRecord scheduled in actions)
+                if(!scheduled.echoed && scheduled.echoDay>scheduled.day && scheduled.echoDay<=timelineLength)
+                {
+                    Vector3 future=DayPoint(scheduled.echoDay)+Vector3.up*.3f;
+                    Transform seed=IntentionSymbol(scheduled.kind,future,scheduled.givesSupport);
+                    seed.SetParent(timelineGroup,true); seed.name="Pending echo D"+scheduled.echoDay+" from D"+scheduled.day;
+                    seed.localScale=Vector3.one*.13f;
+                    CausalLine(timelineGroup,"Scheduled future trace",DayPoint(scheduled.day),future,glass,.015f);
+                }
             BuildTimelineLinks(actions);
         }
 

@@ -67,6 +67,17 @@ namespace Horizon.Game
             if (kind == DomainEventKind.TimeEcho && node?.originHidden == true) detail = "一条回声已经抵达，来路暂未清晰。";
             if (kind == DomainEventKind.HorizonChanged) receipt.horizonLevel = BaseMasterHorizon;
             if (kind == DomainEventKind.OrbitActivated) receipt.orbitIndex = Array.FindIndex(MasterSpecification.OrbitNames, name => title.EndsWith(name, StringComparison.Ordinal));
+            if (kind == DomainEventKind.PredictionLocked || kind == DomainEventKind.Synchronized || kind == DomainEventKind.Surprise)
+            {
+                PredictionRecord prediction = kind == DomainEventKind.PredictionLocked ? Prediction :
+                    Predictions.LastOrDefault(p => p.evaluated && p.dueDay == Day);
+                if (prediction != null)
+                {
+                    receipt.predictionRecorded = true; receipt.predictionResolved = prediction.evaluated;
+                    receipt.predicted = new ResourceDelta(prediction.energy, prediction.mood, prediction.insight, prediction.relation, prediction.money, prediction.ability);
+                    receipt.actual = new ResourceDelta(prediction.actualEnergy, prediction.actualMood, prediction.actualInsight, prediction.actualRelation, prediction.actualMoney, prediction.actualAbility);
+                }
+            }
             DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain, receipt);
             // Optional observers cannot alter a transaction or prevent a choice from completing.
             var handlers = DomainEventRaised;

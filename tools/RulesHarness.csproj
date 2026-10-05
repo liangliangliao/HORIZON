@@ -24,5 +24,7 @@
     <Compile Include="../Assets/Tests/Editor/ExpeditionTests.cs" />
     <Compile Include="../Assets/Tests/Editor/ExpansionContractTests.cs" />
     <Compile Include="../Assets/Tests/Editor/CinematicRewardTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CinematicEventCoverageTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CinematicSpecificationTests.cs" />
   </ItemGroup>
 </Project>

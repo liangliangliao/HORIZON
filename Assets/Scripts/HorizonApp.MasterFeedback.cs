@@ -43,9 +43,15 @@ namespace Horizon
             View.Panel(overlay, "Movie copy safe area", new Color(.008f,.02f,.04f,.94f), .035f,.195f,.965f,.39f,24);
             var caption = overlay.gameObject.AddComponent<CinematicCaption>(); caption.EventId = e.id;
             caption.Title = View.Label(overlay, "Reward event title", e.title, e.tier == RewardTier.Mythic ? 62 : 46, accent, TextAnchor.MiddleCenter, .045f,.75f,.955f,.855f);
-            caption.Story = View.Label(overlay, "Reward story", e.detail,30,Palette.Text,TextAnchor.MiddleCenter,.075f,.25f,.925f,.375f);
-            caption.Resources = View.Label(overlay, "Reward actual resources", "",27,Palette.Mint,TextAnchor.MiddleCenter,.075f,.202f,.925f,.25f);
+            caption.Story = View.Label(overlay, "Reward story", e.detail,28,Palette.Text,TextAnchor.MiddleCenter,.075f,.305f,.925f,.39f);
+            caption.Explanation = View.Label(overlay, "Reward original explanation", e.detail,24,Palette.Text,TextAnchor.MiddleCenter,.075f,.235f,.925f,.305f);
+            caption.Resources = View.Label(overlay, "Reward actual resources", "",24,Palette.Mint,TextAnchor.MiddleCenter,.075f,.195f,.925f,.235f);
             caption.Multiplier = View.Label(overlay, "Reward resilience", "",28,accent,TextAnchor.MiddleCenter,.075f,.40f,.925f,.455f);
+            if(e.receipt!=null && e.receipt.predictionRecorded)
+            {
+                View.Panel(overlay,"Prediction receipt safe area",new Color(.008f,.02f,.04f,.9f),.035f,.455f,.965f,.53f,12);
+                caption.Prediction=View.Label(overlay,"Reward original prediction","",22,Palette.Text,TextAnchor.MiddleCenter,.05f,.455f,.95f,.53f);
+            }
             if (e.kind == DomainEventKind.RealityConvergence)
                 View.Label(overlay, "Convergence evidence labels", "IMAGINATION · SIMULATION · REALITY",24,Palette.Gold,TextAnchor.MiddleCenter,.035f,.665f,.965f,.72f);
             caption.Flash = View.Fill(overlay, "Cinematic impact flash", Color.clear,0,.39f,1,.735f); caption.Flash.raycastTarget = false;
