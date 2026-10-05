@@ -186,17 +186,16 @@ namespace Horizon
             Camera view=world.WorldCamera;
             var data=view.GetUniversalAdditionalCameraData();
             var pipeline=(UniversalRenderPipelineAsset)QualitySettings.renderPipeline;
-            var graph=GraphicsSettings.GetRenderPipelineSettings<RenderGraphSettings>();
             bool post=data.renderPostProcessing,hdr=view.allowHDR,batcher=pipeline.useSRPBatcher;
-            bool compatibility=graph.enableRenderCompatibilityMode;
             try
             {
-                for(int variant=0;variant<5;variant++)
+                // The render path is serialized during the build. Its setter
+                // is forbidden in players, including development diagnostics.
+                for(int variant=0;variant<4;variant++)
                 {
                     data.renderPostProcessing=variant!=1 && variant!=2 && post;
                     view.allowHDR=variant!=2 && hdr;
                     pipeline.useSRPBatcher=variant!=3 && batcher;
-                    graph.enableRenderCompatibilityMode=variant!=4 && compatibility;
                     yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
                     Texture2D frame=ScreenCapture.CaptureScreenshotAsTexture();
                     try
@@ -205,7 +204,7 @@ namespace Horizon
                         File.WriteAllBytes(Path.Combine(AndroidSmoke.DirectoryPath,name+".png"),frame.EncodeToPNG());
                         Debug.Log("HORIZON Android color diagnostic: "+variant+"; sky="+AndroidSkyColor(frame)+
                             "; post="+data.renderPostProcessing+"; hdr="+view.allowHDR+
-                            "; batcher="+pipeline.useSRPBatcher+"; compatibility="+graph.enableRenderCompatibilityMode);
+                            "; batcher="+pipeline.useSRPBatcher);
                     }
                     finally { if(frame!=null) Destroy(frame); }
                 }
@@ -213,7 +212,7 @@ namespace Horizon
             finally
             {
                 data.renderPostProcessing=post; view.allowHDR=hdr;
-                pipeline.useSRPBatcher=batcher; graph.enableRenderCompatibilityMode=compatibility;
+                pipeline.useSRPBatcher=batcher;
             }
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
         }

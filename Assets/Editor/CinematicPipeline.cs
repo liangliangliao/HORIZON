@@ -7,6 +7,7 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -76,7 +77,35 @@ namespace Horizon.Editor
             pipeline.hdrColorBufferPrecision = HDRColorBufferPrecision._64Bits;
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
+            ConfigureMobileRenderPath(directory);
             EditorUtility.SetDirty(pipeline); AssetDatabase.SaveAssets();
+        }
+
+        private static void ConfigureMobileRenderPath(string directory)
+        {
+            // RenderGraphSettings is build configuration, not a runtime quality
+            // setting. Unity 6 throws in a player even when assigning the same
+            // value. Serialize the GLES-compatible path before shader stripping.
+            var global = EditorGraphicsSettings.GetRenderPipelineGlobalSettingsAsset<UniversalRenderPipeline>();
+            if (global == null)
+            {
+                string path = directory + "/HorizonURPGlobalSettings.asset";
+                global = AssetDatabase.LoadAssetAtPath<RenderPipelineGlobalSettings>(path);
+                if (global == null)
+                {
+                    // URP 17's concrete settings type is internal. The public
+                    // creation API accepts its Type and populates all resources.
+                    Type type = typeof(UniversalRenderPipelineAsset).Assembly.GetType(
+                        "UnityEngine.Rendering.Universal.UniversalRenderPipelineGlobalSettings", true);
+                    global = RenderPipelineGlobalSettingsUtils.Create(type, path);
+                }
+            }
+            if (global == null) throw new BuildFailedException("URP global settings could not be created.");
+            EditorGraphicsSettings.SetRenderPipelineGlobalSettingsAsset<UniversalRenderPipeline>(global);
+            if (!EditorGraphicsSettings.TryGetRenderPipelineSettingsForPipeline<RenderGraphSettings, UniversalRenderPipeline>(out var graph))
+                throw new BuildFailedException("URP Render Graph settings were not populated before building.");
+            graph.enableRenderCompatibilityMode = true;
+            EditorUtility.SetDirty(global);
         }
 
         private sealed class PackageAsset
