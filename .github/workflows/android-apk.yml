@@ -112,10 +112,19 @@ jobs:
           docker-images: false
           swap-storage: true
 
+      - name: Restore pinned editor video codec archive
+        id: editor_codec_cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/horizon-ffmpeg.tar.xz
+          key: horizon-ffmpeg-static-abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67-v1
+
       - name: Prepare pinned editor video codec
         shell: bash
         run: |
-          curl -fL --retry 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          if [ ! -s /tmp/horizon-ffmpeg.tar.xz ]; then
+            curl -fL --connect-timeout 15 --max-time 180 --retry 4 --retry-all-errors --retry-delay 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          fi
           echo 'abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67  /tmp/horizon-ffmpeg.tar.xz' | sha256sum -c -
           mkdir -p tools/media
           tar -xJf /tmp/horizon-ffmpeg.tar.xz -C /tmp --wildcards '*/ffmpeg' '*/ffprobe'

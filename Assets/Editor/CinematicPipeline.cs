@@ -26,7 +26,8 @@ namespace Horizon.Editor
         {
             // TMP's shaders/settings ship as the package's essential resources.
             // Import them once so runtime-created Chinese captions survive stripping.
-            if (Resources.Load<TMPro.TMP_Settings>("TMP Settings") == null)
+            const string typographySettings = "Assets/TextMesh Pro/Resources/TMP Settings.asset";
+            if (AssetDatabase.LoadAssetAtPath<TMPro.TMP_Settings>(typographySettings) == null)
             {
                 var package = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
                     .FirstOrDefault(p => p.name == "com.unity.ugui");
@@ -35,8 +36,9 @@ namespace Horizon.Editor
                     throw new BuildFailedException("TextMeshPro essential resources are unavailable.");
                 UnpackTypography(essentials);
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-                if (Resources.Load<TMPro.TMP_Settings>("TMP Settings") == null)
-                    throw new BuildFailedException("TextMeshPro settings were not imported before building.");
+                if (AssetDatabase.LoadAssetAtPath<TMPro.TMP_Settings>(typographySettings) == null)
+                    throw new BuildFailedException("TextMeshPro settings were not imported before building: " +
+                        Path.Combine(Application.dataPath, "TextMesh Pro/Resources/TMP Settings.asset"));
             }
             const string directory = "Assets/Settings";
             const string rendererPath = directory + "/HorizonRenderer.asset";
@@ -89,6 +91,7 @@ namespace Horizon.Editor
         private static void UnpackTypography(string packagePath)
         {
             var assets = new Dictionary<string, PackageAsset>();
+            var entryNames = new List<string>();
             using (var file = File.OpenRead(packagePath))
             using (var archive = new GZipStream(file, CompressionMode.Decompress))
             {
@@ -97,33 +100,42 @@ namespace Horizon.Editor
                 {
                     if (header.All(b => b == 0)) break;
                     string name = Encoding.UTF8.GetString(header, 0, 100).TrimEnd('\0');
+                    if (entryNames.Count < 4) entryNames.Add(name);
                     string sizeText = Encoding.ASCII.GetString(header, 124, 12).Trim('\0', ' ');
                     long size = string.IsNullOrEmpty(sizeText) ? 0 : Convert.ToInt64(sizeText, 8);
                     if (size < 0 || size > 64 * 1024 * 1024)
                         throw new BuildFailedException("Invalid TMP package entry size.");
                     var data = new byte[(int)size]; ReadBlock(archive, data, false);
                     var padding = new byte[(int)((512 - size % 512) % 512)]; ReadBlock(archive, padding, false);
-                    string[] parts = name.Split('/');
-                    if (parts.Length != 2 || parts[0].Length != 32) continue;
-                    if (!assets.TryGetValue(parts[0], out PackageAsset asset))
-                        assets.Add(parts[0], asset = new PackageAsset());
-                    if (parts[1] == "pathname") asset.Path = Encoding.UTF8.GetString(data).TrimEnd('\0', '\r', '\n');
-                    else if (parts[1] == "asset") asset.Asset = data;
-                    else if (parts[1] == "asset.meta") asset.Meta = data;
+                    string[] parts = name.Replace('\\', '/').Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2) continue;
+                    string guid = parts[parts.Length - 2], leaf = parts[parts.Length - 1];
+                    if (!Guid.TryParseExact(guid, "N", out _)) continue;
+                    if (!assets.TryGetValue(guid, out PackageAsset asset))
+                        assets.Add(guid, asset = new PackageAsset());
+                    if (leaf == "pathname") asset.Path = Encoding.UTF8.GetString(data).TrimEnd('\0', '\r', '\n');
+                    else if (leaf == "asset") asset.Asset = data;
+                    else if (leaf == "asset.meta") asset.Meta = data;
                 }
             }
-            string root = System.IO.Path.GetFullPath("Assets/TextMesh Pro");
+            string project = System.IO.Path.GetDirectoryName(Application.dataPath);
+            string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "TextMesh Pro"));
+            int count = 0;
             foreach (PackageAsset asset in assets.Values)
             {
                 if (string.IsNullOrEmpty(asset.Path)) continue;
-                string target = System.IO.Path.GetFullPath(asset.Path);
+                string target = System.IO.Path.GetFullPath(System.IO.Path.Combine(project, asset.Path));
                 if (target != root && !target.StartsWith(root + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal))
                     throw new BuildFailedException("TMP package contains an unexpected asset path.");
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target));
                 if (asset.Asset != null) File.WriteAllBytes(target, asset.Asset);
                 else Directory.CreateDirectory(target);
                 if (asset.Meta != null) File.WriteAllBytes(target + ".meta", asset.Meta);
+                count++;
             }
+            if (count == 0) throw new BuildFailedException("The TMP package has no asset records: " + string.Join(", ", entryNames));
+            Debug.Log("HORIZON typography resources: " + count + "; project assets: " + Application.dataPath +
+                "; settings file exists: " + File.Exists(System.IO.Path.Combine(root, "Resources/TMP Settings.asset")));
         }
 
         private static bool ReadBlock(Stream stream, byte[] data, bool allowEnd)
