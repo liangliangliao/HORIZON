@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -29,7 +33,7 @@ namespace Horizon.Editor
                 string essentials = package == null ? null : Path.Combine(package.resolvedPath, "Package Resources", "TMP Essential Resources.unitypackage");
                 if (essentials == null || !File.Exists(essentials))
                     throw new BuildFailedException("TextMeshPro essential resources are unavailable.");
-                AssetDatabase.ImportPackage(essentials, false);
+                UnpackTypography(essentials);
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
                 if (Resources.Load<TMPro.TMP_Settings>("TMP Settings") == null)
                     throw new BuildFailedException("TextMeshPro settings were not imported before building.");
@@ -71,6 +75,71 @@ namespace Horizon.Editor
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
             EditorUtility.SetDirty(pipeline); AssetDatabase.SaveAssets();
+        }
+
+        private sealed class PackageAsset
+        {
+            public string Path;
+            public byte[] Asset, Meta;
+        }
+
+        // ImportPackage queues editor work even in batch mode. Read the official
+        // package's GUID/asset, asset.meta and pathname entries directly, keeping
+        // its original GUIDs so all TMP font, material and shader references work.
+        private static void UnpackTypography(string packagePath)
+        {
+            var assets = new Dictionary<string, PackageAsset>();
+            using (var file = File.OpenRead(packagePath))
+            using (var archive = new GZipStream(file, CompressionMode.Decompress))
+            {
+                var header = new byte[512];
+                while (ReadBlock(archive, header, true))
+                {
+                    if (header.All(b => b == 0)) break;
+                    string name = Encoding.UTF8.GetString(header, 0, 100).TrimEnd('\0');
+                    string sizeText = Encoding.ASCII.GetString(header, 124, 12).Trim('\0', ' ');
+                    long size = string.IsNullOrEmpty(sizeText) ? 0 : Convert.ToInt64(sizeText, 8);
+                    if (size < 0 || size > 64 * 1024 * 1024)
+                        throw new BuildFailedException("Invalid TMP package entry size.");
+                    var data = new byte[(int)size]; ReadBlock(archive, data, false);
+                    var padding = new byte[(int)((512 - size % 512) % 512)]; ReadBlock(archive, padding, false);
+                    string[] parts = name.Split('/');
+                    if (parts.Length != 2 || parts[0].Length != 32) continue;
+                    if (!assets.TryGetValue(parts[0], out PackageAsset asset))
+                        assets.Add(parts[0], asset = new PackageAsset());
+                    if (parts[1] == "pathname") asset.Path = Encoding.UTF8.GetString(data).TrimEnd('\0', '\r', '\n');
+                    else if (parts[1] == "asset") asset.Asset = data;
+                    else if (parts[1] == "asset.meta") asset.Meta = data;
+                }
+            }
+            string root = System.IO.Path.GetFullPath("Assets/TextMesh Pro");
+            foreach (PackageAsset asset in assets.Values)
+            {
+                if (string.IsNullOrEmpty(asset.Path)) continue;
+                string target = System.IO.Path.GetFullPath(asset.Path);
+                if (target != root && !target.StartsWith(root + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                    throw new BuildFailedException("TMP package contains an unexpected asset path.");
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target));
+                if (asset.Asset != null) File.WriteAllBytes(target, asset.Asset);
+                else Directory.CreateDirectory(target);
+                if (asset.Meta != null) File.WriteAllBytes(target + ".meta", asset.Meta);
+            }
+        }
+
+        private static bool ReadBlock(Stream stream, byte[] data, bool allowEnd)
+        {
+            int count = 0;
+            while (count < data.Length)
+            {
+                int read = stream.Read(data, count, data.Length - count);
+                if (read == 0)
+                {
+                    if (allowEnd && count == 0) return false;
+                    throw new BuildFailedException("The TMP essential package is truncated.");
+                }
+                count += read;
+            }
+            return true;
         }
     }
 }
