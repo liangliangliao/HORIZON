@@ -23,7 +23,7 @@ namespace Horizon.Game
     public enum DomainEventKind { ActionTaken, TimeEcho, PredictionLocked, Synchronized, Surprise, DecisionLocked,
         DecisionReopened, ExecutionStep, TriggerEquipped, FailAndAgain, Comeback, VictoryAnchor, FutureMemory,
         DejaVu, PatternReinforced, PatternBroken, Cascade, CausalSingularity, Overdrive, OrbitActivated,
-        AllLinked, Breakthrough, RealityNode, RealityConvergence, OpportunityExpired, MomentumExpired, Victory }
+        AllLinked, Breakthrough, RealityNode, RealityConvergence, OpportunityExpired, MomentumExpired, Victory, HorizonChanged }
 
     [Serializable]
     public sealed class SecondOrderEffect
@@ -114,7 +114,8 @@ namespace Horizon.Game
         public DomainEventKind kind;
         public RewardTier tier;
         public bool acknowledged;
-        public DomainEvent Copy() { return (DomainEvent)MemberwiseClone(); }
+        public RewardReceipt receipt;
+        public DomainEvent Copy() { var copy = (DomainEvent)MemberwiseClone(); copy.receipt = receipt?.Copy(); return copy; }
     }
 
     [Serializable]
@@ -157,6 +158,7 @@ namespace Horizon.Game
         public int insightPoints, overdriveEnergy, overdriveUntilDay, mythicCount, orbitBits, reservoir,
             resilienceChain = 1, initialFailures, initialInsightPoints, overdriveGainDay, overdriveGain;
         public bool awaitingComeback, allLinked;
+        public int presentationHorizon;
         public string lastFailureNode;
         public DecisionRecord decision;
         public StoryChapter chapter;

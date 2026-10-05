@@ -54,10 +54,11 @@ namespace Horizon
             }
         }
         private void CloseMasterPage()
-        { CancelAIRequest(); if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } }
+        { CancelAIRequest(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } RestoreMasterBackground(); }
         private RectTransform MasterPage(string name, string title, Action back = null)
         {
             CloseMasterPage(); overlay = View.Rect(root, name, 0, 0, 1, 1);
+            HideMasterBackground();
             View.Fill(overlay, "Master shade", new Color(0.009f, 0.023f, 0.04f, 0.985f), 0, 0, 1, 1, true);
             View.Label(overlay, "Master title", title, 43, Palette.Mint, TextAnchor.MiddleLeft, 0.07f, 0.87f, 0.73f, 0.95f);
             View.Button(overlay, "Back master", "返回", back ?? CloseMasterPage, 0.765f, 0.882f, 0.93f, 0.939f, Palette.Panel, Palette.Text, 26);
@@ -81,6 +82,7 @@ namespace Horizon
             View.Button(overlay, "Imagination comparisons", "预演与实际对照", ShowImaginationComparison, 0.07f, 0.205f, 0.93f, 0.26f, Palette.Deep, Palette.Gold, 28);
             View.Button(overlay, "Behavior trends", "近期行为模式", ShowMe, 0.07f, 0.125f, 0.49f, 0.2f, Palette.Deep, Palette.Gold, 26);
             View.Button(overlay, "AI future self dialogue", "AI · 未来自己", ShowFutureSelfDialogue, 0.51f, 0.125f, 0.93f, 0.2f, Palette.Deep, Palette.Mint, 26);
+            View.Button(overlay, "Reward collection", "因果纪念物 · " + archive.rewardCollection.items.Count, ShowRewardCollection, 0.075f,0.096f,0.925f,0.124f,Palette.Deep,Palette.Gold,23);
             if (CanPrepareMaster && session.UsesExpedition)
                 View.Button(overlay, "Choose life route", "人生路线 · 五种不同的选择空间", ShowLifeRoutes, 0.07f, 0.275f, 0.93f, 0.32f, Palette.Deep, Palette.Mint, 24);
         }
@@ -186,6 +188,8 @@ namespace Horizon
             MasterPage("Inner council", "I N N E R  C O U N C I L", ShowMasterHub);
             View.Label(overlay, "Council explanation", "动机可以同时存在。点开一个席位，看看它从哪里来。", 27, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.77f, 0.925f, 0.855f);
             var voices = session.UsesExpedition ? InnerCouncil.Explain(session) : InnerCouncil.Explain(session.Master.engine);
+            overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.1f);
+            world.ShowCouncilScene(voices);
             for (int i = 0; i < voices.Count; i++)
             {
                 CouncilVoice voice = voices[i]; float y = 0.66f - i * (voices.Count > 4 ? 0.085f : 0.12f);
@@ -240,10 +244,11 @@ namespace Horizon
         {
             ImagineRun run = archive.imagination; if (run == null) { ShowImagineSetup(); return; }
             MasterPage("Imagination run", run.phase == ImaginePhase.VictoryAnchor ? "看见抵达 · VICTORY ANCHOR" : run.phase == ImaginePhase.Recover ? "失败之后 · 选择恢复" : run.phase == ImaginePhase.Retry ? "再次开始 · FAIL & AGAIN" : "走过过程 · BUILD THE PATH", ReturnFromImagination);
-            var art = View.Rect(overlay, "Imagine spectacle", 0.075f, 0.42f, 0.925f, 0.8f).gameObject.AddComponent<MasterSpectacleGraphic>();
-            art.Kind = run.phase == ImaginePhase.VictoryAnchor ? DomainEventKind.VictoryAnchor : DomainEventKind.Comeback; art.color = Palette.Mint; art.raycastTarget = false;
+            overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f,.023f,.04f,.04f);
+            world.ShowImaginationScene(run);
+            View.Panel(overlay, "Imagine readable copy", new Color(.009f,.023f,.04f,.94f), .045f,.43f,.955f,.56f,20);
             View.Label(overlay, "Imagine goal title", run.goal, 33, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.77f, 0.925f, 0.86f);
-            View.Label(overlay, "Imagine beat", run.timeline.Last().text, 36, Palette.Text, TextAnchor.MiddleCenter, 0.1f, 0.43f, 0.9f, 0.71f);
+            View.Label(overlay, "Imagine beat", run.timeline.Last().text, 30, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.438f, 0.925f, 0.552f);
             View.Label(overlay, "Imagine resilience", "挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  RECOVERY " + run.recovered + "  ·  ×" + run.multiplier, 26, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.345f, 0.925f, 0.415f);
             if (run.pathVersion >= 2)
                 View.Label(overlay, "Imagine resources", "预演中的状态 · 精力 " + run.energy + " / 专注 " + run.focus + " / 支援 " + run.support,

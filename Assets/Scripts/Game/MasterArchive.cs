@@ -19,6 +19,7 @@ namespace Horizon
         public List<KnowledgeSkill> knowledgeSkills = new List<KnowledgeSkill>();
         public AnalyticsLedger analytics = new AnalyticsLedger();
         public AISettings ai = new AISettings();
+        public RewardCollection rewardCollection = new RewardCollection();
         public void RepairMasterArchive()
         {
             productBaseline = MasterSpecification.Version;
@@ -34,6 +35,10 @@ namespace Horizon
             if (knowledgeSkills == null) knowledgeSkills = new List<KnowledgeSkill>();
             if (analytics == null || analytics.counts == null) analytics = new AnalyticsLedger();
             if (ai == null) ai = new AISettings(); ai.Repair();
+            if (rewardCollection == null) rewardCollection = new RewardCollection(); rewardCollection.Repair();
+            foreach (RunRecord run in runs ?? new List<RunRecord>())
+                foreach (DomainEvent e in run.master?.events ?? new List<DomainEvent>()) rewardCollection.Capture(e, run.number);
+            foreach (DomainEvent e in reality.events) rewardCollection.Capture(e, 0);
             if (imagination != null && string.IsNullOrEmpty(imagination.id)) imagination = null;
         }
         public void CaptureMaster(GameSession life)
@@ -43,6 +48,7 @@ namespace Horizon
             me.Observe(life.Master.observations);
             me.foresightPoints = Math.Max(me.foresightPoints, life.Master.insightPoints);
             analytics.Observe(life.RunNumber, life.Master.events);
+            foreach (DomainEvent e in life.Master.events) rewardCollection.Capture(e, life.RunNumber);
             foreach (KnowledgeSkill k in life.Master.knowledge)
             { int i = knowledgeSkills.FindIndex(x => x.id == k.id); if (i < 0) knowledgeSkills.Add(k.Copy());
                 else if (knowledgeSkills[i].stage < k.stage || knowledgeSkills[i].stage == k.stage && k.stage == KnowledgeStage.Simulate) knowledgeSkills[i] = k.Copy(); }

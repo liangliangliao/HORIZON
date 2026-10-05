@@ -55,15 +55,16 @@ namespace Horizon
             MasterRunState state = CurrentMaster;
             if (state == null) return;
             var pending = state.events.Where(e => !e.acknowledged && e.tier < RewardTier.Mythic).ToList();
-            DomainEvent strongest = pending.OrderByDescending(e => e.tier).ThenByDescending(e => e.day).FirstOrDefault();
-            if (strongest != null)
+            BindLocalCinematicCopy();
+            foreach (DomainEvent e in pending)
             {
-                world.PresentMasterEvent(strongest);
-                if (strongest.tier >= RewardTier.Combo)
-                    View.Label(root, "Joined reward event", strongest.title.Replace("\n", " "), 36, Palette.Mint,
-                        TextAnchor.MiddleCenter, 0.055f, summary ? 0.887f : 0.55f, 0.945f, summary ? 0.935f : 0.615f);
+                DomainEvent shown = e;
+                world.PresentMasterEvent(shown, () => {
+                    shown.acknowledged = true;
+                    if (session != null && session.CompletedRun == null && archive.active?.runNumber == session.RunNumber) archive.active = session.Snapshot();
+                    Save();
+                });
             }
-            foreach (DomainEvent e in pending) e.acknowledged = true;
             if (session != null && session.CompletedRun == null && archive.active?.runNumber == session.RunNumber)
                 archive.active = session.Snapshot();
         }

@@ -59,6 +59,9 @@ namespace Horizon
 
         private void OnApplicationPause(bool paused)
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            AndroidSmoke.NotePause(paused);
+#endif
             if (paused) { CancelAIRequest(); PersistLiveLife(); }
             if (world != null) world.SetPaused(paused || userPaused);
         }
@@ -73,9 +76,10 @@ namespace Horizon
             {
                 Button close = overlay.GetComponentsInChildren<Button>().Reverse().FirstOrDefault(b =>
                     b.interactable && (b.name.StartsWith("Close ") || b.name.StartsWith("Back ") ||
-                    b.name == "Close" || b.name == "Cancel" || b.name == "Leave story" || b.name == "Master back"));
+                    b.name == "Close" || b.name == "Cancel" || b.name == "Leave story" || b.name == "Master back" ||
+                    b.name == "Continue master event"));
                 if (close != null) { close.onClick.Invoke(); return; }
-                Destroy(overlay.gameObject); overlay = null; world.Focus(false); return;
+                CloseMasterPage(); world.Focus(false); return;
             }
             ShowSettings();
         }

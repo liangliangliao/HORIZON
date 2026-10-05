@@ -293,7 +293,7 @@ namespace Horizon.UI
         public void Celebrate() { cheer = 1; }
         private void Update()
         {
-            if (Head == null || Time.unscaledTime < FreezeUntil) return;
+            if (Head == null || MotionRate <= 0 || VisualPreferences.Paused || Time.unscaledTime < FreezeUntil) return;
             float dt = Time.unscaledDeltaTime * MotionRate;
             phase += dt; cheer = Mathf.MoveTowards(cheer, 0, dt * 0.8f);
             float step = Walking ? Mathf.Sin(phase * 8) * 26 : Mathf.Sin(phase * 1.8f) * 3;

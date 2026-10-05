@@ -69,8 +69,8 @@ namespace Horizon
             MasterRunState state = CurrentMaster;
             if (state == null) { ShowMasterUnavailable("未来轨道", "在新的人生中，成长、关系与恢复会逐渐点亮八个未来方向。"); return; }
             MasterPage("Future orbit", "F U T U R E  O R B I T", ShowMasterHub);
-            var orbit = View.Rect(overlay, "Eight future orbit nodes", 0.12f, 0.32f, 0.88f, 0.81f).gameObject.AddComponent<FutureOrbitGraphic>();
-            orbit.Bits = state.orbitBits; orbit.color = Palette.Mint; orbit.raycastTarget = false;
+            overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.1f);
+            world.ShowOrbitScene(state.orbitBits);
             for (int i = 0; i < 8; i++)
             { float a = (90 - i * 45) * Mathf.Deg2Rad; float x = 0.5f + Mathf.Cos(a) * 0.335f, y = 0.565f + Mathf.Sin(a) * 0.215f;
                 View.Label(overlay, "Orbit label " + i, MasterSpecification.OrbitNames[i], 25, (state.orbitBits & (1 << i)) != 0 ? Palette.Mint : Palette.Muted,
@@ -102,13 +102,19 @@ namespace Horizon
                     FutureMemory m = archive.futureMemories.Find(x => x.id == quest.memoryId);
                     foreach (KnowledgeSkill k in archive.knowledgeSkills.Where(k => k.stage == KnowledgeStage.Simulate && k.simulationNodeId == m?.simulationNodeId && k.simulationRun == m?.simulationRun))
                         KnowledgeForge.Advance(k, KnowledgeStage.Execute, quest.id);
-                    Save(); DomainEvent e = archive.reality.events.Last(); PlayMasterSpectacle(e, ShowReality);
+                    Save(); ShowPendingRealityRewards();
                 }, 0.075f, 0.365f, 0.925f, 0.445f, Palette.Mint, Palette.Ink, 29);
             else View.Label(overlay, "Reality completed", "REALITY NODE · 今天已经留下", 31, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.365f, 0.925f, 0.445f);
             View.Label(overlay, "Reality memory", memory == null ? "先在想象中练习失败后的下一步。" : "Future Memory\n" + memory.text,
                 27, Palette.Muted, TextAnchor.MiddleLeft, 0.075f, 0.24f, 0.925f, 0.345f);
             View.Button(overlay, "Reality constellation", "现实星座  ·  " + archive.reality.quests.Count(q => q.completed) + " 个真实行动", ShowConstellation,
                 0.075f, 0.125f, 0.925f, 0.205f, Palette.Panel, Palette.Text, 29);
+        }
+        private void ShowPendingRealityRewards()
+        {
+            DomainEvent next = archive.reality.events.FirstOrDefault(e => !e.acknowledged);
+            if (next == null) { ShowReality(); return; }
+            PlayMasterSpectacle(next, ShowPendingRealityRewards);
         }
         private void ShowConstellation()
         {

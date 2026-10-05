@@ -29,6 +29,7 @@ namespace Horizon.UI
         public void Initialize()
         {
             if (WorldCamera != null) return;
+            ConfigureMobileRenderPath();
             var backdrop = new GameObject("HORIZON full-frame clear", typeof(Camera));
             backdrop.transform.SetParent(transform, false);
             BackgroundCamera = backdrop.GetComponent<Camera>();
@@ -56,7 +57,7 @@ namespace Horizon.UI
             WorldCamera.farClipPlane = 80;
             WorldCamera.fieldOfView = 43;
             WorldCamera.allowHDR = false;
-            WorldCamera.allowMSAA = true;
+            WorldCamera.allowMSAA = SceneMsaaEnabled;
             WorldCamera.cullingMask = ~(1 << 5);
             key = new GameObject("Warm key light", typeof(Light)).GetComponent<Light>();
             key.transform.SetParent(transform, false);
@@ -67,7 +68,7 @@ namespace Horizon.UI
             key.shadowStrength = 0.6f;
             QualitySettings.shadowDistance = 22;
             QualitySettings.shadows = ShadowQuality.All;
-            QualitySettings.antiAliasing = 2;
+            QualitySettings.antiAliasing = SceneMsaaEnabled ? 2 : 0;
             RenderSettings.ambientLight = new Color(0.23f, 0.29f, 0.39f);
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.fog = true;
@@ -111,6 +112,7 @@ namespace Horizon.UI
             sounds.Add(Tone("Impact", new[] { 160f, 110f, 70f }, 0.25f));
             sounds.Add(Tone("Cascade", new[] { 440f, 554f, 660f, 880f, 1108f, 1320f }, 0.7f));
             InitializeAtmosphere();
+            InitializeCinematics();
             SetTheme(0);
             ShowBoard();
             SnapCamera();
@@ -239,6 +241,7 @@ namespace Horizon.UI
 
         public void SnapCamera()
         {
+            if (moviePlan != null || imaginationSceneActive) return;
             WorldCamera.transform.position = cameraPosition;
             WorldCamera.transform.LookAt(cameraLook);
         }
@@ -246,6 +249,7 @@ namespace Horizon.UI
         private void Update()
         {
             if (WorldCamera == null || paused) return;
+            if (Cinematics != null && Cinematics.IsPlaying || imaginationSceneActive) return;
             UpdateInsight();
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
@@ -453,6 +457,7 @@ namespace Horizon.UI
             var material = new Material(Resources.Load<Shader>("HorizonLit"));
             material.SetColor("_Color", color);
             material.SetColor("_Emission", emission);
+            material.enableInstancing = true;
             materials.Add(material);
             return material;
         }
@@ -460,6 +465,7 @@ namespace Horizon.UI
         {
             var material = new Material(Resources.Load<Shader>("HorizonGlow"));
             material.SetColor("_Color", color);
+            material.enableInstancing = true;
             materials.Add(material);
             return material;
         }
@@ -482,6 +488,7 @@ namespace Horizon.UI
 
         private void OnDestroy()
         {
+            RestoreRenderQuality();
             foreach (Material material in materials) Dispose(material);
             foreach (AudioClip sound in sounds) Dispose(sound);
             foreach (Mesh mesh in sculptures) Dispose(mesh);

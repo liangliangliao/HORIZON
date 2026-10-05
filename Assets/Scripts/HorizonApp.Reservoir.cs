@@ -3,6 +3,7 @@ using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Horizon
 {
@@ -12,6 +13,8 @@ namespace Horizon
         {
             MasterRunState state = CurrentMaster; if (state == null) return;
             MasterPage("Causal investment reservoirs", "那些还没有立刻回报的行动", ShowOrbit);
+            overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.1f);
+            world.ShowReservoirScene(state.expedition?.pools);
             string[] ids = { "growth", "skill", "connection", "recovery" };
             string[] names = { "成长投资", "技能训练", "关系支持", "休息恢复" };
             string[] conditions = { "能力≥6，心情≥4", "能力≥6，心情≥4", "关系≥6，精力≥3", "精力≥7，能力≥4" };

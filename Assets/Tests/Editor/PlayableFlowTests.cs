@@ -41,7 +41,8 @@ namespace Horizon.Tests
             string frozen = JsonUtility.ToJson(life.Snapshot());
             ButtonNamed(app, "Settings").onClick.Invoke(); yield return null;
             Assert.IsTrue(VisualPreferences.Paused);
-            Assert.IsFalse(Get<HorizonWorld3D>(app, "world").WorldCamera.enabled);
+            Assert.IsTrue(Get<HorizonWorld3D>(app, "world").WorldCamera.enabled,
+                "Pausing must retain the visible scene instead of revealing only the clear camera.");
             ButtonNamed(app, "Toggle 0").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Toggle 3").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Toggle 4").onClick.Invoke(); yield return null;
@@ -500,11 +501,13 @@ namespace Horizon.Tests
             Assert.IsNull(archive.active);
             Assert.AreEqual(FeedbackKind.Deadline, archive.pendingFeedback.kind);
             balance = archive.wallet.stardust;
+            yield return CausalWaitForButton(app, "Inspect timeline");
             yield return Capture(app, "05-deadline");
             Call(app, "ContinueRun");
             yield return new WaitForSecondsRealtime(0.4f);
             Assert.AreEqual(balance, archive.wallet.stardust);
             Assert.IsNotNull(archive.pendingFeedback);
+            yield return CausalWaitForButton(app, "Inspect timeline");
             ButtonNamed(app, "Inspect timeline").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.35f);
             if (session.CompletedRun.boss.passed < 3)
@@ -800,9 +803,7 @@ namespace Horizon.Tests
             // dynamic font atlas. Rebuild all active text meshes after every
             // character request, before reading the rendered pixels.
             View.RefreshText(canvas.transform);
-            world.BackgroundCamera.Render();
-            world.WorldCamera.Render();
-            ui.Render();
+            HorizonPortraitRenderer.Render(world, ui, canvas, image);
             RenderTexture old = RenderTexture.active;
             RenderTexture.active = image;
             var pixels = new Texture2D(1080, 1920, TextureFormat.RGB24, false);

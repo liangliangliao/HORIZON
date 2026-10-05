@@ -39,6 +39,9 @@ namespace Horizon
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            AndroidSmoke.Begin();
+#endif
             if (FindObjectOfType<HorizonApp>() == null)
                 new GameObject("HORIZON Runtime").AddComponent<HorizonApp>();
         }
@@ -78,6 +81,9 @@ namespace Horizon
 
         private void Start()
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            if (AndroidSmoke.Active) { StartCoroutine(RunAndroidSmoke()); return; }
+#endif
             if (archive.pendingFeedback != null) { ContinueRun(); return; }
             if (archive.runs.Count == 0)
             {
@@ -118,6 +124,7 @@ namespace Horizon
         private void Save()
         {
             if (archive == null) return;
+            foreach (DomainEvent e in archive.reality.events) archive.rewardCollection.Capture(e, 0);
             if (session != null && (archive.active?.runNumber == session.RunNumber || archive.runs.Contains(session.CompletedRun)))
                 archive.CaptureMaster(session);
             if (session != null && (archive.active?.runNumber == session.RunNumber ||
@@ -137,6 +144,8 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
+            RestoreMasterBackground();
+            if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); }
             CancelAIRequest();
             dragJourney = null;
             viewGeneration++;
@@ -383,6 +392,7 @@ namespace Horizon
         private void ContinueFeedback()
         {
             if (busy || archive.pendingFeedback == null) return;
+            world.Cinematics.SkipPending();
             FeedbackRecord receipt = archive.pendingFeedback;
             if (receipt.kind == FeedbackKind.Echoes && receipt.beats != null &&
                 receipt.beats.Exists(b => b.sourceDay > 0 && b.sourceDay < receipt.day))
