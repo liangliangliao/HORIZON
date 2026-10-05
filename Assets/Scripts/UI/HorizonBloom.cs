@@ -21,6 +21,16 @@ namespace Horizon.UI
             view = GetComponent<Camera>();
             if (GraphicsSettings.currentRenderPipeline != null)
             {
+                // URP 17's post-processing intermediates lose G/B on GLES 3.0
+                // (native color diagnostics reproduce it with both HDR formats).
+                // Keep lit geometry, emissive objects and cinematic effects on
+                // that API; use Volume bloom on desktop/Vulkan/Metal.
+                if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3)
+                {
+                    view.GetUniversalAdditionalCameraData().renderPostProcessing = false;
+                    enabled = false;
+                    return;
+                }
                 volume = gameObject.AddComponent<Volume>(); volume.isGlobal = true; volume.priority = 100;
                 profile = ScriptableObject.CreateInstance<VolumeProfile>(); volume.sharedProfile = profile;
                 universalBloom = profile.Add<Bloom>(true); universalBloom.threshold.Override(1.1f);
@@ -35,8 +45,10 @@ namespace Horizon.UI
 
         private void Update()
         { if (VisualPreferences.Paused) return; Echo = Mathf.MoveTowards(Echo, 0, Time.unscaledDeltaTime * 1.4f); if (universalBloom != null) universalBloom.intensity.value = Intensity + Echo; }
-        private void OnEnable() { if (volume != null) volume.enabled = true; }
-        private void OnDisable() { if (volume != null) volume.enabled = false; }
+        private void OnEnable()
+        { if (volume != null) { volume.enabled = true; view.GetUniversalAdditionalCameraData().renderPostProcessing = true; } }
+        private void OnDisable()
+        { if (volume != null) { volume.enabled = false; view.GetUniversalAdditionalCameraData().renderPostProcessing = false; } }
 
         private void OnRenderImage(RenderTexture source, RenderTexture destination)
         {
