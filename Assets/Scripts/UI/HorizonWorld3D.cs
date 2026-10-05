@@ -29,6 +29,7 @@ namespace Horizon.UI
         public void Initialize()
         {
             if (WorldCamera != null) return;
+            ConfigureMobileRenderPath();
             var backdrop = new GameObject("HORIZON full-frame clear", typeof(Camera));
             backdrop.transform.SetParent(transform, false);
             BackgroundCamera = backdrop.GetComponent<Camera>();

@@ -24,6 +24,16 @@ namespace Horizon.UI
         private bool SceneMsaaEnabled => !preferences.batterySaver &&
             SystemInfo.graphicsDeviceType != GraphicsDeviceType.OpenGLES3;
 
+        private static void ConfigureMobileRenderPath()
+        {
+            // The GLES 3.0 backbuffer uses URP's supported compatibility path.
+            // Keep the scene, post processing and overlay on the same path;
+            // RenderGraph's framebuffer-copy shader is unavailable on this API.
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 &&
+                GraphicsSettings.TryGetRenderPipelineSettings<RenderGraphSettings>(out var settings))
+                settings.enableRenderCompatibilityMode = true;
+        }
+
         public void ApplyPreferences(PlayerPreferences value)
         {
             preferences = value ?? new PlayerPreferences();

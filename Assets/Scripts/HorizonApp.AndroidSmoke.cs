@@ -7,6 +7,8 @@ using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 namespace Horizon
@@ -85,11 +87,18 @@ namespace Horizon
             AndroidSmoke.Require(world.WorldCamera.targetTexture==null,"Smoke must render to the phone backbuffer.");
             AndroidSmoke.Require(!world.WorldCamera.allowMSAA && QualitySettings.antiAliasing==0,
                 "GLES scene/backbuffer multisampling is inconsistent.");
+            AndroidSmoke.Require(GraphicsSettings.TryGetRenderPipelineSettings<RenderGraphSettings>(out var graph) &&
+                graph.enableRenderCompatibilityMode,"The GLES compatibility render path was not configured.");
             session=GameSession.StartMasterLife(2,41,RunMode.Quick);
             archive=new ArchiveData { active=session.Snapshot(),seenSecondLife=true,nextRareRun=99 };
             archive.Repair(); archive.preferences.sound=false; archive.preferences.haptics=false;
             archive.wallet.Claim("native-smoke-fixture",142); ApplyPreferences(); ShowHome(); world.SnapCamera();
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
+            if (!AndroidSkyHasBlue())
+            {
+                IEnumerator diagnosis=DiagnoseAndroidColor();
+                while (diagnosis.MoveNext()) yield return diagnosis.Current;
+            }
             CaptureAndroidFrame("01-home",world.Avatar);
             GameObject[] home=root.Cast<Transform>().Where(t=>t.gameObject.activeSelf).Select(t=>t.gameObject).ToArray();
             string actual=JsonUtility.ToJson(session.Snapshot()); Rect viewport=world.WorldCamera.rect;
@@ -159,6 +168,55 @@ namespace Horizon
             Button button=root.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.name==name && b.interactable);
             AndroidSmoke.Require(button!=null,"Missing visible button: "+name); button.onClick.Invoke();
         }
+        private Color AndroidSkyColor(Texture2D frame)
+        {
+            Rect sky=world.WorldCamera.rect;
+            return frame.GetPixel((int)(frame.width*.04f),(int)(frame.height*(sky.yMax-.02f)));
+        }
+        private bool AndroidSkyHasBlue()
+        {
+            Texture2D frame=ScreenCapture.CaptureScreenshotAsTexture();
+            try { Color sample=AndroidSkyColor(frame); return sample.b>sample.r && sample.b>.025f; }
+            finally { if(frame!=null) Destroy(frame); }
+        }
+        // A failing device retains comparisons for diagnosis. Always restore
+        // its normal settings before the unchanged release-blocking assertion.
+        private IEnumerator DiagnoseAndroidColor()
+        {
+            Camera view=world.WorldCamera;
+            var data=view.GetUniversalAdditionalCameraData();
+            var pipeline=(UniversalRenderPipelineAsset)QualitySettings.renderPipeline;
+            var graph=GraphicsSettings.GetRenderPipelineSettings<RenderGraphSettings>();
+            bool post=data.renderPostProcessing,hdr=view.allowHDR,batcher=pipeline.useSRPBatcher;
+            bool compatibility=graph.enableRenderCompatibilityMode;
+            try
+            {
+                for(int variant=0;variant<5;variant++)
+                {
+                    data.renderPostProcessing=variant!=1 && variant!=2 && post;
+                    view.allowHDR=variant!=2 && hdr;
+                    pipeline.useSRPBatcher=variant!=3 && batcher;
+                    graph.enableRenderCompatibilityMode=variant!=4 && compatibility;
+                    yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
+                    Texture2D frame=ScreenCapture.CaptureScreenshotAsTexture();
+                    try
+                    {
+                        string name="00-render-diagnostic-"+variant;
+                        File.WriteAllBytes(Path.Combine(AndroidSmoke.DirectoryPath,name+".png"),frame.EncodeToPNG());
+                        Debug.Log("HORIZON Android color diagnostic: "+variant+"; sky="+AndroidSkyColor(frame)+
+                            "; post="+data.renderPostProcessing+"; hdr="+view.allowHDR+
+                            "; batcher="+pipeline.useSRPBatcher+"; compatibility="+graph.enableRenderCompatibilityMode);
+                    }
+                    finally { if(frame!=null) Destroy(frame); }
+                }
+            }
+            finally
+            {
+                data.renderPostProcessing=post; view.allowHDR=hdr;
+                pipeline.useSRPBatcher=batcher; graph.enableRenderCompatibilityMode=compatibility;
+            }
+            yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
+        }
         private void CaptureAndroidFrame(string name,Transform actor)
         {
             AndroidSmoke.Require(world.WorldCamera.enabled && actor.gameObject.activeInHierarchy,"The scene actor/camera is hidden.");
@@ -171,8 +229,7 @@ namespace Horizon
                 File.WriteAllBytes(Path.Combine(AndroidSmoke.DirectoryPath,name+".png"),frame.EncodeToPNG());
                 if (name=="01-home")
                 {
-                    Rect sky=world.WorldCamera.rect;
-                    Color sample=frame.GetPixel((int)(frame.width*.04f),(int)(frame.height*(sky.yMax-.02f)));
+                    Color sample=AndroidSkyColor(frame);
                     AndroidSmoke.Require(sample.b>sample.r && sample.b>.025f,
                         "The Android night sky lost its blue channel: "+sample);
                 }
