@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "specification_version": "1.0",
-  "audit_date": "2026-10-05",
+  "audit_date": "2026-10-06",
   "review_state": "complete",
   "baseline_commit": "2f67718159bbf87cd1ba087b26c09d2d7febeed2",
   "denominators": {
@@ -57,7 +57,8 @@
         "Horizon.Tests.CinematicRewardTests.RealActionClampingSurvivesObserversPlansSavesAndReplay",
         "Horizon.Tests.CinematicRewardTests.DomainObserversReceiveAnIsolatedRewardReceipt",
         "Horizon.Tests.CinematicPlayableTests.PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched",
-        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -106,7 +107,8 @@
         "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
         "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
@@ -152,7 +154,8 @@
         "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
         "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
@@ -202,7 +205,8 @@
         "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
         "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
@@ -311,7 +315,8 @@
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
-        "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues"
+        "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues",
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -453,13 +458,15 @@
         "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
         "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
         "Horizon.Tests.CinematicRewardTests.RealActionClampingSurvivesObserversPlansSavesAndReplay",
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
-        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth"
+        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -467,7 +474,7 @@
       "remaining": [
         "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
       ],
-      "review_note": "T1–T6仅演出强度，物体档位/粒子/声音/灯光/镜头/角色/数字分层，与实际收益隔离。"
+      "review_note": "演出倍率控制物体缩放、20/50/100档电池组/储能/核心、场景供电、粒子、分层声效、触觉与镜头；实际收益独立。"
     },
     {
       "id": "R18",
@@ -598,7 +605,8 @@
       "tests": [
         "Horizon.Tests.CinematicRewardTests.RealityMovieContainsThreeExistingEvidenceIdsAndCannotBeFarmed",
         "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
-        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.DowngradedConvergenceRetainsThe200msSilence"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -643,7 +651,8 @@
         "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
         "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
@@ -805,7 +814,8 @@
       "tests": [
         "Horizon.Tests.ObservationDesignTests.PredictionExplanationAddsUpToActualClampedResults",
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
-        "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues"
+        "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues",
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -1209,7 +1219,8 @@
       "tests": [
         "Horizon.Tests.CinematicRewardTests.RealityMovieContainsThreeExistingEvidenceIdsAndCannotBeFarmed",
         "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
-        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.DowngradedConvergenceRetainsThe200msSilence"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -1285,7 +1296,8 @@
         "Assets/Scripts/UI/HorizonWorld3D.Imagination.cs",
         "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [

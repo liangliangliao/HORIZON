@@ -20,8 +20,9 @@ namespace Horizon.Tests
     {
         [Serializable] private sealed class FrameEvidence
         {
-            public string eventId, kind, title, explanation, resources, file;
+            public string eventId, kind, title, explanation, resources, file, shot;
             public float time;
+            public Vector3 camera, player;
         }
         [Serializable] private sealed class CaptureEvidence
         {
@@ -83,7 +84,9 @@ namespace Horizon.Tests
                         string file=source.kind+"-"+frame+".png";
                         File.WriteAllBytes(Path.Combine(directory,file),png);
                         evidence.frames.Add(new FrameEvidence { eventId=source.id,kind=source.kind.ToString(),title=source.title,
-                            explanation=source.detail,resources=plan.ResourceCopy,time=time,file=file });
+                            explanation=source.detail,resources=plan.ResourceCopy,time=time,file=file,
+                            shot=world.CurrentCinematicShot,camera=world.WorldCamera.transform.position,
+                            player=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player").position });
                     }
                     world.Cinematics.Skip();
                     typeof(HorizonApp).GetMethod("CloseMasterPage",flags).Invoke(app,null);

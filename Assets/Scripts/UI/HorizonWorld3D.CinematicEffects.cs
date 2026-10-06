@@ -9,6 +9,8 @@ namespace Horizon.UI
         private readonly Transform[] energyIndicators=new Transform[3];
         private readonly Transform[] focusNoise=new Transform[6];
         private readonly Transform[] relationshipFriends=new Transform[3];
+        private readonly Transform[] energyAmplifiers=new Transform[3];
+        private readonly LineRenderer[] energyDistribution=new LineRenderer[4];
         private void PrepareCinematicEffects()
         {
             if(semanticEffects==null)
@@ -20,6 +22,14 @@ namespace Horizon.UI
                 for(int i=0;i<focusNoise.Length;i++) focusNoise[i]=Box(semanticEffects,"Attention distraction "+i,Vector3.zero,Vector3.one*.15f,teal);
                 for(int i=0;i<3;i++) energyIndicators[i]=Box(moviePlayer,"Recovered energy indicator "+i,new Vector3((i-1)*.15f,1.02f+i*.12f,-.22f),new Vector3(.06f,.16f,.025f),portalLight);
                 for(int i=0;i<3;i++) relationshipFriends[i]=Person("Relationship network person "+i,semanticEffects,new Vector3(2.6f+i*.8f,0,1.5f+i),i%2==0?teal:ivory);
+                for(int i=0;i<energyAmplifiers.Length;i++)
+                {
+                    energyAmplifiers[i]=Group("Energy presentation amplifier "+i,semanticEffects);
+                    BuildEnergyDevice(energyAmplifiers[i],i==0?RewardObjectForm.BatteryPack:i==1?RewardObjectForm.StorageUnit:RewardObjectForm.EnergyCore);
+                    energyAmplifiers[i].localPosition=new Vector3(1.8f,.65f,2);
+                }
+                for(int i=0;i<energyDistribution.Length;i++)
+                    energyDistribution[i]=CausalLine(semanticEffects,"Scene power distribution "+i,new Vector3(1.8f,.7f,2),new Vector3((i%2==0?-1:1)*2,.06f,i<2?-1:5),portalLight,.035f);
             }
             ResetCinematicEffects(); semanticEffects.gameObject.SetActive(true);
         }
@@ -30,6 +40,8 @@ namespace Horizon.UI
             foreach(Transform x in focusNoise) x.gameObject.SetActive(false);
             foreach(Transform x in relationshipFriends) x.gameObject.SetActive(false);
             foreach(Transform lamp in energyIndicators) lamp.gameObject.SetActive(false);
+            foreach(Transform device in energyAmplifiers) device.gameObject.SetActive(false);
+            foreach(LineRenderer line in energyDistribution) line.gameObject.SetActive(false);
             impactRing.gameObject.SetActive(false); focusTarget.gameObject.SetActive(false);
         }
         private void SampleCinematicEffects(float time,float impact)
@@ -76,6 +88,22 @@ namespace Horizon.UI
                         moviePerformance.Play(HorizonBodyAction.Stand,impact);
                     }
                     movieLight.intensity=Mathf.Max(movieLight.intensity,impact*(reward.Scale>=3?2:1));
+                    int strength=moviePlan.PresentationMultiplier;
+                    if(strength>=20)
+                    {
+                        // This device amplifies the performance; the receipt and
+                        // absorbed cells keep their original resource amount.
+                        Transform device=energyAmplifiers[strength>=100?2:strength>=50?1:0];
+                        device.gameObject.SetActive(time>=movieImpactTime*.5f);
+                        device.localScale=Vector3.one*(.7f+impact*.6f);
+                        SampleRewardDevice(device,reward,impact);
+                        if(strength>=100) for(int i=0;i<energyDistribution.Length;i++)
+                        {
+                            energyDistribution[i].gameObject.SetActive(impact>i*.15f);
+                            energyDistribution[i].widthMultiplier=.015f+impact*.04f;
+                        }
+                        movieLight.intensity=Mathf.Max(movieLight.intensity,impact*(strength>=100?3:1.5f));
+                    }
                 }
                 if(reward.Kind==RewardObjectKind.WarmLamp && moviePlan.Event.kind==DomainEventKind.ActionTaken)
                     moviePerformance.Play(HorizonBodyAction.Rest,reward.Amount>0?impact:1-impact);

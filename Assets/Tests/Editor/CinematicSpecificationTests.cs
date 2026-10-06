@@ -36,6 +36,17 @@ namespace Horizon.Tests
             Assert.AreEqual(RewardTier.Major,e.tier);
             RewardPlan plan=RewardDirector.Direct(e); var shots=CinematicStoryboard.Pattern(plan);
             Assert.AreEqual(12,shots.Count); Assert.IsTrue(shots.All(s=>s.Time>=0 && s.Time<plan.Duration));
+            Assert.IsTrue(plan.Cues.Any(c=>c.Phase==CinematicPhase.HitStop));
+        }
+        [Test]
+        public void DowngradedConvergenceRetainsThe200msSilence()
+        {
+            var state=new MasterRunState(); DomainEvent e=null;
+            for(int i=0;i<3;i++) e=RewardEngine.Emit(state,1,1,DomainEventKind.RealityConvergence,null,"REALITY CONVERGENCE");
+            Assert.AreEqual(RewardTier.Major,e.tier);
+            RewardPlan plan=RewardDirector.Direct(e);
+            Assert.AreEqual(.2f,plan.Cues.Single(c=>c.Phase==CinematicPhase.Impact).Time-
+                plan.Cues.Single(c=>c.Phase==CinematicPhase.HitStop).Time,.0001f);
         }
         [Test]
         public void PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth()
@@ -59,6 +70,28 @@ namespace Horizon.Tests
                 Assert.IsTrue(plan.Objects.Any(o=>o.Kind==RewardObjectKind.PredictionPanel));
                 Assert.IsTrue(plan.Objects.Any(o=>o.Kind==RewardObjectKind.InsightPrism));
             }
+        }
+        [Test]
+        public void InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday()
+        {
+            var life=GameSession.StartMasterLife(1,15,RunMode.Quick);
+            while(life.Day<7)
+            {
+                while(life.HasPredictionReview) life.MarkPredictionReviewed();
+                if(life.CanPredict) life.LockPrediction(0,0,0);
+                if(life.Day==6) life.ApplyMystery();
+                life.Choose(life.Hand.Last(c=>life.CanPlay(c)).Id);
+                if(life.NeedsStation) life.VisitStation();
+                life.Advance();
+            }
+            Assert.IsTrue(life.Predictions.Any(p=>p.evaluated && p.dueDay==life.Day));
+            life.Master.insightPoints=90;
+            var mystery=life.Mysteries.First(); Assert.IsTrue(life.RevealHiddenCause(mystery.consequenceNodeId));
+            DomainEvent reveal=life.Master.events.Last(e=>e.kind==DomainEventKind.Synchronized);
+            Assert.IsFalse(reveal.receipt.predictionRecorded);
+            RewardPlan plan=RewardDirector.Direct(reveal);
+            Assert.IsFalse(plan.Objects.Any(o=>o.Kind==RewardObjectKind.PredictionPanel));
+            Assert.IsTrue(plan.Objects.Any(o=>o.Kind==RewardObjectKind.InsightPrism));
         }
         [Test]
         public void HiddenOriginsNeverInventARewindDate()

@@ -147,7 +147,7 @@ namespace Horizon.Game
             }
             RewardObjectKind? system = ObjectFor(e.kind);
             if (system.HasValue) objects.Add(new MaterialReward(system.Value, IsMilestone(e.kind) ? RewardObjectClass.Milestone : RewardObjectClass.System, e.title));
-            if (e.kind == DomainEventKind.Synchronized || e.kind == DomainEventKind.Surprise)
+            if (r.predictionRecorded && (e.kind == DomainEventKind.Synchronized || e.kind == DomainEventKind.Surprise))
                 objects.Add(new MaterialReward(RewardObjectKind.PredictionPanel, RewardObjectClass.System, e.detail));
             float duration = Duration(e.tier);
             int multiplier = PresentationStrength(e);
@@ -201,6 +201,9 @@ namespace Horizon.Game
             }
             if(e.kind==DomainEventKind.Synchronized && e.tier<RewardTier.Epic)
                 cues.Add(new CinematicCue(duration*.52f-.1f,CinematicPhase.HitStop,"预测与现实，正在重合。"));
+            if(e.tier<RewardTier.Epic && (e.kind==DomainEventKind.RealityConvergence || e.kind==DomainEventKind.PatternBroken))
+                cues.Add(new CinematicCue(Math.Max(0,duration*.52f-(e.kind==DomainEventKind.RealityConvergence?.2f:.12f)),
+                    CinematicPhase.HitStop,e.kind==DomainEventKind.RealityConvergence?"三条路径锁定同一个事件。":"这一刻，时间停住。"));
             var beats = new List<PresentationBeat>();
             if (e.kind == DomainEventKind.PatternBroken && e.tier == RewardTier.Mythic)
             {

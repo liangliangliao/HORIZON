@@ -59,7 +59,7 @@ namespace Horizon.Game
             Master.engine.socialPressure = Master.triggers.Contains("promise") || Master.triggers.Contains("friend") ? 2 : 0;
             RefreshExpeditionEngine();
         }
-        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null)
+        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null, PredictionRecord prediction = null)
         {
             RewardReceipt receipt = RewardReceipt.Capture(kind, node, CausalNodes, Master.orbitBits, MasterHorizon, Master.triggers.LastOrDefault());
             if (sourceDay > 0 && node?.originHidden != true) receipt.sourceDay = sourceDay;
@@ -67,16 +67,11 @@ namespace Horizon.Game
             if (kind == DomainEventKind.TimeEcho && node?.originHidden == true) detail = "一条回声已经抵达，来路暂未清晰。";
             if (kind == DomainEventKind.HorizonChanged) receipt.horizonLevel = BaseMasterHorizon;
             if (kind == DomainEventKind.OrbitActivated) receipt.orbitIndex = Array.FindIndex(MasterSpecification.OrbitNames, name => title.EndsWith(name, StringComparison.Ordinal));
-            if (kind == DomainEventKind.PredictionLocked || kind == DomainEventKind.Synchronized || kind == DomainEventKind.Surprise)
+            if (prediction != null)
             {
-                PredictionRecord prediction = kind == DomainEventKind.PredictionLocked ? Prediction :
-                    Predictions.LastOrDefault(p => p.evaluated && p.dueDay == Day);
-                if (prediction != null)
-                {
-                    receipt.predictionRecorded = true; receipt.predictionResolved = prediction.evaluated;
-                    receipt.predicted = new ResourceDelta(prediction.energy, prediction.mood, prediction.insight, prediction.relation, prediction.money, prediction.ability);
-                    receipt.actual = new ResourceDelta(prediction.actualEnergy, prediction.actualMood, prediction.actualInsight, prediction.actualRelation, prediction.actualMoney, prediction.actualAbility);
-                }
+                receipt.predictionRecorded = true; receipt.predictionResolved = prediction.evaluated;
+                receipt.predicted = new ResourceDelta(prediction.energy, prediction.mood, prediction.insight, prediction.relation, prediction.money, prediction.ability);
+                receipt.actual = new ResourceDelta(prediction.actualEnergy, prediction.actualMood, prediction.actualInsight, prediction.actualRelation, prediction.actualMoney, prediction.actualAbility);
             }
             DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain, receipt);
             // Optional observers cannot alter a transaction or prevent a choice from completing.
@@ -355,7 +350,7 @@ namespace Horizon.Game
             RefreshEngine(); RecordResourceSample();
         }
         private void MasterPredictionLocked()
-        { if (!UsesMasterRules) return; CausalNode n = MasterNode(CausalNodeKind.Prediction, "LOCK PREDICTION · D" + Prediction.dueDay); ChargeOverdrive(8, n); Emit(DomainEventKind.PredictionLocked, n, "LOCK PREDICTION"); }
+        { if (!UsesMasterRules) return; CausalNode n = MasterNode(CausalNodeKind.Prediction, "LOCK PREDICTION · D" + Prediction.dueDay); ChargeOverdrive(8, n); Emit(DomainEventKind.PredictionLocked, n, "LOCK PREDICTION", prediction: Prediction); }
         private void MasterPredictionEvaluated(PredictionRecord p)
         {
             if (!UsesMasterRules) return;
@@ -363,7 +358,7 @@ namespace Horizon.Game
             CausalNode n = MasterNode(CausalNodeKind.Prediction, p.accurate ? "SYNCHRONIZED" : "SURPRISE", origin?.id);
             foreach (CausalNode cause in CausalNodes.FindAll(x => x.effectRecorded && x.day >= p.sourceDay && x.day <= p.dueDay)) CausalGraph.Link(n, cause.id);
             Master.insightPoints += p.accurate ? 2 : 1; ChargeOverdrive(8, n); Emit(p.accurate ? DomainEventKind.Synchronized : DomainEventKind.Surprise, n,
-                p.accurate ? "SYNCHRONIZED" : "SURPRISE", "对照差异，再看看过去的哪些行动回来了。");
+                p.accurate ? "SYNCHRONIZED" : "SURPRISE", "对照差异，再看看过去的哪些行动回来了。", prediction: p);
         }
         private void MasterComplete(BossResult boss)
         {

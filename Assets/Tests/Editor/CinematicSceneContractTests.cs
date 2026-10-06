@@ -54,8 +54,16 @@ namespace Horizon.Tests
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="EnergyCell"));
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Assembled tool 0"));
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Relationship other person"));
+                Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Energy presentation amplifier 0"));
                 world.Cinematics.Skip();
             }
+            world.Cinematics.Enqueue(new DomainEvent { id="major-energy",kind=DomainEventKind.PatternBroken,tier=RewardTier.Mythic,
+                receipt=new RewardReceipt { resourcesRecorded=true,resources=new ResourceDelta(1) } },true);
+            world.Cinematics.Advance(7);
+            Assert.AreEqual(1,world.Cinematics.Current.Objects.Single(o=>o.Kind==RewardObjectKind.EnergyCell).Amount);
+            Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Energy presentation amplifier 2"));
+            Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Scene power distribution 0"));
+            world.Cinematics.Skip();
             var film=new DomainEvent { id="film",kind=DomainEventKind.FutureMemory,tier=RewardTier.Major };
             world.Cinematics.Enqueue(film,true); world.Cinematics.Advance(3); world.Cinematics.Skip();
             world.Cinematics.Enqueue(new DomainEvent { id="next",kind=DomainEventKind.DecisionLocked,tier=RewardTier.Local },true);
@@ -68,8 +76,13 @@ namespace Horizon.Tests
             world.ShowReservoirScene(new[] { new InvestmentPool { id="growth",sources=new List<string> { "real:1","real:2" } } });
             Assert.AreEqual(.55f,world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Storage lid").localPosition.y,.001f);
             world.EndImaginationScene();
-            var life=new GameSession(2,15); ActionRecord immediate=life.Choose(life.Hand[0].Id); world.SetTimeline(life.Actions,life.Deadline);
-            Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Pending echo D"+immediate.echoDay+" from D"+immediate.day));
+            var life=new GameSession(2,15);
+            ActionRecord immediate=life.Choose(life.Hand[0].Id);
+            world.SetTimeline(life.Actions,life.Deadline);
+            // Do not capture iterator locals across EnterPlayMode: Unity's
+            // domain reload cannot restore a compiler-generated closure here.
+            CollectionAssert.Contains(world.GetComponentsInChildren<Transform>().Select(t=>t.name),
+                "Pending echo D"+immediate.echoDay+" from D"+immediate.day);
             Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }
     }

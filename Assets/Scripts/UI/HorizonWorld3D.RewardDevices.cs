@@ -110,7 +110,12 @@ namespace Horizon.UI
                     {
                         if(part.name=="Tool head") part.localPosition=rest+new Vector3(.35f,.4f,0)*(1-arrival);
                         if(part.name=="Tool joint") part.localPosition=rest+new Vector3(-.4f,.15f,0)*(1-arrival);
-                        if(part.name.StartsWith("Assembled tool")) part.localPosition=rest+Vector3.up*(1-arrival)*.6f;
+                        if(part.name.StartsWith("Assembled tool"))
+                        {
+                            int index=part.GetSiblingIndex();
+                            float filled=Mathf.Clamp01((arrival-Mathf.Max(0,index-2)*.16f)/.65f);
+                            part.localPosition=rest+Vector3.up*(1-filled)*.9f;
+                        }
                     }
             if(reward.Kind==RewardObjectKind.MoneyWallet)
             {

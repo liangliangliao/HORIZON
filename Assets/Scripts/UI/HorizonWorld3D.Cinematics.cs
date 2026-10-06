@@ -147,7 +147,7 @@ namespace Horizon.UI
                 for(int i=0;i<3;i++) { movieLines[i].name=i==0?"IMAGINATION":i==1?"SIMULATION":"REALITY";
                     movieLines[i].gameObject.SetActive(true); MovieLine(movieLines[i],new Vector3((i-1)*3,.35f,-1),new Vector3((i-1)*1.6f,1.3f,3)); }
             }
-            if(kind==DomainEventKind.PredictionLocked || kind==DomainEventKind.Synchronized || kind==DomainEventKind.Surprise || kind==DomainEventKind.DecisionLocked)
+            if(receipt?.predictionRecorded==true || kind==DomainEventKind.DecisionLocked)
             {
                 for(int i=0;i<2;i++) { movieLines[i].gameObject.SetActive(true); MovieLine(movieLines[i],new Vector3((i-1)*.55f,.1f,-1),new Vector3((i-1)*1.5f,.3f,5)); }
             }
@@ -180,6 +180,8 @@ namespace Horizon.UI
                 float strength=Mathf.Clamp01(Mathf.Log10(Mathf.Max(1,moviePlan.PresentationMultiplier))/2.7f);
                 MovieBurst(hit,Mathf.RoundToInt(8+56*strength));
                 CueSound(ImpactVoice(moviePlan.Event.kind),.25f+.75f*strength);
+                if(moviePlan.PresentationMultiplier>=50) CueSound(nodeTone,.3f);
+                if(moviePlan.PresentationMultiplier>=100) CueSound(heartbeatTone,.35f);
                 MasterHaptics.Impact(moviePlan.Event,preferences);
                 if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.11f:.025f; if(bloom!=null) bloom.Echo=.6f; }
                 bool losing = moviePlan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount < 0);
@@ -272,7 +274,7 @@ namespace Horizon.UI
                     SetMovieColor(movieOrbit[i],lit && (i!=receipt?.orbitIndex || impact>0)?Palette.Mint:Palette.Muted*.35f); }
                 look=new Vector3(0,1.5f,4.2f); movieFuture.localScale=Vector3.one*(kind==DomainEventKind.AllLinked?1+impact*.18f:1);
             }
-            if(kind==DomainEventKind.Synchronized || kind==DomainEventKind.Surprise)
+            if(receipt?.predictionRecorded==true && (kind==DomainEventKind.Synchronized || kind==DomainEventKind.Surprise))
             {
                 float merge=Smooth(.15f,.55f,progress); float divergence=kind==DomainEventKind.Surprise?1:-1;
                 Vector3 start = Vector3.Lerp(new Vector3(.5f,.1f,-1), new Vector3(-.55f,.1f,-1), kind==DomainEventKind.Synchronized?merge:0);
@@ -298,6 +300,7 @@ namespace Horizon.UI
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;
             cinematicCamera.Lens.NearClipPlane = .1f; cinematicCamera.Lens.FarClipPlane = 80;
             cinematicBrain.ManualUpdate();
+            foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
             shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
         }
         private void SampleRewardObjects(float time,float impact)
@@ -321,7 +324,8 @@ namespace Horizon.UI
                 if(reward.Kind==RewardObjectKind.ReservoirCore) target=new Vector3(0,1.2f,2);
                 if(reward.Amount<0) { Vector3 swap=start; start=target; target=swap; SetMovieColor(item,Color.Lerp(Palette.Muted,Palette.Muted*.2f,arrival)); }
                 item.localPosition=Vector3.Lerp(start,target,arrival);
-                float size=Smooth(0,movieImpactTime,time)*(.45f+reward.Scale*.18f);
+                float presentationScale=1+.16f*Mathf.Log10(Mathf.Max(1,moviePlan.PresentationMultiplier));
+                float size=Smooth(0,movieImpactTime,time)*(.45f+reward.Scale*.18f)*presentationScale;
                 if(reward.Kind==RewardObjectKind.EnergyCell && reward.Amount>0) { item.localPosition=Vector3.Lerp(start,moviePlayer.localPosition+Vector3.up*1.1f,arrival); size*=1-arrival*.95f; }
                 item.localScale=Vector3.one*Mathf.Max(.001f,size); item.localRotation=Quaternion.Euler(0,Mathf.Lerp(progress*160,0,arrival),0);
                 SampleRewardDevice(item,reward,arrival);

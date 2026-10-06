@@ -49,7 +49,7 @@ namespace Horizon.UI
         {
             if(cinemaNarrative==null) return;
             cinemaNarrative.gameObject.SetActive(false); CurrentCinematicShot="";
-            foreach(TextMesh label in movieLabels) { label.gameObject.SetActive(false); label.color=Palette.Text; }
+            foreach(TextMesh label in movieLabels) { label.gameObject.SetActive(false); label.color=Palette.Text; label.characterSize=.052f; }
             foreach(Transform node in convergenceNodes) node.gameObject.SetActive(false);
             foreach(LineRenderer crack in patternCracks) crack.gameObject.SetActive(false);
             horizonPlatform.gameObject.SetActive(false); causalPulse.gameObject.SetActive(false);
@@ -76,20 +76,27 @@ namespace Horizon.UI
                 for(int i=0;i<3;i++)
                 {
                     convergenceNodes[i].gameObject.SetActive(true);
-                    convergenceNodes[i].localPosition=new Vector3((i-1)*2.5f,.25f,-.3f);
-                    EvidenceLabel(i,i==0?"IMAGINATION":i==1?"SIMULATION":"REALITY",new Vector3((i-1)*2.5f,1.7f,-.3f));
+                    convergenceNodes[i].localPosition=new Vector3((i-1)*1.7f,.25f,1);
+                    EvidenceLabel(i,i==0?"IMAGINATION":i==1?"SIMULATION":"REALITY",new Vector3((i-1)*1.7f,2.15f,1));
+                    movieLabels[i].characterSize=.033f;
                 }
             if(e.kind==DomainEventKind.HorizonChanged || e.kind==DomainEventKind.Overdrive)
             {
                 horizonPlatform.gameObject.SetActive(true);
                 for(int i=0;i<2;i++)
                 {
-                    movieNodes[i].gameObject.SetActive(true); movieNodes[i].localPosition=new Vector3(i==0?-1.1f:1.1f,1.8f+i*.5f,4+i*2);
                     int level=receipt?.horizonLevel??1;
-                    EvidenceLabel(i,level>=3?(i==0?"Day +3":level>=4?"Day +7 · 概率节点":"未显现的远方"):(i==0?"Day +1":"未显现的远方"),movieNodes[i].localPosition+Vector3.up*.4f);
+                    bool visible=i==0 || level>=4;
+                    movieNodes[i].gameObject.SetActive(visible);
+                    movieNodes[i].localPosition=new Vector3(level<4?0:i==0?-.7f:.7f,1.8f+i*.5f,4.6f+i*1.6f);
+                    if(visible)
+                    {
+                        EvidenceLabel(i,i==0?(level>=3?"Day +3":level>=2?"Day +1":"现在"):"Day +7 · 概率节点",movieNodes[i].localPosition+Vector3.up*.4f);
+                        movieLabels[i].characterSize=.033f;
+                    }
                 }
             }
-            if(e.kind==DomainEventKind.PredictionLocked || e.kind==DomainEventKind.Synchronized || e.kind==DomainEventKind.Surprise)
+            if(receipt?.predictionRecorded==true)
             {
                 EvidenceLabel(0,"PREDICTION",new Vector3(-1.5f,.8f,4.8f));
                 EvidenceLabel(1,"REALITY",new Vector3(1.5f,.8f,4.8f));
@@ -112,12 +119,15 @@ namespace Horizon.UI
                 float rewind=(receipt?.sourceDay??0)>0?Smooth(.35f,.8f,time):0, forward=Smooth(1.05f,2.15f,time);
                 look=Vector3.Lerp(new Vector3(0,1,2),source,rewind*(1-forward));
                 camera=Vector3.Lerp(new Vector3(3.7f,2.8f,-4.8f),source+new Vector3(1.8f,1.5f,-2.5f),rewind);
-                camera=Vector3.Lerp(camera,new Vector3(3.7f,2.8f,-4.8f),forward);
+                bool connection=receipt?.resourcesRecorded==true && receipt.resources.relation!=0;
+                camera=Vector3.Lerp(camera,connection?new Vector3(3.8f,3.5f,-7):new Vector3(3.7f,2.8f,-4.8f),forward);
+                if(connection) look=Vector3.Lerp(look,new Vector3(.8f,1.2f,1.5f),forward);
                 movieLabels[24].text=(receipt?.sourceDay??0)>0?"Day "+CinematicStoryboard.DayDuringRewind(e,time):"来路暂未显现";
                 movieLabels[24].transform.localPosition=look+Vector3.up*1.1f;
                 float saturation=time<1.05f?1-Smooth(.12f,.35f,time)*.85f:Smooth(1.05f,2.15f,time);
                 foreach(Transform tile in movieTiles) SetMovieColor(tile,Color.Lerp(Palette.Muted*.3f,Palette.Mint*.4f,saturation));
-                SetMovieColor(moviePlayer,Color.Lerp(Palette.Muted*.5f,Color.white,saturation));
+                if(saturation>=.995f) ResetMovieColor(moviePlayer);
+                else SetMovieColor(moviePlayer,Color.Lerp(Palette.Muted*.5f,Color.white,saturation));
                 moviePlayer.GetComponent<HorizonActor>().MotionRate=time<.12f?Mathf.Lerp(1,.18f,time/.12f):time<1.05f?0:1;
                 causalPulse.gameObject.SetActive(time>=1.05f && time<2.15f);
                 float nodeProgress=forward*Mathf.Max(1,count-1); int node=Mathf.Min(Mathf.FloorToInt(nodeProgress),Mathf.Max(0,count-2));
@@ -132,14 +142,14 @@ namespace Horizon.UI
                 {
                     float lockTime=i==0?hitStop*.2f:i==1?hitStop*.5f:hitStop;
                     float arrived=i<2?Smooth(lockTime-.35f,lockTime,time):Smooth(hitStop-.8f,hitStop,time);
-                    Vector3 from=new Vector3((i-1)*2.5f,.25f,-.3f);
+                    Vector3 from=new Vector3((i-1)*1.7f,.25f,1);
                     convergenceNodes[i].localPosition=from+Vector3.up*(i==2?(1-arrived)*3:0);
                     convergenceNodes[i].localScale=Vector3.one*(.7f+arrived*.3f);
                     SetMovieColor(convergenceNodes[i],Color.Lerp(Palette.Muted*.3f,i==2?Palette.Gold:Palette.Mint,arrived));
                     Vector3 end=Vector3.Lerp(new Vector3((i-1)*1.6f,1.3f,3),new Vector3(0,1.3f,3),impact);
                     MovieLine(movieLines[i],from+Vector3.up*.3f,end); movieLines[i].widthMultiplier=.025f+impact*.06f;
                 }
-                camera=Vector3.Lerp(new Vector3(1,3,-7),new Vector3(5.5f,6,-12),Smooth(movieImpactTime,moviePlan.Duration*.85f,time));
+                camera=Vector3.Lerp(new Vector3(.2f,3.6f,-9),new Vector3(3.5f,6,-14),Smooth(movieImpactTime,moviePlan.Duration*.85f,time));
                 look=new Vector3(0,1.2f,2); CurrentCinematicFraming=impact>.7f?CinematicFraming.ExtremeWide:CinematicFraming.Wide;
             }
             else if(e.kind==DomainEventKind.HorizonChanged || e.kind==DomainEventKind.Overdrive)
@@ -150,8 +160,12 @@ namespace Horizon.UI
                 foreach(Transform node in movieNodes.Where(x=>x.gameObject.activeSelf)) SetMovieColor(node,Color.Lerp(Palette.Muted*.12f,Palette.Mint,reveal));
                 if(e.kind==DomainEventKind.HorizonChanged)
                 {
-                    camera=Vector3.Lerp(new Vector3(1.6f,2,-1.5f),new Vector3(.1f,2.05f,2.5f),Smooth(.2f,.7f,p));
-                    look=new Vector3(0,2.1f,6); CurrentCinematicFraming=p<.45f?CinematicFraming.ObjectDetail:CinematicFraming.Wide;
+                    for(int i=0;i<movieObjects.Count;i++) if(movieObjectReceipts[i].Kind==RewardObjectKind.HorizonLens)
+                        movieObjects[i].localPosition=new Vector3(0,2.05f,1.8f);
+                    camera=Vector3.Lerp(new Vector3(2.8f,3,-3),new Vector3(0,2.05f,2.3f),Smooth(.12f,.5f,p));
+                    camera=Vector3.Lerp(camera,new Vector3(3.8f,4.4f,-7.2f),Smooth(.5f,.78f,p));
+                    look=Vector3.Lerp(new Vector3(0,2.1f,6),new Vector3(0,1.8f,3.5f),Smooth(.5f,.78f,p));
+                    CurrentCinematicFraming=p<.5f?CinematicFraming.ObjectDetail:CinematicFraming.Wide;
                 }
                 else { camera=Vector3.Lerp(new Vector3(.2f,2,-2.4f),new Vector3(3.8f,4.8f,-8),reveal); look=new Vector3(0,1.8f,4); }
             }
@@ -162,8 +176,13 @@ namespace Horizon.UI
             }
             else if(e.kind==DomainEventKind.Synchronized || e.kind==DomainEventKind.Surprise)
             {
-                camera=Vector3.Lerp(new Vector3(2.8f,2.6f,-4.8f),new Vector3(1.3f,1.8f,1.6f),Smooth(.08f,.5f,p));
-                look=new Vector3(0,.6f,3); CurrentCinematicShot=e.kind==DomainEventKind.Synchronized?"Calibration overlap":"Explain the divergence";
+                camera=Vector3.Lerp(new Vector3(2.8f,2.6f,-4.8f),new Vector3(1.8f,2.3f,-2),Smooth(.08f,.5f,p));
+                look=new Vector3(0,1.2f,2.6f); CurrentCinematicShot=e.kind==DomainEventKind.Synchronized?"Calibration overlap":"Explain the divergence";
+                for(int i=0;i<movieObjects.Count;i++)
+                {
+                    if(movieObjectReceipts[i].Kind==RewardObjectKind.InsightPrism) movieObjects[i].localPosition=new Vector3(0,1.3f,2.5f);
+                    if(movieObjectReceipts[i].Kind==RewardObjectKind.PredictionPanel) movieObjects[i].localPosition=new Vector3(-1.3f,1.45f,2.8f);
+                }
                 int sources=Mathf.Min(6,receipt?.causes.Count??0);
                 if(impact>0) for(int i=0;i<sources;i++)
                 { movieLines[i+2].gameObject.SetActive(true); Vector3 end=new Vector3((i-(sources-1)*.5f)*.65f,1.1f,4);
@@ -195,13 +214,13 @@ namespace Horizon.UI
             else if(e.kind==DomainEventKind.CausalSingularity && p>.65f)
             { camera=Vector3.Lerp(camera,new Vector3(7,7,-14),Smooth(.65f,.86f,p)); CurrentCinematicFraming=CinematicFraming.ExtremeWide; }
             SampleCinematicEffects(time,impact);
-            foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
         }
         private void SamplePatternStoryboard(float time,ref Vector3 camera,ref Vector3 look)
         {
             CinematicShot shot=patternStoryboard.Last(s=>s.Time<=time); int index=(int)shot.Beat;
             float next=index+1<patternStoryboard.Count?patternStoryboard[index+1].Time:moviePlan.Duration;
             float p=Smooth(shot.Time,next,time); CurrentCinematicShot=shot.Beat.ToString(); CurrentCinematicFraming=shot.Framing;
+            moviePlayer.gameObject.SetActive(index!=11);
             float crossing=Smooth(patternStoryboard[7].Time,patternStoryboard[8].Time,time);
             float shatter=Smooth(patternStoryboard[8].Time,patternStoryboard[9].Time,time);
             float extension=Smooth(patternStoryboard[9].Time,patternStoryboard[10].Time,time);
@@ -238,7 +257,9 @@ namespace Horizon.UI
             switch(shot.Framing)
             {
                 case CinematicFraming.Close: camera=look+new Vector3(1.4f,.35f,-2.2f); break;
-                case CinematicFraming.ObjectDetail: look=index==5?new Vector3(0,.2f,2):new Vector3(0,1.2f,1.1f); camera=look+new Vector3(1,.6f,-2.8f); break;
+                case CinematicFraming.ObjectDetail:
+                    look=index==5?new Vector3(0,.2f,2):new Vector3(0,1.2f,1.1f);
+                    camera=look+new Vector3(index==11?-1.8f:1,.6f,-3.4f); break;
                 case CinematicFraming.Medium: camera=look+new Vector3(index==3?0:2.4f,1,index==3?4.4f:-4.4f); break;
                 case CinematicFraming.ExtremeWide: look=new Vector3(0,1.3f,3); camera=new Vector3(7,6,-12); break;
                 default: look=new Vector3(0,1,2); camera=new Vector3(4.7f,3.8f,-6.8f); break;
