@@ -576,7 +576,8 @@
         "Horizon.Tests.CinematicRewardTests.PatternMovieUsesOnlyRecordedFailuresAndTheChosenAction",
         "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
-        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth"
+        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -975,7 +976,8 @@
         "Horizon.Tests.MasterSpecificationTests.ImaginationCannotReachVictoryWithoutFailuresAndRecovery",
         "Horizon.Tests.MasterSpecificationTests.ImaginationIsIsolatedUntilAnExplicitCompletedPathIsAttached",
         "Horizon.Tests.CinematicPlayableTests.TransparentMasterPagesHideHomeAndRestoreItAfterRepeatedNavigation",
-        "Horizon.Tests.CinematicSceneContractTests.ElevenImaginationScenesKeepTheRealRecoveryChoicesAndPause"
+        "Horizon.Tests.CinematicSceneContractTests.ElevenImaginationScenesKeepTheRealRecoveryChoicesAndPause",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
       ],
       "runtime_evidence": [],
       "remaining": [
@@ -999,7 +1001,8 @@
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
-        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -1163,7 +1166,8 @@
         "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
         "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth",
-        "Horizon.Tests.CinematicSpecificationTests.MythicBudgetDowngradeStillHasAPlayablePatternStoryboard"
+        "Horizon.Tests.CinematicSpecificationTests.MythicBudgetDowngradeStillHasAPlayablePatternStoryboard",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"

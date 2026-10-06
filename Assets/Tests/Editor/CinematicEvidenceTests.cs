@@ -68,6 +68,9 @@ namespace Horizon.Tests
                         world.Cinematics.Advance(Mathf.Max(0,time-world.Cinematics.Elapsed));
                         yield return null;
                         Assert.IsTrue(world.Cinematics.IsPlaying);
+                        if(source.kind==DomainEventKind.PatternBroken && frame==1)
+                            Assert.Greater(world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Cinematic player").localPosition.z,3.5f,
+                                "A rendered Pattern Broken must show the actor beyond the old interruption, not just changing effects.");
                         Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                         Assert.AreEqual(plan.ResourceCopy,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward actual resources").text);
                         Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);

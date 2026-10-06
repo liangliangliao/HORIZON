@@ -14,6 +14,38 @@ namespace Horizon.Tests
     public sealed class CinematicSceneContractTests
     {
         [UnityTest]
+        public IEnumerator RigEvaluationPreservesDirectorMovementAndProceduralBodyPose()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Director and character rig contract").AddComponent<HorizonWorld3D>(); world.Initialize();
+            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            world.Cinematics.Enqueue(CinematicEventCoverageTests.RealEvents().Single(e=>e.kind==DomainEventKind.PatternBroken),true);
+            var body=world.GetComponentsInChildren<HorizonActorPerformance>().Single(x=>x.name=="Cinematic player");
+            var actor=body.GetComponent<HorizonActor>();
+            world.Cinematics.Advance(world.Cinematics.Current.Duration*.54f);
+            Assert.IsTrue(body.GraphReady);
+            Assert.Greater(body.transform.localPosition.z,3.5f,"The character must cross the old break at z=2 before the memento shot.");
+            Vector3 crossed=body.transform.localPosition; yield return null;
+            Assert.That(Vector3.Distance(crossed,body.transform.localPosition),Is.LessThan(.001f));
+
+            Vector3 position=new Vector3(.4f,.2f,5.2f),scale=new Vector3(.7f,.8f,.9f);
+            Quaternion rotation=Quaternion.Euler(0,35,0);
+            body.transform.localPosition=position; body.transform.localRotation=rotation; body.transform.localScale=scale;
+            body.Play(HorizonBodyAction.Walk,.0625f);
+            Quaternion arm=actor.LeftArm.localRotation,leg=actor.LeftLeg.localRotation;
+            body.Play(HorizonBodyAction.Walk,.1875f);
+            Assert.Greater(Quaternion.Angle(arm,actor.LeftArm.localRotation),40,"Walking must change the actual limb pose after the rig evaluates.");
+            Assert.Greater(Quaternion.Angle(leg,actor.LeftLeg.localRotation),40);
+            Assert.That(Vector3.Distance(position,body.transform.localPosition),Is.LessThan(.001f));
+            Assert.That(Quaternion.Angle(rotation,body.transform.localRotation),Is.LessThan(.01f));
+            Assert.That(Vector3.Distance(scale,body.transform.localScale),Is.LessThan(.001f));
+            body.Play(HorizonBodyAction.Wait,0); Quaternion forward=actor.Head.localRotation;
+            body.Play(HorizonBodyAction.Point,.5f);
+            Assert.Greater(Quaternion.Angle(forward,actor.Head.localRotation),1,"The gaze constraint must still solve on top of the supplied pose.");
+            Assert.Greater(Mathf.Abs(Mathf.DeltaAngle(0,actor.Head.localEulerAngles.y)),2,"Pointing must turn the gaze toward its lateral target.");
+            world.Cinematics.Skip(); Object.Destroy(world.gameObject); yield return new ExitPlayMode();
+        }
+        [UnityTest]
         public IEnumerator ElevenImaginationScenesKeepTheRealRecoveryChoicesAndPause()
         {
             yield return new EnterPlayMode(); yield return null;

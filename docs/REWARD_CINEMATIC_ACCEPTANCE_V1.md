@@ -6,7 +6,7 @@
 
 当前代码审查：奖励 19/22（86.36%），动画 24/28（85.71%）。这些项目标记为“实现待验收”，不是人工视觉、触觉或真机帧率通过。CI 仅在每组关联的测试全部实际执行通过后计入测试支持实现率；APK 构建和 Android 原生显示仍是独立门槛。
 
-便携业务全量测试已通过 261/261；随后新增降级汇流停顿检查，奖励专项 39/39 通过。第一轮 Unity 功能验证 327/328 通过，唯一失败为测试协程在 Play Mode 重载后的局部闭包；已修复并重跑，尚不将旧失败报告作为最终通过证据。完整 Unity 场景、11 场想象模板、场景复用和真实事件截图由本提交 CI 验证。最终结果见 `HORIZON-Cinematic-Specification-Acceptance` 产物；截图见 `HORIZON-Cinematic-Reward-Previews`。
+提交 `b931bfe` 的完整流程 [37419022985](https://github.com/liangliangliao/HORIZON/actions/runs/37419022985) 已通过：便携业务 262/262、Unity 330/330、两份方案独立实现率门槛、APK 构建及 Android 模拟器显示检查。最终截图核对发现角色 Rig 求值会覆盖导演位移；本次新增 RigTransform 场景姿势同步，并加入真实事件跨越断点、四肢动作、根节点位移/旋转/缩放和注视约束的回归检查。修改后的完整结果必须以本提交 CI 为准，旧 APK 不替代修复后的验证。最终结果见 `HORIZON-Cinematic-Specification-Acceptance` 产物；51 张实际事件截图与坐标见 `HORIZON-Cinematic-Reward-Previews`。
 
 APK 故障修复：Unity 6 的 RenderGraph 兼容配置移至编辑器构建阶段；GLES3 使用项目光照/自发光路径，避免不兼容 URP 后处理引起首屏红色。修复提交 `db07606` 已通过完整构建及 Android 原生显示流程 [37345576432](https://github.com/liangliangliao/HORIZON/actions/runs/37345576432)。此结果不替代后续功能提交的检查。
 

@@ -29,6 +29,11 @@ namespace Horizon.UI
             actor=value;
             Animator animator=GetComponent<Animator>(); if(animator==null) animator=gameObject.AddComponent<Animator>();
             animator.cullingMode=AnimatorCullingMode.AlwaysAnimate; animator.applyRootMotion=false;
+            // The director writes the root and body pose in the scene. Feed
+            // those transforms into the animation stream before solving gaze;
+            // otherwise Animator restores its bind pose on every evaluation.
+            foreach(Transform bone in new[] { transform,actor.Head,actor.LeftArm,actor.RightArm,actor.LeftLeg,actor.RightLeg })
+                if(bone!=null && bone.GetComponent<RigTransform>()==null) bone.gameObject.AddComponent<RigTransform>();
             builder=gameObject.AddComponent<RigBuilder>(); builder.enabled=false;
             Transform rigRoot=new GameObject("Character performance rig").transform; rigRoot.SetParent(transform,false);
             Rig rig=rigRoot.gameObject.AddComponent<Rig>();
