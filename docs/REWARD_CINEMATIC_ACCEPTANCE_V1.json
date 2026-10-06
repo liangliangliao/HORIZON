@@ -1027,7 +1027,7 @@
       "entrypoint": "当前Run到达Station → RenderStationBeat → ShowCausalMemories / RevealMemoryNode",
       "tests": [
         "Horizon.Tests.CausalPresentationTests.StationContainsRealMultiSourceEdgesAndKeepsMysteryProvenanceHidden",
-        "Horizon.Tests.CausalFlowTests.ActualStationNetworkAndMemoryPagesResumeAndNeverAwardResources",
+        "Horizon.Tests.PlayableFlowTests.ActualStationNetworkAndMemoryPagesResumeAndNeverAwardResources",
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
       ],
       "runtime_evidence": [
