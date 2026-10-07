@@ -29,10 +29,10 @@ namespace Horizon.UI
             actor=value;
             Animator animator=GetComponent<Animator>(); if(animator==null) animator=gameObject.AddComponent<Animator>();
             animator.cullingMode=AnimatorCullingMode.AlwaysAnimate; animator.applyRootMotion=false;
-            // The director writes the root and body pose in the scene. Feed
-            // those transforms into the animation stream before solving gaze;
+            // The director writes the body pose in the scene. Feed those
+            // transforms into the animation stream before solving gaze;
             // otherwise Animator restores its bind pose on every evaluation.
-            foreach(Transform bone in new[] { transform,actor.Head,actor.LeftArm,actor.RightArm,actor.LeftLeg,actor.RightLeg })
+            foreach(Transform bone in new[] { actor.Head,actor.LeftArm,actor.RightArm,actor.LeftLeg,actor.RightLeg })
                 if(bone!=null && bone.GetComponent<RigTransform>()==null) bone.gameObject.AddComponent<RigTransform>();
             builder=gameObject.AddComponent<RigBuilder>(); builder.enabled=false;
             Transform rigRoot=new GameObject("Character performance rig").transform; rigRoot.SetParent(transform,false);
@@ -71,7 +71,15 @@ namespace Horizon.UI
             actor.Head.localRotation=Quaternion.Euler(head,0,0);
             target.localPosition=new Vector3(action==HorizonBodyAction.Point?.7f:0,1.65f-Mathf.Sin(head*Mathf.Deg2Rad)*3,-3);
             if(!GraphReady && gameObject.activeInHierarchy) { builder.Build(); if(GraphReady) builder.graph.SetTimeUpdateMode(DirectorUpdateMode.Manual); }
-            if(GraphReady) builder.Evaluate(0);
+            if(GraphReady)
+            {
+                // Animator's root is not a syncable child bone. Its cached
+                // transform must not replace the director's scene placement.
+                Vector3 position=transform.localPosition,scale=transform.localScale;
+                Quaternion rotation=transform.localRotation;
+                builder.Evaluate(0);
+                transform.SetLocalPositionAndRotation(position,rotation); transform.localScale=scale;
+            }
         }
         public void Release()
         {

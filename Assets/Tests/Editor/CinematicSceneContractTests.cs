@@ -14,6 +14,29 @@ namespace Horizon.Tests
     public sealed class CinematicSceneContractTests
     {
         [UnityTest]
+        public IEnumerator InsightSourcesRevealInOrderWithoutOverlappingCaptions()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Causal source caption contract").AddComponent<HorizonWorld3D>(); world.Initialize();
+            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            DomainEvent source=CinematicEventCoverageTests.RealEvents().Single(e=>e.kind==DomainEventKind.Synchronized);
+            Assert.Greater(source.receipt.causes.Count,1);
+            world.Cinematics.Enqueue(source,true);
+            float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            float duration=world.Cinematics.Current.Duration;
+            var seen=new List<string>();
+            for(int sample=0;sample<=12;sample++)
+            {
+                float time=Mathf.Lerp(impact+.005f,duration*.88f,sample/12f);
+                world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
+                var captions=world.GetComponentsInChildren<TextMesh>().Where(t=>t.name.StartsWith("Cinematic evidence label ") && t.text.StartsWith("Day ")).ToArray();
+                Assert.AreEqual(1,captions.Length,"Only the current source should occupy the caption area.");
+                string copy=captions[0].text.Replace("\n",""); if(!seen.Contains(copy)) seen.Add(copy);
+            }
+            CollectionAssert.AreEqual(source.receipt.causes.Take(6).Select(c=>"Day "+c.day+c.label).Distinct(),seen);
+            world.Cinematics.Skip(); Object.Destroy(world.gameObject); yield return new ExitPlayMode();
+        }
+        [UnityTest]
         public IEnumerator RigEvaluationPreservesDirectorMovementAndProceduralBodyPose()
         {
             yield return new EnterPlayMode(); yield return null;

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "specification_version": "1.0",
-  "audit_date": "2026-10-06",
+  "audit_date": "2026-10-07",
   "review_state": "complete",
   "baseline_commit": "2f67718159bbf87cd1ba087b26c09d2d7febeed2",
   "denominators": {
@@ -260,7 +260,8 @@
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
-        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSceneContractTests.InsightSourcesRevealInOrderWithoutOverlappingCaptions"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -316,7 +317,8 @@
       "tests": [
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
         "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues",
-        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday"
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday",
+        "Horizon.Tests.CinematicSceneContractTests.InsightSourcesRevealInOrderWithoutOverlappingCaptions"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"
@@ -816,7 +818,8 @@
         "Horizon.Tests.ObservationDesignTests.PredictionExplanationAddsUpToActualClampedResults",
         "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
         "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues",
-        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday"
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday",
+        "Horizon.Tests.CinematicSceneContractTests.InsightSourcesRevealInOrderWithoutOverlappingCaptions"
       ],
       "runtime_evidence": [
         "artifacts/cinematics/frames.json"

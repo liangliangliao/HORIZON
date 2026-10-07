@@ -15,6 +15,7 @@ namespace Horizon.UI
         private Transform horizonPlatform, causalPulse;
         private IReadOnlyList<CinematicShot> patternStoryboard;
         private HorizonActorPerformance moviePerformance;
+        private int currentInsightSource=-1;
         public string CurrentCinematicShot { get; private set; } = "";
         public CinematicFraming CurrentCinematicFraming { get; private set; } = CinematicFraming.Wide;
 
@@ -48,7 +49,7 @@ namespace Horizon.UI
         private void ResetCinematicStaging()
         {
             if(cinemaNarrative==null) return;
-            cinemaNarrative.gameObject.SetActive(false); CurrentCinematicShot="";
+            cinemaNarrative.gameObject.SetActive(false); CurrentCinematicShot=""; currentInsightSource=-1;
             foreach(TextMesh label in movieLabels) { label.gameObject.SetActive(false); label.color=Palette.Text; label.characterSize=.052f; }
             foreach(Transform node in convergenceNodes) node.gameObject.SetActive(false);
             foreach(LineRenderer crack in patternCracks) crack.gameObject.SetActive(false);
@@ -98,8 +99,9 @@ namespace Horizon.UI
             }
             if(receipt?.predictionRecorded==true)
             {
-                EvidenceLabel(0,"PREDICTION",new Vector3(-1.5f,.8f,4.8f));
-                EvidenceLabel(1,"REALITY",new Vector3(1.5f,.8f,4.8f));
+                EvidenceLabel(0,"PREDICTION",new Vector3(-1.1f,1.8f,4.8f));
+                EvidenceLabel(1,"REALITY",new Vector3(1.1f,1.8f,4.8f));
+                movieLabels[0].characterSize=movieLabels[1].characterSize=.024f;
             }
             if(e.kind==DomainEventKind.RealityNode) EvidenceLabel(0,"Day "+e.day+" · REALITY NODE",new Vector3(0,1.8f,2));
             PrepareCinematicEffects();
@@ -184,10 +186,28 @@ namespace Horizon.UI
                     if(movieObjectReceipts[i].Kind==RewardObjectKind.PredictionPanel) movieObjects[i].localPosition=new Vector3(-1.3f,1.45f,2.8f);
                 }
                 int sources=Mathf.Min(6,receipt?.causes.Count??0);
-                if(impact>0) for(int i=0;i<sources;i++)
-                { movieLines[i+2].gameObject.SetActive(true); Vector3 end=new Vector3((i-(sources-1)*.5f)*.65f,1.1f,4);
-                    MovieLine(movieLines[i+2],new Vector3(0,1.2f,1),end); SetMovieColor(movieLines[i+2].transform,Palette.Mint);
-                    EvidenceLabel(i+2,"D"+receipt.causes[i].day+" · "+receipt.causes[i].label,end+Vector3.up*.35f); }
+                if(impact>0 && sources>0)
+                {
+                    int current=Mathf.Min(sources-1,Mathf.FloorToInt(Mathf.InverseLerp(movieImpactTime,moviePlan.Duration*.85f,time)*sources));
+                    for(int i=0;i<sources;i++)
+                    {
+                        movieLines[i+2].gameObject.SetActive(i<=current);
+                        Vector3 end=new Vector3((i-(sources-1)*.5f)*.65f,1.1f,4);
+                        MovieLine(movieLines[i+2],new Vector3(0,1.3f,2.5f),end);
+                        SetMovieColor(movieLines[i+2].transform,i==current?Palette.Gold:Palette.Mint);
+                    }
+                    // Keep the full source copy but show only the current
+                    // cause above the prism instead of overlapping six labels.
+                    if(currentInsightSource!=current)
+                    {
+                        currentInsightSource=current; RewardEvidence source=receipt.causes[current];
+                        string detail=source.label??"";
+                        var lines=new List<string>();
+                        for(int start=0;start<detail.Length;start+=14) lines.Add(detail.Substring(start,Mathf.Min(14,detail.Length-start)));
+                        EvidenceLabel(2,"Day "+source.day+"\n"+string.Join("\n",lines),new Vector3(0,2.65f,4));
+                        movieLabels[2].characterSize=Mathf.Min(.026f,.08f/Mathf.Max(1,lines.Count));
+                    }
+                }
             }
             else if(e.kind==DomainEventKind.OrbitActivated || e.kind==DomainEventKind.AllLinked)
             {
