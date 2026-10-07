@@ -300,7 +300,7 @@ namespace Horizon.UI
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;
             cinematicCamera.Lens.NearClipPlane = .1f; cinematicCamera.Lens.FarClipPlane = 80;
             cinematicBrain.ManualUpdate();
-            foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
+            FrameCinematicLabels();
             shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
         }
         private void SampleRewardObjects(float time,float impact)

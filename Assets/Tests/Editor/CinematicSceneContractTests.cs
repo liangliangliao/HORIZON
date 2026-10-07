@@ -34,6 +34,23 @@ namespace Horizon.Tests
                 string copy=captions[0].text.Replace("\n",""); if(!seen.Contains(copy)) seen.Add(copy);
             }
             CollectionAssert.AreEqual(source.receipt.causes.Take(6).Select(c=>"Day "+c.day+c.label).Distinct(),seen);
+            Camera camera=world.WorldCamera; float originalAspect=camera.aspect;
+            foreach(float aspect in new[] { .45f/.64f,.5625f/.64f })
+            {
+                camera.aspect=aspect; world.FrameCinematicLabels(); yield return null;
+                foreach(TextMesh label in world.GetComponentsInChildren<TextMesh>().Where(t=>t.name.StartsWith("Cinematic evidence label ")))
+                {
+                    Bounds bounds=label.GetComponent<Renderer>().bounds;
+                    for(int corner=0;corner<8;corner++)
+                    {
+                        Vector3 edge=bounds.center+Vector3.Scale(bounds.extents,new Vector3((corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                        Vector3 screen=camera.WorldToViewportPoint(edge);
+                        Assert.That(screen.x,Is.InRange(.025f,.975f),"A causal caption must fit the phone width.");
+                        Assert.That(screen.y,Is.InRange(.55f,.855f),"Causal captions must clear the title and numeric prediction panels.");
+                    }
+                }
+            }
+            camera.aspect=originalAspect;
             world.Cinematics.Skip(); Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }
         [UnityTest]

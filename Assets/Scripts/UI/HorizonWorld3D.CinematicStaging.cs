@@ -108,6 +108,17 @@ namespace Horizon.UI
         }
         private void EvidenceLabel(int index,string text,Vector3 position)
         { TextMesh label=movieLabels[index]; label.gameObject.SetActive(true); label.text=text; label.transform.localPosition=position; }
+        public void FrameCinematicLabels()
+        {
+            if(WorldCamera==null) return;
+            foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
+            if(moviePlan==null || (moviePlan.Event.kind!=DomainEventKind.Synchronized && moviePlan.Event.kind!=DomainEventKind.Surprise)) return;
+            // These are readable annotations, so frame them against the actual
+            // portrait camera rather than the depth of the world-space rays.
+            // Keep them between the event heading and the prediction panel.
+            for(int i=0;i<3;i++) if(movieLabels[i].gameObject.activeSelf)
+                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.62f:.78f,6));
+        }
         private void SampleCinematicStaging(float time,float impact,ref Vector3 camera,ref Vector3 look)
         {
             DomainEvent e=moviePlan.Event; RewardReceipt receipt=e.receipt; float p=time/moviePlan.Duration;

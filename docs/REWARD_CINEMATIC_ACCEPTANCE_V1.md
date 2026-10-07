@@ -8,6 +8,8 @@
 
 提交 `b931bfe` 的完整流程 [37419022985](https://github.com/liangliangliao/HORIZON/actions/runs/37419022985) 已通过：便携业务 262/262、Unity 330/330、两份方案独立实现率门槛、APK 构建及 Android 模拟器显示检查。最终截图核对发现角色 Rig 求值会覆盖导演位移；新增回归确认根节点不能仅依赖 RigTransform 同步，因此显式保留导演的根节点位移/旋转/缩放，并用 RigTransform 同步四肢和注视姿势。预测因果来源改为逐条点亮和单一完整换行标签，避免长标签重叠；新增对应场景回归。修改后的完整结果必须以本提交 CI 为准，旧 APK 不替代修复后的验证。最终结果见 `HORIZON-Cinematic-Specification-Acceptance` 产物；51 张实际事件截图与坐标见 `HORIZON-Cinematic-Reward-Previews`。
 
+提交 `2c196fc` 的 Unity 测试已通过 332/332，实际截图中 Pattern Broken 角色从断点前 z=0.46 前进到 z=4.25，跨过 z=2 的断点；根节点、四肢动作和注视回归均通过。最终截图进一步发现预测来源标签会被标题遮住，现按实际相机视口放入标题与数值面板之间，并检查 9:20 和 9:16 两种竖屏宽高比的标签完整边界。此修正的最终构建仍以当前提交 CI 为准。
+
 APK 故障修复：Unity 6 的 RenderGraph 兼容配置移至编辑器构建阶段；GLES3 使用项目光照/自发光路径，避免不兼容 URP 后处理引起首屏红色。修复提交 `db07606` 已通过完整构建及 Android 原生显示流程 [37345576432](https://github.com/liangliangliao/HORIZON/actions/runs/37345576432)。此结果不替代后续功能提交的检查。
 
 ## 固定需求组

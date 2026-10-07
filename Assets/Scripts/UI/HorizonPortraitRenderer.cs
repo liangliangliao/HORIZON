@@ -20,7 +20,8 @@ namespace Horizon.UI
             CameraClearFlags clear = ui.clearFlags; Color background = ui.backgroundColor;
             try
             {
-                scene.rect = new Rect(0,0,1,1); scene.targetTexture = sceneImage; scene.Render();
+                scene.rect = new Rect(0,0,1,1); scene.targetTexture = sceneImage;
+                world.FrameCinematicLabels(); scene.Render();
                 scene.rect = rect; scene.targetTexture = prior;
                 RectTransform backdrop = View.Rect(canvas.transform, "Portrait scene composition", rect.xMin, rect.yMin, rect.xMax, rect.yMax);
                 composite = backdrop.gameObject; composite.layer = 5; backdrop.SetAsFirstSibling();
@@ -31,6 +32,7 @@ namespace Horizon.UI
             finally
             {
                 scene.rect = rect; scene.targetTexture = prior; ui.clearFlags = clear; ui.backgroundColor = background;
+                world.FrameCinematicLabels();
                 if (composite != null) { composite.SetActive(false); Object.DestroyImmediate(composite); }
                 RenderTexture.ReleaseTemporary(sceneImage);
             }
