@@ -126,6 +126,12 @@ namespace Horizon.UI
             Transform item=RewardObject(kind,0); item.localPosition=new Vector3(0,1.3f,2); item.localScale=Vector3.one*1.7f;
             ResetMovieColor(item); movieObjects.Add(item);
         }
+        public void ShowMementoScene(RewardMemento memento)
+        {
+            ShowMementoScene(memento.kind);
+            if(memento.kind==RewardObjectKind.MemoryFilm)
+            { BindMemoryFilm(movieObjects[0],memento.frames); movieObjects[0].localScale=Vector3.one*2.5f; }
+        }
         private void SampleSystemScene()
         {
             if(inspectedSystem=="reservoir") for(int i=0;i<inspectedValue;i++)

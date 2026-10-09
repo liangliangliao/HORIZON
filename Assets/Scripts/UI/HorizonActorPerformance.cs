@@ -32,7 +32,7 @@ namespace Horizon.UI
             // The director writes the body pose in the scene. Feed those
             // transforms into the animation stream before solving gaze;
             // otherwise Animator restores its bind pose on every evaluation.
-            foreach(Transform bone in new[] { actor.Head,actor.LeftArm,actor.RightArm,actor.LeftLeg,actor.RightLeg })
+            foreach(Transform bone in new[] { actor.Head,actor.Chest,actor.LeftArm,actor.RightArm,actor.LeftLeg,actor.RightLeg })
                 if(bone!=null && bone.GetComponent<RigTransform>()==null) bone.gameObject.AddComponent<RigTransform>();
             builder=gameObject.AddComponent<RigBuilder>(); builder.enabled=false;
             Transform rigRoot=new GameObject("Character performance rig").transform; rigRoot.SetParent(transform,false);
@@ -51,6 +51,7 @@ namespace Horizon.UI
         {
             if(actor==null || actor.Head==null) return;
             performing=true; CurrentAction=action; actor.enabled=false;
+            GetComponent<LODGroup>()?.ForceLOD(0);
             float p=Mathf.Clamp01(progress), e=Mathf.Clamp(emphasis,.25f,1.5f), swing=Mathf.Sin(p*Mathf.PI*8)*28*e;
             float left=0,right=0,leg=0,head=0,spread=5;
             switch(action)
@@ -69,6 +70,7 @@ namespace Horizon.UI
             actor.RightArm.localRotation=Quaternion.Euler(right,0,spread);
             actor.LeftLeg.localRotation=Quaternion.Euler(-leg,0,0); actor.RightLeg.localRotation=Quaternion.Euler(leg,0,0);
             actor.Head.localRotation=Quaternion.Euler(head,0,0);
+            actor.SampleBreath(p*4,action==HorizonBodyAction.Rest?p:0);
             target.localPosition=new Vector3(action==HorizonBodyAction.Point?.7f:0,1.65f-Mathf.Sin(head*Mathf.Deg2Rad)*3,-3);
             if(!GraphReady && gameObject.activeInHierarchy) { builder.Build(); if(GraphReady) builder.graph.SetTimeUpdateMode(DirectorUpdateMode.Manual); }
             if(GraphReady)
@@ -85,6 +87,7 @@ namespace Horizon.UI
         {
             if(!performing) return;
             performing=false; if(actor!=null) actor.enabled=true;
+            GetComponent<LODGroup>()?.ForceLOD(-1);
             if(builder!=null) builder.Clear();
         }
         private void OnDisable() { Release(); }

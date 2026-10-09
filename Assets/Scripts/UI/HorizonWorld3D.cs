@@ -50,6 +50,7 @@ namespace Horizon.UI
             var cameraObject = new GameObject("HORIZON 3D Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             WorldCamera = cameraObject.GetComponent<Camera>();
+            optics = cameraObject.AddComponent<HorizonOptics>();
             WorldCamera.depth = 0;
             WorldCamera.clearFlags = CameraClearFlags.SolidColor;
             WorldCamera.nearClipPlane = 0.1f;
@@ -344,7 +345,7 @@ namespace Horizon.UI
             Transform person = Group(name, parent);
             person.localPosition = position;
             var actor = person.gameObject.AddComponent<HorizonActor>();
-            Sculpt(person, "Tailored coat", coatMesh, new Vector3(0,0.67f,0), new Vector3(1,1,0.78f), coat);
+            actor.Chest = Sculpt(person, "Tailored coat", coatMesh, new Vector3(0,0.67f,0), new Vector3(1,1,0.78f), coat);
             Box(person, "Jacket seam", new Vector3(0, 1.05f, -0.218f), new Vector3(0.02f, 0.58f, 0.02f), dark);
             for (int button = 0; button < 3; button++)
                 Shape(person, "Jacket button", PrimitiveType.Sphere, new Vector3(0.035f, 0.86f + button * 0.16f, -0.226f), Vector3.one * 0.035f, gold);
@@ -386,6 +387,7 @@ namespace Horizon.UI
             Soft(person, "Left collar", new Vector3(-0.12f,1.34f,-0.21f), new Vector3(0.17f,0.16f,0.08f), ivory);
             Soft(person, "Right collar", new Vector3(0.12f,1.34f,-0.21f), new Vector3(0.17f,0.16f,0.08f), ivory);
             actor.SetNeutral();
+            ConfigureActorLod(person,coat);
             return person;
         }
 
@@ -488,6 +490,7 @@ namespace Horizon.UI
         private void OnDestroy()
         {
             RestoreRenderQuality();
+            ClearMemoryTextures();
             foreach (Material material in materials) Dispose(material);
             foreach (AudioClip sound in sounds) Dispose(sound);
             foreach (Mesh mesh in sculptures) Dispose(mesh);

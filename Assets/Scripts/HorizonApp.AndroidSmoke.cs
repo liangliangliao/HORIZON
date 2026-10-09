@@ -100,6 +100,13 @@ namespace Horizon
                 while (diagnosis.MoveNext()) yield return diagnosis.Current;
             }
             CaptureAndroidFrame("01-home",world.Avatar);
+            HorizonOptics optics=world.WorldCamera.GetComponent<HorizonOptics>();
+            optics.FocusDistance=Vector3.Distance(world.WorldCamera.transform.position,world.Avatar.position+Vector3.up);
+            optics.Defocus=1; optics.Distortion=.4f;
+            yield return new WaitForSecondsRealtime(.2f); yield return new WaitForEndOfFrame();
+            CaptureAndroidFrame("01b-depth-focus",world.Avatar);
+            AndroidSmoke.Require(AndroidSkyHasBlue(),"The custom depth focus pass lost the GLES blue channel.");
+            optics.Clear();
             GameObject[] home=root.Cast<Transform>().Where(t=>t.gameObject.activeSelf).Select(t=>t.gameObject).ToArray();
             string actual=JsonUtility.ToJson(session.Snapshot()); Rect viewport=world.WorldCamera.rect;
             SmokeButton("Master hub"); yield return null; SmokeButton("Master feature 0"); yield return null;
@@ -118,6 +125,11 @@ namespace Horizon
                 AndroidSmoke.Require(next!=null,"The next imagination action is unavailable."); next.onClick.Invoke();
             }
             AndroidSmoke.Require(archive.imagination.phase==ImaginePhase.Complete,"The imagination sequence did not complete.");
+            AndroidSmoke.Require(archive.imagination.frames.Count==5,"The phone did not capture all five actual memory keyframes.");
+            foreach(MemoryFrame memoryFrame in archive.imagination.frames)
+                AndroidSmoke.Require(HorizonWorld3D.IsMemoryJpeg(Convert.FromBase64String(memoryFrame.jpeg),128,96),"A native memory keyframe could not be decoded.");
+            Shader projection=Resources.Load<Shader>("HorizonProjection");
+            AndroidSmoke.Require(projection!=null && projection.isSupported,"The APK's projection Shader Graph is unavailable.");
             AndroidSmoke.Require(JsonUtility.ToJson(session.Snapshot())==actual,"Imagination changed the real life.");
             SmokeButton("Master back"); yield return null; SmokeButton("Master back"); yield return null;
             AndroidSmoke.Require(home.All(g=>g.activeInHierarchy),"Home was not restored after returning.");
@@ -162,6 +174,7 @@ namespace Horizon
             AndroidSmoke.Require(reward.acknowledged && world.WorldCamera.rect==viewport,"Reward back did not restore the scene.");
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
             CaptureAndroidFrame("06-reward-back-home",world.Avatar);
+            File.WriteAllText(Path.Combine(AndroidSmoke.DirectoryPath,"performance.json"),world.ExportPerformanceReport());
         }
         private void SmokeButton(string name)
         {

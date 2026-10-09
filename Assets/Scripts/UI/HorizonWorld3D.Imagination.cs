@@ -26,6 +26,7 @@ namespace Horizon.UI
             movieAnchor.localScale=Vector3.one; movieAnchor.localPosition=Vector3.zero;
             movieMuted=run.phase==ImaginePhase.Failure; if(movieMuted) audioSource.Stop(); UpdateAudio();
             cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,.44f,1,.38f);
+            PrepareProjectionWorld();
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
             moviePlayer.gameObject.SetActive(true); movieFuture.gameObject.SetActive(true); moviePlayer.localRotation=Quaternion.Euler(0,180,0);
@@ -56,7 +57,7 @@ namespace Horizon.UI
             }
             if(run.phase==ImaginePhase.VictoryAnchor || run.phase==ImaginePhase.Preparation)
             { Transform projector=RewardObject(RewardObjectKind.Projector,0); projector.localPosition=new Vector3(-1.6f,.65f,1); projector.localScale=Vector3.one*.7f; movieObjects.Add(projector); }
-            if(run.phase==ImaginePhase.Complete) { Transform film=RewardObject(RewardObjectKind.MemoryFilm,0); film.localPosition=new Vector3(0,1.4f,4.7f); film.localScale=Vector3.one*.8f; movieObjects.Add(film); }
+            if(run.phase==ImaginePhase.Complete) { Transform film=RewardObject(RewardObjectKind.MemoryFilm,0); BindMemoryFilm(film,run.frames); film.localPosition=new Vector3(0,1.4f,4.7f); film.localScale=Vector3.one*1.4f; movieObjects.Add(film); }
             SampleImaginationScene();
         }
         private void SampleImaginationScene()
@@ -128,16 +129,8 @@ namespace Horizon.UI
                     break;
                 case ImaginationShot.ImaginedVictory: action=HorizonBodyAction.Celebrate; position=new Vector3(0,0,5); camera=new Vector3(3.4f,2.7f,1.2f); look=new Vector3(0,1.2f,5.6f); break;
             }
-            if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor || CurrentImaginationFrame.Shot==ImaginationShot.BuildThePath)
-            {
-                float solid=Mathf.Clamp01(beat*2);
-                movieLines[6].gameObject.SetActive(true); MovieLine(movieLines[6],new Vector3(-1.6f,.75f,1),new Vector3(0,1,5));
-                for(int i=0;i<4;i++)
-                { float x=i%2==0?-2:2; float z=i<2?4:6.7f; movieLines[8+i].gameObject.SetActive(true);
-                    MovieLine(movieLines[8+i],new Vector3(x,0,z),new Vector3(x,2.5f*solid,z)); }
-                movieAnchor.Find("Future work desk").localScale=new Vector3(1.45f,.12f,.7f)*Mathf.Max(.01f,solid);
-                movieFuture.localScale=Vector3.one*Mathf.Max(.01f,solid);
-            }
+            SampleProjectionWorld(preferences.reducedMotion?1:beat,CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor || CurrentImaginationFrame.Shot==ImaginationShot.BuildThePath);
+            if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor) position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
             imaginationPerformance.Play(action,beat);
             moviePlayer.localPosition=position;
             if(preferences.reducedMotion) camera=new Vector3(5,4,-6);
@@ -149,10 +142,14 @@ namespace Horizon.UI
             imaginationPerformance?.Release(); movieMuted=false; UpdateAudio();
             foreach(HorizonActorPerformance performance in cinematicStage.GetComponentsInChildren<HorizonActorPerformance>(true)) performance.Release();
             imaginationSceneActive=false; imaginedScene=null; cinematicStage.gameObject.SetActive(false);
+            if(projectionWorld!=null) projectionWorld.gameObject.SetActive(false);
+            ResetAdditionalVfx();
+            movieAnchor.localScale=Vector3.one; optics?.Clear();
             cameraPosition=imaginationSavedCamera; cameraLook=imaginationSavedLook; WorldCamera.rect=imaginationSavedRect; WorldCamera.fieldOfView=imaginationSavedFov; SnapCamera();
         }
         private void LateUpdate()
         {
+            SamplePerformance();
             if(imaginationSceneActive && !paused) { imaginationTime+=Time.unscaledDeltaTime; if (imaginedScene!=null) SampleImaginationScene(); else SampleSystemScene(); }
         }
     }

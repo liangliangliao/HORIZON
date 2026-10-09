@@ -33,7 +33,7 @@ namespace Horizon
         {
             MasterPage("Memento object",MementoName(item.kind),ShowRewardCollection);
             overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.06f);
-            world.ShowMementoScene(item.kind);
+            world.ShowMementoScene(item);
             View.Panel(overlay,"Memento safe copy",Palette.Panel,.05f,.18f,.95f,.41f,24);
             View.Label(overlay,"Memento event",item.title,38,Palette.Gold,TextAnchor.MiddleCenter,.075f,.31f,.925f,.40f);
             View.Label(overlay,"Memento original meaning",item.detail,29,Palette.Text,TextAnchor.MiddleCenter,.075f,.19f,.925f,.31f);

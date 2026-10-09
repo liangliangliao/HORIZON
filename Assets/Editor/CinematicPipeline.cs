@@ -25,6 +25,7 @@ namespace Horizon.Editor
         [MenuItem("HORIZON/Configure cinematic URP")]
         public static void Ensure()
         {
+            CinematicAtlases.Ensure();
             // TMP's shaders/settings ship as the package's essential resources.
             // Import them once so runtime-created Chinese captions survive stripping.
             const string typographySettings = "Assets/TextMesh Pro/Resources/TMP Settings.asset";
@@ -57,6 +58,14 @@ namespace Horizon.Editor
             {
                 renderer.postProcessData = AssetDatabase.LoadAssetAtPath<PostProcessData>(
                     "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset");
+                EditorUtility.SetDirty(renderer);
+            }
+            if (!renderer.rendererFeatures.Any(f => f is Horizon.UI.HorizonOpticsFeature))
+            {
+                var optics = ScriptableObject.CreateInstance<Horizon.UI.HorizonOpticsFeature>();
+                optics.name = "HORIZON depth focus and refraction";
+                AssetDatabase.AddObjectToAsset(optics, renderer);
+                renderer.rendererFeatures.Add(optics); optics.Create();
                 EditorUtility.SetDirty(renderer);
             }
             var pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(pipelinePath);

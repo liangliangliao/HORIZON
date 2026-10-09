@@ -120,7 +120,7 @@ namespace Horizon.UI
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
-            var budget = movieParticles.main; budget.maxParticles = preferences.batterySaver ? 12 : 64;
+            var budget = movieParticles.main; budget.maxParticles = ParticleBudget;
             movieParticles.Play();
             SampleCinematic(0);
         }
@@ -204,8 +204,9 @@ namespace Horizon.UI
         private void MovieBurst(Vector3 position,int requested)
         {
             if(preferences.reducedMotion) return;
+            if(moviePlan!=null && (moviePlan.Event.kind==DomainEventKind.RealityNode || moviePlan.Event.kind==DomainEventKind.RealityConvergence)) return;
             movieParticles.transform.position=position;
-            int remaining = Mathf.Max(0, (preferences.batterySaver ? 12 : 64) - movieParticles.particleCount);
+            int remaining = Mathf.Max(0, ParticleBudget - movieParticles.particleCount);
             movieParticles.Emit(Mathf.Min(requested, remaining));
         }
         private void SetMovieColor(Transform item,Color tint)

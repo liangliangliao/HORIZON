@@ -27,6 +27,7 @@ namespace Horizon.UI
         public void ApplyPreferences(PlayerPreferences value)
         {
             preferences = value ?? new PlayerPreferences();
+            VisualPreferences.ReducedMotion=preferences.reducedMotion;
             if (movieParticles != null)
             {
                 var budget = movieParticles.main; int cap = preferences.batterySaver ? 12 : 64;
@@ -54,6 +55,7 @@ namespace Horizon.UI
             WorldCamera.allowHDR = !preferences.batterySaver && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.DefaultHDR);
             QualitySettings.antiAliasing = SceneMsaaEnabled ? 2 : 0;
             QualitySettings.shadows = preferences.batterySaver ? UnityEngine.ShadowQuality.Disable : UnityEngine.ShadowQuality.All;
+            adaptiveBudget.Reset(); ApplyAdaptiveQuality();
             UpdateAudio();
         }
 
@@ -77,6 +79,7 @@ namespace Horizon.UI
         }
         private void RestoreRenderQuality()
         {
+            if(savedLodBias) { QualitySettings.lodBias=priorLodBias; savedLodBias=false; }
             if (runtimePipeline == null) return;
             if (QualitySettings.renderPipeline == runtimePipeline) QualitySettings.renderPipeline = priorPipeline;
             Dispose(runtimePipeline); runtimePipeline = null;

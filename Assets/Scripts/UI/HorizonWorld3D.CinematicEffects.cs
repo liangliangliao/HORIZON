@@ -5,6 +5,7 @@ namespace Horizon.UI
 {
     public sealed partial class HorizonWorld3D
     {
+        private HorizonOptics optics;
         private Transform semanticEffects, impactRing, focusTarget;
         private readonly Transform[] energyIndicators=new Transform[3];
         private readonly Transform[] focusNoise=new Transform[6];
@@ -32,9 +33,13 @@ namespace Horizon.UI
                     energyDistribution[i]=CausalLine(semanticEffects,"Scene power distribution "+i,new Vector3(1.8f,.7f,2),new Vector3((i%2==0?-1:1)*2,.06f,i<2?-1:5),portalLight,.035f);
             }
             ResetCinematicEffects(); semanticEffects.gameObject.SetActive(true);
+            PrepareAdditionalVfx();
         }
         private void ResetCinematicEffects()
         {
+            optics?.Clear();
+            ResetAdditionalVfx();
+            if(memoryFreezePlane!=null) memoryFreezePlane.gameObject.SetActive(false);
             if(semanticEffects==null) return;
             semanticEffects.gameObject.SetActive(false);
             foreach(Transform x in focusNoise) x.gameObject.SetActive(false);
@@ -47,6 +52,7 @@ namespace Horizon.UI
         private void SampleCinematicEffects(float time,float impact)
         {
             if(semanticEffects==null) return;
+            SampleAdditionalVfx(time,impact);
             float after=time-movieImpactTime;
             impactRing.gameObject.SetActive(!preferences.reducedMotion && after>=0 && after<.7f && moviePlan.Event.tier>=RewardTier.Major);
             impactRing.localPosition=new Vector3(0,.02f,2); impactRing.localScale=Vector3.one*(.1f+Mathf.Clamp01(after/.7f)*4);
@@ -56,6 +62,9 @@ namespace Horizon.UI
                 if(reward.Kind==RewardObjectKind.FocusLens)
                 {
                     float convergence=reward.Amount>0?impact:1-impact;
+                    optics.Defocus = preferences.reducedMotion ? 0 : 1-convergence;
+                    optics.LowPower = LowCostEffects;
+                    optics.FocusDistance = Vector3.Distance(WorldCamera.transform.position, focusTarget.position);
                     focusTarget.gameObject.SetActive(true);
                     for(int i=0;i<focusNoise.Length;i++)
                     {

@@ -11,6 +11,7 @@ namespace Horizon.Game
         public int day, run;
         public RewardObjectKind kind;
         public List<RewardEvidence> evidence = new List<RewardEvidence>();
+        public List<MemoryFrame> frames = new List<MemoryFrame>();
     }
     [Serializable]
     public sealed class RewardCollection
@@ -28,6 +29,7 @@ namespace Horizon.Game
             RewardObjectKind? kind = RewardDirector.ObjectFor(e.kind); if (!kind.HasValue) return false;
             items.Add(new RewardMemento { id = "memento:" + e.id, eventId = e.id, nodeId = e.nodeId, title = e.title,
                 detail = e.detail, day = e.day, run = run, kind = kind.Value,
+                frames = MemoryFrame.CopyFrames(e.receipt?.frames),
                 evidence = (e.receipt?.causes ?? new List<RewardEvidence>()).Select(x => x.Copy()).ToList() }); return true;
         }
     }

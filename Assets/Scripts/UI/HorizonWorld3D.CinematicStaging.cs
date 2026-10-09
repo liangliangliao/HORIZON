@@ -240,7 +240,7 @@ namespace Horizon.UI
                 moviePerformance.Play(HorizonBodyAction.Operate,Mathf.Min(.65f,p*2));
                 for(int i=0;i<movieObjects.Count;i++) if(movieObjectReceipts[i].Kind==RewardObjectKind.MemoryFilm)
                 { movieObjects[i].localPosition=new Vector3(0,1.3f,2); movieObjects[i].localScale=Vector3.one*(.45f+Smooth(.3f,.65f,p)*.35f); }
-                moviePlayer.localScale=Vector3.one*(1-Smooth(.3f,.65f,p)*.85f); moviePlayer.localPosition=new Vector3(0,Smooth(.3f,.65f,p),Smooth(.3f,.65f,p)*2);
+                SampleMemoryFreeze(p);
             }
             else if(e.kind==DomainEventKind.CausalSingularity && p>.65f)
             { camera=Vector3.Lerp(camera,new Vector3(7,7,-14),Smooth(.65f,.86f,p)); CurrentCinematicFraming=CinematicFraming.ExtremeWide; }

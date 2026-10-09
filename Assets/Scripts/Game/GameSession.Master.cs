@@ -59,9 +59,10 @@ namespace Horizon.Game
             Master.engine.socialPressure = Master.triggers.Contains("promise") || Master.triggers.Contains("friend") ? 2 : 0;
             RefreshExpeditionEngine();
         }
-        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null, PredictionRecord prediction = null)
+        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null, PredictionRecord prediction = null, IEnumerable<MemoryFrame> frames = null)
         {
             RewardReceipt receipt = RewardReceipt.Capture(kind, node, CausalNodes, Master.orbitBits, MasterHorizon, Master.triggers.LastOrDefault());
+            receipt.frames = MemoryFrame.CopyFrames(frames);
             if (sourceDay > 0 && node?.originHidden != true) receipt.sourceDay = sourceDay;
             if (actionText != null && node?.originHidden != true) receipt.action = actionText;
             if (kind == DomainEventKind.TimeEcho && node?.originHidden == true) detail = "一条回声已经抵达，来路暂未清晰。";
@@ -199,7 +200,7 @@ namespace Horizon.Game
             }
             Command("imagine", imagination: run);
             CausalNode last = CausalNodes.Find(n => n.id == parent);
-            Master.insightPoints += run.recovered; Emit(DomainEventKind.FutureMemory, last, "FUTURE MEMORY", "你预演了 " + run.failures + " 次失败，也练习了 " + run.recovered + " 次重新开始。");
+            Master.insightPoints += run.recovered; Emit(DomainEventKind.FutureMemory, last, "FUTURE MEMORY", "你预演了 " + run.failures + " 次失败，也练习了 " + run.recovered + " 次重新开始。", frames:run.frames);
         }
         public void RecognizeKnowledge()
         {
@@ -287,7 +288,7 @@ namespace Horizon.Game
                     CausalNode imagined = memory.imaginationRun == RunNumber ? CausalNodes.Find(x => x.id == memory.imaginationNodeId && x.type == CausalNodeKind.Imagination) : null;
                     if (imagined == null) imagined = MasterNode(CausalNodeKind.Memory, "Future Memory · " + memory.text);
                     CausalGraph.Link(n, imagined.id);
-                    Emit(DomainEventKind.DejaVu, n, "YOU HAVE SEEN\nTHIS BEFORE", memory.text); break;
+                    Emit(DomainEventKind.DejaVu, n, "YOU HAVE SEEN\nTHIS BEFORE", memory.text, frames: new[] { memory.frame }); break;
                 }
             KnowledgeSkill skill = Master.knowledge[0];
             if (skill.stage == KnowledgeStage.Recognize && (card.GivesSupport || card.Id == "again" || card.Id == "forge"))

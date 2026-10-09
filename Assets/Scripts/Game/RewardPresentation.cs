@@ -35,11 +35,13 @@ namespace Horizon.Game
         public int sourceDay, orbitBits, orbitIndex = -1, horizonLevel;
         public List<RewardEvidence> causes = new List<RewardEvidence>();
         public List<RewardEvidence> pastFailures = new List<RewardEvidence>();
+        public List<MemoryFrame> frames = new List<MemoryFrame>();
         public RewardReceipt Copy()
         {
             var copy = (RewardReceipt)MemberwiseClone(); copy.resources = ResourceMath.Copy(resources);
             copy.predicted = ResourceMath.Copy(predicted); copy.actual = ResourceMath.Copy(actual);
             copy.causes = (causes ?? new List<RewardEvidence>()).Select(x => x.Copy()).ToList();
+            copy.frames = MemoryFrame.CopyFrames(frames);
             copy.pastFailures = (pastFailures ?? new List<RewardEvidence>()).Select(x => x.Copy()).ToList(); return copy;
         }
         public static RewardReceipt Capture(DomainEventKind kind, CausalNode node, IList<CausalNode> graph,

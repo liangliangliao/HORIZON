@@ -28,6 +28,7 @@ namespace Horizon.UI
                 if (part != item && rewardRestPositions.TryGetValue(part, out Vector3 rest))
                 { part.localPosition = rest; part.localRotation = rewardRestRotations[part]; part.localScale=rewardRestScales[part]; ResetMovieColor(part); part.gameObject.SetActive(true); }
             if (kind == RewardObjectKind.ReservoirCore) item.Find("Storage lid").localPosition = new Vector3(0,.55f,0);
+            if (kind == RewardObjectKind.MemoryFilm) BindMemoryFilm(item,moviePlan?.Event.receipt?.frames);
             item.gameObject.SetActive(true); return item;
         }
         private Transform BuildRewardObject(RewardObjectKind kind, RewardObjectForm form, TriggerAppearance appearance)
@@ -74,11 +75,11 @@ namespace Horizon.UI
                     Box(item,"Repair cross vertical",new Vector3(.12f,-.16f,-.215f),new Vector3(.06f,.18f,.035f),teal);
                     Box(item,"Repair cross horizontal",new Vector3(.12f,-.16f,-.215f),new Vector3(.18f,.06f,.035f),teal); break;
                 case RewardObjectKind.MemoryFilm:
-                    for(int i=0;i<4;i++)
+                    for(int i=0;i<MemoryFrame.MaximumFrames;i++)
                     {
-                        Box(item,"Film frame "+i,new Vector3((i-1.5f)*.25f,0,0),new Vector3(.23f,.4f,.055f),dark);
-                        Box(item,"Recorded scene "+i,new Vector3((i-1.5f)*.25f,0,-.035f),new Vector3(.16f,.26f,.025f),teal);
-                        for(int side=-1;side<=1;side+=2) for(int hole=0;hole<3;hole++) Box(item,"Film perforation",new Vector3((i-1.5f)*.25f+(hole-1)*.07f,side*.17f,-.035f),Vector3.one*.025f,ivory);
+                        Box(item,"Film frame "+i,new Vector3((i-2)*.34f,0,0),new Vector3(.32f,.32f,.055f),dark);
+                        Shape(item,"Recorded scene "+i,PrimitiveType.Quad,new Vector3((i-2)*.34f,0,-.035f),new Vector3(.28f,.21f,1),teal);
+                        for(int side=-1;side<=1;side+=2) for(int hole=0;hole<3;hole++) Box(item,"Film perforation",new Vector3((i-2)*.34f+(hole-1)*.1f,side*.14f,-.035f),Vector3.one*.025f,ivory);
                     } break;
                 case RewardObjectKind.RouteLock:
                     Box(item,"Mechanical lock",new Vector3(0,-.18f,0),new Vector3(.48f,.35f,.2f),gold);

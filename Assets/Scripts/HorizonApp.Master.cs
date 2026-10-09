@@ -280,6 +280,7 @@ namespace Horizon
                     archive.KeepImagination(run); archive.imagination = null; PersistMasterAction(); ReturnFromImagination();
                 }, 0.075f, 0.15f, 0.925f, 0.235f, Palette.Mint, Palette.Ink, 28);
             else View.Button(overlay, "Continue imagination", run.phase == ImaginePhase.VictoryAnchor ? "时间倒退 · 回到今天" : run.phase == ImaginePhase.Failure ? "失败以后怎么办？" : "经历下一步", () => {
+                world.RecordImaginationFrame(run);
                 ImaginationEngine.Continue(run); if (run.phase == ImaginePhase.Complete) archive.KeepImagination(run); Save(); ShowImagineRun();
             }, 0.075f, 0.15f, 0.925f, 0.235f, Palette.Mint, Palette.Ink, 29);
         }

@@ -119,7 +119,8 @@ namespace Horizon
                 0.51f, 0.269f, 0.925f, 0.332f, Palette.Panel, Palette.Mint, 26);
             string status = saveStore.Notice ?? "自动保留当前与上一份安全存档。";
             View.Label(overlay, "Storage status", status, 22, Palette.Muted,
-                TextAnchor.MiddleLeft, 0.075f, 0.183f, 0.925f, 0.25f);
+                TextAnchor.MiddleLeft, 0.075f, 0.183f, 0.67f, 0.25f);
+            View.Button(overlay,"Performance report","运行表现",ShowPerformance,.7f,.192f,.925f,.248f,Palette.Panel,Palette.Mint,23);
             View.Button(overlay, "Close settings", "继续这段人生", CloseSettings,
                 0.075f, 0.085f, 0.925f, 0.161f, Palette.Mint, Palette.Ink, 31);
             if (archive.runs.Count > 0) View.Button(overlay, "Home from settings", "回到地平线", () =>
