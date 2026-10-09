@@ -26,6 +26,7 @@ Shader "HORIZON/Depth Focus and Refraction"
                 // Foreground and background have different circles of confusion;
                 // the focus plane stays sharp as the lens settles into place.
                 float coc=saturate(abs(depth-_Optics.y)/max(1.0,depth)*2)*_Optics.x;
+                if(coc<.001) return half4(SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv).rgb,1);
                 float2 radius=abs(_MainTex_TexelSize.xy)*_Optics.w*coc;
                 half3 c=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv).rgb*2;
                 c+=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv+radius*float2(1,0)).rgb;

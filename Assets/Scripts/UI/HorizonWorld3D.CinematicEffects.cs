@@ -64,7 +64,6 @@ namespace Horizon.UI
                     float convergence=reward.Amount>0?impact:1-impact;
                     optics.Defocus = preferences.reducedMotion ? 0 : 1-convergence;
                     optics.LowPower = LowCostEffects;
-                    optics.FocusDistance = Vector3.Distance(WorldCamera.transform.position, focusTarget.position);
                     focusTarget.gameObject.SetActive(true);
                     for(int i=0;i<focusNoise.Length;i++)
                     {

@@ -88,13 +88,17 @@ namespace Horizon.UI
             for(int trail=0;trail<3;trail++)
             {
                 bool energy=moviePlan.Objects.Any(o=>o.Kind==RewardObjectKind.EnergyCell && o.Amount>0);
+                Vector3 tip=Vector3.zero; int found=0;
+                for(int objectIndex=0;objectIndex<movieObjects.Count;objectIndex++)
+                    if(movieObjectReceipts[objectIndex].Kind==RewardObjectKind.EnergyCell)
+                    { tip=movieObjects[objectIndex].localPosition; if(found++==trail) break; }
                 energyTrails[trail].gameObject.SetActive(motion && energy && impact>0 && impact<1 && (!LowCostEffects || trail==0));
                 timeTrails[trail].gameObject.SetActive(motion && echo && time<movieImpactTime+.6f && (!LowCostEffects || trail==0));
                 for(int i=0;i<20;i++)
                 {
                     if(!energyTrails[trail].gameObject.activeSelf && !timeTrails[trail].gameObject.activeSelf) break;
-                    float p=i/19f, a=(trail*2.1f+time*2-p)*Mathf.PI;
-                    if(energyTrails[trail].gameObject.activeSelf) energyTrails[trail].SetPosition(i,Vector3.Lerp(new Vector3(Mathf.Cos(a)*1.5f,2+Mathf.Sin(a)*.25f,1),new Vector3(0,1.1f,1.1f),Mathf.Clamp01(impact-p*.2f)));
+                    float p=i/19f;
+                    if(energyTrails[trail].gameObject.activeSelf) energyTrails[trail].SetPosition(i,tip+(tip-new Vector3(0,1.1f,1.1f))*p*.3f+Vector3.up*Mathf.Sin(p*Mathf.PI)*.08f);
                     if(timeTrails[trail].gameObject.activeSelf) timeTrails[trail].SetPosition(i,new Vector3((trail-1)*.22f+Mathf.Sin(p*5+time)*.1f,.28f+Mathf.Sin(p*Mathf.PI)*.2f,Mathf.Lerp(-3,3,p)));
                 }
             }

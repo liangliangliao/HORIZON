@@ -82,11 +82,15 @@ namespace Horizon.Tests
             Assert.AreEqual(5,layers.Length); Assert.Less(layers.Count(t=>t.gameObject.activeSelf),5);
             Shader graph=Resources.Load<Shader>("HorizonProjection"); Assert.IsNotNull(graph);
             Assert.IsFalse(ShaderUtil.ShaderHasError(graph));
-            Assert.IsTrue(layers.SelectMany(t=>t.GetComponentsInChildren<Renderer>()).Any(r=>r.sharedMaterial.shader==graph));
+            bool graphVisible=false;
+            foreach(Transform layer in layers) foreach(Renderer renderer in layer.GetComponentsInChildren<Renderer>())
+                if(renderer.sharedMaterial.shader==graph) graphVisible=true;
+            Assert.IsTrue(graphVisible);
             Texture2D image=Capture(world.WorldCamera,"projecting"); Object.Destroy(image);
             world.SampleImaginationAt(4); Assert.IsTrue(layers.All(t=>t.gameObject.activeSelf && t.localScale.y>.99f));
             image=Capture(world.WorldCamera,"projected-world"); Object.Destroy(image);
-            Assert.IsFalse(layers.SelectMany(t=>t.GetComponentsInChildren<Renderer>()).Any(r=>r.sharedMaterial.shader==graph),"Completed layers must regain their solid materials.");
+            foreach(Transform layer in layers) foreach(Renderer renderer in layer.GetComponentsInChildren<Renderer>())
+                Assert.AreNotSame(graph,renderer.sharedMaterial.shader,"Completed layers must regain their solid materials.");
             world.EndImaginationScene(); Assert.IsTrue(layers.All(t=>!t.gameObject.activeInHierarchy));
             Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }
@@ -104,10 +108,76 @@ namespace Horizon.Tests
             Texture2D blurred=Capture(world.WorldCamera,"focus-blurred"); optics.Clear();
             Texture2D sharp=Capture(world.WorldCamera,"focus-sharp");
             Color32[] a=blurred.GetPixels32(),b=sharp.GetPixels32();
-            Assert.Greater(a.Where((c,i)=>Math.Abs(c.r-b[i].r)+Math.Abs(c.g-b[i].g)+Math.Abs(c.b-b[i].b)>6).Count(),100);
+            int changed=0;
+            for(int i=0;i<a.Length;i++)
+                if(Math.Abs(a[i].r-b[i].r)+Math.Abs(a[i].g-b[i].g)+Math.Abs(a[i].b-b[i].b)>6) changed++;
+            Assert.Greater(changed,100);
             world.Cinematics.Advance(world.Cinematics.Current.Duration*.9f); Assert.Less(optics.Defocus,.01f);
             world.Cinematics.Skip(); Assert.IsFalse(optics.Active);
             Object.Destroy(blurred); Object.Destroy(sharp); Object.Destroy(world.gameObject); yield return new ExitPlayMode();
+        }
+        [UnityTest]
+        public IEnumerator SpecializedEffectsUseDifferentGeometryAndSurfaces()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Effect vocabulary contract").AddComponent<HorizonWorld3D>(); world.Initialize();
+            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            var receipt=new RewardReceipt { resourcesRecorded=true,resources=new ResourceDelta(5),orbitBits=5,horizonLevel=4 };
+            for(int i=0;i<3;i++) receipt.causes.Add(new RewardEvidence { id="effect-fixture-"+i,day=i+1,label="Recorded cause "+i });
+            // Rendering fixtures exercise the library; gameplay reachability is
+            // separately covered by RealDomainEventsRetainCopyAndRenderDistinctPortraitStages.
+            foreach(DomainEventKind kind in new[] { DomainEventKind.TimeEcho,DomainEventKind.PatternBroken,
+                DomainEventKind.FailAndAgain,DomainEventKind.OrbitActivated,DomainEventKind.Breakthrough,DomainEventKind.Overdrive,DomainEventKind.RealityConvergence })
+            {
+                var e=new DomainEvent { id="effect-fixture-"+kind,kind=kind,tier=kind==DomainEventKind.TimeEcho?RewardTier.Major:RewardTier.Epic,receipt=receipt };
+                world.Cinematics.Enqueue(e,true);
+                float hit=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                if(kind==DomainEventKind.PatternBroken)
+                {
+                    world.Cinematics.Advance(world.Cinematics.Current.Duration*.405f);
+                    Assert.IsTrue(world.GetComponentsInChildren<LineRenderer>().Any(l=>l.name.StartsWith("Pattern crack")));
+                }
+                world.Cinematics.Advance(Mathf.Max(0,hit+.15f-world.Cinematics.Elapsed));
+                var lines=world.GetComponentsInChildren<LineRenderer>();
+                if(kind==DomainEventKind.TimeEcho)
+                {
+                    Assert.AreEqual(3,lines.Count(l=>l.name.StartsWith("Energy trail ")));
+                    Assert.AreEqual(3,lines.Count(l=>l.name.StartsWith("Time trail ")));
+                    Assert.IsTrue(lines.Any(l=>l.name=="Ground shockwave"));
+                    Assert.IsTrue(lines.Any(l=>l.name=="Activation halo"));
+                    Assert.IsTrue(lines.Any(l=>l.name=="Cause beam 1"));
+                }
+                if(kind==DomainEventKind.PatternBroken)
+                {
+                    Assert.Greater(world.WorldCamera.GetComponent<HorizonOptics>().Distortion,0);
+                    Assert.IsTrue(world.GetComponentsInChildren<Renderer>().Any(r=>r.name=="Historical interruption" && r.sharedMaterial.shader==Resources.Load<Shader>("HorizonProjection")));
+                }
+                if(kind==DomainEventKind.FailAndAgain)
+                    Assert.AreEqual(8,world.GetComponentsInChildren<Renderer>().Count(r=>r.name.StartsWith("Time fracture ")));
+                if(kind==DomainEventKind.OrbitActivated) Assert.AreEqual(2,lines.Count(l=>l.name.StartsWith("Orbit trail ")));
+                if(kind==DomainEventKind.Breakthrough)
+                {
+                    var fluid=world.GetComponentsInChildren<Renderer>().Single(r=>r.name=="Baked reservoir energy");
+                    Assert.AreSame(Resources.Load<Texture2D>("HorizonFlowFlipbook"),fluid.sharedMaterial.mainTexture);
+                }
+                if(kind==DomainEventKind.Overdrive)
+                {
+                    Assert.AreEqual(3,lines.Count(l=>l.name.StartsWith("Overdrive horizon glow ")));
+                    float reveal=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
+                    world.Cinematics.Advance(Mathf.Max(0,reveal+.01f-world.Cinematics.Elapsed));
+                    var future=world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Future self cut in");
+                    Assert.AreSame(Resources.Load<Shader>("HorizonProjection"),future.Chest.GetComponent<Renderer>().sharedMaterial.shader);
+                }
+                if(kind==DomainEventKind.RealityConvergence)
+                {
+                    CollectionAssert.IsSubsetOf(new[] { "IMAGINATION","SIMULATION","REALITY" },lines.Select(l=>l.name));
+                    Assert.AreEqual(3,world.GetComponentsInChildren<Renderer>().Count(r=>r.name.StartsWith("Reality impact dust ")));
+                }
+                Texture2D image=Capture(world.WorldCamera,"effect-"+kind); Object.Destroy(image);
+                world.Cinematics.Skip();
+                Assert.IsFalse(world.WorldCamera.GetComponent<HorizonOptics>().Active);
+            }
+            Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }
         [UnityTest]
         public IEnumerator BakedEffectsLodAndBodyBreathingRespectPauseAndReduction()

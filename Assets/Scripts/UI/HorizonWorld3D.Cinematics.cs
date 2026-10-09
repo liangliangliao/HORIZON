@@ -303,6 +303,8 @@ namespace Horizon.UI
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;
             cinematicCamera.Lens.NearClipPlane = .1f; cinematicCamera.Lens.FarClipPlane = 80;
             cinematicBrain.ManualUpdate();
+            if(optics.Active && focusTarget!=null && focusTarget.gameObject.activeSelf)
+                optics.FocusDistance=Mathf.Max(.1f,WorldCamera.WorldToViewportPoint(focusTarget.position).z);
             FrameCinematicLabels();
             shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
         }

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "specification_version": "1.0",
-  "audit_date": "2026-10-07",
+  "audit_date": "2026-10-09",
   "review_state": "complete",
   "baseline_commit": "2f67718159bbf87cd1ba087b26c09d2d7febeed2",
   "denominators": {
@@ -127,19 +127,26 @@
       "title": "专注",
       "requirement": "单片/双片/完整聚焦装置；镜片归位、散光收束、失焦转清晰、干扰变暗；同步保留专注文案，方向不能做成散射",
       "priority": "P1",
-      "status": "partial",
+      "status": "implemented_pending_acceptance",
       "source": [
         "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
         "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic"
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonOpticsFeature.cs",
+        "Assets/Resources/HorizonOptics.shader",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
-      "tests": [],
-      "runtime_evidence": [],
-      "remaining": [
-        "已经实现透镜归位、干扰收束变暗；完整画面景深失焦/复焦后处理尚未实现。"
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.DepthFocusChangesRenderedPixelsAndClearsAfterSkipping"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-focus-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
     },
     {
       "id": "R05",
@@ -334,19 +341,29 @@
       "title": "Future Memory",
       "requirement": "预演关键行为冻结并缩入胶片格，多帧形成胶卷；来自真实预演结果",
       "priority": "P1",
-      "status": "partial",
+      "status": "implemented_pending_acceptance",
       "source": [
         "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
         "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic"
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/Game/MemoryFrame.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.MemoryFilm.cs",
+        "Assets/Scripts/HorizonApp.Master.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
-      "tests": [],
-      "runtime_evidence": [],
-      "remaining": [
-        "已有可收藏胶片、关键角色冻结缩入；尚未将真实预演的多个关键帧写入每个胶片格。"
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.ActualImaginationFramesPersistAndRenderInTheFilmstrip",
+        "Horizon.Tests.RemainingRewardTests.MemoryFramesFollowRealBeatsAndCopiesCannotRewriteReceipts",
+        "Horizon.Tests.RemainingRewardTests.LegacyAndOversizedMemoryFramesDoNotBlockGameplayOrBecomeTextures"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "runtime_evidence": [
+        "artifacts/cinematics/memory-*.jpg",
+        "artifacts/cinematics/remaining-memory-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
     },
     {
       "id": "R13",
@@ -354,19 +371,25 @@
       "title": "Imagination",
       "requirement": "投影机/核心启动；空白空间依次形成轮廓、街道/房间/人物/障碍/未来场景，角色进入 3D 投影世界",
       "priority": "P1",
-      "status": "partial",
+      "status": "implemented_pending_acceptance",
       "source": [
         "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
         "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
-        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic"
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.Projection.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Imagination.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
-      "tests": [],
-      "runtime_evidence": [],
-      "remaining": [
-        "已有投影机、轮廓与路径生成；完整街道/房间/人物分层投影实体化仍需扩充。"
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.ProjectionMaterializesFiveLayersAndUsesCompiledShaderGraph"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-project*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
     },
     {
       "id": "R14",
@@ -625,22 +648,28 @@
       "title": "技术架构与业务隔离",
       "requirement": "原文明定 Unity 6 LTS、URP、Cinemachine、Timeline/PlayableDirector、Animator、Animation Rigging、Particle System、Shader Graph、TextMeshPro、Tween、URP Volume/Renderer Feature、Haptics；CinematicDirector 仅接受原事件。若实际仓库采用别的引擎，应明确列为技术栈偏差，不能静默算此组通过",
       "priority": "P0",
-      "status": "partial",
+      "status": "implemented_pending_acceptance",
       "source": [
         "ProjectSettings/ProjectVersion.txt",
         "Packages/manifest.json",
         "Assets/Editor/CinematicPipeline.cs",
-        "Assets/Scripts/UI/CinematicDirector.cs"
+        "Assets/Scripts/UI/CinematicDirector.cs",
+        "Assets/Resources/HorizonProjection.shadergraph",
+        "Assets/Scripts/UI/HorizonOpticsFeature.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Vfx.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
-        "Horizon.Tests.CinematicPlayableTests.PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched"
+        "Horizon.Tests.CinematicPlayableTests.PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched",
+        "Horizon.Tests.RemainingCinematicTests.ProjectionMaterializesFiveLayersAndUsesCompiledShaderGraph"
       ],
-      "runtime_evidence": [],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-project*.png"
+      ],
       "remaining": [
-        "Unity6/URP/Cinemachine/Playable/TMP/Animator/Animation Rigging均已接入；Shader Graph美术资产尚缺，使用项目自有HLSL着色器。"
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
     },
     {
       "id": "A02",
@@ -731,20 +760,27 @@
       "title": "基础资源表演",
       "requirement": "精力 5 电芯依次吸入并站直；专注 3 透镜依次归位清晰；心情冷转暖与自然呼吸；关系两人连通；能力零件成工具；与奖励方案同一实现及文案",
       "priority": "P1",
-      "status": "partial",
+      "status": "implemented_pending_acceptance",
       "source": [
         "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
-        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic"
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonOpticsFeature.cs",
+        "Assets/Scripts/UI/HorizonActorPerformance.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Experience.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
-        "Horizon.Tests.CinematicRewardTests.AllSixResourceObjectsDescribeTheActualSignedReceipt"
+        "Horizon.Tests.CinematicRewardTests.AllSixResourceObjectsDescribeTheActualSignedReceipt",
+        "Horizon.Tests.RemainingCinematicTests.DepthFocusChangesRenderedPixelsAndClearsAfterSkipping",
+        "Horizon.Tests.RemainingCinematicTests.BakedEffectsLodAndBodyBreathingRespectPauseAndReduction"
       ],
-      "runtime_evidence": [],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-focus-*.png"
+      ],
       "remaining": [
-        "电芯恢复、暖灯、关系网络和工具组装已实现；专注的全屏景深变化仍不完整，整组不计完整实现。"
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
     },
     {
       "id": "A06",
@@ -1325,18 +1361,28 @@
       "title": "至少 16 类特效",
       "requirement": "下表 16 种效果可区别并按概念使用，不能用单一通用 Particle 仅改名称满足",
       "priority": "P1",
-      "status": "partial",
+      "status": "implemented_pending_acceptance",
       "source": [
         "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#MovieBurst",
-        "Assets/Scripts/UI/HorizonWorld3D.Art.cs"
+        "Assets/Scripts/UI/HorizonWorld3D.Art.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Vfx.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.MemoryFilm.cs",
+        "Assets/Editor/CinematicAtlases.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
-      "tests": [],
-      "runtime_evidence": [],
-      "remaining": [
-        "已用能量/时间拖尾、因果线、冲击环、节点亮起、历史碎片等；不能认定16类完整独立特效全部完成。"
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.SpecializedEffectsUseDifferentGeometryAndSurfaces",
+        "Horizon.Tests.RemainingCinematicTests.ActualImaginationFramesPersistAndRenderInTheFilmstrip",
+        "Horizon.Tests.RemainingCinematicTests.DepthFocusChangesRenderedPixelsAndClearsAfterSkipping"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-effect-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
     },
     {
       "id": "A28",
@@ -1348,17 +1394,24 @@
       "source": [
         "Assets/Scripts/UI/HorizonWorld3D.Preferences.cs",
         "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs#rewardPool",
-        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#MovieBurst"
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#MovieBurst",
+        "Assets/Scripts/UI/HorizonWorld3D.Performance.cs",
+        "Assets/Scripts/Game/FramePerformance.cs",
+        "Assets/Editor/CinematicAtlases.cs",
+        "Assets/Scripts/HorizonApp.Performance.cs"
       ],
       "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
       "tests": [
-        "Horizon.Tests.CinematicPlayableTests.LowQualityKeepsAllShotsObjectsAndCopyWithBoundedParticles"
+        "Horizon.Tests.CinematicPlayableTests.LowQualityKeepsAllShotsObjectsAndCopyWithBoundedParticles",
+        "Horizon.Tests.RemainingCinematicTests.BakedEffectsLodAndBodyBreathingRespectPauseAndReduction",
+        "Horizon.Tests.RemainingRewardTests.FrameStatisticsUseElapsedTimeAndRetainHitches",
+        "Horizon.Tests.RemainingRewardTests.AdaptiveQualityNeedsSustainedPressureAndRecoversWithHysteresis"
       ],
       "runtime_evidence": [],
       "remaining": [
-        "对象复用/静态合批/粒子预算/省电保叙事已接入；缺真实手机60/30FPS实测与完整LOD/Flipbook方案。"
+        "LOD、两套Flipbook、实时3D混用、分辨率/阴影/粒子自适应降级、场景帧率统计及报告导出已实现；缺少实际 Android 手机普通60 FPS/重大演出最低30 FPS数据。本组保留部分实现，不用模拟器或统计单元测试代替真机验收。"
       ],
-      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+      "review_note": "代码可复验；完整需求明确包含实际设备性能，取得合格真机数据前不计入完整组。"
     }
   ],
   "review_limit": "代码按固定自然需求组审查；实现待验收不代表成熟美术品质或真机帧率合格。独立CI报告仅在对应检查实际通过后计入测试支持实现率。"

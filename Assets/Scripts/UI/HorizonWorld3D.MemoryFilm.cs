@@ -85,7 +85,12 @@ namespace Horizon.UI
             float sequence=Mathf.Clamp01(progress/.65f)*frames.Count;
             int index=Mathf.Min(frames.Count-1,Mathf.FloorToInt(sequence));
             Transform cell=film.Find("Recorded scene "+index);
-            memoryFreezePlane.gameObject.SetActive(progress<.65f && cell!=null && cell.gameObject.activeSelf);
+            for(int i=0;i<frames.Count;i++)
+            {
+                Transform completed=film.Find("Recorded scene "+i);
+                if(completed!=null) completed.gameObject.SetActive(i<Mathf.FloorToInt(sequence));
+            }
+            memoryFreezePlane.gameObject.SetActive(progress<.65f && cell!=null && cell.GetComponent<Renderer>().sharedMaterial.mainTexture!=null);
             if(!memoryFreezePlane.gameObject.activeSelf) return;
             memoryFreezePlane.GetComponent<Renderer>().sharedMaterial=cell.GetComponent<Renderer>().sharedMaterial;
             float shrink=Smooth(.3f,.95f,Mathf.Repeat(sequence,1));
