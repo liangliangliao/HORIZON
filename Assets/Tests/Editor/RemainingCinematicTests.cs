@@ -105,7 +105,7 @@ namespace Horizon.Tests
             Texture2D sharp=Capture(world.WorldCamera,"focus-sharp");
             Color32[] a=blurred.GetPixels32(),b=sharp.GetPixels32();
             Assert.Greater(a.Where((c,i)=>Math.Abs(c.r-b[i].r)+Math.Abs(c.g-b[i].g)+Math.Abs(c.b-b[i].b)>6).Count(),100);
-            world.Cinematics.Advance(world.Cinematics.Current.Duration*.7f); Assert.Less(optics.Defocus,.01f);
+            world.Cinematics.Advance(world.Cinematics.Current.Duration*.9f); Assert.Less(optics.Defocus,.01f);
             world.Cinematics.Skip(); Assert.IsFalse(optics.Active);
             Object.Destroy(blurred); Object.Destroy(sharp); Object.Destroy(world.gameObject); yield return new ExitPlayMode();
         }

@@ -17,7 +17,7 @@ namespace Horizon.UI
         private Transform reservoirFlow;
         private Material projectionMaterial;
         private readonly Dictionary<Renderer,Material[]> projectionOriginals=new Dictionary<Renderer,Material[]>();
-        private readonly MaterialPropertyBlock effectProperties=new MaterialPropertyBlock();
+        private MaterialPropertyBlock effectProperties;
         private void PrepareAdditionalVfx()
         {
             if(additionalVfx!=null) { additionalVfx.gameObject.SetActive(true); return; }
@@ -50,6 +50,7 @@ namespace Horizon.UI
         }
         private void ProjectionSurface(Transform group,float reveal,float clock,bool active)
         {
+            if(!active && projectionOriginals.Count==0) return;
             if(projectionMaterial==null)
             {
                 Shader shader=Resources.Load<Shader>("HorizonProjection");
@@ -91,9 +92,10 @@ namespace Horizon.UI
                 timeTrails[trail].gameObject.SetActive(motion && echo && time<movieImpactTime+.6f && (!LowCostEffects || trail==0));
                 for(int i=0;i<20;i++)
                 {
+                    if(!energyTrails[trail].gameObject.activeSelf && !timeTrails[trail].gameObject.activeSelf) break;
                     float p=i/19f, a=(trail*2.1f+time*2-p)*Mathf.PI;
-                    energyTrails[trail].SetPosition(i,Vector3.Lerp(new Vector3(Mathf.Cos(a)*1.5f,2+Mathf.Sin(a)*.25f,1),new Vector3(0,1.1f,1.1f),Mathf.Clamp01(impact-p*.2f)));
-                    timeTrails[trail].SetPosition(i,new Vector3((trail-1)*.22f+Mathf.Sin(p*5+time)*.1f,.28f+Mathf.Sin(p*Mathf.PI)*.2f,Mathf.Lerp(-3,3,p)));
+                    if(energyTrails[trail].gameObject.activeSelf) energyTrails[trail].SetPosition(i,Vector3.Lerp(new Vector3(Mathf.Cos(a)*1.5f,2+Mathf.Sin(a)*.25f,1),new Vector3(0,1.1f,1.1f),Mathf.Clamp01(impact-p*.2f)));
+                    if(timeTrails[trail].gameObject.activeSelf) timeTrails[trail].SetPosition(i,new Vector3((trail-1)*.22f+Mathf.Sin(p*5+time)*.1f,.28f+Mathf.Sin(p*Mathf.PI)*.2f,Mathf.Lerp(-3,3,p)));
                 }
             }
             for(int i=0;i<24;i++)
@@ -117,7 +119,7 @@ namespace Horizon.UI
                 fracturePanels[i].localRotation=Quaternion.Euler(impact*i*35,impact*85,impact*i*11);
                 int bits=moviePlan.Event.receipt?.orbitBits??0;
                 orbitTrails[i].gameObject.SetActive((kind==DomainEventKind.OrbitActivated || kind==DomainEventKind.AllLinked) && (bits&(1<<i))!=0);
-                for(int point=0;point<20;point++)
+                for(int point=0;point<20 && orbitTrails[i].gameObject.activeSelf;point++)
                 {
                     float angle=(i+point/19f)*Mathf.PI/4;
                     orbitTrails[i].SetPosition(point,new Vector3(Mathf.Cos(angle)*2,1.7f+Mathf.Sin(angle)*1.1f,4.2f));
@@ -126,12 +128,12 @@ namespace Horizon.UI
             bool storage=kind==DomainEventKind.Breakthrough;
             reservoirFlow.gameObject.SetActive(storage);
             reservoirFlow.rotation=WorldCamera.transform.rotation;
-            Flipbook(reservoirFlow,Mathf.Repeat(time*12,16),new Color(1,1,1,motion?1:.5f));
+            if(storage) Flipbook(reservoirFlow,motion?Mathf.Repeat(time*12,16):0,new Color(1,1,1,motion?1:.5f));
             for(int i=0;i<3;i++)
             {
                 bool horizon=kind==DomainEventKind.Overdrive || kind==DomainEventKind.HorizonChanged;
                 horizonGlows[i].gameObject.SetActive(horizon && (!LowCostEffects || i==0));
-                for(int point=0;point<20;point++)
+                for(int point=0;point<20 && horizonGlows[i].gameObject.activeSelf;point++)
                 { float p=point/19f; horizonGlows[i].SetPosition(point,new Vector3((p-.5f)*16,1.2f+Mathf.Sin(p*Mathf.PI)*1.8f+i*.14f,7+impact*2)); }
                 SetMovieColor(horizonGlows[i].transform,Palette.Mint*(.08f+impact*.25f));
                 bool reality=kind==DomainEventKind.RealityNode || kind==DomainEventKind.RealityConvergence;
@@ -139,7 +141,7 @@ namespace Horizon.UI
                 dustCards[i].localPosition=new Vector3((i-1)*.45f,.12f,2+i*.15f);
                 dustCards[i].localRotation=Quaternion.Euler(90,0,i*60);
                 dustCards[i].localScale=Vector3.one*(1.3f+i*.25f);
-                Flipbook(dustCards[i],after/.85f*15,Color.white);
+                if(dustCards[i].gameObject.activeSelf) Flipbook(dustCards[i],after/.85f*15,Color.white);
             }
         }
     }

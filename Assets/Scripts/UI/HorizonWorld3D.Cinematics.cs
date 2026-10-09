@@ -40,6 +40,7 @@ namespace Horizon.UI
             cinematicCamera.transform.SetParent(transform, false); cinematicCamera.gameObject.SetActive(false);
             cinematicStage = Group("HORIZON cinematic stage"); cinematicStage.localPosition = new Vector3(32,0,0);
             movieProperties = new MaterialPropertyBlock();
+            effectProperties = new MaterialPropertyBlock();
             Box(cinematicStage,"Time space floor",new Vector3(0,-.3f,2),new Vector3(15,.25f,19),dark);
             moviePlayer=Person("Cinematic player",cinematicStage,new Vector3(0,0,-.5f),cloth);
             movieFuture=Person("Future self cut in",cinematicStage,new Vector3(0,0,6),ivory);
@@ -227,7 +228,8 @@ namespace Horizon.UI
         {
             if(moviePlan==null) return;
             if (moviePhase == CinematicPhase.HitStop) time = moviePhaseTime;
-            float progress=time/moviePlan.Duration, impact=Smooth(movieImpactTime,movieImpactTime+.75f,time);
+            float impactSpan=Mathf.Min(.75f,Mathf.Max(.02f,moviePlan.Duration*.78f-movieImpactTime));
+            float progress=time/moviePlan.Duration, impact=Smooth(movieImpactTime,movieImpactTime+impactSpan,time);
             bool frozen=moviePhase==CinematicPhase.HitStop;
             DomainEventKind kind=moviePlan.Event.kind; RewardReceipt receipt=moviePlan.Event.receipt;
             Vector3 camera=new Vector3(4.6f,3.6f,-6.8f),look=new Vector3(0,1.1f,2);
