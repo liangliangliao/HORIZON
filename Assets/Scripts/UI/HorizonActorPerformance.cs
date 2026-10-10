@@ -87,10 +87,15 @@ namespace Horizon.UI
         {
             if(!performing) return;
             performing=false; if(actor!=null) actor.enabled=true;
-            LODGroup lod=GetComponent<LODGroup>(); if(lod!=null && lod.isActiveAndEnabled) lod.ForceLOD(-1);
+            ResetAutomaticLod();
             if(builder!=null) builder.Clear();
         }
-        private void OnEnable() { if(!performing) GetComponent<LODGroup>()?.ForceLOD(-1); }
+        private void ResetAutomaticLod()
+        {
+            LODGroup lod=GetComponent<LODGroup>();
+            if(lod!=null && lod.enabled && lod.gameObject.activeInHierarchy) lod.ForceLOD(-1);
+        }
+        private void OnEnable() { if(!performing) ResetAutomaticLod(); }
         private void OnDisable() { Release(); }
         private void OnDestroy() { if(builder!=null) builder.Clear(); }
     }
