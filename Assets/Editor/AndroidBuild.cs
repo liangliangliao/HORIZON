@@ -64,7 +64,9 @@ namespace Horizon.Editor
             }));
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException("Android build failed: " + report.summary.result);
-            Debug.Log("HORIZON APK: ARMv7 + ARM64, " + report.summary.totalSize + " bytes, " + output);
+            // BuildReport also counts auxiliary build outputs. Report the actual
+            // installable file size here, rather than labeling that total as APK.
+            Debug.Log("HORIZON APK: ARMv7 + ARM64, " + new FileInfo(output).Length + " bytes, " + output);
             if (string.Equals(Argument("-horizonSmoke"), "true", StringComparison.OrdinalIgnoreCase))
             {
                 if (release) throw new BuildFailedException("Android smoke is restricted to preview builds.");

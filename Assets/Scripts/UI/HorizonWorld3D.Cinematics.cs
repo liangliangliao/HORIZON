@@ -103,7 +103,7 @@ namespace Horizon.UI
             cinematicStage.gameObject.SetActive(true); WorldCamera.rect=fullscreen?new Rect(0,.18f,1,.64f):new Rect(0,.543f,1,.245f);
             cinematicCamera.gameObject.SetActive(true);
             movieFuture.localPosition = new Vector3(0,0,6); movieFuture.localScale = Vector3.one;
-            movieAnchor.localPosition = Vector3.zero; SetMovieColor(movieAnchor, Palette.Mint);
+            movieAnchor.localPosition = Vector3.zero; ResetMovieColor(movieAnchor);
             movieAnchor.Find("Future work desk").localScale=new Vector3(1.45f,.12f,.7f);
             movieAnchor.Find("Future work desk").gameObject.SetActive(true); movieAnchor.Find("Future open task").gameObject.SetActive(true);
             moviePlayer.gameObject.SetActive(true); moviePlayer.localPosition=new Vector3(0,0,-.5f); moviePlayer.localRotation=Quaternion.Euler(0,180,0);

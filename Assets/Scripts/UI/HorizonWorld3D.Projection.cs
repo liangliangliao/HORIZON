@@ -56,6 +56,8 @@ namespace Horizon.UI
             }
             foreach(LineRenderer line in projectionOutlines) line.gameObject.SetActive(p<.9f);
             float future=Smooth(.68f,.98f,p);
+            movieAnchor.gameObject.SetActive(future>.001f);
+            if(materializing) movieFuture.gameObject.SetActive(future>.001f);
             movieAnchor.localScale=new Vector3(1,Mathf.Max(.001f,future),1);
             movieFuture.localScale=Vector3.one*Mathf.Max(.001f,future);
             ProjectionSurface(movieFuture,future,p*3,future>0 && future<1);

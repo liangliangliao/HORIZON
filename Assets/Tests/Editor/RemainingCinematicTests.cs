@@ -80,6 +80,8 @@ namespace Horizon.Tests
             world.ShowImaginationScene(run); world.SampleImaginationAt(.75f);
             var layers=world.GetComponentsInChildren<Transform>(true).Where(t=>t.name.StartsWith("Projection layer ")).ToArray();
             Assert.AreEqual(5,layers.Length); Assert.Less(layers.Count(t=>t.gameObject.activeSelf),5);
+            Transform futureRoom=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Victory anchor");
+            Assert.IsFalse(futureRoom.gameObject.activeSelf,"The future room must not cover the initial flat blueprint.");
             Shader graph=Resources.Load<Shader>("HorizonProjection"); Assert.IsNotNull(graph);
             Assert.IsFalse(ShaderUtil.ShaderHasError(graph));
             bool graphVisible=false;
@@ -88,6 +90,7 @@ namespace Horizon.Tests
             Assert.IsTrue(graphVisible);
             Texture2D image=Capture(world.WorldCamera,"projecting"); Object.Destroy(image);
             world.SampleImaginationAt(4); Assert.IsTrue(layers.All(t=>t.gameObject.activeSelf && t.localScale.y>.99f));
+            Assert.IsTrue(futureRoom.gameObject.activeSelf);
             image=Capture(world.WorldCamera,"projected-world"); Object.Destroy(image);
             foreach(Transform layer in layers) foreach(Renderer renderer in layer.GetComponentsInChildren<Renderer>())
                 Assert.AreNotSame(graph,renderer.sharedMaterial.shader,"Completed layers must regain their solid materials.");

@@ -81,7 +81,13 @@ namespace Horizon.UI
                 for(int i=9;i<14;i++) movieTiles[i].gameObject.SetActive(false);
                 movieLight.intensity=.2f;
             }
-            else { moviePlayer.GetComponent<HorizonActor>().Pointing=false; SetMovieColor(movieAnchor,Palette.Mint); }
+            else
+            {
+                moviePlayer.GetComponent<HorizonActor>().Pointing=false;
+                // Restore wood, walls and upholstery after the failure dimming.
+                // A uniform emissive tint erases the room's everyday details.
+                if(movieColors.ContainsKey(movieAnchor)) ResetMovieColor(movieAnchor);
+            }
             if(phase==ImaginePhase.Retry) { position=new Vector3(0,Mathf.Lerp(-.9f,0,p),Mathf.Lerp(1.6f,2.5f,p)); moviePlayer.GetComponent<HorizonActor>().Walking=p>.4f && p<1; }
             if(phase==ImaginePhase.Adjust) { bool changed=imaginedScene.memories.Count>0 && imaginedScene.memories[imaginedScene.memories.Count-1].actionKey=="ChangeMethod";
                 position=new Vector3(changed?Mathf.Sin(p*Mathf.PI)*.7f:0,0,Mathf.Lerp(2,3.6f,p)); moviePlayer.GetComponent<HorizonActor>().Walking=p<1; }

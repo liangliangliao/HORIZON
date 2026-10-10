@@ -63,7 +63,7 @@ def main():
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
     adb("shell", "am", "start", "-W", "-n", activity, "--ez", "horizonSmoke", "true")
-    deadline = time.monotonic() + 240
+    deadline = time.monotonic() + 360
     backgrounded = False
     back_pressed = False
     previous = None

@@ -174,7 +174,35 @@ namespace Horizon
             AndroidSmoke.Require(reward.acknowledged && world.WorldCamera.rect==viewport,"Reward back did not restore the scene.");
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
             CaptureAndroidFrame("06-reward-back-home",world.Avatar);
-            File.WriteAllText(Path.Combine(AndroidSmoke.DirectoryPath,"performance.json"),world.ExportPerformanceReport());
+            // Exercise the player's recording/export controls. The short shots
+            // above can finish before the recorder's startup/resume warmup on a
+            // slow emulator. Wait for actual rendered frames, never inject timing.
+            AndroidSmoke.Write("recording_performance");
+            SmokeButton("Settings"); yield return null; SmokeButton("Performance report"); yield return null;
+            SmokeButton("Restart performance recording");
+            for(int frame=0;frame<100;frame++) yield return null;
+            AndroidSmoke.Require(world.PerformanceReport().scenes.Sum(s=>s.frames)>=60,
+                "Normal quality did not record foreground frames after warmup; focused="+Application.isFocused);
+            SmokeButton("Settings"); yield return null;
+            int pausedFrames=world.PerformanceReport().scenes.Sum(s=>s.frames);
+            for(int frame=0;frame<10;frame++) yield return null;
+            AndroidSmoke.Require(world.PerformanceReport().scenes.Sum(s=>s.frames)==pausedFrames,
+                "Performance recording included paused settings frames.");
+            SmokeButton("Toggle 4"); yield return null; SmokeButton("Close settings");
+            AndroidSmoke.Require(Application.targetFrameRate==30,"Battery quality did not set its frame target.");
+            for(int frame=0;frame<100;frame++) yield return null;
+            yield return new WaitForEndOfFrame(); CaptureAndroidFrame("07-battery-home",world.Avatar);
+            AndroidSmoke.Require(AndroidSkyHasBlue(),"Battery quality lost the GLES blue channel.");
+            SmokeButton("Settings"); yield return null; SmokeButton("Performance report"); yield return null;
+            SmokeButton("Copy performance report");
+            string performance=File.ReadAllText(Path.Combine(Application.persistentDataPath,"horizon-performance.json"));
+            HorizonPerformanceReport recorded=JsonUtility.FromJson<HorizonPerformanceReport>(performance);
+            AndroidSmoke.Require(recorded.scenes.Where(s=>s.targetFps==60).Sum(s=>s.frames)>=60 &&
+                recorded.scenes.Where(s=>s.targetFps==30).Sum(s=>s.frames)>=60,
+                "The exported report is missing standard or battery quality samples.");
+            File.WriteAllText(Path.Combine(AndroidSmoke.DirectoryPath,"performance.json"),performance);
+            SmokeButton("Back from performance"); yield return null;
+            SmokeButton("Toggle 4"); yield return null; SmokeButton("Close settings");
         }
         private void SmokeButton(string name)
         {
