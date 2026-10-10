@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Horizon.Editor
 {
@@ -12,12 +13,19 @@ namespace Horizon.Editor
     {
         public static void Build()
         {
+            // Prepare resources before BuildPipeline starts collecting player
+            // assets; editor delay callbacks do not run during this batch build.
+            CinematicPipeline.Ensure();
             string output = Argument("-customBuildPath") ?? "build/Android/HORIZON.apk";
             var scenes = EditorBuildSettings.scenes.Where(scene => scene.enabled).Select(scene => scene.path).ToArray();
             if (scenes.Length == 0) throw new BuildFailedException("No enabled scenes for the Android build.");
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output)));
 
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            // Use the same mobile graphics backend for the preview and its
+            // native emulator check, instead of choosing an untested Vulkan driver.
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.OpenGLES3 });
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             bool release = string.Equals(Argument("-horizonChannel"), "release", StringComparison.OrdinalIgnoreCase);
@@ -43,9 +51,39 @@ namespace Horizon.Editor
                 target = BuildTarget.Android,
                 options = BuildOptions.None
             });
+            // Game-CI validates this stdout summary after Unity exits. Keep it
+            // tied to the real BuildReport so custom builds report failures too.
+            Console.WriteLine(string.Join(Environment.NewLine, new[]
+            {
+                "", "###########################", "#      Build results      #",
+                "###########################", "",
+                "Duration: " + report.summary.totalTime,
+                "Warnings: " + report.summary.totalWarnings,
+                "Errors: " + report.summary.totalErrors,
+                "Size: " + report.summary.totalSize + " bytes", ""
+            }));
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException("Android build failed: " + report.summary.result);
-            Debug.Log("HORIZON APK: ARMv7 + ARM64, " + report.summary.totalSize + " bytes, " + output);
+            // BuildReport also counts auxiliary build outputs. Report the actual
+            // installable file size here, rather than labeling that total as APK.
+            Debug.Log("HORIZON APK: ARMv7 + ARM64, " + new FileInfo(output).Length + " bytes, " + output);
+            if (string.Equals(Argument("-horizonSmoke"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                if (release) throw new BuildFailedException("Android smoke is restricted to preview builds.");
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.X86_64;
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.liangliangliao.horizon.smoke");
+                const string smokePath = "artifacts/android-smoke/HORIZON-Smoke.apk";
+                Directory.CreateDirectory(Path.GetDirectoryName(smokePath));
+                BuildReport smoke = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = scenes, locationPathName = smokePath, target = BuildTarget.Android,
+                    options = BuildOptions.Development
+                });
+                if (smoke.summary.result != BuildResult.Succeeded)
+                    throw new BuildFailedException("Native Android smoke build failed: " + smoke.summary.result);
+                Debug.Log("HORIZON native smoke APK: " + smokePath);
+            }
+            Console.WriteLine("Build succeeded!");
         }
 
         private static void ConfigureSigning(bool release)

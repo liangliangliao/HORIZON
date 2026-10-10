@@ -1,7 +1,7 @@
 {
   "name": "Horizon.Runtime",
   "rootNamespace": "Horizon",
-  "references": [],
+  "references": ["Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime", "Unity.Cinemachine", "Unity.TextMeshPro", "Unity.Animation.Rigging"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
@@ -12,4 +12,3 @@
   "versionDefines": [],
   "noEngineReferences": false
 }
-

@@ -1,0 +1,1418 @@
+{
+  "schema_version": 1,
+  "specification_version": "1.0",
+  "audit_date": "2026-10-09",
+  "review_state": "complete",
+  "baseline_commit": "2f67718159bbf87cd1ba087b26c09d2d7febeed2",
+  "denominators": {
+    "reward": 22,
+    "animation": 28
+  },
+  "thresholds": {
+    "reward": 19,
+    "animation": 24
+  },
+  "counting_policy": {
+    "implementation_statuses": [
+      "passed",
+      "implemented_pending_acceptance"
+    ],
+    "acceptance_statuses": [
+      "passed"
+    ],
+    "partial_credit": false,
+    "must_pass_separately": true,
+    "old_v042_acceptance_excluded": true
+  },
+  "status_labels": {
+    "passed": "通过",
+    "implemented_pending_acceptance": "实现待验收",
+    "partial": "部分实现",
+    "missing": "未实现",
+    "nonconformant": "不符合"
+  },
+  "global_constraints": [
+    "动画只消费既有结算；不引入资源或独立经济。",
+    "演出倍率不得乘入实际收益。",
+    "跳过、关闭、取消、重播不得改变业务结果。",
+    "原解释必须保留；缺设备帧率不能写验收通过。",
+    "编译APK成功为独立交付条件，覆盖率不能替代。"
+  ],
+  "evidence_policy": "tests仅关联NUnit方法名，不代表已执行；当前提交XML/图形证据由独立report记录。视觉或设备要求不能以规则测试自动升级passed。",
+  "groups": [
+    {
+      "id": "R01",
+      "spec": "reward",
+      "title": "设计边界与领域事件接入",
+      "requirement": "RewardDirector 只消费现有玩法结果；Domain Event → 文案、3D 物体、VFX、数字、镜头、音频、触觉；动画不计算/增加资源，不反向控制玩法；不引入独立经济、资源或赌博",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/GameSession.Master.cs#Emit",
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/CinematicDirector.cs#Enqueue"
+      ],
+      "entrypoint": "Choose/Advance/RealityQuest.Complete → GameSession.Emit → queue → RewardDirector → CinematicDirector",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.RealActionClampingSurvivesObserversPlansSavesAndReplay",
+        "Horizon.Tests.CinematicRewardTests.DomainObserversReceiveAnIsolatedRewardReceipt",
+        "Horizon.Tests.CinematicPlayableTests.PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+    },
+    {
+      "id": "R02",
+      "spec": "reward",
+      "title": "三类奖励与共同表达",
+      "requirement": "既有资源、系统物件、里程碑三类可区分；所有实际奖励同时具有明确文案、可识别实体、概念一致动画；纪念物支持收藏/展示而不变成新属性",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#MaterialReward",
+        "Assets/Scripts/Game/RewardCollection.cs#Capture",
+        "Assets/Scripts/HorizonApp.RewardCollection.cs"
+      ],
+      "entrypoint": "已结算事件 → Archive.Repair/Capture → 奖励收藏页",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.AllSixResourceObjectsDescribeTheActualSignedReceipt",
+        "Horizon.Tests.CinematicRewardTests.MementosArePermanentDeduplicatedAndMigrateWithoutASecondEconomy",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+    },
+    {
+      "id": "R03",
+      "spec": "reward",
+      "title": "精力",
+      "requirement": "电芯进入角色胸前/状态核心，身体由疲劳恢复；1/2/5/10/20+ 分别体现电芯、并联、小组、大包、储能装置；高倍率升级核心并影响环境，不能只是大量复制小电池",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.LargeResourceReceiptsBecomeDevicesWithoutMultiplyingYield",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "电芯的实际数量与设备档位、电池包/储能/核心，逐次入体、状态灯和直立恢复。"
+    },
+    {
+      "id": "R04",
+      "spec": "reward",
+      "title": "专注",
+      "requirement": "单片/双片/完整聚焦装置；镜片归位、散光收束、失焦转清晰、干扰变暗；同步保留专注文案，方向不能做成散射",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonOpticsFeature.cs",
+        "Assets/Resources/HorizonOptics.shader",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.DepthFocusChangesRenderedPixelsAndClearsAfterSkipping"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-focus-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
+    },
+    {
+      "id": "R05",
+      "spec": "reward",
+      "title": "心情",
+      "requirement": "暖光灯/球被点亮，冷色到暖色、姿态放松、环境恢复色彩；高量多个灯依次点亮",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "灯具依次归位，舞台光由冷变暖，角色状态恢复。"
+    },
+    {
+      "id": "R06",
+      "spec": "reward",
+      "title": "金钱",
+      "requirement": "硬币/钱包/现金束/金库规模变化；小量飞入钱包，中量钱包打开收现金，大量保险箱打开；仍为原有金钱结果",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "硬币、钱包、现金束、金库及铰链开合/现金入袋。"
+    },
+    {
+      "id": "R07",
+      "spec": "reward",
+      "title": "关系",
+      "requirement": "至少玩家和 NPC 两个独立对象；实体环/纽带连接双方，光沿连接传播；多个提升形成关系网络；保留关系变化文字",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "双人连接、光沿连接传播、多NPC关系网。"
+    },
+    {
+      "id": "R08",
+      "spec": "reward",
+      "title": "能力",
+      "requirement": "零件悬浮自动组装成可识别工具；较大成长进入工具箱，体现空/半满/完整；保留能力文案",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "工具头/轴/接头由分散到装配并落入工具箱。"
+    },
+    {
+      "id": "R09",
+      "spec": "reward",
+      "title": "洞察",
+      "requirement": "棱镜折射后显露隐藏因果路径，并保留“获得新的洞察”含义",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSceneContractTests.InsightSourcesRevealInOrderWithoutOverlappingCaptions"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "真实因果证据通过棱镜光线逐条显露，原解释保持。"
+    },
+    {
+      "id": "R10",
+      "spec": "reward",
+      "title": "Horizon 视野",
+      "requirement": "望远装置展开，镜头/焦距推进或拉远，未来 Day+3、Day+7 由模糊变清晰",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "高台、望远装置、镜片机位与按真实视野等级开放的远期标签。"
+    },
+    {
+      "id": "R11",
+      "spec": "reward",
+      "title": "Prediction",
+      "requirement": "透明预测投影板，预测与真实轨迹分离存在；相近时重合、SYNCHRONIZED，与原解释同时出现",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues",
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday",
+        "Horizon.Tests.CinematicSceneContractTests.InsightSourcesRevealInOrderWithoutOverlappingCaptions"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "预测/实际六轴独立快照、透明双轨迹与校准/分叉演出。"
+    },
+    {
+      "id": "R12",
+      "spec": "reward",
+      "title": "Future Memory",
+      "requirement": "预演关键行为冻结并缩入胶片格，多帧形成胶卷；来自真实预演结果",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/Game/MemoryFrame.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.MemoryFilm.cs",
+        "Assets/Scripts/HorizonApp.Master.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.ActualImaginationFramesPersistAndRenderInTheFilmstrip",
+        "Horizon.Tests.RemainingRewardTests.MemoryFramesFollowRealBeatsAndCopiesCannotRewriteReceipts",
+        "Horizon.Tests.RemainingRewardTests.LegacyAndOversizedMemoryFramesDoNotBlockGameplayOrBecomeTextures"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/memory-*.jpg",
+        "artifacts/cinematics/remaining-memory-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
+    },
+    {
+      "id": "R13",
+      "spec": "reward",
+      "title": "Imagination",
+      "requirement": "投影机/核心启动；空白空间依次形成轮廓、街道/房间/人物/障碍/未来场景，角色进入 3D 投影世界",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.Projection.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Imagination.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.ProjectionMaterializesFiveLayersAndUsesCompiledShaderGraph"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-project*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
+    },
+    {
+      "id": "R14",
+      "spec": "reward",
+      "title": "Decision Lock",
+      "requirement": "已决定路线由机械锁/封印固定，其他路线降低亮度；保留“决定已锁定，进入执行阶段”解释；不是惩罚",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "机械锁扣合、其他路线变暗、沿锁定路线推进。"
+    },
+    {
+      "id": "R15",
+      "spec": "reward",
+      "title": "Trigger",
+      "requirement": "按实际情境表现为闹钟、钥匙、预约凭证、车票、倒计时；都映射同一既有 Trigger，不能成为新机制",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "既有Trigger映射闹钟、钥匙、预约、票据、倒计时等现实物件。"
+    },
+    {
+      "id": "R16",
+      "spec": "reward",
+      "title": "Recovery",
+      "requirement": "修复包逐段修补断裂路径，角色状态恢复，与现有 Comeback 连接",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "修复件逐段重建路径，角色重新站立和Comeback熟练度。"
+    },
+    {
+      "id": "R17",
+      "spec": "reward",
+      "title": "演出倍率及规模升级",
+      "requirement": "游戏收益与演出倍率分离；T1–T6 梯度完整；倍率影响物品规模/数量、粒子、音层、触觉、镜头、发光、角色、环境、接管强度；高倍率必须由实际事件重要性支持",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.RealActionClampingSurvivesObserversPlansSavesAndReplay",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "演出倍率控制物体缩放、20/50/100档电池组/储能/核心、场景供电、粒子、分层声效、触觉与镜头；实际收益独立。"
+    },
+    {
+      "id": "R18",
+      "spec": "reward",
+      "title": "六级奖励时长及稀有性",
+      "requirement": "Micro/Local/Combo/Major/Epic/Mythic 六级符合下表时长与事件边界；小资源不过度接管，Mythic 仅重大稀有事件",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardEngine.cs#Tier",
+        "Assets/Scripts/Game/RewardPresentation.cs#Duration"
+      ],
+      "entrypoint": "RewardEngine.Emit 为既有事件分级 → RewardDirector.Duration",
+      "tests": [
+        "Horizon.Tests.MasterSpecificationTests.RepeatedPatternBreakUsesActualPriorFailuresAndCapsMythicRewards",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+    },
+    {
+      "id": "R19",
+      "spec": "reward",
+      "title": "六类奖励导演迁移机制",
+      "requirement": "递进 CauseGraph 倍率、Overdrive 环境/音乐/角色升级、Orbit 逐个点亮、Reservoir 蓄力到真实突破、Future Self Cut-in、重大事件 Jackpot 均映射原机制；不使用捕鱼角色/素材",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.ExpansionContractTests.CascadeAndSingularityComeFromRealMergedActionsInLongLives",
+        "Horizon.Tests.ExpansionContractTests.OverdriveBuildsFromActualExecutionHasADailyCapAndExpires",
+        "Horizon.Tests.MasterInvariantTests.ReservoirPayoutHasSixRealParentsAndDoesNotRepeatOnReload",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "既有因果链、Overdrive、Orbit、Reservoir、FutureSelf与重大事件共用导演。"
+    },
+    {
+      "id": "R20",
+      "spec": "reward",
+      "title": "十类核心结果的奖励映射",
+      "requirement": "Prediction、TIME ECHO、CASCADE、Horizon 升级、Overdrive、Imagine Run 完成、Comeback、Pattern Broken、Reality Node、Reality Convergence 均有与原文表格相符的奖励物及演出；必须从真实事件可达",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/GameSession.Master.cs#Emit",
+        "Assets/Scripts/Game/RealityBridge.cs#Complete",
+        "Assets/Scripts/Game/RewardPresentation.cs#ObjectFor"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.RealityMovieContainsThreeExistingEvidenceIdsAndCannotBeFarmed",
+        "Horizon.Tests.CinematicRewardTests.PatternMovieUsesOnlyRecordedFailuresAndTheChosenAction",
+        "Horizon.Tests.CinematicRewardTests.TemporaryOverdriveDoesNotInventPermanentHorizonGrowth",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "保留现有规则与持久化契约，新增表现不参与结算。"
+    },
+    {
+      "id": "R21",
+      "spec": "reward",
+      "title": "Pattern Broken 最终奖励结构",
+      "requirement": "真实不同动作与历史中断线关联；递进展示旧失败线、破裂、当前线穿越；最终 PATTERN BROKEN 后出现断链纪念物；完整保留“过去多次在此中断。这一次，你继续了。”含义；×300/×500 只用于真实极高级 Pattern",
+      "priority": "P0，最高",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/GameSession.Master.cs#PatternBroken",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/Game/RewardCollection.cs#Capture",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.PatternMovieUsesOnlyRecordedFailuresAndTheChosenAction",
+        "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "12镜头、实际历史中断/新动作、递进演出倍率、穿越、碎裂及断链收藏。"
+    },
+    {
+      "id": "R22",
+      "spec": "reward",
+      "title": "Reality Convergence 最终奖励",
+      "requirement": "IMAGINATION、SIMULATION、REALITY 三节点及标签真实存在，转为三条 3D 能量流汇聚，形成三棱汇流纪念体；保留“想象→预演→真实发生”解释，不能用金币雨替代",
+      "priority": "P0，最高",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RealityBridge.cs#Complete",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs#RewardPrism",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.RealityMovieContainsThreeExistingEvidenceIdsAndCannotBeFarmed",
+        "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.DowngradedConvergenceRetainsThe200msSilence"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "三个独立标签节点、第三现实节点落下、0.2秒静音、三流汇聚与纪念体。"
+    },
+    {
+      "id": "A01",
+      "spec": "animation",
+      "title": "技术架构与业务隔离",
+      "requirement": "原文明定 Unity 6 LTS、URP、Cinemachine、Timeline/PlayableDirector、Animator、Animation Rigging、Particle System、Shader Graph、TextMeshPro、Tween、URP Volume/Renderer Feature、Haptics；CinematicDirector 仅接受原事件。若实际仓库采用别的引擎，应明确列为技术栈偏差，不能静默算此组通过",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "ProjectSettings/ProjectVersion.txt",
+        "Packages/manifest.json",
+        "Assets/Editor/CinematicPipeline.cs",
+        "Assets/Scripts/UI/CinematicDirector.cs",
+        "Assets/Resources/HorizonProjection.shadergraph",
+        "Assets/Scripts/UI/HorizonOpticsFeature.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Vfx.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicPlayableTests.PausingSkippingAndCancellingRestoreTheCameraAndLeaveRulesUntouched",
+        "Horizon.Tests.RemainingCinematicTests.ProjectionMaterializesFiveLayersAndUsesCompiledShaderGraph"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-project*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
+    },
+    {
+      "id": "A02",
+      "spec": "animation",
+      "title": "统一导演骨架与同步冲击",
+      "requirement": "Epic/Mythic 覆盖预兆、蓄力、升级、主体登场、Hit Stop、Impact、Multiplication、Second Reveal、Jackpot、Settlement、Return；同一撞击时点同步角色 Hit、粒子、白闪、镜头、触觉、低频音、倍率数字、环境光",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.EpicAndMythicShareOrderedDirectorGrammar",
+        "Horizon.Tests.CinematicRewardTests.PauseSlowFramesAndSkipNeverRepeatAnImpact",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "同一cue启动音/触/粒子/字幕闪光，统一时钟取样身体/光/镜头；无反向结算。"
+    },
+    {
+      "id": "A03",
+      "spec": "animation",
+      "title": "通用镜头语法",
+      "requirement": "远景展现道路/因果/未来；中景选择/行动/困难；近景关键动作；特写系统物件；Extreme Wide 仅 Pattern Broken、Reality Convergence、Causal Singularity",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.HiddenOriginsNeverInventARewindDate"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "明确Wide/Medium/Close/ObjectDetail/ExtremeWide分镜，最后一种仅三个最高事件。"
+    },
+    {
+      "id": "A04",
+      "spec": "animation",
+      "title": "六大概念的 3D 语言",
+      "requirement": "TIME 为前延道路/节点/轨道，过去在后未来在上/远；FORESIGHT 雾退清晰；IMAGINATION 现实冻结与线稿实体化；PATTERN 历史线同点中断；RECOVERY 重连/站起；REALITY 材质光线稳定有重量",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.HiddenProvenanceStaysHiddenInRewardMovies",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "道路与过去来源、雾退、投影轮廓、同点历史中断、修路恢复、有重量现实落点。"
+    },
+    {
+      "id": "A05",
+      "spec": "animation",
+      "title": "基础资源表演",
+      "requirement": "精力 5 电芯依次吸入并站直；专注 3 透镜依次归位清晰；心情冷转暖与自然呼吸；关系两人连通；能力零件成工具；与奖励方案同一实现及文案",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonOpticsFeature.cs",
+        "Assets/Scripts/UI/HorizonActorPerformance.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Experience.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.AllSixResourceObjectsDescribeTheActualSignedReceipt",
+        "Horizon.Tests.RemainingCinematicTests.DepthFocusChangesRenderedPixelsAndClearsAfterSkipping",
+        "Horizon.Tests.RemainingCinematicTests.BakedEffectsLodAndBodyBreathingRespectPauseAndReduction"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-focus-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
+    },
+    {
+      "id": "A06",
+      "spec": "animation",
+      "title": "出牌与未来节点",
+      "requirement": "长期卡向上推、变小、停在实际 Day 未来节点；即时卡快速影响当前角色/环境；带未来 Echo 的即时卡仍留下远方 Echo；上方未来、中央/下方当前",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/UI/HorizonWorld3D.cs#SendSymbol",
+        "Assets/Scripts/HorizonApp.cs#Choose",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "真实卡片提交 → Commit / SendSymbol(kind, dueDay)",
+      "tests": [
+        "Horizon.Tests.MasterPlayableFlowTests.PhoneCardIsRaycastableAndDragThroughEventSystemPlaysExactlyOnce",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "牌向上投放缩小并落在实际Day，所有未兑现行动含即时卡都保留远方3D Echo实体。"
+    },
+    {
+      "id": "A07",
+      "spec": "animation",
+      "title": "TIME ECHO 完整分镜",
+      "requirement": "按下表关键时序减速、退色、沿日序回溯、Hit Stop 找原行动；原行动解释重现，因果光逐节点从过去到现在，命中后展示原结果与奖励；因果归属解释保留 0.8–1.5 秒",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.HiddenProvenanceStaysHiddenInRewardMovies",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.HiddenOriginsNeverInventARewindDate"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "0.12/0.35/0.8/1.05分镜、按实际Day回溯、回到现在逐节点命中，尾部来源解释1.1秒。"
+    },
+    {
+      "id": "A08",
+      "spec": "animation",
+      "title": "Prediction 校准",
+      "requirement": "原预测文字、透明预测线、真实线皆存在；同步时镜头沿线、Hit Stop、棱镜、SYNCHRONIZED；不符时分叉、SURPRISE、镜头展示分叉点与解释，不渲染为红色失败惩罚",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.ObservationDesignTests.PredictionExplanationAddsUpToActualClampedResults",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.PredictionMoviesKeepSeparateImmutableExpectedAndActualValues",
+        "Horizon.Tests.CinematicSpecificationTests.InsightRevealDoesNotBorrowAnUnrelatedPredictionSettledToday",
+        "Horizon.Tests.CinematicSceneContractTests.InsightSourcesRevealInOrderWithoutOverlappingCaptions"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "原解释常驻，真实预测/实际数据绘制双线，同步短暂停顿和棱镜，差异使用金色分叉。"
+    },
+    {
+      "id": "A09",
+      "spec": "animation",
+      "title": "Horizon 成长",
+      "requirement": "角色高处、前方雾、望远器展开、镜头过镜片、揭示 Day+3/Day+7/概率节点，同步解释“现在可以看见”",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.TemporaryOverdriveDoesNotInventPermanentHorizonGrowth",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "真实等级控制远期标签，高台人物、镜头过光学装置和雾退。"
+    },
+    {
+      "id": "A10",
+      "spec": "animation",
+      "title": "Decision Lock",
+      "requirement": "其他未来路线保留且变暗，机械锁扣固定所选路线/轨道，解释执行阶段，镜头只沿当前线前行",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.MasterSpecificationTests.LockedDecisionRequiresExecutionAndSurvivesReload",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "锁扣、暗化备选、所选路径镜头。"
+    },
+    {
+      "id": "A11",
+      "spec": "animation",
+      "title": "Thought Monsters 四主题",
+      "requirement": "更好机会＝侧路更亮且信息不全；明天再说＝目标移远一天；完美计划＝路线持续分叉而人物不动；别人怎么看＝NPC 轮廓目光与评价；均保留原思想解释",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.Expedition.cs#ShowThought",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs#ShowThoughtScene",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "思想页 → ShowThoughtScene(thought.id)",
+      "tests": [
+        "Horizon.Tests.ExpeditionTests.EveryThoughtHasAReasonAndTradeoffRatherThanAThreat",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "更好机会侧路未知、明天目标逐格后移、完美计划分叉而不动、目光NPC围观。"
+    },
+    {
+      "id": "A12",
+      "spec": "animation",
+      "title": "Inner Council",
+      "requirement": "玩家居中、动机投影围成议会；大小、声音、亮度体现实际权重；明确数字；点击席位推进镜头并打开真实权重成因",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.Master.cs#ShowCouncil",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs#ShowCouncilScene",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "议会页 → InnerCouncil.Explain(session) → ShowCouncilScene / 席位真实来源页",
+      "tests": [
+        "Horizon.Tests.ExpeditionTests.CouncilWeightsHaveSixVoicesAndExplainEnvironmentMoneyAndFailure",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "按权重大小亮度的人物议会、数字、点击席位后镜头接近并显示实际成因。"
+    },
+    {
+      "id": "A13",
+      "spec": "animation",
+      "title": "Knowledge Forge",
+      "requirement": "保留 KNOW→RECOGNIZE→SIMULATE→EXECUTE→EXPERIENCE；可读知识文字变为熔炉拆解、真实情境、模拟、具体动作、最终工具",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.Expedition.cs#ShowKnowledge",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs#ShowForgeScene",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "知识页 → 当前 KnowledgeSkill → ShowForgeScene",
+      "tests": [
+        "Horizon.Tests.MasterSpecificationTests.KnowledgeCannotSkipFromKnowingToRealExperience",
+        "Horizon.Tests.ExpeditionTests.KnowledgeRequiresARealConditionAndAMatchingSimulationBeforeReality",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "文字入熔炉、情境障碍、未来身模拟、当前身操作、最终工具箱，受实际知识阶段约束。"
+    },
+    {
+      "id": "A14",
+      "spec": "animation",
+      "title": "Imagination Engine 11 场模板",
+      "requirement": "以下 11 场完整可播放且顺序/含义不变；角色有实际身体动作，非幻灯片；情境由既有主题、障碍、策略和系统状态驱动；失败后恢复、再战、改变策略不可省略；结尾 Future Memory 接奖励",
+      "priority": "P0，核心",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/ImaginationEngine.cs",
+        "Assets/Scripts/HorizonApp.Master.cs#ShowImagineRun",
+        "Assets/Scripts/UI/HorizonWorld3D.Imagination.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "预演入口 → ImaginationEngine 状态机 → ShowImagineRun → ShowImaginationScene",
+      "tests": [
+        "Horizon.Tests.MasterSpecificationTests.ImaginationCannotReachVictoryWithoutFailuresAndRecovery",
+        "Horizon.Tests.MasterSpecificationTests.ImaginationIsIsolatedUntilAnExplicitCompletedPathIsAttached",
+        "Horizon.Tests.CinematicPlayableTests.TransparentMasterPagesHideHomeAndRestoreItAfterRepeatedNavigation",
+        "Horizon.Tests.CinematicSceneContractTests.ElevenImaginationScenesKeepTheRealRecoveryChoicesAndPause",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "9个保存状态映射11场，具体身体动作与Rig，失败/恢复/再战/改变方法及最终汇流。"
+    },
+    {
+      "id": "A15",
+      "spec": "animation",
+      "title": "Comeback",
+      "requirement": "第一次再次行动犹豫，第二次熟练，第三次困难仍在但不停住；实际规则满足时才展示 ×2/×3，不凭动画制造成长",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "按真实韧性链缩短犹豫并逐渐熟练，第三次保留障碍。"
+    },
+    {
+      "id": "A16",
+      "spec": "animation",
+      "title": "Future Station",
+      "requirement": "安静、慢、干净的情绪停顿；接近 Future Self，当前 Run 重要 CauseGraph 路径显现，Future Self 指向路径且同步原解释",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.Experience.cs#RenderStationBeat",
+        "Assets/Scripts/UI/HorizonWorld3D.cs#ShowStation",
+        "Assets/Scripts/UI/HorizonWorld3D.Causality.cs#ShowCausalMemories",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "当前Run到达Station → RenderStationBeat → ShowCausalMemories / RevealMemoryNode",
+      "tests": [
+        "Horizon.Tests.CausalPresentationTests.StationContainsRealMultiSourceEdgesAndKeepsMysteryProvenanceHidden",
+        "Horizon.Tests.PlayableFlowTests.ActualStationNetworkAndMemoryPagesResumeAndNeverAwardResources",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "原有安静未来站和真实当前Run因果记忆，未来自己指向。"
+    },
+    {
+      "id": "A17",
+      "spec": "animation",
+      "title": "Future Orbit",
+      "requirement": "Future Self 居中、既有时间节点环绕、逐个点亮；真实多因果可快速连续亮；实际 ALL LINKED 才后拉揭示完整 Orbit",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "按真实bits逐个亮起，ALL LINKED独有全轨道后拉。"
+    },
+    {
+      "id": "A18",
+      "spec": "animation",
+      "title": "Causal Reservoir",
+      "requirement": "透明 3D 储存核、长期行为 Cause Energy 沿管线输入，亮度/活跃随积累提高；只有业务 BREAKTHROUGH 才打开，保留长期积累解释",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.Reservoir.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs#ShowReservoirScene",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "长期行动投资 → Reservoir突破事件；储备页只观察当前池",
+      "tests": [
+        "Horizon.Tests.MasterInvariantTests.ReservoirPayoutHasSixRealParentsAndDoesNotRepeatOnReload",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "真实投入数量驱动输入管线与亮度；查看储备不会打开核心，突破事件才打开。"
+    },
+    {
+      "id": "A19",
+      "spec": "animation",
+      "title": "Horizon Overdrive",
+      "requirement": "噪点降低、远处时间线清晰、隐藏因果线显现；达到原阈值后从角色后方拉远揭示未来空间，保留“短时间看得极清楚”说明",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.ExpansionContractTests.OverdriveBuildsFromActualExecutionHasADailyCapAndExpires",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "实际Overdrive触发，减少雾/噪点，显示真实因果网络，后方拉远并升级音/光。"
+    },
+    {
+      "id": "A20",
+      "spec": "animation",
+      "title": "CASCADE / Causal Singularity",
+      "requirement": "实际 CauseGraph 逐节点命中、光、声、小触觉；间隔 0.35→0.28→0.21→0.15 秒加速；末尾停 0.15 秒后全图亮；只有最高既有层级显示 Singularity 并快速拉远",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.CascadeAcceleratesAndStopsFor150msBeforeNetworkImpact",
+        "Horizon.Tests.ExpansionContractTests.CascadeAndSingularityComeFromRealMergedActionsInLongLives",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.SparseAndFullCascadeReceiptsKeepOrderedPhasesAnd150msSilence"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "真实节点0.35→0.28→0.21→0.15间隔，末节点后150ms停顿，全图点亮。"
+    },
+    {
+      "id": "A21",
+      "spec": "animation",
+      "title": "Pattern Broken 12 镜头",
+      "requirement": "下列 12 镜头完整；旧时间线同点断裂，角色用实际记录的新动作穿越，Hit Stop 完全静音，旧线碎裂、当前线延伸、Future Self 重现，解释保留、纪念物收藏",
+      "priority": "P0，最高",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.PatternMovieUsesOnlyRecordedFailuresAndTheChosenAction",
+        "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.PresentationLadderNeverMultipliesResourcesOrClaimsCausalDepth",
+        "Horizon.Tests.CinematicSpecificationTests.MythicBudgetDowngradeStillHasAPlayablePatternStoryboard",
+        "Horizon.Tests.CinematicSceneContractTests.RigEvaluationPreservesDirectorMovementAndProceduralBodyPose"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "完整12镜头独立于业务phase，预算降级亦可播放，完全静音、穿越旧断点、纪念物。"
+    },
+    {
+      "id": "A22",
+      "spec": "animation",
+      "title": "Reality Node",
+      "requirement": "Reality Quest 真实完成后实体节点从上落下，重击/落地感、坐标、明确建立文案；节点永久可见于 Reality Constellation",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "RealityQuest真实报告完成 → Complete → RealityNode事件 → 持久RealityConstellation",
+      "tests": [
+        "Horizon.Tests.MasterSpecificationTests.RealityQuestIsOncePerDateAndConvergenceNeedsAllThreeKindsOfEvidence",
+        "Horizon.Tests.CinematicRewardTests.MementosArePermanentDeduplicatedAndMigrateWithoutASecondEconomy",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "真实Quest完成产生落地实体、坐标标签与永久现实星座。"
+    },
+    {
+      "id": "A23",
+      "spec": "animation",
+      "title": "Reality Convergence",
+      "requirement": "左想象/中模拟/右现实三标签与时间线；前两线锁定、第三真实节点到达，音乐停约 0.2 秒，三流入中心形成三重汇流体、强光/后拉、完整因果解释",
+      "priority": "P0，最高",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/Game/RewardPresentation.cs#RewardDirector.Direct",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#SampleCinematic",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicRewardTests.RealityMovieContainsThreeExistingEvidenceIdsAndCannotBeFarmed",
+        "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages",
+        "Horizon.Tests.CinematicSpecificationTests.DowngradedConvergenceRetainsThe200msSilence"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "IMAGINATION/SIMULATION/REALITY实体标签、顺序锁定和0.2秒停顿后的三流汇聚。"
+    },
+    {
+      "id": "A24",
+      "spec": "animation",
+      "title": "Boss 既有思想主题",
+      "requirement": "舒适区＝柔软舒适而远方世界缩小；完美＝蓝图分叉但停步；明天＝目标逐格移远；目光＝NPC 视线但目标线仍在；另一个可能＝平行未来变亮干扰当前路线；不另造怪兽故事",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.Expedition.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs#ShowThoughtScene",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "既有思想/Boss入口 → 当前主题ID → ShowThoughtScene",
+      "tests": [
+        "Horizon.Tests.ExpeditionTests.EveryBossCanBePreparedRecoveredAndActuallyReached",
+        "Horizon.Tests.CinematicSceneContractTests.ResourceDevicesAndSystemScenesReuseWithoutLeakingTransforms"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "舒适座椅且远方缩小、蓝图分叉不动、目标后移、NPC目光与平行未来侧路。"
+    },
+    {
+      "id": "A25",
+      "spec": "animation",
+      "title": "永久可读的电影 UI",
+      "requirement": "重大演出顶部事件名、中部核心文案/思想、底部解释/选择；半透明安全区或环境压暗保证可读；电影不得遮掉文字",
+      "priority": "P0",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/HorizonApp.MasterFeedback.cs#PlayMasterSpectacle",
+        "Assets/Scripts/UI/CinematicCaption.cs",
+        "Assets/Scripts/UI/CinematicTypography.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicPlayableTests.RealPatternAndConvergenceProducePortraitFramesAndPersistentMementos",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "事件名、动态分镜文案、原始解释、实际收益独立且常驻，半透明安全区。"
+    },
+    {
+      "id": "A26",
+      "spec": "animation",
+      "title": "角色、时间、奖励、场景资产",
+      "requirement": "具备下表成体系的 HORIZON 自有 3D 资产，不用捕鱼素材；不是用相同抽象几何体/图标换名称冒充语义不同物品；真实生活场景而非仅金色抽象空间",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/UI/HorizonWorld3D.Art.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Imagination.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicStaging.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardDevices.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.SystemScenes.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.ExpeditionTests.FutureSelfVersionsUseActualCompletedLivesAndKeepTheirEvidence",
+        "Horizon.Tests.CinematicEvidenceTests.RealDomainEventsRetainCopyAndRenderDistinctPortraitStages"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/frames.json"
+      ],
+      "remaining": [
+        "待本提交Unity运行及人工视觉/声音/触觉验收；不以静态实现等同体验验收。"
+      ],
+      "review_note": "项目自有程序化角色、生活桌椅/书本/房间模块、道路/节点/物化道具与投影空间；美术精细度待人工验收。"
+    },
+    {
+      "id": "A27",
+      "spec": "animation",
+      "title": "至少 16 类特效",
+      "requirement": "下表 16 种效果可区别并按概念使用，不能用单一通用 Particle 仅改名称满足",
+      "priority": "P1",
+      "status": "implemented_pending_acceptance",
+      "source": [
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#MovieBurst",
+        "Assets/Scripts/UI/HorizonWorld3D.Art.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.Vfx.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.CinematicEffects.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.MemoryFilm.cs",
+        "Assets/Editor/CinematicAtlases.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.RemainingCinematicTests.SpecializedEffectsUseDifferentGeometryAndSurfaces",
+        "Horizon.Tests.RemainingCinematicTests.ActualImaginationFramesPersistAndRenderInTheFilmstrip",
+        "Horizon.Tests.RemainingCinematicTests.DepthFocusChangesRenderedPixelsAndClearsAfterSkipping"
+      ],
+      "runtime_evidence": [
+        "artifacts/cinematics/remaining-effect-*.png"
+      ],
+      "remaining": [
+        "当前提交须通过所列图形测试、截图审阅及 Android 原生验证；高品质美术与实际手机体验仍需人工验收。"
+      ],
+      "review_note": "2026-10-09：原缺失功能已补齐，细节见 docs/CINEMATIC_REMAINING_IMPLEMENTATION.md。只以当前提交实际执行结果计算自动化支持率。"
+    },
+    {
+      "id": "A28",
+      "spec": "animation",
+      "title": "移动性能与降级",
+      "requirement": "普通 60 FPS；重大演出优先 60、最低 30；对象池、实例化、低模、LOD、粒子预算、Flipbook/预渲染混用、阴影与透明叠加控制；档位仅降低高成本特效，低端仍保留镜头、节奏、主体动作、倍率、文字；用实际设备数据验证",
+      "priority": "P0",
+      "status": "partial",
+      "source": [
+        "Assets/Scripts/UI/HorizonWorld3D.Preferences.cs",
+        "Assets/Scripts/UI/HorizonWorld3D.RewardObjects.cs#rewardPool",
+        "Assets/Scripts/UI/HorizonWorld3D.Cinematics.cs#MovieBurst",
+        "Assets/Scripts/UI/HorizonWorld3D.Performance.cs",
+        "Assets/Scripts/Game/FramePerformance.cs",
+        "Assets/Editor/CinematicAtlases.cs",
+        "Assets/Scripts/HorizonApp.Performance.cs"
+      ],
+      "entrypoint": "对应真实 DomainEvent / 当前业务状态 → HorizonApp → HorizonWorld3D",
+      "tests": [
+        "Horizon.Tests.CinematicPlayableTests.LowQualityKeepsAllShotsObjectsAndCopyWithBoundedParticles",
+        "Horizon.Tests.RemainingCinematicTests.BakedEffectsLodAndBodyBreathingRespectPauseAndReduction",
+        "Horizon.Tests.RemainingRewardTests.FrameStatisticsUseElapsedTimeAndRetainHitches",
+        "Horizon.Tests.RemainingRewardTests.AdaptiveQualityNeedsSustainedPressureAndRecoversWithHysteresis"
+      ],
+      "runtime_evidence": [],
+      "remaining": [
+        "LOD、两套Flipbook、实时3D混用、分辨率/阴影/粒子自适应降级、场景帧率统计及报告导出已实现；缺少实际 Android 手机普通60 FPS/重大演出最低30 FPS数据。本组保留部分实现，不用模拟器或统计单元测试代替真机验收。"
+      ],
+      "review_note": "代码可复验；完整需求明确包含实际设备性能，取得合格真机数据前不计入完整组。"
+    }
+  ],
+  "review_limit": "代码按固定自然需求组审查；实现待验收不代表成熟美术品质或真机帧率合格。独立CI报告仅在对应检查实际通过后计入测试支持实现率。"
+}

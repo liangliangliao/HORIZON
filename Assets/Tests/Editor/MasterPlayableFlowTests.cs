@@ -37,7 +37,7 @@ namespace Horizon.Tests
             {
                 if (!Get<bool>(app, "busy") && Get<ArchiveData>(app, "archive").pendingFeedback == null && Get<GameSession>(app, "session").Day > fromDay) yield break;
                 var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b =>
-                    b.interactable && (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Next station beat"));
+                    b.interactable && (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
                 if (next != null) next.onClick.Invoke();
                 yield return new WaitForSecondsRealtime(0.15f);
             }
@@ -318,7 +318,7 @@ namespace Horizon.Tests
                     if (!sawBundle && archive.pendingFeedback?.kind == FeedbackKind.Echoes && archive.pendingFeedback.beats.Count > 1 && !Get<bool>(app, "busy"))
                     { sawBundle = true; yield return Capture(app, "60-grouped-time-echo"); }
                     var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.interactable &&
-                        (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Next station beat"));
+                        (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
                     if (next != null) { next.onClick.Invoke(); receipts++; }
                     yield return new WaitForSecondsRealtime(0.15f);
                 }
@@ -432,7 +432,7 @@ namespace Horizon.Tests
                     {
                         if (!Get<bool>(app, "busy") && Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Try another timeline")) break;
                         var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.interactable &&
-                            (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Next station beat"));
+                            (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
                         if (next != null) next.onClick.Invoke(); yield return new WaitForSecondsRealtime(0.15f);
                     }
                     Assert.Less(Time.realtimeSinceStartup, until);
@@ -466,6 +466,15 @@ namespace Horizon.Tests
             var cameraObject = new GameObject("Retained viewport", typeof(Camera)); Camera view = cameraObject.GetComponent<Camera>();
             view.enabled = false; view.rect = new Rect(0, 0.4f, 1, 0.5f);
             HorizonBloom bloom = cameraObject.AddComponent<HorizonBloom>(); bloom.Initialize(Resources.Load<Shader>("HorizonBloom")); Assert.IsTrue(bloom.IsSupported);
+            if (UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null)
+            {
+                Assert.IsTrue(cameraObject.GetComponent<UnityEngine.Rendering.Volume>().enabled);
+                bloom.enabled = false; Assert.IsFalse(cameraObject.GetComponent<UnityEngine.Rendering.Volume>().enabled);
+                bloom.enabled = true; Assert.IsTrue(cameraObject.GetComponent<UnityEngine.Rendering.Volume>().enabled);
+                world.BackgroundCamera.targetTexture = null; RenderTexture.active = previous;
+                source.Release(); target.Release(); Object.Destroy(source); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(cameraObject);
+                yield return new ExitPlayMode(); yield break;
+            }
             Material material = (Material)typeof(HorizonBloom).GetField("material", Private).GetValue(bloom); material.SetFloat("_Intensity", 0); material.SetFloat("_Echo", 0);
             Graphics.SetRenderTarget(target); GL.Viewport(new Rect(0, 160, 200, 200));
             typeof(HorizonBloom).GetMethod("DrawInViewport", Private).Invoke(bloom, new object[] { source, target });
@@ -518,7 +527,7 @@ namespace Horizon.Tests
             Assert.AreEqual(2, archive.imagination.RequiredFailures); Assert.AreEqual(2, archive.imagination.pathVersion);
             yield return Capture(app, "84-goal-specific-imagination");
             Call(app, "PlayMasterSpectacle", new DomainEvent { kind = DomainEventKind.PatternBroken, tier = RewardTier.Mythic,
-                title = "PATTERN\nBROKEN", detail = "过去的路停在这里。这次，你继续了。", multiplier = 3 }, (Action)ReturnToTestHome);
+                id = "preview:pattern", title = "PATTERN\nBROKEN", detail = "过去的路停在这里。这次，你继续了。", multiplier = 3 }, (Action)ReturnToTestHome);
             yield return new WaitForSecondsRealtime(1.5f); yield return Capture(app, "85-pattern-broken-timelines");
             yield return new ExitPlayMode();
         }
@@ -595,7 +604,7 @@ namespace Horizon.Tests
             foreach (Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer = 5;
             canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = camera; canvas.planeDistance = 5;
             world.BackgroundCamera.targetTexture = image; world.WorldCamera.targetTexture = image; world.SnapCamera(); yield return null; yield return null;
-            Canvas.ForceUpdateCanvases(); View.RefreshText(canvas.transform); world.BackgroundCamera.Render(); world.WorldCamera.Render(); camera.Render();
+            Canvas.ForceUpdateCanvases(); View.RefreshText(canvas.transform); HorizonPortraitRenderer.Render(world, camera, canvas, image);
             RenderTexture previous = RenderTexture.active; RenderTexture.active = image;
             var pixels = new Texture2D(1080, height, TextureFormat.RGB24, false); pixels.ReadPixels(new Rect(0, 0, 1080, height), 0, 0); pixels.Apply();
             string directory = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "visuals"); Directory.CreateDirectory(directory); File.WriteAllBytes(Path.Combine(directory, name + ".png"), pixels.EncodeToPNG());

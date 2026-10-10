@@ -43,6 +43,8 @@ namespace Horizon
             if (!CanPrepareMaster || !session.UsesExpedition) return;
             ThoughtMonster thought = session.ActiveThought;
             MasterPage("Thought encounter", "思维怪物 · " + thought.name, ShowExecution);
+            overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.1f);
+            world.ShowThoughtScene(thought.id);
             View.Label(overlay, "Thought rationale", "它有一部分合理性\n" + thought.reasonablePart + "\n\n也有代价\n" + thought.tradeoff, 34, Palette.Text, TextAnchor.UpperLeft, 0.08f, 0.48f, 0.92f, 0.84f);
             View.Label(overlay, "Thought perspective", session.WorldviewPerspective(session.Hand[1]), 25, Palette.Muted, TextAnchor.UpperLeft, 0.08f, 0.40f, 0.92f, 0.48f);
             View.Button(overlay, "Thought dialogue", "让这个念头说完，再作决定", () => ShowContentStudio(NarrativePurpose.Npc, thought.reasonablePart + " " + thought.tradeoff, ShowThoughtEncounter),
@@ -77,6 +79,8 @@ namespace Horizon
             KnowledgeSkill remembered = archive.knowledgeSkills.Find(k => k.id == skill.id);
             if (remembered != null && remembered.stage > skill.stage) skill = remembered;
             MasterPage("Knowledge forge", skill.principle, ShowMasterHub);
+            overlay.Find("Master shade").GetComponent<Image>().color=new Color(.009f,.023f,.04f,.1f);
+            world.ShowForgeScene(skill);
             View.Label(overlay, "Knowledge rule", "IF · " + skill.condition + "\nTHEN · " + skill.action, 33, Palette.Text, TextAnchor.MiddleLeft, 0.075f, 0.69f, 0.925f, 0.845f);
             string[] stages = { "KNOW · 我知道", "RECOGNIZE · 识别过情境", "SIMULATE · 实际用过一次", "EXECUTE · 亲自报告现实动作", "EXPERIENCE · 回顾后留下经验" };
             for (int i = 0; i < stages.Length; i++)

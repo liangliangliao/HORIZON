@@ -59,6 +59,9 @@ namespace Horizon
 
         private void OnApplicationPause(bool paused)
         {
+#if UNITY_ANDROID && DEVELOPMENT_BUILD
+            AndroidSmoke.NotePause(paused);
+#endif
             if (paused) { CancelAIRequest(); PersistLiveLife(); }
             if (world != null) world.SetPaused(paused || userPaused);
         }
@@ -73,9 +76,10 @@ namespace Horizon
             {
                 Button close = overlay.GetComponentsInChildren<Button>().Reverse().FirstOrDefault(b =>
                     b.interactable && (b.name.StartsWith("Close ") || b.name.StartsWith("Back ") ||
-                    b.name == "Close" || b.name == "Cancel" || b.name == "Leave story" || b.name == "Master back"));
+                    b.name == "Close" || b.name == "Cancel" || b.name == "Leave story" || b.name == "Master back" ||
+                    b.name == "Continue master event"));
                 if (close != null) { close.onClick.Invoke(); return; }
-                Destroy(overlay.gameObject); overlay = null; world.Focus(false); return;
+                CloseMasterPage(); world.Focus(false); return;
             }
             ShowSettings();
         }
@@ -115,7 +119,8 @@ namespace Horizon
                 0.51f, 0.269f, 0.925f, 0.332f, Palette.Panel, Palette.Mint, 26);
             string status = saveStore.Notice ?? "自动保留当前与上一份安全存档。";
             View.Label(overlay, "Storage status", status, 22, Palette.Muted,
-                TextAnchor.MiddleLeft, 0.075f, 0.183f, 0.925f, 0.25f);
+                TextAnchor.MiddleLeft, 0.075f, 0.183f, 0.67f, 0.25f);
+            View.Button(overlay,"Performance report","运行表现",ShowPerformance,.7f,.192f,.925f,.248f,Palette.Panel,Palette.Mint,23);
             View.Button(overlay, "Close settings", "继续这段人生", CloseSettings,
                 0.075f, 0.085f, 0.925f, 0.161f, Palette.Mint, Palette.Ink, 31);
             if (archive.runs.Count > 0) View.Button(overlay, "Home from settings", "回到地平线", () =>

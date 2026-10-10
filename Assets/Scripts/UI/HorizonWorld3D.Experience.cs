@@ -66,6 +66,15 @@ namespace Horizon.UI
                 if (action != null && action.echoed)
                     Ring(timelineGroup, "Returned day " + day, DayPoint(day) + Vector3.up * 0.05f, 0.2f, glass, false);
             }
+            if(actions!=null) foreach(ActionRecord scheduled in actions)
+                if(!scheduled.echoed && scheduled.echoDay>scheduled.day && scheduled.echoDay<=timelineLength)
+                {
+                    Vector3 future=DayPoint(scheduled.echoDay)+Vector3.up*.3f;
+                    Transform seed=IntentionSymbol(scheduled.kind,future,scheduled.givesSupport);
+                    seed.SetParent(timelineGroup,true); seed.name="Pending echo D"+scheduled.echoDay+" from D"+scheduled.day;
+                    seed.localScale=Vector3.one*.13f;
+                    CausalLine(timelineGroup,"Scheduled future trace",DayPoint(scheduled.day),future,glass,.015f);
+                }
             BuildTimelineLinks(actions);
         }
 
@@ -281,7 +290,7 @@ namespace Horizon.UI
 
     public sealed class HorizonActor : MonoBehaviour
     {
-        public Transform Head, LeftArm, RightArm, LeftLeg, RightLeg, LeftEye, RightEye;
+        public Transform Head, Chest, LeftArm, RightArm, LeftLeg, RightLeg, LeftEye, RightEye;
         public GameObject Phone, Book;
         public bool Walking, Pointing;
         public float MotionRate = 1, FreezeUntil, TiredUntil;
@@ -291,11 +300,22 @@ namespace Horizon.UI
         public void SetIntent(CardKind kind)
         { intent = (int)kind; Phone.SetActive(kind == CardKind.Temptation); Book.SetActive(kind == CardKind.Growth); }
         public void Celebrate() { cheer = 1; }
+        public void SampleBreath(float seconds,float relaxation=0)
+        {
+            if(Chest==null) return;
+            float breath=VisualPreferences.ReducedMotion?0:Mathf.Sin(seconds*(relaxation>0?1.2f:1.8f));
+            Chest.localScale=new Vector3(1+breath*.004f,1+breath*.01f,.78f+breath*.014f);
+            Vector3 head=Head.localPosition; head.y=1.66f+breath*.008f-relaxation*.012f; Head.localPosition=head;
+            Vector3 left=LeftArm.localPosition,right=RightArm.localPosition;
+            left.y=right.y=1.3f+breath*.004f-relaxation*.025f;
+            LeftArm.localPosition=left; RightArm.localPosition=right;
+        }
         private void Update()
         {
-            if (Head == null || Time.unscaledTime < FreezeUntil) return;
+            if (Head == null || MotionRate <= 0 || VisualPreferences.Paused || Time.unscaledTime < FreezeUntil) return;
             float dt = Time.unscaledDeltaTime * MotionRate;
             phase += dt; cheer = Mathf.MoveTowards(cheer, 0, dt * 0.8f);
+            SampleBreath(phase);
             float step = Walking ? Mathf.Sin(phase * 8) * 26 : Mathf.Sin(phase * 1.8f) * 3;
             float arm = intent == 0 ? 52 : intent == 1 ? 28 : 0;
             LeftArm.localRotation = Quaternion.Euler(arm + step + cheer * 55, 0, -5 - cheer * 20);

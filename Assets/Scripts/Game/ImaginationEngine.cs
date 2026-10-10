@@ -21,7 +21,8 @@ namespace Horizon.Game
         public string id, goalId, goal, context, actionKey, text, imaginationNodeId, simulationNodeId;
         public int value = 1, imaginationRun, simulationRun, simulationDay;
         public bool recalled;
-        public FutureMemory Copy() { return (FutureMemory)MemberwiseClone(); }
+        public MemoryFrame frame;
+        public FutureMemory Copy() { var c=(FutureMemory)MemberwiseClone(); c.frame=frame?.Copy(); return c; }
     }
     [Serializable]
     public sealed class ImagineRun
@@ -35,9 +36,10 @@ namespace Horizon.Game
         public ImaginePhase phase;
         public List<ImagineBeat> timeline = new List<ImagineBeat>();
         public List<FutureMemory> memories = new List<FutureMemory>();
+        public List<MemoryFrame> frames = new List<MemoryFrame>();
         public int RequiredFailures { get { return plannedFailures > 0 ? plannedFailures : difficulty == 1 ? 1 : difficulty + 1; } }
         public ImagineRun Copy()
-        { var c = (ImagineRun)MemberwiseClone(); c.timeline = timeline.Select(b => b.Copy()).ToList(); c.memories = memories.Select(m => m.Copy()).ToList(); return c; }
+        { var c = (ImagineRun)MemberwiseClone(); c.timeline = timeline.Select(b => b.Copy()).ToList(); c.memories = memories.Select(m => m.Copy()).ToList(); c.frames=MemoryFrame.CopyFrames(frames); return c; }
         public void Validate()
         {
             if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(goalId) || string.IsNullOrWhiteSpace(goal) || goal.Length > 100 ||

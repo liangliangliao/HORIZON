@@ -50,13 +50,14 @@ namespace Horizon.UI
             var cameraObject = new GameObject("HORIZON 3D Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(transform, false);
             WorldCamera = cameraObject.GetComponent<Camera>();
+            optics = cameraObject.AddComponent<HorizonOptics>();
             WorldCamera.depth = 0;
             WorldCamera.clearFlags = CameraClearFlags.SolidColor;
             WorldCamera.nearClipPlane = 0.1f;
             WorldCamera.farClipPlane = 80;
             WorldCamera.fieldOfView = 43;
             WorldCamera.allowHDR = false;
-            WorldCamera.allowMSAA = true;
+            WorldCamera.allowMSAA = SceneMsaaEnabled;
             WorldCamera.cullingMask = ~(1 << 5);
             key = new GameObject("Warm key light", typeof(Light)).GetComponent<Light>();
             key.transform.SetParent(transform, false);
@@ -67,7 +68,7 @@ namespace Horizon.UI
             key.shadowStrength = 0.6f;
             QualitySettings.shadowDistance = 22;
             QualitySettings.shadows = ShadowQuality.All;
-            QualitySettings.antiAliasing = 2;
+            QualitySettings.antiAliasing = SceneMsaaEnabled ? 2 : 0;
             RenderSettings.ambientLight = new Color(0.23f, 0.29f, 0.39f);
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.fog = true;
@@ -111,6 +112,7 @@ namespace Horizon.UI
             sounds.Add(Tone("Impact", new[] { 160f, 110f, 70f }, 0.25f));
             sounds.Add(Tone("Cascade", new[] { 440f, 554f, 660f, 880f, 1108f, 1320f }, 0.7f));
             InitializeAtmosphere();
+            InitializeCinematics();
             SetTheme(0);
             ShowBoard();
             SnapCamera();
@@ -239,6 +241,7 @@ namespace Horizon.UI
 
         public void SnapCamera()
         {
+            if (moviePlan != null || imaginationSceneActive) return;
             WorldCamera.transform.position = cameraPosition;
             WorldCamera.transform.LookAt(cameraLook);
         }
@@ -246,6 +249,7 @@ namespace Horizon.UI
         private void Update()
         {
             if (WorldCamera == null || paused) return;
+            if (Cinematics != null && Cinematics.IsPlaying || imaginationSceneActive) return;
             UpdateInsight();
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);
@@ -341,7 +345,7 @@ namespace Horizon.UI
             Transform person = Group(name, parent);
             person.localPosition = position;
             var actor = person.gameObject.AddComponent<HorizonActor>();
-            Sculpt(person, "Tailored coat", coatMesh, new Vector3(0,0.67f,0), new Vector3(1,1,0.78f), coat);
+            actor.Chest = Sculpt(person, "Tailored coat", coatMesh, new Vector3(0,0.67f,0), new Vector3(1,1,0.78f), coat);
             Box(person, "Jacket seam", new Vector3(0, 1.05f, -0.218f), new Vector3(0.02f, 0.58f, 0.02f), dark);
             for (int button = 0; button < 3; button++)
                 Shape(person, "Jacket button", PrimitiveType.Sphere, new Vector3(0.035f, 0.86f + button * 0.16f, -0.226f), Vector3.one * 0.035f, gold);
@@ -383,6 +387,7 @@ namespace Horizon.UI
             Soft(person, "Left collar", new Vector3(-0.12f,1.34f,-0.21f), new Vector3(0.17f,0.16f,0.08f), ivory);
             Soft(person, "Right collar", new Vector3(0.12f,1.34f,-0.21f), new Vector3(0.17f,0.16f,0.08f), ivory);
             actor.SetNeutral();
+            ConfigureActorLod(person,coat);
             return person;
         }
 
@@ -453,6 +458,7 @@ namespace Horizon.UI
             var material = new Material(Resources.Load<Shader>("HorizonLit"));
             material.SetColor("_Color", color);
             material.SetColor("_Emission", emission);
+            material.enableInstancing = true;
             materials.Add(material);
             return material;
         }
@@ -460,6 +466,7 @@ namespace Horizon.UI
         {
             var material = new Material(Resources.Load<Shader>("HorizonGlow"));
             material.SetColor("_Color", color);
+            material.enableInstancing = true;
             materials.Add(material);
             return material;
         }
@@ -482,6 +489,8 @@ namespace Horizon.UI
 
         private void OnDestroy()
         {
+            RestoreRenderQuality();
+            ClearMemoryTextures();
             foreach (Material material in materials) Dispose(material);
             foreach (AudioClip sound in sounds) Dispose(sound);
             foreach (Mesh mesh in sculptures) Dispose(mesh);

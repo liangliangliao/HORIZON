@@ -1,7 +1,7 @@
 {
   "name": "Horizon.Tests.Editor",
   "rootNamespace": "Horizon.Tests",
-  "references": ["Horizon.Runtime"],
+  "references": ["Horizon.Runtime", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
@@ -13,4 +13,3 @@
   "optionalUnityReferences": ["TestAssemblies"],
   "noEngineReferences": false
 }
-

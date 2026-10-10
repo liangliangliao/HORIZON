@@ -10,8 +10,9 @@ namespace Horizon.Game
         public bool UsesMasterRules { get { return CatalogVersion >= 7; } }
         public event Action<DomainEvent> DomainEventRaised;
         public int MasterHorizon
-        { get { if (!UsesMasterRules) return HorizonLevel; int[] thresholds = { 0, 4, 12, 22, 36, 50, 70, 90 };
-            int level = thresholds.Count(v => Master.insightPoints >= v); return Math.Min(8, level + (Day <= Master.overdriveUntilDay ? 2 : 0)); } }
+        { get { return Math.Min(8, BaseMasterHorizon + (UsesMasterRules && Day <= Master.overdriveUntilDay ? 2 : 0)); } }
+        private int BaseMasterHorizon
+        { get { if (!UsesMasterRules) return HorizonLevel; int[] thresholds = { 0, 4, 12, 22, 36, 50, 70, 90 }; return thresholds.Count(v => Master.insightPoints >= v); } }
         public bool InExecutionMode { get { return UsesMasterRules && Master.decision != null && Master.decision.day == Day &&
             Master.decision.status != DecisionStatus.Unlocked && Master.decision.status != DecisionStatus.Completed; } }
 
@@ -37,6 +38,7 @@ namespace Horizon.Game
             KnowledgeSkill learned = knowledge?.FirstOrDefault(k => k.id == "face"); if (learned != null) Master.knowledge[0] = learned.Copy();
             Master.initialKnowledge = Master.knowledge.Select(k => k.Copy()).ToList();
             Master.resources.Add(new ResourceSample { day = Day, values = Values() });
+            Master.presentationHorizon = BaseMasterHorizon;
             RefreshEngine();
             InitializeExpedition();
             if (UsesExpedition && knowledge != null)
@@ -57,13 +59,32 @@ namespace Horizon.Game
             Master.engine.socialPressure = Master.triggers.Contains("promise") || Master.triggers.Contains("friend") ? 2 : 0;
             RefreshExpeditionEngine();
         }
-        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0)
+        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null, PredictionRecord prediction = null, IEnumerable<MemoryFrame> frames = null)
         {
-            DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain);
+            RewardReceipt receipt = RewardReceipt.Capture(kind, node, CausalNodes, Master.orbitBits, MasterHorizon, Master.triggers.LastOrDefault());
+            receipt.frames = MemoryFrame.CopyFrames(frames);
+            if (sourceDay > 0 && node?.originHidden != true) receipt.sourceDay = sourceDay;
+            if (actionText != null && node?.originHidden != true) receipt.action = actionText;
+            if (kind == DomainEventKind.TimeEcho && node?.originHidden == true) detail = "一条回声已经抵达，来路暂未清晰。";
+            if (kind == DomainEventKind.HorizonChanged) receipt.horizonLevel = BaseMasterHorizon;
+            if (kind == DomainEventKind.OrbitActivated) receipt.orbitIndex = Array.FindIndex(MasterSpecification.OrbitNames, name => title.EndsWith(name, StringComparison.Ordinal));
+            if (prediction != null)
+            {
+                receipt.predictionRecorded = true; receipt.predictionResolved = prediction.evaluated;
+                receipt.predicted = new ResourceDelta(prediction.energy, prediction.mood, prediction.insight, prediction.relation, prediction.money, prediction.ability);
+                receipt.actual = new ResourceDelta(prediction.actualEnergy, prediction.actualMood, prediction.actualInsight, prediction.actualRelation, prediction.actualMoney, prediction.actualAbility);
+            }
+            DomainEvent e = RewardEngine.Emit(Master, RunNumber, Day, kind, node?.id, title, detail, chain, receipt);
             // Optional observers cannot alter a transaction or prevent a choice from completing.
             var handlers = DomainEventRaised;
             if (handlers != null) foreach (Action<DomainEvent> handler in handlers.GetInvocationList())
                 try { handler(e.Copy()); } catch (Exception) { /* Presentation failure does not change rules. */ }
+            if (kind != DomainEventKind.HorizonChanged && BaseMasterHorizon > Master.presentationHorizon)
+            {
+                Master.presentationHorizon = BaseMasterHorizon;
+                Emit(DomainEventKind.HorizonChanged, node, "HORIZON " + BaseMasterHorizon,
+                    "你现在可以看见：" + MasterSpecification.HorizonNames[BaseMasterHorizon - 1] + "。视野成长扩大信息范围。");
+            }
             return e;
         }
         private CausalNode MasterNode(CausalNodeKind kind, string label, string parent = null, ResourceDelta effect = null)
@@ -179,7 +200,7 @@ namespace Horizon.Game
             }
             Command("imagine", imagination: run);
             CausalNode last = CausalNodes.Find(n => n.id == parent);
-            Master.insightPoints += run.recovered; Emit(DomainEventKind.FutureMemory, last, "FUTURE MEMORY", "你预演了 " + run.failures + " 次失败，也练习了 " + run.recovered + " 次重新开始。");
+            Master.insightPoints += run.recovered; Emit(DomainEventKind.FutureMemory, last, "FUTURE MEMORY", "你预演了 " + run.failures + " 次失败，也练习了 " + run.recovered + " 次重新开始。", frames:run.frames);
         }
         public void RecognizeKnowledge()
         {
@@ -267,7 +288,7 @@ namespace Horizon.Game
                     CausalNode imagined = memory.imaginationRun == RunNumber ? CausalNodes.Find(x => x.id == memory.imaginationNodeId && x.type == CausalNodeKind.Imagination) : null;
                     if (imagined == null) imagined = MasterNode(CausalNodeKind.Memory, "Future Memory · " + memory.text);
                     CausalGraph.Link(n, imagined.id);
-                    Emit(DomainEventKind.DejaVu, n, "YOU HAVE SEEN\nTHIS BEFORE", memory.text); break;
+                    Emit(DomainEventKind.DejaVu, n, "YOU HAVE SEEN\nTHIS BEFORE", memory.text, frames: new[] { memory.frame }); break;
                 }
             KnowledgeSkill skill = Master.knowledge[0];
             if (skill.stage == KnowledgeStage.Recognize && (card.GivesSupport || card.Id == "again" || card.Id == "forge"))
@@ -286,7 +307,7 @@ namespace Horizon.Game
             if (!UsesMasterRules) return;
             CausalNode n = CausalNodes.Find(x => x.id == echo.nodeId);
             int chain = EchoChainSize(echo);
-            Emit(DomainEventKind.TimeEcho, n, "TIME ECHO", "D" + echo.sourceDay + " 的「" + echo.cardName + "」回来了。", chain);
+            Emit(DomainEventKind.TimeEcho, n, "TIME ECHO", "D" + echo.sourceDay + " 的「" + echo.cardName + "」回来了。", chain, echo.sourceDay, echo.cardName);
             if (chain >= (UsesExpedition && Day <= Master.overdriveUntilDay ? 4 : 5)) { Master.insightPoints += 2; Emit(chain >= 9 ? DomainEventKind.CausalSingularity : DomainEventKind.Cascade, n,
                 chain >= 9 ? "CAUSAL SINGULARITY" : "CASCADE ×" + chain, "过去多个选择形成了真实因果路径。", chain); }
             if (UsesExpedition && Day <= Master.overdriveUntilDay && chain >= 4)
@@ -330,7 +351,7 @@ namespace Horizon.Game
             RefreshEngine(); RecordResourceSample();
         }
         private void MasterPredictionLocked()
-        { if (!UsesMasterRules) return; CausalNode n = MasterNode(CausalNodeKind.Prediction, "LOCK PREDICTION · D" + Prediction.dueDay); ChargeOverdrive(8, n); Emit(DomainEventKind.PredictionLocked, n, "LOCK PREDICTION"); }
+        { if (!UsesMasterRules) return; CausalNode n = MasterNode(CausalNodeKind.Prediction, "LOCK PREDICTION · D" + Prediction.dueDay); ChargeOverdrive(8, n); Emit(DomainEventKind.PredictionLocked, n, "LOCK PREDICTION", prediction: Prediction); }
         private void MasterPredictionEvaluated(PredictionRecord p)
         {
             if (!UsesMasterRules) return;
@@ -338,7 +359,7 @@ namespace Horizon.Game
             CausalNode n = MasterNode(CausalNodeKind.Prediction, p.accurate ? "SYNCHRONIZED" : "SURPRISE", origin?.id);
             foreach (CausalNode cause in CausalNodes.FindAll(x => x.effectRecorded && x.day >= p.sourceDay && x.day <= p.dueDay)) CausalGraph.Link(n, cause.id);
             Master.insightPoints += p.accurate ? 2 : 1; ChargeOverdrive(8, n); Emit(p.accurate ? DomainEventKind.Synchronized : DomainEventKind.Surprise, n,
-                p.accurate ? "SYNCHRONIZED" : "SURPRISE", "对照差异，再看看过去的哪些行动回来了。");
+                p.accurate ? "SYNCHRONIZED" : "SURPRISE", "对照差异，再看看过去的哪些行动回来了。", prediction: p);
         }
         private void MasterComplete(BossResult boss)
         {

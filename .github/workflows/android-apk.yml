@@ -10,17 +10,25 @@ on:
       - codex/unity-prototype-v0-3
       - codex/playable-feedback-3d
   workflow_dispatch:
+    inputs:
+      native_check_run:
+        description: 'Retained native APK run ID for diagnosis; leaves ordinary APK publication to the full workflow'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
   checks: write
+  actions: read
 
 concurrency:
-  group: android-apk-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: android-apk-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ inputs.native_check_run || 'full' }}
   cancel-in-progress: true
 
 jobs:
   parallel-lives:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -39,6 +47,7 @@ jobs:
           name: HORIZON-Parallel-Service-Results
           path: artifacts/services/parallel-lives.xml
   ai-gateway:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -57,6 +66,7 @@ jobs:
           name: HORIZON-Gateway-Service-Results
           path: artifacts/services/ai-gateway.xml
   rules:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -77,6 +87,7 @@ jobs:
             artifacts/playability/
           retention-days: 14
   test:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     needs: [ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -101,10 +112,19 @@ jobs:
           docker-images: false
           swap-storage: true
 
+      - name: Restore pinned editor video codec archive
+        id: editor_codec_cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/horizon-ffmpeg.tar.xz
+          key: horizon-ffmpeg-static-abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67-v1
+
       - name: Prepare pinned editor video codec
         shell: bash
         run: |
-          curl -fL --retry 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          if [ ! -s /tmp/horizon-ffmpeg.tar.xz ]; then
+            curl -fL --connect-timeout 15 --max-time 180 --retry 4 --retry-all-errors --retry-delay 2 -o /tmp/horizon-ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          fi
           echo 'abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67  /tmp/horizon-ffmpeg.tar.xz' | sha256sum -c -
           mkdir -p tools/media
           tar -xJf /tmp/horizon-ffmpeg.tar.xz -C /tmp --wildcards '*/ffmpeg' '*/ffprobe'
@@ -114,17 +134,20 @@ jobs:
         id: tests
         uses: game-ci/unity-test-runner@v4
         env:
+          # Personal uses account activation on ephemeral runners; an old .ulf
+          # takes precedence and fails Unity 6 timestamp/machine validation.
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          unityVersion: 2022.3.22f1
+          unityVersion: 6000.0.62f1
+          cliVersion: v0.1.72
           testMode: EditMode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           customParameters: -force-glcore
 
       - name: Upload EditMode results
-        if: always()
+        if: always() && steps.tests.outputs.artifactsPath != ''
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-EditMode-Results
@@ -136,7 +159,20 @@ jobs:
 
       - name: Publish honest chapter-by-chapter execution evidence
         if: always()
-        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
+        run: python3 tools/build_product_acceptance.py --results "${{ steps.tests.outputs.artifactsPath || 'artifacts' }}" --output "${{ runner.temp }}/HORIZON-product-acceptance.json" --enforce
+
+      - name: Verify reward and cinematic specifications independently
+        if: always()
+        run: python3 tools/report_cinematic_acceptance.py --results "${{ steps.tests.outputs.artifactsPath || 'artifacts' }}" --output "${{ runner.temp }}/HORIZON-cinematic-acceptance.json" --enforce
+
+      - name: Upload reward and cinematic requirement evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Cinematic-Specification-Acceptance
+          path: ${{ runner.temp }}/HORIZON-cinematic-acceptance.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload product acceptance report
         if: always()
@@ -222,6 +258,8 @@ jobs:
           test -s artifacts/visuals/71-story-home.png
           test -s artifacts/visuals/72-tall-phone-board.png
           test -s artifacts/visuals/73-tall-phone-home.png
+          test -s artifacts/visuals/90-pattern-3d.png
+          test -s artifacts/visuals/91-reality-convergence-3d.png
 
       - name: Decode and verify actual Unity GIF exports
         shell: bash
@@ -258,7 +296,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Upload cinematic reward portrait previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Cinematic-Reward-Previews
+          path: |
+            artifacts/visuals/9[01]-*.png
+            artifacts/cinematics/
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.native_check_run == ''
     needs: [rules, test, ai-gateway, parallel-lives]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -268,14 +318,13 @@ jobs:
 
       - name: Check Unity activation secrets
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         shell: bash
         run: |
-          if [[ -z "$UNITY_EMAIL" || -z "$UNITY_PASSWORD" || ( -z "$UNITY_LICENSE" && -z "$UNITY_SERIAL" ) ]]; then
-            echo '::error title=Unity activation required::Set UNITY_EMAIL and UNITY_PASSWORD, plus UNITY_LICENSE (Personal) or UNITY_SERIAL (Pro), in repository Actions secrets.'
+          if [[ -z "$UNITY_EMAIL" || -z "$UNITY_PASSWORD" ]]; then
+            echo '::error title=Unity activation required::Set UNITY_EMAIL and UNITY_PASSWORD in repository Actions secrets. Personal activates online; Pro also uses UNITY_SERIAL.'
             exit 1
           fi
 
@@ -291,18 +340,18 @@ jobs:
           swap-storage: true
 
       - name: Build Android APK
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v6.0.0
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          unityVersion: 2022.3.22f1
+          unityVersion: 6000.0.62f1
+          cliVersion: v0.1.72
           targetPlatform: Android
           buildMethod: Horizon.Editor.AndroidBuild.Build
           androidExportType: androidPackage
-          customParameters: -horizonChannel preview -horizonVersion 0.4.2 -horizonBuildNumber ${{ github.run_number }}
+          customParameters: -horizonChannel preview -horizonVersion 0.4.2 -horizonBuildNumber ${{ github.run_number }} -horizonSmoke true
 
       - name: Verify APK output
         shell: bash
@@ -324,10 +373,113 @@ jobs:
           PY
           python3 tools/verify_preview_apk.py build
 
+
+      - name: Enable Android emulator acceleration
+        shell: bash
+        run: |
+          # Unity's root container can create the shared Android state directory.
+          # The host emulator action must be able to create its own AVD there.
+          android_state_dir="$HOME/.android"
+          sudo mkdir -p "$android_state_dir"
+          sudo chown -R -- "$(id -u):$(id -g)" "$android_state_dir"
+          sudo chown -R -- "$(id -u):$(id -g)" artifacts/android-smoke
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Retain the internal native check APK for diagnosis
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Internal-Native-Check-APK
+          path: artifacts/android-smoke/HORIZON-Smoke.apk
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Verify actual Android display and navigation
+        uses: ReactiveCircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed # v2.34.0
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 tools/run_android_smoke.py
+
+      - name: Decode native Android screen captures
+        shell: bash
+        run: |
+          python3 -m venv /tmp/horizon-native-verification
+          /tmp/horizon-native-verification/bin/python -m pip install pillow==12.3.0
+          /tmp/horizon-native-verification/bin/python tools/verify_android_smoke.py
+
+      - name: Upload native Android display evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Native-Android-Display
+          path: artifacts/android-smoke/device/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Android-APK
           path: build/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  native-recheck:
+    if: github.event_name == 'workflow_dispatch' && inputs.native_check_run != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify retained APK source and previous checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_SOURCE_RUN: ${{ inputs.native_check_run }}
+        run: python3 tools/verify_native_recheck_source.py "$NATIVE_SOURCE_RUN"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: HORIZON-Internal-Native-Check-APK
+          path: artifacts/android-smoke
+          run-id: ${{ inputs.native_check_run }}
+          github-token: ${{ github.token }}
+
+      - name: Enable Android emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify actual Android display and navigation
+        uses: ReactiveCircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed # v2.34.0
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 tools/run_android_smoke.py
+
+      - name: Decode native Android screen captures
+        run: |
+          python3 -m venv /tmp/horizon-native-verification
+          /tmp/horizon-native-verification/bin/python -m pip install pillow==12.3.0
+          /tmp/horizon-native-verification/bin/python tools/verify_android_smoke.py
+
+      - name: Upload native Android recheck evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Native-Android-Recheck
+          path: artifacts/android-smoke/device/
           if-no-files-found: error
           retention-days: 14
