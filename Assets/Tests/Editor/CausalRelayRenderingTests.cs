@@ -84,6 +84,7 @@ namespace Horizon.Tests
                     foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                     canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                     float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
+                    string lossless="artifacts/cinematics/frames-"+kind; Directory.CreateDirectory(lossless);
                     using(var stream=File.Create("artifacts/cinematics/causal-relays-"+kind+".gif"))
                     using(var gif=new TimelineGifWriter(stream,540,960))
                     {
@@ -92,6 +93,9 @@ namespace Horizon.Tests
                             if(frame>0) world.Cinematics.Advance(duration/frames);
                             Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target); RenderTexture.active=target;
                             pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); gif.Frame(pixels.GetPixels32(),5);
+                            // Preserve the actual camera's full color depth for
+                            // MP4 review; the compact GIF has a limited palette.
+                            File.WriteAllBytes(Path.Combine(lossless,"frame-"+frame.ToString("D5")+".png"),pixels.EncodeToPNG());
                             float heroTime=new RewardSpectacle(world.Cinematics.Current).HeroTime;
                             if(frame==Mathf.CeilToInt(heroTime*20)+8)
                             {
