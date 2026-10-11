@@ -85,6 +85,15 @@ namespace Horizon.UI
             var renderer=movieParticles.GetComponent<ParticleSystemRenderer>(); renderer.sharedMaterial=portalLight; renderer.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
             InitializeCinematicStaging();
             InitializeJackpotStage();
+            renderer.renderMode=ParticleSystemRenderMode.Mesh; renderer.mesh=rewardStar; renderer.sharedMaterial=teal;
+            main.startRotation3D=true;
+            main.startRotationX=new ParticleSystem.MinMaxCurve(0,Mathf.PI*2);
+            main.startRotationY=new ParticleSystem.MinMaxCurve(0,Mathf.PI*2);
+            main.startRotationZ=new ParticleSystem.MinMaxCurve(0,Mathf.PI*2);
+            var spin=movieParticles.rotationOverLifetime; spin.enabled=true; spin.separateAxes=true;
+            spin.x=1.3f; spin.y=2.1f; spin.z=.8f;
+            var shrink=movieParticles.sizeOverLifetime; shrink.enabled=true;
+            shrink.size=new ParticleSystem.MinMaxCurve(1,AnimationCurve.Linear(0,1,1,0));
             cinematicStage.gameObject.SetActive(false);
             impactTone=ShortCueTone("Synchronous low impact",65,.24f); nodeTone=ShortCueTone("Causal node hit",220,.12f); heartbeatTone=ShortCueTone("Quiet heartbeat",48,.16f);
         }
@@ -122,6 +131,8 @@ namespace Horizon.UI
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
             PrepareJackpotStage(plan,fullscreen);
+            movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
+                spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             var budget = movieParticles.main; budget.maxParticles = ParticleBudget;
             movieParticles.Play();
