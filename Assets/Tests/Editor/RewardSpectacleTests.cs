@@ -50,6 +50,7 @@ namespace Horizon.Tests
             var visual=new RewardSpectacle(Plan(RewardTier.Major,kind,0));
             Assert.AreEqual(RewardSpectacleStyle.Quiet,visual.Style); Assert.IsFalse(visual.HasHero);
             Assert.AreEqual(0,visual.MoteBudget(false,0,false));
+            Assert.IsFalse(visual.Sample(visual.Plan.Duration*.8f).ShowMultiplier);
         }
 
         [Test]

@@ -61,7 +61,7 @@ namespace Horizon.Game
             return new RewardSpectacleFrame(time, charge, burst * fade, hero,
                 Ease(HeroTime, HeroTime + span * 1.6f, time), fade,
                 Plan.PresentationMultiplierAt(time),
-                Plan.Event.tier >= RewardTier.Combo && Style != RewardSpectacleStyle.Loss && time >= ImpactTime && fade > 0,
+                Plan.Event.tier >= RewardTier.Combo && Style != RewardSpectacleStyle.Loss && Style != RewardSpectacleStyle.Quiet && time >= ImpactTime && fade > 0,
                 (.12f * charge + .65f * burst + .28f * hero) * fade);
         }
 

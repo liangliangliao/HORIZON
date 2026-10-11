@@ -11,6 +11,7 @@
 - 精力呈现带圆润端盖和金属环的能量电芯；专注呈现金属双层边框的透镜；心情使用有高光的暖灯；金钱使用浮雕金币与钱包；关系使用连接环；能力使用工具。模式突破展示断裂链环，现实合流展示带金属倒角的三棱纪念体，储备突破展示可开启的储备核心，未来记忆使用实际记录的胶片。
 - 紫色神秘光效用于洞察棱镜或隐藏来源回声的实际资源。色光按主体类型区分：能量与时间偏青绿、透镜偏蓝、关系偏粉、金钱和暖灯偏金，Mythic 使用更强的金色爆光。
 - 倍率牌使用真正三维数字网格，包含侧面和倒角。数字由仓库内 SIL OFL 字体生成，来源与许可仍见 `Assets/Resources/HorizonSansSC-OFL.txt`。
+- 手机竖屏特写与倍率牌避开标题、结果说明和预测收据。主体完成揭示后，原叙事角色和重复物件让出特写画面，保留此前的因果分镜。素材不会被站在镜头前的角色遮挡。
 - 光晕、放射光束和冲击闪光直接由透明着色器渲染；Android GLES3 无需后处理即可看到效果。光束只读取导演时钟，暂停与 Hit Stop 会冻结。
 - 日常回声、星尘与截止日的飞散改用 64 槽复用对象池和实体星屑网格。电影动效最多 48 个星屑，省电最多 8 个，自适应低画质最多 20/12 个。只有包含正向金钱收据时才改用金币形态。
 - 减弱动效关闭飞散、冲击闪光、数字弹跳与光束旋转，保留固定镜头、核心装置动作、静态光晕和文字。中途切换画质会更新当前画面；跳过和退出会清空舞台。
@@ -27,11 +28,11 @@ dotnet run --project tools/RulesHarness.csproj -- --workers=0
 
 新增 23 个便携用例验证六级动效预算、真实资源快照、负面与准备事件、隐藏来源、暂停、跳过、尾部清理、非法时间和六种事件到真实主体的映射。
 
-Unity EditMode 新增 `JackpotRenderingTests`，从真实游戏事件展示因果链和棱镜，检查实体数字、暂停、低画质、减弱动效与重播隔离；另有六资源独立渲染检查。预期导出：
+Unity EditMode 新增 `JackpotRenderingTests`，从真实游戏事件展示因果链和棱镜，检查实体数字、真实手机 HUD 安全区、主体遮挡、暂停、低画质、减弱动效与重播隔离；另有六资源独立渲染检查。预期导出：
 
 - `artifacts/cinematics/showcase-*.png`：模式突破、现实合流、洞察棱镜的三档画质，以及六资源的实际主体。
-- `artifacts/cinematics/showcase-causal-link-motion.gif`、`showcase-insight-prism-motion.gif`：360×640、20fps，由实际 Unity 相机录制的完整演出。
+- `artifacts/cinematics/showcase-causal-link-motion.gif`、`showcase-insight-prism-motion.gif`：360×640、20fps，由实际 Unity 相机与游戏 Canvas 录制的完整演出，包含真实标题、资源字幕、暂停与跳过按钮。
 
 APK 工作流保留原 ARMv7/ARM64 构建与验收，并允许以最新修复分支为目标的 PR 运行。预览随 `HORIZON-Cinematic-Reward-Previews` 产物上传。Unity 6 编译、着色器导入、实际截图和 APK 结果以本次提交的 CI 为准。截图不能证明手机帧率已达标，设备表现仍需真机验收。
 
-数字资产可重建：开发环境安装 `fonttools`、`shapely>=2.1` 后运行 `python3 tools/build_reward_digits.py`。运行游戏不需要 Python 或在线下载。
+数字资产可重建：开发环境安装 `fonttools`、`shapely>=2.1` 后运行 `python3 tools/build_reward_digits.py`。运行游戏不需要 Python 或在线下载。`python3 tools/verify_unity_metadata.py` 验证所有资产 GUID 的格式与唯一性，CI 在启动编辑器前运行。

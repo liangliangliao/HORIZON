@@ -22,6 +22,7 @@ namespace Horizon.UI
         private int displayedJackpotMultiplier=-1;
         private float jackpotNumberChangedAt, showcaseScale;
         private Vector3 showcaseOffset, showcaseCenter;
+        private bool showcaseFullscreen;
         private HorizonRewardSparkPool rewardSparkPool;
 
         private void InitializeJackpotStage()
@@ -94,9 +95,10 @@ namespace Horizon.UI
             }
         }
 
-        private void PrepareJackpotStage(RewardPlan plan)
+        private void PrepareJackpotStage(RewardPlan plan,bool fullscreen)
         {
             ResetJackpotStage(); spectacle=new RewardSpectacle(plan);
+            showcaseFullscreen=fullscreen;
             jackpotStage.gameObject.SetActive(true); displayedJackpotMultiplier=-1;
             MaterialReward receipt=spectacle.HeroReward;
             if(spectacle.HasHero && receipt!=null)
@@ -120,7 +122,7 @@ namespace Horizon.UI
                     if(renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
                     if(!found) { bounds=renderer.bounds; found=true; } else bounds.Encapsulate(renderer.bounds);
                 }
-                showcaseScale=2/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
+                showcaseScale=(fullscreen?1.35f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
                 showcaseOffset=found?showcaseHero.InverseTransformPoint(bounds.center):Vector3.zero;
             }
             bool money=plan.Objects.Any(o=>o.Kind==RewardObjectKind.MoneyWallet && o.Amount>0);
@@ -164,16 +166,31 @@ namespace Horizon.UI
                 }
                 if(spectacle.HeroReward.Kind==RewardObjectKind.BrokenLink)
                     showcaseHero.Find("Other link").localPosition=new Vector3(.2f+frame.Lid*.16f,.04f+frame.Lid*.1f,0);
+                if(frame.Hero>.95f)
+                {
+                    // The narrative bodies remain in the earlier shots. In the
+                    // final product shot they must not occlude the actual asset.
+                    moviePlayer.gameObject.SetActive(false); movieFuture.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false);
+                    foreach(Transform item in movieObjects) item.gameObject.SetActive(false);
+                }
             }
             showcasePlatform.gameObject.SetActive(hero);
             showcasePlatform.localPosition=new Vector3(showcaseCenter.x,.08f,showcaseCenter.z);
             showcasePlatform.localScale=Vector3.one*(.8f+frame.Hero*.25f);
             // Original narrative shots remain intact until their second reveal.
             // The final close-up highlights the actual resource or memento.
-            if(hero && !preferences.reducedMotion)
+            if(hero)
             {
-                camera=Vector3.Lerp(camera,showcaseCenter+new Vector3(1.1f,1.05f,-6.3f),frame.Hero);
-                look=Vector3.Lerp(look,showcaseCenter,frame.Hero);
+                Vector3 closeCamera=preferences.reducedMotion?new Vector3(5,4,-8):showcaseCenter+new Vector3(1.1f,1.05f,-6.3f);
+                Vector3 eye=closeCamera-showcaseCenter;
+                float q=2*Mathf.Tan(CinematicFieldOfView(time)*Mathf.Deg2Rad*.5f)*((showcaseFullscreen?.70f:.64f)-.5f);
+                float horizontal=Mathf.Sqrt(eye.x*eye.x+eye.z*eye.z);
+                float offset=q*eye.sqrMagnitude/Mathf.Max(.1f,horizontal-q*eye.y);
+                Vector3 closeLook=showcaseCenter-Vector3.up*offset;
+                // The actual phone HUD covers the lower viewport, including the
+                // prediction receipt. Keep the physical asset above those panels.
+                if(!preferences.reducedMotion) camera=Vector3.Lerp(camera,closeCamera,frame.Hero);
+                look=preferences.reducedMotion?closeLook:Vector3.Lerp(look,closeLook,frame.Hero);
             }
             int budget=spectacle.MoteBudget(preferences.batterySaver,adaptiveBudget.Level,preferences.reducedMotion);
             for(int i=0;i<rewardMotes.Length;i++) SampleRewardMote(i,time,budget);
@@ -248,9 +265,9 @@ namespace Horizon.UI
             const float depth=5;
             float viewWidth=2*depth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f)*WorldCamera.aspect;
             float punch=preferences.reducedMotion?0:Mathf.Sin(Mathf.Clamp01((frame.Time-jackpotNumberChangedAt)/.3f)*Mathf.PI)*.12f;
-            jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,.17f,depth));
+            jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,showcaseFullscreen?.61f:.50f,depth));
             jackpotPlaque.rotation=WorldCamera.transform.rotation;
-            jackpotPlaque.localScale=Vector3.one*Mathf.Min(.78f,viewWidth*.78f/3.5f)*(1+punch)*frame.Fade;
+            jackpotPlaque.localScale=Vector3.one*Mathf.Min(.78f,viewWidth*(showcaseFullscreen?.52f:.30f)/3.5f)*(1+punch)*frame.Fade;
         }
 
         private void Aura(Transform item,Vector3 center,float size,float mode,Color tint,float intensity)

@@ -51,9 +51,12 @@ namespace Horizon.Tests
                     Assert.IsTrue(stage.gameObject.activeInHierarchy);
                     Transform asset=stage.Find("Reward showcase "+visual.HeroReward.Kind);
                     Assert.IsNotNull(asset); Assert.IsTrue(asset.gameObject.activeInHierarchy);
+                    Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player").gameObject.activeInHierarchy,
+                        "The completed showcase shot must not put the narrative actor in front of the actual asset.");
                     Quaternion angle=asset.localRotation; Vector3 position=asset.localPosition;
                     world.SetPaused(true); world.Cinematics.Advance(2); yield return null;
                     Assert.AreEqual(angle,asset.localRotation); Assert.AreEqual(position,asset.localPosition); world.SetPaused(false);
+                    AssertPortraitSafeArea(world,stage,asset);
                     Capture(world,files[i]);
                     world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,batterySaver=true });
                     world.Cinematics.Advance(.01f);
@@ -94,6 +97,37 @@ namespace Horizon.Tests
             { camera.rect=rect; camera.targetTexture=previous; RenderTexture.active=active; world.FrameCinematicLabels(); RenderTexture.ReleaseTemporary(target); if(pixels!=null) Object.Destroy(pixels); }
         }
 
+        private static void AssertPortraitSafeArea(HorizonWorld3D world,Transform stage,Transform asset)
+        {
+            Camera camera=world.WorldCamera; Rect viewport=camera.rect;
+            RenderTexture prior=camera.targetTexture;
+            var target=RenderTexture.GetTemporary(540,Mathf.RoundToInt(960*viewport.height),24);
+            try
+            {
+                camera.rect=new Rect(0,0,1,1); camera.targetTexture=target; world.FrameCinematicLabels();
+                Transform plaque=stage.Find("3D presentation multiplier plaque");
+                float bottom=1,top=0;
+                foreach(Renderer renderer in plaque.GetComponentsInChildren<Renderer>())
+                {
+                    Bounds bounds=renderer.localBounds;
+                    for(int i=0;i<8;i++)
+                    {
+                        Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
+                        float y=viewport.y+camera.WorldToViewportPoint(renderer.transform.TransformPoint(corner)).y*viewport.height;
+                        bottom=Mathf.Min(bottom,y); top=Mathf.Max(top,y);
+                    }
+                }
+                Assert.Greater(bottom,.53f,"The 3D multiplier must clear the real prediction receipt panel.");
+                Assert.Less(top,.735f,"The 3D multiplier must clear the actual title panel.");
+                Bounds hero=asset.GetComponentsInChildren<Renderer>().First().bounds;
+                foreach(Renderer renderer in asset.GetComponentsInChildren<Renderer>()) hero.Encapsulate(renderer.bounds);
+                float center=viewport.y+camera.WorldToViewportPoint(hero.center).y*viewport.height;
+                Assert.Greater(center,.56f,"The physical reward must be visible above the receipt panel.");
+                Assert.Less(center,.735f);
+            }
+            finally { camera.rect=viewport; camera.targetTexture=prior; world.FrameCinematicLabels(); RenderTexture.ReleaseTemporary(target); }
+        }
+
         [UnityTest]
         public IEnumerator SixResourcesHighlightTheirOwnPhysicalAssets()
         {
@@ -127,20 +161,32 @@ namespace Horizon.Tests
         public IEnumerator GoldAndVioletMoviesExportFromTheActualUnityCamera()
         {
             yield return new EnterPlayMode(); yield return null;
-            var world=new GameObject("Animated jackpot preview recorder").AddComponent<HorizonWorld3D>(); world.Initialize();
-            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            var app=Object.FindObjectOfType<HorizonApp>(); if(app==null) app=new GameObject("Showcase phone preview recorder").AddComponent<HorizonApp>();
+            yield return null;
+            const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
+            var root=(RectTransform)typeof(HorizonApp).GetField("root",flags).GetValue(app); Canvas canvas=root.GetComponentInParent<Canvas>();
+            var archive=(ArchiveData)typeof(HorizonApp).GetField("archive",flags).GetValue(app);
+            archive.preferences.sound=false; archive.preferences.haptics=false;
+            typeof(HorizonApp).GetMethod("ApplyPreferences",flags).Invoke(app,null); world.Cinematics.enabled=false;
             List<DomainEvent> events=CinematicEventCoverageTests.RealEvents();
             DomainEvent[] subjects={events.First(e=>e.kind==DomainEventKind.PatternBroken),events.First(e=>e.kind==DomainEventKind.Surprise)};
             string[] names={"showcase-causal-link-motion","showcase-insight-prism-motion"};
-            var target=RenderTexture.GetTemporary(360,640,24,RenderTextureFormat.ARGB32);
+            var target=new RenderTexture(360,640,24,RenderTextureFormat.ARGB32); target.Create();
             var pixels=new Texture2D(360,640,TextureFormat.RGB24,false);
-            Camera camera=world.WorldCamera; Rect rect=camera.rect; RenderTexture prior=camera.targetTexture,active=RenderTexture.active;
+            Camera ui=new GameObject("Showcase UI recording camera",typeof(Camera)).GetComponent<Camera>();
+            ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20; ui.targetTexture=target;
+            RenderMode mode=canvas.renderMode; Camera prior=canvas.worldCamera; float distance=canvas.planeDistance;
+            RenderTexture active=RenderTexture.active;
             Directory.CreateDirectory("artifacts/cinematics");
             try
             {
                 for(int movie=0;movie<subjects.Length;movie++)
                 {
-                    Assert.IsTrue(world.Cinematics.Enqueue(subjects[movie],true));
+                    typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { subjects[movie],(System.Action)(()=>{}) });
+                    Assert.IsNotNull(world.Cinematics.Current);
+                    foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                    canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                     float duration=world.Cinematics.Current.Duration;
                     int frames=Mathf.CeilToInt(duration*20);
                     using(var stream=File.Create("artifacts/cinematics/"+names[movie]+".gif"))
@@ -149,10 +195,8 @@ namespace Horizon.Tests
                         for(int frame=0;frame<frames;frame++)
                         {
                             if(frame>0) world.Cinematics.Advance(duration/frames);
-                            camera.rect=new Rect(0,0,1,1); camera.targetTexture=target;
-                            world.FrameCinematicLabels(); camera.Render(); RenderTexture.active=target;
+                            Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target); RenderTexture.active=target;
                             pixels.ReadPixels(new Rect(0,0,360,640),0,0); pixels.Apply(); gif.Frame(pixels.GetPixels32(),5);
-                            camera.rect=rect; camera.targetTexture=prior; world.FrameCinematicLabels();
                             yield return null;
                         }
                     }
@@ -160,7 +204,8 @@ namespace Horizon.Tests
                 }
             }
             finally
-            { camera.rect=rect; camera.targetTexture=prior; RenderTexture.active=active; RenderTexture.ReleaseTemporary(target); Object.Destroy(pixels); world.Cinematics.CancelAll(); Object.Destroy(world.gameObject); }
+            { canvas.renderMode=mode; canvas.worldCamera=prior; canvas.planeDistance=distance; RenderTexture.active=active;
+                target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject); world.Cinematics.enabled=true; world.Cinematics.CancelAll(); }
             yield return new ExitPlayMode();
         }
     }
