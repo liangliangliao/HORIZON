@@ -131,6 +131,7 @@ namespace Horizon.UI
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
             PrepareJackpotStage(plan,fullscreen);
+            PrepareCausalRelays();
             movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
                 spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -308,6 +309,7 @@ namespace Horizon.UI
             float pulseAtImpact=time>=movieImpactTime?Mathf.Clamp01(1-(time-movieImpactTime)/.25f):0;
             movieLight.intensity=Mathf.Max(impact,pulseAtImpact)*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
             SampleCinematicStaging(time,impact,ref camera,ref look);
+            SampleCausalRelays(time);
             SampleJackpotStage(time,ref camera,ref look);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
@@ -367,6 +369,7 @@ namespace Horizon.UI
         {
             if(moviePlan==null) return;
             ResetCinematicStaging();
+            ResetCausalRelays();
             ResetJackpotStage();
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             cinematicCamera.gameObject.SetActive(false);

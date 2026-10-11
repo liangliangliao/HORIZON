@@ -22,7 +22,14 @@ namespace Horizon.Game
         public string id, label;
         public int day;
         public CausalNodeKind kind;
-        public RewardEvidence Copy() { return (RewardEvidence)MemberwiseClone(); }
+        // Older receipts have no recorded edges. Never infer causal links from
+        // their chronological order; new movies retain the observed graph.
+        public List<string> parentIds = new List<string>();
+        public RewardEvidence Copy()
+        {
+            var copy = (RewardEvidence)MemberwiseClone();
+            copy.parentIds = new List<string>(parentIds ?? new List<string>()); return copy;
+        }
     }
     [Serializable]
     public sealed class RewardReceipt
@@ -55,7 +62,8 @@ namespace Horizon.Game
             var causes = CausalGraph.Ancestors(observed, node.id).OrderBy(n => n.day).ThenBy(n => n.depth).ToList();
             foreach (CausalNode n in causes)
             {
-                var evidence = new RewardEvidence { id = n.id, day = n.day, kind = n.type, label = n.label };
+                var evidence = new RewardEvidence { id = n.id, day = n.day, kind = n.type, label = n.label,
+                    parentIds = CausalGraph.ObservedParents(n) };
                 if (n.type == CausalNodeKind.Memory && kind == DomainEventKind.PatternBroken) receipt.pastFailures.Add(evidence);
                 else receipt.causes.Add(evidence);
             }

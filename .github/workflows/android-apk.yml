@@ -10,6 +10,7 @@ on:
       - codex/unity-prototype-v0-3
       - codex/playable-feedback-3d
       - fix/apk-rewards-animation
+      - feat/3d-jackpot-animation
   workflow_dispatch:
     inputs:
       native_check_run:

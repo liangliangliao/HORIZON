@@ -105,7 +105,9 @@ namespace Horizon.UI
             for(int i=0;i<24;i++)
             {
                 float pulse=after-i*.06f;
-                bool show=movieNodes[i].gameObject.activeSelf && pulse>=0 && pulse<.5f;
+                // Cascade now has a physical relay ring at the exact NodeHit;
+                // the old post-impact stagger would imply a second chain.
+                bool show=kind!=DomainEventKind.Cascade && kind!=DomainEventKind.CausalSingularity && movieNodes[i].gameObject.activeSelf && pulse>=0 && pulse<.5f;
                 nodeHalos[i].gameObject.SetActive(show && (motion || pulse<.2f) && (!LowCostEffects || i<8));
                 nodeHalos[i].localPosition=movieNodes[i].localPosition;
                 nodeHalos[i].localScale=Vector3.one*(1+Mathf.Clamp01(pulse/.5f)*2);
