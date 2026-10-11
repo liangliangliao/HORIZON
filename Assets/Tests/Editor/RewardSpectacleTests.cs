@@ -20,10 +20,10 @@ namespace Horizon.Tests
         {
             RewardPlan plan=Plan(tier); string original=JsonUtility.ToJson(plan.Event);
             var visual=new RewardSpectacle(plan);
-            Assert.LessOrEqual(visual.CoinBudget(false,0,false),48);
-            Assert.LessOrEqual(visual.CoinBudget(true,0,false),8);
-            Assert.LessOrEqual(visual.CoinBudget(false,2,false),12);
-            Assert.AreEqual(0,visual.CoinBudget(false,0,true));
+            Assert.LessOrEqual(visual.MoteBudget(false,0,false),48);
+            Assert.LessOrEqual(visual.MoteBudget(true,0,false),8);
+            Assert.LessOrEqual(visual.MoteBudget(false,2,false),12);
+            Assert.AreEqual(0,visual.MoteBudget(false,0,true));
             for(int i=0;i<=200;i++)
             {
                 RewardSpectacleFrame frame=visual.Sample(plan.Duration*i/200);
@@ -35,11 +35,11 @@ namespace Horizon.Tests
         }
 
         [TestCase(DomainEventKind.TimeEcho)] [TestCase(DomainEventKind.Breakthrough)] [TestCase(DomainEventKind.FailAndAgain)]
-        public void LossesDoNotOpenTreasureOrSprayGold(DomainEventKind kind)
+        public void LossesDoNotCreateAHeroOrSprayRewardTokens(DomainEventKind kind)
         {
             var visual=new RewardSpectacle(Plan(RewardTier.Mythic,kind,-4));
             Assert.AreEqual(RewardSpectacleStyle.Loss,visual.Style); Assert.IsFalse(visual.HasHero);
-            Assert.AreEqual(0,visual.CoinBudget(false,0,false));
+            Assert.AreEqual(0,visual.MoteBudget(false,0,false));
             Assert.IsFalse(visual.Sample(visual.Plan.Duration*.8f).ShowMultiplier);
         }
 
@@ -49,21 +49,22 @@ namespace Horizon.Tests
         {
             var visual=new RewardSpectacle(Plan(RewardTier.Major,kind,0));
             Assert.AreEqual(RewardSpectacleStyle.Quiet,visual.Style); Assert.IsFalse(visual.HasHero);
-            Assert.AreEqual(0,visual.CoinBudget(false,0,false));
+            Assert.AreEqual(0,visual.MoteBudget(false,0,false));
         }
 
         [Test]
-        public void HiddenEchoUsesMysteryOrbsWithoutInventingAnOriginOrReward()
+        public void HiddenEchoUsesItsActualResourceWithMysteryLightingWithoutInventingAnOrigin()
         {
             var source=new DomainEvent { id="hidden",kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,day=6,
                 receipt=new RewardReceipt { sourceDay=0,resourcesRecorded=true,resources=new ResourceDelta(2) } };
             var visual=new RewardSpectacle(RewardDirector.Direct(source));
             Assert.AreEqual(RewardSpectacleStyle.Mystery,visual.Style); Assert.IsTrue(visual.HasHero);
-            Assert.IsFalse(visual.HasCoins); Assert.AreEqual(0,visual.Plan.Event.receipt.sourceDay);
+            Assert.IsFalse(visual.HasMotes); Assert.AreEqual(0,visual.Plan.Event.receipt.sourceDay);
+            Assert.AreEqual(RewardObjectKind.EnergyCell,visual.HeroReward.Kind); Assert.AreEqual(2,visual.HeroReward.Amount);
         }
 
         [Test]
-        public void TreasureFollowsTheSecondRevealAndAllEffectsVanishAtCompletion()
+        public void HeroFollowsTheSecondRevealAndAllEffectsVanishAtCompletion()
         {
             var visual=new RewardSpectacle(Plan(RewardTier.Epic));
             Assert.AreEqual(0,visual.Sample(visual.ImpactTime+.05f).Hero);
@@ -74,7 +75,7 @@ namespace Horizon.Tests
         }
 
         [Test]
-        public void PausedDirectorCannotAdvanceTreasureAndReducedMotionHasNoFlash()
+        public void PausedDirectorCannotAdvanceTheHeroAndReducedMotionHasNoFlash()
         {
             var visual=new RewardSpectacle(Plan(RewardTier.Epic)); var clock=new CinematicClock(visual.Plan);
             clock.Advance(visual.ImpactTime,c=>{}); RewardSpectacleFrame before=visual.Sample(clock.Elapsed);
@@ -91,6 +92,18 @@ namespace Horizon.Tests
             Assert.Throws<ArgumentOutOfRangeException>(()=>visual.Sample(float.NaN));
             Assert.Throws<ArgumentOutOfRangeException>(()=>visual.Sample(float.PositiveInfinity));
             Assert.AreEqual(0,visual.Sample(-1).Time);
+        }
+
+        [TestCase(DomainEventKind.PatternBroken,RewardObjectKind.BrokenLink)]
+        [TestCase(DomainEventKind.RealityConvergence,RewardObjectKind.ConvergencePrism)]
+        [TestCase(DomainEventKind.Surprise,RewardObjectKind.InsightPrism)]
+        [TestCase(DomainEventKind.Breakthrough,RewardObjectKind.ReservoirCore)]
+        [TestCase(DomainEventKind.FutureMemory,RewardObjectKind.MemoryFilm)]
+        [TestCase(DomainEventKind.Comeback,RewardObjectKind.RepairKit)]
+        public void HeroModelsFollowTheGameEventInsteadOfBorrowingReferenceImageProps(DomainEventKind kind,RewardObjectKind asset)
+        {
+            var visual=new RewardSpectacle(Plan(RewardTier.Major,kind));
+            Assert.AreEqual(asset,visual.HeroReward.Kind);
         }
     }
 }

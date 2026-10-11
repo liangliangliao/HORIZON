@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace Horizon.UI
 {
-    // The same embossed 3D coins upgrade board, gate and echo bursts. All slots
+    // Solid stardust stars upgrade board, gate and echo bursts. All slots
     // are allocated once; repeated rewards cannot accumulate transient objects.
     public sealed class HorizonRewardSparkPool : MonoBehaviour
     {
@@ -21,7 +21,7 @@ namespace Horizon.UI
             gold=goldMaterial; mint=mintMaterial; coral=coralMaterial;
             for(int i=0;i<slots.Length;i++)
             {
-                var item=new GameObject("Pooled world reward coin "+i,typeof(MeshFilter),typeof(MeshRenderer));
+                var item=new GameObject("Pooled world stardust star "+i,typeof(MeshFilter),typeof(MeshRenderer));
                 item.transform.SetParent(transform,false); slots[i]=item.transform;
                 item.GetComponent<MeshFilter>().sharedMesh=mesh; renderers[i]=item.GetComponent<MeshRenderer>();
                 renderers[i].sharedMaterial=gold; renderers[i].shadowCastingMode=ShadowCastingMode.Off;

@@ -38,25 +38,6 @@ namespace Horizon.UI
             Release(disc); Release(seal); Release(rim); return mesh;
         }
 
-        public static Mesh ChestLid()
-        {
-            const int steps=20; var vertices=new List<Vector3>(); var triangles=new List<int>();
-            // Barrel vault along X, closed end caps and an actual hinge at the rear.
-            for(int end=0;end<2;end++)
-            {
-                float x=end==0?-.86f:.86f; int center=vertices.Count; vertices.Add(new Vector3(x,0,0));
-                for(int i=0;i<=steps;i++)
-                { float a=i*Mathf.PI/steps; vertices.Add(new Vector3(x,Mathf.Sin(a)*.43f,Mathf.Cos(a)*.52f)); }
-                for(int i=0;i<steps;i++)
-                { int a=center+i+1,b=a+1; triangles.Add(center); triangles.Add(end==0?a:b); triangles.Add(end==0?b:a); }
-            }
-            for(int i=0;i<steps;i++)
-            { int a=i+1,b=a+1,c=a+steps+2,d=c+1; triangles.AddRange(new[] { a,b,d,a,d,c }); }
-            triangles.AddRange(new[] { 1,steps*2+3,steps+3,1,steps+1,steps*2+3 });
-            var mesh=new Mesh { name="HORIZON barrel vaulted treasure lid" }; mesh.SetVertices(vertices); mesh.SetTriangles(triangles,0);
-            mesh.RecalculateNormals(); mesh.RecalculateBounds(); return mesh;
-        }
-
         private static void Release(UnityEngine.Object value)
         { if(Application.isPlaying) UnityEngine.Object.Destroy(value); else UnityEngine.Object.DestroyImmediate(value); }
     }

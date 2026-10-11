@@ -22,14 +22,18 @@ namespace Horizon.UI
             if (!rewardPool.TryGetValue(key, out List<Transform> pool))
             { pool = new List<Transform>(); rewardPool.Add(key, pool); }
             while (pool.Count <= index) pool.Add(BuildRewardObject(kind, form, appearance));
-            Transform item = pool[index]; item.localRotation = Quaternion.identity;
+            Transform item = pool[index]; RestoreRewardObject(item,kind);
+            item.gameObject.SetActive(true); return item;
+        }
+        private void RestoreRewardObject(Transform item,RewardObjectKind kind)
+        {
+            item.localRotation = Quaternion.identity;
             ResetMovieColor(item);
             foreach (Transform part in item.GetComponentsInChildren<Transform>(true))
                 if (part != item && rewardRestPositions.TryGetValue(part, out Vector3 rest))
                 { part.localPosition = rest; part.localRotation = rewardRestRotations[part]; part.localScale=rewardRestScales[part]; ResetMovieColor(part); part.gameObject.SetActive(true); }
             if (kind == RewardObjectKind.ReservoirCore) item.Find("Storage lid").localPosition = new Vector3(0,.55f,0);
             if (kind == RewardObjectKind.MemoryFilm) BindMemoryFilm(item,moviePlan?.Event.receipt?.frames);
-            item.gameObject.SetActive(true); return item;
         }
         private Transform BuildRewardObject(RewardObjectKind kind, RewardObjectForm form, TriggerAppearance appearance)
         {
@@ -41,7 +45,8 @@ namespace Horizon.UI
                     BuildEnergyDevice(item, form); break;
                 case RewardObjectKind.FocusLens:
                 case RewardObjectKind.HorizonLens:
-                    Sculpt(item, "Optical rim", rewardRing, Vector3.zero, Vector3.one, ivory);
+                    Sculpt(item, "Optical rim", rewardRing, Vector3.zero, Vector3.one, gold);
+                    Sculpt(item, "Rear optical bevel", rewardRing, new Vector3(0,0,.09f), Vector3.one*.96f, teal);
                     Transform lens = Shape(item, "Glass lens", PrimitiveType.Cylinder, Vector3.zero, new Vector3(.75f,.025f,.75f), glass);
                     lens.localRotation = Quaternion.Euler(90,0,0);
                     if (form == RewardObjectForm.OpticalDevice)
@@ -57,7 +62,8 @@ namespace Horizon.UI
                 case RewardObjectKind.WarmLamp:
                     Shape(item, "Lamp base", PrimitiveType.Cylinder, new Vector3(0,-.36f,0),new Vector3(.42f,.04f,.42f),wood);
                     Box(item, "Lamp stem", new Vector3(0,-.16f,0), new Vector3(.055f,.4f,.055f), ivory);
-                    Shape(item,"Warm globe",PrimitiveType.Sphere,new Vector3(0,.12f,0),Vector3.one*.48f,warmLight); break;
+                    Shape(item,"Warm globe",PrimitiveType.Sphere,new Vector3(0,.12f,0),Vector3.one*.48f,gold);
+                    Sculpt(item,"Lamp protective rim",rewardRing,new Vector3(0,-.1f,0),Vector3.one*.5f,ivory).localRotation=Quaternion.Euler(90,0,0); break;
                 case RewardObjectKind.MoneyWallet:
                     BuildMoneyDevice(item, form); break;
                 case RewardObjectKind.ConnectionRing:
@@ -113,7 +119,14 @@ namespace Horizon.UI
                     CausalLine(item,"Actual trajectory",new Vector3(-.3f,.12f,-.06f),new Vector3(.3f,-.1f,-.06f),warmLight,.025f); break;
                 default:
                     // An actual triangular optical prism; no generic reward gem.
-                    Mesh prism = RewardPrism(); Sculpt(item,"Three sided prism",prism,Vector3.zero,Vector3.one,ivory);
+                    Mesh prism = RewardPrism(); Sculpt(item,"Three sided prism",prism,Vector3.zero,Vector3.one,rewardCrystal??ivory);
+                    Vector3[] corners=prism.vertices;
+                    int[] edges={0,1,1,2,2,0,3,4,4,5,5,3,0,3,1,4,2,5};
+                    for(int edge=0;edge<edges.Length;edge+=2)
+                    {
+                        Vector3 from=corners[edges[edge]],to=corners[edges[edge+1]],direction=to-from;
+                        Box(item,"Prism metal bevel "+edge,(from+to)*.5f,new Vector3(.023f,.023f,direction.magnitude),gold).localRotation=Quaternion.LookRotation(direction);
+                    }
                     if(kind==RewardObjectKind.ConvergencePrism) for(int i=0;i<3;i++)
                         CausalLine(item,"Convergence inlet "+i,new Vector3((i-1)*.65f,-.4f,.15f),new Vector3(0,0,0),i==2?warmLight:portalLight,.04f);
                     break;

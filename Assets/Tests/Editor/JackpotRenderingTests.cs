@@ -31,14 +31,14 @@ namespace Horizon.Tests
         }
 
         [UnityTest]
-        public IEnumerator RealEventsRenderGoldTreasureAndMysteryWithPauseQualityAndReplayIsolation()
+        public IEnumerator RealEventsRenderTheirOwnMementosWithPauseQualityAndReplayIsolation()
         {
             yield return new EnterPlayMode(); yield return null;
             var world=new GameObject("Jackpot rendering verification").AddComponent<HorizonWorld3D>(); world.Initialize();
             world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
             List<DomainEvent> events=CinematicEventCoverageTests.RealEvents();
             DomainEvent[] subjects={events.First(e=>e.kind==DomainEventKind.PatternBroken),events.First(e=>e.kind==DomainEventKind.RealityConvergence),events.First(e=>e.kind==DomainEventKind.Surprise)};
-            string[] files={"jackpot-pattern-gold","jackpot-convergence-gold","jackpot-mystery-violet"};
+            string[] files={"showcase-pattern-link","showcase-convergence-prism","showcase-insight-prism"};
             try
             {
                 for(int i=0;i<subjects.Length;i++)
@@ -49,20 +49,20 @@ namespace Horizon.Tests
                     world.Cinematics.Advance(visual.HeroTime+.65f); yield return null;
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
                     Assert.IsTrue(stage.gameObject.activeInHierarchy);
-                    Transform chest=stage.Find("Gold and crimson reward chest");
-                    Assert.AreEqual(visual.Style!=RewardSpectacleStyle.Mystery,chest.gameObject.activeInHierarchy);
-                    Transform lid=chest.Find("Treasure lid hinge"); Quaternion angle=lid.localRotation;
+                    Transform asset=stage.Find("Reward showcase "+visual.HeroReward.Kind);
+                    Assert.IsNotNull(asset); Assert.IsTrue(asset.gameObject.activeInHierarchy);
+                    Quaternion angle=asset.localRotation; Vector3 position=asset.localPosition;
                     world.SetPaused(true); world.Cinematics.Advance(2); yield return null;
-                    Assert.AreEqual(angle,lid.localRotation); world.SetPaused(false);
+                    Assert.AreEqual(angle,asset.localRotation); Assert.AreEqual(position,asset.localPosition); world.SetPaused(false);
                     Capture(world,files[i]);
                     world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,batterySaver=true });
                     world.Cinematics.Advance(.01f);
-                    Assert.LessOrEqual(stage.GetComponentsInChildren<Transform>().Count(t=>t.name.StartsWith("Decorative embossed gold coin")),8);
+                    Assert.LessOrEqual(stage.GetComponentsInChildren<Transform>().Count(t=>t.name.StartsWith("Decorative reward")),8);
                     Capture(world,files[i]+"-battery");
                     world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,reducedMotion=true });
                     world.Cinematics.Advance(.01f);
-                    Assert.IsFalse(stage.GetComponentsInChildren<Transform>().Any(t=>t.name.StartsWith("Decorative embossed gold coin")));
-                    Assert.Greater(Quaternion.Angle(Quaternion.identity,lid.localRotation),30);
+                    Assert.IsFalse(stage.GetComponentsInChildren<Transform>().Any(t=>t.name.StartsWith("Decorative reward")));
+                    Assert.AreEqual(Quaternion.Euler(0,-15,0),asset.localRotation);
                     Capture(world,files[i]+"-reduced");
                     world.Cinematics.Skip(); Assert.IsFalse(stage.gameObject.activeInHierarchy);
                     Assert.AreEqual(before,JsonUtility.ToJson(subjects[i]));
@@ -95,6 +95,35 @@ namespace Horizon.Tests
         }
 
         [UnityTest]
+        public IEnumerator SixResourcesHighlightTheirOwnPhysicalAssets()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Resource material rendering verification").AddComponent<HorizonWorld3D>(); world.Initialize();
+            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            ResourceDelta[] changes={new ResourceDelta(energy:2),new ResourceDelta(mood:2),new ResourceDelta(insight:2),
+                new ResourceDelta(money:2),new ResourceDelta(relation:2),new ResourceDelta(ability:2)};
+            RewardObjectKind[] kinds={RewardObjectKind.EnergyCell,RewardObjectKind.WarmLamp,RewardObjectKind.FocusLens,
+                RewardObjectKind.MoneyWallet,RewardObjectKind.ConnectionRing,RewardObjectKind.ToolKit};
+            try
+            {
+                for(int i=0;i<changes.Length;i++)
+                {
+                    var source=new DomainEvent { id="resource-render-"+i,kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,day=7,
+                        receipt=new RewardReceipt { resourcesRecorded=true,resources=changes[i],sourceDay=3,action="实际行动" } };
+                    string before=JsonUtility.ToJson(source);
+                    Assert.IsTrue(world.Cinematics.Enqueue(source,true)); world.Cinematics.Advance(2.85f);
+                    Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
+                    Assert.IsNotNull(stage.Find("Reward showcase "+kinds[i]));
+                    Assert.IsTrue(stage.Find("Reward showcase "+kinds[i]).gameObject.activeInHierarchy);
+                    Capture(world,"showcase-resource-"+kinds[i]);
+                    Assert.AreEqual(before,JsonUtility.ToJson(source)); world.Cinematics.Skip();
+                }
+            }
+            finally { world.Cinematics.CancelAll(); Object.Destroy(world.gameObject); }
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator GoldAndVioletMoviesExportFromTheActualUnityCamera()
         {
             yield return new EnterPlayMode(); yield return null;
@@ -102,7 +131,7 @@ namespace Horizon.Tests
             world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
             List<DomainEvent> events=CinematicEventCoverageTests.RealEvents();
             DomainEvent[] subjects={events.First(e=>e.kind==DomainEventKind.PatternBroken),events.First(e=>e.kind==DomainEventKind.Surprise)};
-            string[] names={"jackpot-gold-motion","jackpot-violet-motion"};
+            string[] names={"showcase-causal-link-motion","showcase-insight-prism-motion"};
             var target=RenderTexture.GetTemporary(360,640,24,RenderTextureFormat.ARGB32);
             var pixels=new Texture2D(360,640,TextureFormat.RGB24,false);
             Camera camera=world.WorldCamera; Rect rect=camera.rect; RenderTexture prior=camera.targetTexture,active=RenderTexture.active;

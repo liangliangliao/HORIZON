@@ -6,14 +6,15 @@ namespace Horizon.Game
     public enum RewardSpectacleStyle { Quiet, Golden, Mystery, Legendary, Loss }
 
     // Visual choreography reads the same immutable receipt and director clock as
-    // the existing movie. Decorative coins and the multiplier never settle rewards.
+    // the existing movie. Decorative motes and the multiplier never settle rewards.
     public sealed class RewardSpectacle
     {
         public readonly RewardPlan Plan;
         public readonly RewardSpectacleStyle Style;
+        public readonly MaterialReward HeroReward;
         public readonly float ImpactTime, HeroTime, SettlementTime, JackpotTime;
         public bool HasHero => Plan.Event.tier >= RewardTier.Major && Style != RewardSpectacleStyle.Quiet && Style != RewardSpectacleStyle.Loss;
-        public bool HasCoins => Style == RewardSpectacleStyle.Golden || Style == RewardSpectacleStyle.Legendary;
+        public bool HasMotes => Style == RewardSpectacleStyle.Golden || Style == RewardSpectacleStyle.Legendary;
 
         public RewardSpectacle(RewardPlan plan)
         {
@@ -23,6 +24,9 @@ namespace Horizon.Game
             SettlementTime = CueTime(CinematicPhase.Settlement, plan.Duration * .86f);
             JackpotTime = CueTime(CinematicPhase.Jackpot, HeroTime);
             Style = SelectStyle(plan);
+            HeroReward = plan.Objects.FirstOrDefault(o => o.Class == RewardObjectClass.Milestone) ??
+                plan.Objects.FirstOrDefault(o => o.Class == RewardObjectClass.System && o.Kind != RewardObjectKind.PredictionPanel) ??
+                plan.Objects.FirstOrDefault(o => o.Class == RewardObjectClass.Resource && o.Amount > 0);
         }
 
         private float CueTime(CinematicPhase phase, float fallback)
@@ -61,9 +65,9 @@ namespace Horizon.Game
                 (.12f * charge + .65f * burst + .28f * hero) * fade);
         }
 
-        public int CoinBudget(bool batterySaver, int adaptiveLevel, bool reducedMotion)
+        public int MoteBudget(bool batterySaver, int adaptiveLevel, bool reducedMotion)
         {
-            if (reducedMotion || !HasCoins || Plan.Event.tier == RewardTier.Micro) return 0;
+            if (reducedMotion || !HasMotes || Plan.Event.tier == RewardTier.Micro) return 0;
             int normal = Plan.Event.tier == RewardTier.Local ? 8 : Plan.Event.tier == RewardTier.Combo ? 16 :
                 Plan.Event.tier == RewardTier.Major ? 24 : Plan.Event.tier == RewardTier.Epic ? 40 : 48;
             return Math.Min(normal, batterySaver ? 8 : adaptiveLevel >= 2 ? 12 : adaptiveLevel == 1 ? 20 : 48);

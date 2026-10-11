@@ -5,15 +5,20 @@ namespace Horizon.UI
 {
     public sealed partial class HorizonWorld3D
     {
+        private Mesh energyCellMesh;
         private void BuildEnergyDevice(Transform item, RewardObjectForm form)
         {
+            if(energyCellMesh==null) energyCellMesh=Own(HorizonSculpt.Profile("Rounded energy cell",new[] {
+                new Vector2(0,-.5f),new Vector2(.42f,-.5f),new Vector2(.5f,-.42f),
+                new Vector2(.5f,.41f),new Vector2(.42f,.5f),new Vector2(0,.5f) },24));
             bool storage=form==RewardObjectForm.StorageUnit || form==RewardObjectForm.EnergyCore;
             int count=form==RewardObjectForm.BatteryPack?6:storage?4:1;
             if(count>1) Box(item,"Battery carrier",new Vector3(0,-.37f,0),new Vector3(.85f,.1f,.58f),ivory);
             for(int i=0;i<count;i++)
             {
                 Vector3 at=count==1?Vector3.zero:new Vector3((i%3-1)*.24f,0,(i/3-.5f)*.28f);
-                Shape(item,"Energy cell "+i,PrimitiveType.Cylinder,at,new Vector3(.2f,.32f,.2f),teal);
+                Sculpt(item,"Energy cell "+i,energyCellMesh,at,new Vector3(.2f,.64f,.2f),teal);
+                Sculpt(item,"Cell metal collar "+i,rewardRing,at+Vector3.up*.27f,Vector3.one*.25f,gold).localRotation=Quaternion.Euler(90,0,0);
                 Shape(item,"Cell terminal "+i,PrimitiveType.Cylinder,at+Vector3.up*.34f,new Vector3(.08f,.035f,.08f),gold);
                 Box(item,"Cell charge "+i,at+new Vector3(0,0,-.105f),new Vector3(.08f,.36f,.025f),portalLight);
             }
@@ -36,7 +41,7 @@ namespace Horizon.UI
             {
                 if(form==RewardObjectForm.CashBundle || form==RewardObjectForm.Vault)
                     Box(coins,"Cash note "+i,new Vector3(0,i*.04f,0),new Vector3(.42f,.025f,.21f),ivory);
-                else Shape(coins,"Coin "+i,PrimitiveType.Cylinder,new Vector3(i*.09f,0,0),new Vector3(.23f,.025f,.23f),gold);
+                else Sculpt(coins,"Coin "+i,embossedCoin,new Vector3(i*.09f,0,0),Vector3.one*.4f,gold).localRotation=Quaternion.Euler(90,0,0);
             }
             if(form==RewardObjectForm.Vault)
             {
