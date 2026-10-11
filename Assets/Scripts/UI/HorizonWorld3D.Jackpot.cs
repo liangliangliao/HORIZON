@@ -275,7 +275,9 @@ namespace Horizon.UI
                 }
                 jackpotNumbers.localScale=Vector3.one*Mathf.Min(.86f,2.35f/Mathf.Max(.1f,width));
             }
-            const float depth=5;
+            // Keep the physical numeral mesh ahead of the nearest evidence
+            // carriers. Scale with depth to preserve its apparent phone size.
+            const float depth=2;
             float viewWidth=2*depth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f)*WorldCamera.aspect;
             float punch=preferences.reducedMotion?0:Mathf.Sin(Mathf.Clamp01((frame.Time-jackpotNumberChangedAt)/.3f)*Mathf.PI)*.12f;
             jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,showcaseFullscreen?HorizonCinemaLayout.PlaqueViewportY:.50f,depth));

@@ -62,6 +62,7 @@ namespace Horizon.Tests
                     world.Cinematics.Advance(first-.01f);
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     world.Cinematics.Advance(.04f); yield return null;
+                    AssertSourceInsideCamera(world);
                     var beam=stage.GetComponentsInChildren<Renderer>().First(r=>r.name.StartsWith("Director driven causal light shaft"));
                     Vector3 scale=beam.transform.localScale; var properties=new MaterialPropertyBlock(); beam.GetPropertyBlock(properties);
                     float clock=properties.GetFloat("_Clock");
@@ -92,6 +93,12 @@ namespace Horizon.Tests
                             Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target); RenderTexture.active=target;
                             pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); gif.Frame(pixels.GetPixels32(),5);
                             float heroTime=new RewardSpectacle(world.Cinematics.Current).HeroTime;
+                            if(frame==Mathf.CeilToInt(heroTime*20)+8)
+                            {
+                                Transform plaque=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="3D presentation multiplier plaque");
+                                foreach(Renderer carrier in stage.GetComponentsInChildren<Renderer>().Where(r=>r.name=="Evidence metal base"))
+                                    Assert.Greater(world.WorldCamera.WorldToViewportPoint(carrier.bounds.center).z,world.WorldCamera.WorldToViewportPoint(plaque.position).z+.3f,"Evidence carriers must not hide the physical multiplier.");
+                            }
                             if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2 || frame==Mathf.CeilToInt(heroTime*20)+8)
                                 File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+"-"+frame+".png",pixels.EncodeToPNG());
                             yield return null;
@@ -115,6 +122,25 @@ namespace Horizon.Tests
                 target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
             }
             yield return new ExitPlayMode();
+        }
+
+        private static void AssertSourceInsideCamera(HorizonWorld3D world)
+        {
+            Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
+            var target=RenderTexture.GetTemporary(540,614,24);
+            try
+            {
+                camera.rect=new Rect(0,0,1,1); camera.targetTexture=target; world.FrameCinematicLabels();
+                TextMesh source=world.GetComponentsInChildren<TextMesh>().Single(t=>t.name=="Cinematic evidence label 25");
+                Bounds bounds=source.GetComponent<Renderer>().localBounds;
+                for(int i=0;i<8;i++)
+                {
+                    Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
+                    Vector3 projected=camera.WorldToViewportPoint(source.transform.TransformPoint(corner));
+                    Assert.That(projected.y,Is.InRange(.02f,.98f),"The full day and source must remain inside the rendered scene.");
+                }
+            }
+            finally { camera.rect=viewport; camera.targetTexture=prior; world.FrameCinematicLabels(); RenderTexture.ReleaseTemporary(target); }
         }
     }
 }

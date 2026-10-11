@@ -114,7 +114,7 @@ namespace Horizon.UI
             foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
             FrameJackpotStage();
             if(relayPlan!=null && relayPlan.Nodes.Count>0 && movieLabels[25].gameObject.activeSelf)
-                movieLabels[25].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,.96f,6));
+                movieLabels[25].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,.88f,6));
             if(moviePlan==null || (moviePlan.Event.kind!=DomainEventKind.Synchronized && moviePlan.Event.kind!=DomainEventKind.Surprise)) return;
             // These are readable annotations, so frame them against the actual
             // portrait camera rather than the depth of the world-space rays.

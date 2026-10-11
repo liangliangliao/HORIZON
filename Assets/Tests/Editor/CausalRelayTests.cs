@@ -105,6 +105,20 @@ namespace Horizon.Tests
             Assert.Throws<ArgumentOutOfRangeException>(()=>relay.Sample(0,float.NaN,false));
         }
         [Test]
+        public void ActualSecondRevealAndJackpotReigniteTheRecordedNetwork()
+        {
+            var source=ActualCascade(DomainEventKind.CausalSingularity); string before=JsonUtility.ToJson(source);
+            RewardPlan plan=RewardDirector.Direct(source); var relay=new CausalRelayPlan(plan);
+            foreach(CinematicPhase phase in new[] {CinematicPhase.SecondReveal,CinematicPhase.Jackpot})
+            {
+                float cue=plan.Cues.Single(c=>!c.NodeHit && c.Phase==phase).Time;
+                Assert.Greater(relay.Sample(0,cue+.001f,false).Beam,relay.Sample(0,cue-.01f,false).Beam);
+                Assert.IsTrue(relay.Nodes.All(n=>relay.Sample(n.Index,cue+.001f,false).Lit));
+                Assert.AreEqual(0,relay.Sample(0,cue+.001f,true).Beam);
+            }
+            Assert.AreEqual(before,JsonUtility.ToJson(source));
+        }
+        [Test]
         public void DenseReceiptHasBoundedVisualObjectsAndOnlyRecordedEdges()
         {
             RewardPlan plan=Merge();

@@ -12,11 +12,14 @@ namespace Horizon.Game
         public readonly IReadOnlyList<CausalRelayNode> Nodes;
         public readonly IReadOnlyList<CausalRelayEdge> Edges;
         public readonly float ImpactTime, Duration;
+        private readonly float secondRevealTime,jackpotTime;
         public CausalRelayPlan(RewardPlan plan)
         {
             if (plan == null) throw new ArgumentNullException(nameof(plan));
             Duration = plan.Duration;
             ImpactTime = plan.Cues.First(c => !c.NodeHit && c.Phase == CinematicPhase.Impact).Time;
+            secondRevealTime=plan.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal)?.Time??Duration;
+            jackpotTime=plan.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot)?.Time??Duration;
             bool cascade = plan.Event.kind == DomainEventKind.Cascade || plan.Event.kind == DomainEventKind.CausalSingularity;
             var nodes = new List<CausalRelayNode>(); var edges = new List<CausalRelayEdge>();
             if (cascade)
@@ -57,9 +60,12 @@ namespace Horizon.Game
             bool lit = age >= 0;
             float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 4);
             float final = time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
-            float beam = lit && !reducedMotion ? Math.Max(pulse, final) * fade : 0;
-            return new CausalRelayFrame(lit, fade, pulse * fade, beam,
-                reducedMotion ? 0 : (2.2f + 1.0f * Math.Max(pulse, final)) * fade);
+            if(!reducedMotion && time>=secondRevealTime) final=Math.Max(final,(float)Math.Exp(-(time-secondRevealTime)*3.5f));
+            if(!reducedMotion && time>=jackpotTime) final=Math.Max(final,(float)Math.Exp(-(time-jackpotTime)*3.5f));
+            float emphasis=Math.Max(pulse,final);
+            float beam = lit && !reducedMotion ? Math.Max(emphasis, .1f) * fade : 0;
+            return new CausalRelayFrame(lit, fade, emphasis * fade, beam,
+                reducedMotion ? 0 : (2.2f + emphasis) * fade);
         }
         private static float Ease(float a, float b, float t)
         { float p = Math.Max(0, Math.Min(1, (t - a) / Math.Max(.0001f, b - a))); return p * p * (3 - 2 * p); }

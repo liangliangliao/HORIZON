@@ -70,6 +70,7 @@ namespace Horizon.UI
         {
             if(cinemaProduction==null || !cinemaProduction.gameObject.activeSelf || spectacle==null) return;
             Color tint=RewardEffectTint();
+            bool golden=spectacle.Style==RewardSpectacleStyle.Golden || spectacle.Style==RewardSpectacleStyle.Legendary;
             Vector3 burstCenter=relayPlan!=null && relayPlan.Nodes.Count>0 && time<spectacle.HeroTime?new Vector3(0,1.3f,2):showcaseCenter;
             bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
             cinemaBackdropMaterial.SetColor("_Color",tint); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:time);
@@ -96,7 +97,7 @@ namespace Horizon.UI
                     line.SetPosition(segment,center+new Vector3(Mathf.Cos(turn)*radius,Mathf.Sin(turn)*radius*.78f,Mathf.Sin(a)*.45f+p*.6f));
                 }
                 line.widthMultiplier=Mathf.Max(.008f,.015f+Mathf.Sin(timeSince*Mathf.PI)*.025f)*pulse;
-                SetMovieColor(line.transform,Color.Lerp(tint,i%3==0?Palette.Gold:Color.white,.4f)*pulse);
+                SetMovieColor(line.transform,Color.Lerp(tint,golden && i%3==0?Palette.Gold:Color.white,.4f)*pulse);
             }
             for(int i=0;i<cinemaWaves.Length;i++)
             {
@@ -115,6 +116,7 @@ namespace Horizon.UI
                 star.localPosition=new Vector3(Mathf.Cos(a)*(2.1f+i%3*.5f),.5f+i%6*.53f+drift,2.5f+Mathf.Sin(a)*2.6f);
                 star.localRotation=Quaternion.Euler(time*17+i*11,time*23,i*23);
                 star.localScale=Vector3.one*(.032f+Mathf.Pow(Mathf.Max(0,Mathf.Sin(time*2+i)),8)*.09f+ pulse*.04f);
+                SetMovieColor(star,golden?(i%3==0?Palette.Gold:Color.white):Color.Lerp(tint,Color.white,.3f));
             }
         }
 
