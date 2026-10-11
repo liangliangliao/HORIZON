@@ -26,6 +26,8 @@ Unity 竖屏时间策略与人生卡牌游戏。**Master Product Specification v
 
 ## 三维与奖励
 
+最新渲染升级基于 `fix/apk-rewards-animation@c9a1570`，参考捕鱼中奖演出的金属高光、放射光束、粒子爆发和立体倍率数字，按 HORIZON 的真实资源与事件呈现电芯、透镜、储备核心、因果链与纪念物。全部接入既有奖励时间线，保留真实收益、省电、减弱动效、暂停与跳过；实现及真实 Unity 预览入口见 [三维演出渲染升级](docs/JACKPOT_3D_UPGRADE.md)。
+
 本次 Reward System v1.0 与 Cinematic v1.0 改造说明及验收范围见 [电影式动画与实体奖励](docs/CINEMATIC_REWARDS_V1.md)。Unity 6 LTS、URP 17、Cinemachine 3、手动 Playable 时间线与 TMP 字幕已接入。奖励事件保存实际资源与真实因果快照；六资源对应电芯、透镜、暖灯、钱包、连接环与工具箱。电影暂停、跳过及重复播放不改变收益。重大事件保留原始文字，收藏入口在 HORIZON ME。
 
 

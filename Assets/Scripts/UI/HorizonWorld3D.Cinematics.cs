@@ -84,6 +84,16 @@ namespace Horizon.UI
             var shape=movieParticles.shape; shape.shapeType=ParticleSystemShapeType.Sphere; shape.radius=.15f;
             var renderer=movieParticles.GetComponent<ParticleSystemRenderer>(); renderer.sharedMaterial=portalLight; renderer.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
             InitializeCinematicStaging();
+            InitializeJackpotStage();
+            renderer.renderMode=ParticleSystemRenderMode.Mesh; renderer.mesh=rewardStar; renderer.sharedMaterial=teal;
+            main.startRotation3D=true;
+            main.startRotationX=new ParticleSystem.MinMaxCurve(0,Mathf.PI*2);
+            main.startRotationY=new ParticleSystem.MinMaxCurve(0,Mathf.PI*2);
+            main.startRotationZ=new ParticleSystem.MinMaxCurve(0,Mathf.PI*2);
+            var spin=movieParticles.rotationOverLifetime; spin.enabled=true; spin.separateAxes=true;
+            spin.x=1.3f; spin.y=2.1f; spin.z=.8f;
+            var shrink=movieParticles.sizeOverLifetime; shrink.enabled=true;
+            shrink.size=new ParticleSystem.MinMaxCurve(1,AnimationCurve.Linear(0,1,1,0));
             cinematicStage.gameObject.SetActive(false);
             impactTone=ShortCueTone("Synchronous low impact",65,.24f); nodeTone=ShortCueTone("Causal node hit",220,.12f); heartbeatTone=ShortCueTone("Quiet heartbeat",48,.16f);
         }
@@ -120,6 +130,9 @@ namespace Horizon.UI
             foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
+            PrepareJackpotStage(plan,fullscreen);
+            movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
+                spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             var budget = movieParticles.main; budget.maxParticles = ParticleBudget;
             movieParticles.Play();
@@ -295,10 +308,11 @@ namespace Horizon.UI
             float pulseAtImpact=time>=movieImpactTime?Mathf.Clamp01(1-(time-movieImpactTime)/.25f):0;
             movieLight.intensity=Mathf.Max(impact,pulseAtImpact)*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
             SampleCinematicStaging(time,impact,ref camera,ref look);
+            SampleJackpotStage(time,ref camera,ref look);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen) WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*shake;
-            WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=moviePlan.Event.tier>=RewardTier.Epic?Mathf.Lerp(39,48,Smooth(.55f,.85f,progress)):38;
+            WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=CinematicFieldOfView(time);
             cinematicCamera.transform.SetPositionAndRotation(WorldCamera.transform.position, WorldCamera.transform.rotation);
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;
             cinematicCamera.Lens.NearClipPlane = .1f; cinematicCamera.Lens.FarClipPlane = 80;
@@ -308,6 +322,8 @@ namespace Horizon.UI
             FrameCinematicLabels();
             shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
         }
+        private float CinematicFieldOfView(float time)
+        { return moviePlan.Event.tier>=RewardTier.Epic?Mathf.Lerp(39,48,Smooth(.55f,.85f,time/moviePlan.Duration)):38; }
         private void SampleRewardObjects(float time,float impact)
         {
             float progress=time/moviePlan.Duration;
@@ -351,6 +367,7 @@ namespace Horizon.UI
         {
             if(moviePlan==null) return;
             ResetCinematicStaging();
+            ResetJackpotStage();
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             cinematicCamera.gameObject.SetActive(false);
             cameraPosition=savedCameraPosition; cameraLook=savedCameraLook; WorldCamera.rect=savedCameraRect; WorldCamera.fieldOfView=savedFov;

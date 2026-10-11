@@ -9,6 +9,7 @@ on:
       - main
       - codex/unity-prototype-v0-3
       - codex/playable-feedback-3d
+      - fix/apk-rewards-animation
   workflow_dispatch:
     inputs:
       native_check_run:
@@ -94,6 +95,9 @@ jobs:
     steps:
       - name: Check out project
         uses: actions/checkout@v4
+
+      - name: Verify Unity asset metadata before importing
+        run: python3 tools/verify_unity_metadata.py
 
       - uses: actions/download-artifact@v4
         with:

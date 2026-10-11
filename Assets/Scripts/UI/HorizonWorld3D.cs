@@ -41,6 +41,8 @@ namespace Horizon.UI
             dark = Lit(new Color(0.04f, 0.09f, 0.15f));
             teal = Lit(new Color(0.15f, 0.65f, 0.63f), new Color(0.04f, 0.18f, 0.16f));
             gold = Lit(new Color(1, 0.65f, 0.18f), new Color(0.2f, 0.1f, 0.02f));
+            gold.SetFloat("_Metallic", .92f); gold.SetFloat("_Smoothness", .86f); gold.SetFloat("_Coat", .4f);
+            teal.SetFloat("_Metallic", .28f); teal.SetFloat("_Smoothness", .62f);
             pink = Lit(new Color(0.88f, 0.24f, 0.39f), new Color(0.2f, 0.03f, 0.06f));
             glass = Glow(new Color(0.35f, 1, 0.85f, 0.65f));
             skin = Lit(new Color(0.94f, 0.69f, 0.51f));
@@ -412,18 +414,8 @@ namespace Horizon.UI
 
         private void Burst(Vector3 position, Color color, int count)
         {
-            if (preferences.reducedMotion) count = Mathf.Min(count, 4);
-            else if (preferences.batterySaver) count = Mathf.Min(count, 16);
-            for (int i = 0; i < count; i++)
-            {
-                Transform spark = Shape(transform, "Stardust", PrimitiveType.Cylinder, position,
-                    new Vector3(0.12f, 0.018f, 0.12f), color == Palette.Coral ? pink :
-                        color == Palette.Mint ? teal : gold);
-                var motion = spark.gameObject.AddComponent<WorldSpark>();
-                spark.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
-                float angle = i * 2.399f;
-                motion.Velocity = new Vector3(Mathf.Cos(angle), 1.5f + (i % 5) * 0.22f, Mathf.Sin(angle)) * 2;
-            }
+            if(preferences.reducedMotion) return;
+            rewardSparkPool?.Emit(position,color,count,ParticleBudget);
         }
 
         private Transform Group(string name, Transform parent = null)
@@ -458,6 +450,8 @@ namespace Horizon.UI
             var material = new Material(Resources.Load<Shader>("HorizonLit"));
             material.SetColor("_Color", color);
             material.SetColor("_Emission", emission);
+            material.SetFloat("_Smoothness", .46f);
+            material.SetFloat("_Coat", .22f);
             material.enableInstancing = true;
             materials.Add(material);
             return material;
@@ -503,19 +497,4 @@ namespace Horizon.UI
         }
     }
 
-    public sealed class WorldSpark : MonoBehaviour
-    {
-        public Vector3 Velocity;
-        private float age;
-        private void Update()
-        {
-            float dt = Time.unscaledDeltaTime;
-            age += dt;
-            Velocity += Vector3.down * dt * 4;
-            transform.position += Velocity * dt;
-            transform.Rotate(120 * dt, 150 * dt, 80 * dt);
-            if (age > 0.9f) transform.localScale *= Mathf.Max(0, 1 - dt * 5);
-            if (age > 1.5f) Destroy(gameObject);
-        }
-    }
 }
