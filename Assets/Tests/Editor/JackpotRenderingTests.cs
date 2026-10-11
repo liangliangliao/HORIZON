@@ -45,14 +45,17 @@ namespace Horizon.Tests
                 {
                     string before=JsonUtility.ToJson(subjects[i]);
                     Assert.IsTrue(world.Cinematics.Enqueue(subjects[i],true));
+                    Transform actor=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player");
+                    var originalRenderers=actor.GetComponentsInChildren<Renderer>(true).ToDictionary(r=>r,r=>r.enabled);
                     var visual=new RewardSpectacle(world.Cinematics.Current);
                     world.Cinematics.Advance(visual.HeroTime+.65f); yield return null;
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
                     Assert.IsTrue(stage.gameObject.activeInHierarchy);
                     Transform asset=stage.Find("Reward showcase "+visual.HeroReward.Kind);
                     Assert.IsNotNull(asset); Assert.IsTrue(asset.gameObject.activeInHierarchy);
-                    Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player").gameObject.activeInHierarchy,
-                        "The completed showcase shot must not put the narrative actor in front of the actual asset.");
+                    Assert.IsTrue(actor.gameObject.activeInHierarchy,"The narrative actor must retain its state for subsequent shots.");
+                    Assert.IsTrue(actor.GetComponentsInChildren<Renderer>(true).All(r=>!r.enabled),
+                        "The completed showcase shot must not draw the narrative actor in front of the actual asset.");
                     Quaternion angle=asset.localRotation; Vector3 position=asset.localPosition;
                     world.SetPaused(true); world.Cinematics.Advance(2); yield return null;
                     Assert.AreEqual(angle,asset.localRotation); Assert.AreEqual(position,asset.localPosition); world.SetPaused(false);
@@ -68,6 +71,7 @@ namespace Horizon.Tests
                     Assert.AreEqual(Quaternion.Euler(0,-15,0),asset.localRotation);
                     Capture(world,files[i]+"-reduced");
                     world.Cinematics.Skip(); Assert.IsFalse(stage.gameObject.activeInHierarchy);
+                    foreach(var state in originalRenderers) Assert.AreEqual(state.Value,state.Key.enabled,"Leaving a showcase must restore the original narrative renderer state.");
                     Assert.AreEqual(before,JsonUtility.ToJson(subjects[i]));
                     Assert.IsTrue(world.Cinematics.Enqueue(subjects[i],true)); world.Cinematics.Skip();
                     Assert.AreEqual(before,JsonUtility.ToJson(subjects[i]));

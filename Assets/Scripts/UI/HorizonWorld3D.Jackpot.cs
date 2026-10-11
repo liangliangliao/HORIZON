@@ -13,6 +13,7 @@ namespace Horizon.UI
         private readonly Transform[] rewardMotes=new Transform[48], jackpotStars=new Transform[16];
         private readonly MeshFilter[] jackpotGlyphs=new MeshFilter[6];
         private readonly Dictionary<string,Transform> showcasePool=new Dictionary<string,Transform>();
+        private readonly List<Renderer> showcaseOccluders=new List<Renderer>();
         private HorizonRewardDigits rewardDigits;
         private Mesh embossedCoin, rewardStar;
         private Material showcaseEnamel, rewardCrystal, jackpotAura;
@@ -136,6 +137,8 @@ namespace Horizon.UI
         private void ResetJackpotStage()
         {
             spectacle=null; showcaseHero=null;
+            foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
+            showcaseOccluders.Clear();
             if(jackpotStage==null) return;
             jackpotStage.gameObject.SetActive(false); showcasePlatform.gameObject.SetActive(false); jackpotPlaque.gameObject.SetActive(false);
             foreach(Transform item in showcasePool.Values) item.gameObject.SetActive(false);
@@ -166,12 +169,13 @@ namespace Horizon.UI
                 }
                 if(spectacle.HeroReward.Kind==RewardObjectKind.BrokenLink)
                     showcaseHero.Find("Other link").localPosition=new Vector3(.2f+frame.Lid*.16f,.04f+frame.Lid*.1f,0);
-                if(frame.Hero>.95f)
+                if(frame.Hero>.95f && showcaseOccluders.Count==0)
                 {
                     // The narrative bodies remain in the earlier shots. In the
-                    // final product shot they must not occlude the actual asset.
-                    moviePlayer.gameObject.SetActive(false); movieFuture.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false);
-                    foreach(Transform item in movieObjects) item.gameObject.SetActive(false);
+                    // final product shot keep their state alive while hiding the
+                    // renderers that would occlude the actual receipt asset.
+                    HideShowcaseOccluder(moviePlayer); HideShowcaseOccluder(movieFuture); HideShowcaseOccluder(movieFriend);
+                    foreach(Transform item in movieObjects) HideShowcaseOccluder(item);
                 }
             }
             showcasePlatform.gameObject.SetActive(hero);
@@ -208,6 +212,12 @@ namespace Horizon.UI
             }
             movieLight.color=RewardEffectTint();
             movieLight.intensity=Mathf.Max(movieLight.intensity,frame.Light*(moviePlan.Event.tier>=RewardTier.Epic?3.5f:1.3f));
+        }
+
+        private void HideShowcaseOccluder(Transform item)
+        {
+            foreach(Renderer renderer in item.GetComponentsInChildren<Renderer>(true))
+                if(renderer.enabled) { showcaseOccluders.Add(renderer); renderer.enabled=false; }
         }
 
         private Color RewardEffectTint()
