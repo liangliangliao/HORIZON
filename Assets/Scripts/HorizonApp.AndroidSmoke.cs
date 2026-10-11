@@ -174,6 +174,35 @@ namespace Horizon
             AndroidSmoke.Require(reward.acknowledged && world.WorldCamera.rect==viewport,"Reward back did not restore the scene.");
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
             CaptureAndroidFrame("06-reward-back-home",world.Avatar);
+            // Verify the relay material on the actual GLES backbuffer.
+            foreach(DomainEventKind kind in new[] {DomainEventKind.Cascade,DomainEventKind.CausalSingularity})
+            {
+                DomainEvent causal=AndroidCausalEvent(kind);
+                androidSmokeRewardReturned=false;
+                world.Cinematics.enabled=false;
+                try
+                {
+                    PlayMasterSpectacle(causal,AndroidSmokeFinishReward);
+                    var relay=new CausalRelayPlan(world.Cinematics.Current);
+                    Shader beam=Resources.Load<Shader>("HorizonCausalBeam");
+                    AndroidSmoke.Require(beam!=null && beam.isSupported,"The native causal beam shader is unavailable.");
+                    float first=relay.Nodes[0].ActivationTime+.03f;
+                    world.Cinematics.Advance(first);
+                    yield return null; yield return new WaitForEndOfFrame();
+                    AndroidSmoke.Require(world.GetComponentsInChildren<Renderer>().Any(r=>
+                        r.name.StartsWith("Director driven causal light shaft") && r.enabled),
+                        "The native causal cue did not activate a light shaft.");
+                    Transform actor=world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Cinematic player").transform;
+                    CaptureAndroidFrame("08-causal-"+kind+"-first",actor);
+                    world.Cinematics.Advance(relay.ImpactTime-first+.03f);
+                    yield return null; yield return new WaitForEndOfFrame();
+                    CaptureAndroidFrame("08-causal-"+kind+"-impact",actor);
+                    SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event"); yield return null;
+                    AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
+                        "The native causal movie did not restore the phone controls.");
+                }
+                finally { world.Cinematics.enabled=true; }
+            }
             // Exercise the player's recording/export controls. The short shots
             // above can finish before the recorder's startup/resume warmup on a
             // slow emulator. Wait for actual rendered frames, never inject timing.
@@ -208,6 +237,27 @@ namespace Horizon
         {
             Button button=root.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.name==name && b.interactable);
             AndroidSmoke.Require(button!=null,"Missing visible button: "+name); button.onClick.Invoke();
+        }
+        private static DomainEvent AndroidCausalEvent(DomainEventKind kind)
+        {
+            for(int seed=15;seed<19;seed++)
+            {
+                var life=GameSession.StartMasterLife(3,seed,RunMode.LongRun);
+                while(life.CompletedRun==null)
+                {
+                    while(life.HasPredictionReview) life.MarkPredictionReviewed();
+                    if(life.CanPredict) life.SkipPrediction();
+                    if(life.NeedsStation) life.VisitStation();
+                    if(life.HasChosen) { life.Advance(); continue; }
+                    CardSpec[] available=life.Hand.Where(life.CanPlay).ToArray();
+                    CardSpec chosen=available.FirstOrDefault(c=>c.GivesSupport && life.Day%3==0) ??
+                        available.FirstOrDefault(c=>c.Kind==CardKind.Growth && life.Energy>=4 && c.Id!="imagine") ?? available.Last();
+                    life.Choose(chosen.Id);
+                    DomainEvent source=life.Master.events.FirstOrDefault(e=>e.kind==kind);
+                    if(source!=null) return source.Copy();
+                }
+            }
+            throw new InvalidOperationException("The original rules did not reach native "+kind);
         }
         private Color AndroidSkyColor(Texture2D frame)
         {

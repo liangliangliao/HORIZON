@@ -12,4 +12,6 @@
 
 便携测试 `CausalRelayTests` 验证真实 Long Run 的 CASCADE / Causal Singularity、多父节点、快照与存档、隐藏来源、旧收据、暂停和对象上限。`CausalRelayRenderingTests` 在 Unity 中验证实际事件、光柱着色器、暂停、减弱动效、清理和原文保留，输出 `artifacts/cinematics/causal-relays-*.png` 及 360×640 / 20fps 动图。
 
+Android 开发检查包另外从原规则生成两种因果事件，在实际 GLES3 后缓冲中录制首次光柱与最终汇聚画面，检查材质支持和演出返回。验证脚本要求这四张原生截图齐全。
+
 验证必须对应本轮提交。实际 Unity 输出、Android 构建及原生检查通过前，不把本地规则测试当成渲染成功。模拟器兼容检查也不代替真机帧率、美术、音效和触觉体验验收。
