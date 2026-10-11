@@ -121,8 +121,8 @@ namespace Horizon.Tests
                         bottom=Mathf.Min(bottom,y); top=Mathf.Max(top,y);
                     }
                 }
-                Assert.Greater(bottom,.53f,"The 3D multiplier must clear the real prediction receipt panel.");
-                Assert.Less(top,.735f,"The 3D multiplier must clear the actual title panel.");
+                Assert.Greater(bottom,HorizonCinemaLayout.PredictionTop,"The 3D multiplier must clear the real prediction receipt panel.");
+                Assert.Less(top,HorizonCinemaLayout.TitleBottom,"The 3D multiplier must clear the actual title panel.");
                 Bounds hero=asset.GetComponentsInChildren<Renderer>().First().bounds;
                 foreach(Renderer renderer in asset.GetComponentsInChildren<Renderer>()) hero.Encapsulate(renderer.bounds);
                 float center=viewport.y+camera.WorldToViewportPoint(hero.center).y*viewport.height;

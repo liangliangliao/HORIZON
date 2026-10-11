@@ -123,7 +123,7 @@ namespace Horizon.UI
                     if(renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
                     if(!found) { bounds=renderer.bounds; found=true; } else bounds.Encapsulate(renderer.bounds);
                 }
-                showcaseScale=(fullscreen?1.35f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
+                showcaseScale=(fullscreen?2.15f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
                 showcaseOffset=found?showcaseHero.InverseTransformPoint(bounds.center):Vector3.zero;
             }
             bool money=plan.Objects.Any(o=>o.Kind==RewardObjectKind.MoneyWallet && o.Amount>0);
@@ -157,11 +157,14 @@ namespace Horizon.UI
             {
                 showcaseHero.gameObject.SetActive(hero);
                 float breath=preferences.reducedMotion?0:Mathf.Sin(time*2)*.02f;
-                float scale=showcaseScale*(.72f+frame.Hero*.28f+breath);
+                float age=time-spectacle.HeroTime;
+                float bounce=preferences.reducedMotion?0:age>=0?Mathf.Sin(Mathf.Min(1,age/.45f)*Mathf.PI)*.18f:0;
+                float scale=showcaseScale*(.72f+frame.Hero*.28f+breath+bounce);
                 showcaseHero.localScale=Vector3.one*scale;
                 showcaseHero.localRotation=Quaternion.Euler(0,preferences.reducedMotion?-15:-15+Mathf.Sin(time*.65f)*9,0);
                 showcaseHero.localPosition=showcaseCenter-showcaseHero.localRotation*(showcaseOffset*scale);
                 SampleRewardDevice(showcaseHero,spectacle.HeroReward,frame.Lid);
+                SampleRewardDetail(showcaseHero,time,frame.Lid);
                 if(spectacle.HeroReward.Kind==RewardObjectKind.ReservoirCore)
                 {
                     Transform lid=showcaseHero.Find("Storage lid");
@@ -275,7 +278,7 @@ namespace Horizon.UI
             const float depth=5;
             float viewWidth=2*depth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f)*WorldCamera.aspect;
             float punch=preferences.reducedMotion?0:Mathf.Sin(Mathf.Clamp01((frame.Time-jackpotNumberChangedAt)/.3f)*Mathf.PI)*.12f;
-            jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,showcaseFullscreen?.61f:.50f,depth));
+            jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,showcaseFullscreen?HorizonCinemaLayout.PlaqueViewportY:.50f,depth));
             jackpotPlaque.rotation=WorldCamera.transform.rotation;
             jackpotPlaque.localScale=Vector3.one*Mathf.Min(.78f,viewWidth*(showcaseFullscreen?.52f:.30f)/3.5f)*(1+punch)*frame.Fade;
         }

@@ -100,7 +100,17 @@ namespace Horizon.UI
         private AudioClip ShortCueTone(string name,float frequency,float duration)
         {
             const int rate=22050; var samples=new float[(int)(duration*rate)];
-            for(int i=0;i<samples.Length;i++) { float t=i/(float)rate; samples[i]=(Mathf.Sin(t*frequency*2*Mathf.PI)+.18f*Mathf.Sin(t*frequency*3*Mathf.PI))*Mathf.Exp(-t*18)*.4f; }
+            bool low=frequency<90;
+            for(int i=0;i<samples.Length;i++)
+            {
+                float t=i/(float)rate,progress=t/duration;
+                float attack=Mathf.Min(1,t/.004f),release=Mathf.Min(1,(duration-t)/.025f);
+                float envelope=attack*release*Mathf.Exp(-t*(low?9:15));
+                float phase=2*Mathf.PI*frequency*(t-(low?.38f:.08f)*t*t/duration);
+                float fundamental=Mathf.Sin(phase),harmonic=Mathf.Sin(phase*(low?2:2.76f));
+                float shimmer=Mathf.Sin(phase*4.17f)*Mathf.Exp(-t*35);
+                samples[i]=Mathf.Clamp((fundamental*.56f+harmonic*.17f+shimmer*.1f)*envelope,-.85f,.85f);
+            }
             AudioClip clip=AudioClip.Create(name,samples.Length,1,rate,false); clip.SetData(samples,0); sounds.Add(clip); return clip;
         }
         public void BeginCinematic(RewardPlan plan,bool fullscreen)
@@ -132,6 +142,7 @@ namespace Horizon.UI
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
             PrepareJackpotStage(plan,fullscreen);
             PrepareCausalRelays();
+            PrepareCinemaProduction();
             movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
                 spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -309,8 +320,9 @@ namespace Horizon.UI
             float pulseAtImpact=time>=movieImpactTime?Mathf.Clamp01(1-(time-movieImpactTime)/.25f):0;
             movieLight.intensity=Mathf.Max(impact,pulseAtImpact)*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
             SampleCinematicStaging(time,impact,ref camera,ref look);
-            SampleCausalRelays(time);
+            SampleCausalRelays(time,ref camera,ref look);
             SampleJackpotStage(time,ref camera,ref look);
+            SampleCinemaProduction(time);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen) WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*shake;
@@ -369,6 +381,7 @@ namespace Horizon.UI
         {
             if(moviePlan==null) return;
             ResetCinematicStaging();
+            ResetCinemaProduction();
             ResetCausalRelays();
             ResetJackpotStage();
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);

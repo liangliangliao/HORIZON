@@ -20,6 +20,10 @@ namespace Horizon.Tests
         public void CausalBeamShaderImportsWithoutErrors()
         { Shader shader=Resources.Load<Shader>("HorizonCausalBeam"); Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader)); }
 
+        [Test]
+        public void OpticalCinemaBackdropImportsWithoutErrors()
+        { Shader shader=Resources.Load<Shader>("HorizonCinemaBackdrop"); Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader)); }
+
         [UnityTest]
         public IEnumerator ActualCascadeRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
         {
@@ -35,8 +39,8 @@ namespace Horizon.Tests
             archive.preferences.sound=false; archive.preferences.haptics=false;
             typeof(HorizonApp).GetMethod("ApplyPreferences",flags).Invoke(app,null);
             world.Cinematics.enabled=false;
-            var target=new RenderTexture(360,640,24,RenderTextureFormat.ARGB32); target.Create();
-            var pixels=new Texture2D(360,640,TextureFormat.RGB24,false);
+            var target=new RenderTexture(540,960,24,RenderTextureFormat.ARGB32); target.Create();
+            var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
             var ui=new GameObject("Causal relay UI capture",typeof(Camera)).GetComponent<Camera>();
             ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20; ui.targetTexture=target;
             RenderMode mode=canvas.renderMode; Camera previous=canvas.worldCamera; float distance=canvas.planeDistance;
@@ -47,6 +51,7 @@ namespace Horizon.Tests
                 foreach(DomainEventKind kind in new[] {DomainEventKind.Cascade,DomainEventKind.CausalSingularity})
                 {
                     DomainEvent source=CausalRelayTests.ActualCascade(kind); string before=JsonUtility.ToJson(source);
+                    CameraClearFlags clear=world.WorldCamera.clearFlags; Color background=world.WorldCamera.backgroundColor;
                     typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
                     var relay=new CausalRelayPlan(world.Cinematics.Current);
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled actual causal relays");
@@ -62,11 +67,16 @@ namespace Horizon.Tests
                     float clock=properties.GetFloat("_Clock");
                     world.Cinematics.SetPaused(true); world.Cinematics.Advance(1); yield return null;
                     beam.GetPropertyBlock(properties); Assert.AreEqual(clock,properties.GetFloat("_Clock")); Assert.AreEqual(scale,beam.transform.localScale);
+                    Transform production=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="HORIZON optical cinema production");
+                    Transform rotor=production.Find("Architectural horizon aperture/Rotating time coordinate rim"); Quaternion rotation=rotor.localRotation;
+                    world.Cinematics.Advance(.7f); yield return null; Assert.AreEqual(rotation,rotor.localRotation);
                     world.Cinematics.SetPaused(false);
                     world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false,reducedMotion=true}); world.Cinematics.Advance(.001f);
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     Assert.AreEqual(relay.Nodes.Count,stage.Cast<Transform>().Count(t=>t.gameObject.activeSelf && t.name.StartsWith("Causal relay ·")));
+                    Assert.IsFalse(production.GetComponentsInChildren<LineRenderer>().Any(l=>l.name.StartsWith("Cinematic energy ribbon")));
                     world.Cinematics.Skip(); Assert.IsFalse(stage.gameObject.activeInHierarchy);
+                    Assert.IsFalse(production.gameObject.activeInHierarchy); Assert.AreEqual(clear,world.WorldCamera.clearFlags); Assert.AreEqual(background,world.WorldCamera.backgroundColor);
                     world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false});
                     typeof(HorizonApp).GetMethod("CloseMasterPage",flags).Invoke(app,null);
                     typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
@@ -74,20 +84,26 @@ namespace Horizon.Tests
                     canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                     float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
                     using(var stream=File.Create("artifacts/cinematics/causal-relays-"+kind+".gif"))
-                    using(var gif=new TimelineGifWriter(stream,360,640))
+                    using(var gif=new TimelineGifWriter(stream,540,960))
                     {
                         for(int frame=0;frame<frames;frame++)
                         {
                             if(frame>0) world.Cinematics.Advance(duration/frames);
                             Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target); RenderTexture.active=target;
-                            pixels.ReadPixels(new Rect(0,0,360,640),0,0); pixels.Apply(); gif.Frame(pixels.GetPixels32(),5);
-                            if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2)
+                            pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); gif.Frame(pixels.GetPixels32(),5);
+                            float heroTime=new RewardSpectacle(world.Cinematics.Current).HeroTime;
+                            if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2 || frame==Mathf.CeilToInt(heroTime*20)+8)
                                 File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+"-"+frame+".png",pixels.EncodeToPNG());
                             yield return null;
                         }
                     }
                     Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                     Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
+                    foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})
+                    {
+                        Text text=root.GetComponentsInChildren<Text>(true).Single(t=>t.name==name);
+                        Assert.GreaterOrEqual(text.rectTransform.rect.height+.5f,text.preferredHeight,name+" must fit without clipping the original copy.");
+                    }
                     world.Cinematics.Skip(); typeof(HorizonApp).GetMethod("CloseMasterPage",flags).Invoke(app,null);
                     Assert.AreEqual(before,JsonUtility.ToJson(source));
                 }

@@ -28,7 +28,7 @@ namespace Horizon.Game
                     RewardEvidence source = evidence[i];
                     var peers = evidence.Where(x => x.day == source.day).ToList();
                     int lane = peers.IndexOf(source);
-                    float x = peers.Count == 1 ? 0 : (lane / (float)(peers.Count - 1) - .5f) * 2.6f;
+                    float x = peers.Count == 1 ? (float)Math.Sin(i*2.39996f)*1.2f : (lane / (float)(peers.Count - 1) - .5f) * 2.6f;
                     int first = evidence.Min(n => n.day), last = evidence.Max(n => n.day);
                     float z = first == last ? 2 : -1 + (source.day - first) / (float)(last - first) * 6;
                     // Same-day nodes retain depth separation, even when their
@@ -59,7 +59,7 @@ namespace Horizon.Game
             float final = time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
             float beam = lit && !reducedMotion ? Math.Max(pulse, final) * fade : 0;
             return new CausalRelayFrame(lit, fade, pulse * fade, beam,
-                reducedMotion ? 0 : (1.15f + .55f * Math.Max(pulse, final)) * fade);
+                reducedMotion ? 0 : (2.2f + 1.0f * Math.Max(pulse, final)) * fade);
         }
         private static float Ease(float a, float b, float t)
         { float p = Math.Max(0, Math.Min(1, (t - a) / Math.Max(.0001f, b - a))); return p * p * (3 - 2 * p); }
