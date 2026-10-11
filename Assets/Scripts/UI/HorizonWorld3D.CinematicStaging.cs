@@ -118,7 +118,7 @@ namespace Horizon.UI
             // portrait camera rather than the depth of the world-space rays.
             // Keep them between the event heading and the prediction panel.
             for(int i=0;i<3;i++) if(movieLabels[i].gameObject.activeSelf)
-                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.62f:.78f,6));
+                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.70f:.78f,6));
         }
         private void SampleCinematicStaging(float time,float impact,ref Vector3 camera,ref Vector3 look)
         {
