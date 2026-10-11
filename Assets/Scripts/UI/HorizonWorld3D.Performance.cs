@@ -90,6 +90,7 @@ namespace Horizon.UI
                 { movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear); main.maxParticles=ParticleBudget; }
             }
             if(optics!=null) optics.LowPower=LowCostEffects;
+            rewardSparkPool?.SetBudget(ParticleBudget,preferences.reducedMotion);
             if(bloom!=null) bloom.enabled=!LowCostEffects && bloom.IsSupported;
         }
     }

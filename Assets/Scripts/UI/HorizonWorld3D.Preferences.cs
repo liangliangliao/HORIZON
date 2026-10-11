@@ -57,6 +57,7 @@ namespace Horizon.UI
             QualitySettings.shadows = preferences.batterySaver ? UnityEngine.ShadowQuality.Disable : UnityEngine.ShadowQuality.All;
             adaptiveBudget.Reset(); ApplyAdaptiveQuality();
             UpdateAudio();
+            if(moviePlan!=null && Cinematics.Current!=null) SampleCinematic(Cinematics.Elapsed);
         }
 
         public void SetPaused(bool value)
@@ -66,6 +67,7 @@ namespace Horizon.UI
             // scene. Disabling the base camera leaves URP's clear camera behind
             // and turns the phone's 3D viewport blank during settings/backgrounding.
             paused = value;
+            rewardSparkPool?.SetPaused(value);
             foreach (HorizonActor actor in GetComponentsInChildren<HorizonActor>(true))
                 actor.MotionRate = value ? 0 : 1;
             Cinematics?.SetPaused(value);

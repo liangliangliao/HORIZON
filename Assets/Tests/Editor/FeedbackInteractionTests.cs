@@ -79,7 +79,7 @@ namespace Horizon.Tests
         [Test]
         public void ArtShadersImportWithoutCompilationErrors()
         {
-            foreach (string name in new[] { "HorizonLit", "HorizonGlow", "HorizonAtmosphere", "HorizonContact", "HorizonBloom" })
+            foreach (string name in new[] { "HorizonLit", "HorizonGlow", "HorizonAtmosphere", "HorizonContact", "HorizonBloom", "HorizonRewardAura" })
             {
                 Shader shader = Resources.Load<Shader>(name);
                 Assert.IsNotNull(shader, name);

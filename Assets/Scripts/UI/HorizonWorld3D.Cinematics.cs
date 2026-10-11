@@ -84,6 +84,7 @@ namespace Horizon.UI
             var shape=movieParticles.shape; shape.shapeType=ParticleSystemShapeType.Sphere; shape.radius=.15f;
             var renderer=movieParticles.GetComponent<ParticleSystemRenderer>(); renderer.sharedMaterial=portalLight; renderer.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
             InitializeCinematicStaging();
+            InitializeJackpotStage();
             cinematicStage.gameObject.SetActive(false);
             impactTone=ShortCueTone("Synchronous low impact",65,.24f); nodeTone=ShortCueTone("Causal node hit",220,.12f); heartbeatTone=ShortCueTone("Quiet heartbeat",48,.16f);
         }
@@ -120,6 +121,7 @@ namespace Horizon.UI
             foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
+            PrepareJackpotStage(plan);
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             var budget = movieParticles.main; budget.maxParticles = ParticleBudget;
             movieParticles.Play();
@@ -295,6 +297,7 @@ namespace Horizon.UI
             float pulseAtImpact=time>=movieImpactTime?Mathf.Clamp01(1-(time-movieImpactTime)/.25f):0;
             movieLight.intensity=Mathf.Max(impact,pulseAtImpact)*(moviePlan.Event.tier>=RewardTier.Epic?2:1);
             SampleCinematicStaging(time,impact,ref camera,ref look);
+            SampleJackpotStage(time,ref camera,ref look);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen) WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*shake;
@@ -351,6 +354,7 @@ namespace Horizon.UI
         {
             if(moviePlan==null) return;
             ResetCinematicStaging();
+            ResetJackpotStage();
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             cinematicCamera.gameObject.SetActive(false);
             cameraPosition=savedCameraPosition; cameraLook=savedCameraLook; WorldCamera.rect=savedCameraRect; WorldCamera.fieldOfView=savedFov;

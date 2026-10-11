@@ -112,6 +112,7 @@ namespace Horizon.UI
         {
             if(WorldCamera==null) return;
             foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
+            FrameJackpotStage();
             if(moviePlan==null || (moviePlan.Event.kind!=DomainEventKind.Synchronized && moviePlan.Event.kind!=DomainEventKind.Surprise)) return;
             // These are readable annotations, so frame them against the actual
             // portrait camera rather than the depth of the world-space rays.

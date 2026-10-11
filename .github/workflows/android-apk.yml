@@ -9,6 +9,7 @@ on:
       - main
       - codex/unity-prototype-v0-3
       - codex/playable-feedback-3d
+      - fix/apk-rewards-animation
   workflow_dispatch:
     inputs:
       native_check_run:
