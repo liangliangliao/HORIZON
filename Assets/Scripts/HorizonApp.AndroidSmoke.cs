@@ -192,11 +192,18 @@ namespace Horizon
                     AndroidSmoke.Require(world.GetComponentsInChildren<Renderer>().Any(r=>
                         r.name.StartsWith("Director driven causal light shaft") && r.enabled),
                         "The native causal cue did not activate a light shaft.");
-                    Transform actor=world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Cinematic player").transform;
-                    CaptureAndroidFrame("08-causal-"+kind+"-first",actor);
+                    // The close shot deliberately hides bystanders. Inspect the
+                    // actual lit source and preserve all backbuffer/contrast checks.
+                    Transform relays=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Pooled actual causal relays");
+                    Transform source=relays.GetChild(relay.Nodes[0].Index);
+                    AndroidSmoke.Require(source.GetComponentsInChildren<Renderer>().Any(r=>r.enabled && r.gameObject.activeInHierarchy),
+                        "The actual native source has no visible renderer.");
+                    Shader iris=Resources.Load<Shader>("HorizonCinemaIris");
+                    AndroidSmoke.Require(iris!=null && iris.isSupported,"The native attention iris shader is unavailable.");
+                    CaptureAndroidFrame("08-causal-"+kind+"-first",source,Vector3.up*.1f);
                     world.Cinematics.Advance(relay.ImpactTime-first+.03f);
                     yield return null; yield return new WaitForEndOfFrame();
-                    CaptureAndroidFrame("08-causal-"+kind+"-impact",actor);
+                    CaptureAndroidFrame("08-causal-"+kind+"-impact",source,Vector3.up*.1f);
                     SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event"); yield return null;
                     AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
                         "The native causal movie did not restore the phone controls.");
@@ -307,7 +314,7 @@ namespace Horizon
             }
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
         }
-        private void CaptureAndroidFrame(string name,Transform actor)
+        private void CaptureAndroidFrame(string name,Transform actor,Vector3? focusOffset=null)
         {
             AndroidSmoke.Require(world.WorldCamera.enabled && actor.gameObject.activeInHierarchy,"The scene actor/camera is hidden.");
             Texture2D frame=ScreenCapture.CaptureScreenshotAsTexture();
@@ -323,7 +330,7 @@ namespace Horizon
                     AndroidSmoke.Require(sample.b>sample.r && sample.b>.025f,
                         "The Android night sky lost its blue channel: "+sample);
                 }
-                Vector3 point=world.WorldCamera.WorldToScreenPoint(actor.position+Vector3.up*1.3f);
+                Vector3 point=world.WorldCamera.WorldToScreenPoint(actor.position+(focusOffset??Vector3.up*1.3f));
                 AndroidSmoke.Require(point.z>0 && point.x>0 && point.x<frame.width && point.y>0 && point.y<frame.height,"The scene actor is outside the phone viewport.");
                 float minimum=1,maximum=0;
                 int radius=Mathf.Max(12,frame.width/24);
