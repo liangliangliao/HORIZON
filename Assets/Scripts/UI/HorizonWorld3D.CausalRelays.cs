@@ -80,6 +80,14 @@ namespace Horizon.UI
             if(relayPlan==null || relayStage==null || !relayStage.gameObject.activeSelf) return;
             bool final=time>=relayPlan.ImpactTime;
             camera=new Vector3(2.8f,7.2f,-7.5f); look=new Vector3(0,.15f,2);
+            if(cinemaTension!=null && cinemaTension.SourceCloseup && time<cinemaTension.FirstRelease+1.10f && !preferences.reducedMotion)
+            {
+                CausalRelayNode source=relayPlan.Nodes[0]; Vector3 center=new Vector3(source.X,source.Y,source.Z);
+                float push=Smooth(0,cinemaTension.FirstHold,tensionFrame.PoseTime);
+                Vector3 eye=center+Vector3.Lerp(new Vector3(1.15f,1.2f,-2.9f),new Vector3(.8f,1f,-2.35f),push);
+                camera=Vector3.Lerp(camera,eye,tensionFrame.Focus);
+                look=Vector3.Lerp(look,center+Vector3.up*.08f,tensionFrame.Focus);
+            }
             int columnBudget=preferences.reducedMotion?0:LowCostEffects?4:causalRelays.Length;
             for(int i=0;i<relayPlan.Nodes.Count;i++)
             {
@@ -87,10 +95,24 @@ namespace Horizon.UI
                 Color tint=relayPlan.Nodes[i].Evidence.kind==CausalNodeKind.Action?Palette.Gold:Palette.Mint;
                 SetMovieColor(movieNodes[i],frame.Lit?Color.Lerp(tint,tint*1.6f,frame.Pulse)*frame.Fade:Palette.Muted*.25f);
                 movieNodes[i].localScale=Vector3.one*(.24f+frame.Pulse*.16f);
+                if(i==0 && cinemaTension!=null && cinemaTension.SourceCloseup && time<cinemaTension.FirstRelease && !preferences.reducedMotion)
+                {
+                    float charge=tensionFrame.Charge;
+                    causalRelays[i].localScale=Vector3.one*(.92f-charge*.045f);
+                    movieNodes[i].localScale=Vector3.one*(.24f+charge*.10f);
+                    SetMovieColor(movieNodes[i],Color.Lerp(Palette.Muted*.25f,tint*.8f,charge));
+                }
+                else causalRelays[i].localScale=Vector3.one;
                 relayCrowns[i].localPosition=Vector3.up*(.08f+frame.Pulse*.33f);
                 relayCrowns[i].localRotation=Quaternion.Euler(0,preferences.reducedMotion?0:frame.Pulse*90,0);
                 relayRings[i].localScale=Vector3.one*(1+frame.Pulse*1.1f);
                 SetMovieColor(relayRings[i],(frame.Lit?tint:Palette.Muted*.15f)*frame.Fade);
+                if(i==0 && cinemaTension!=null && cinemaTension.SourceCloseup && time<cinemaTension.FirstRelease && !preferences.reducedMotion)
+                {
+                    relayCrowns[i].localPosition=Vector3.up*(.08f-tensionFrame.Charge*.055f);
+                    relayCrowns[i].localRotation=Quaternion.Euler(0,tensionFrame.Charge*18,0);
+                    SetMovieColor(relayRings[i],tint*(.1f+tensionFrame.Charge*.65f));
+                }
                 // Low quality preserves every source and connection, reducing
                 // only simultaneous decorative columns around the newest hits.
                 int recent=0;
@@ -104,7 +126,7 @@ namespace Horizon.UI
                     renderer.transform.localPosition=Vector3.up*(frame.Height*.5f-.03f);
                     renderer.transform.localScale=new Vector3(.46f+frame.Pulse*.2f,frame.Height,1);
                     relayProperties.Clear(); relayProperties.SetColor("_Color",tint);
-                    relayProperties.SetFloat("_Intensity",frame.Beam);
+                    relayProperties.SetFloat("_Intensity",frame.Beam*(1-tensionFrame.Preview*.94f));
                     relayProperties.SetFloat("_Clock",time); renderer.SetPropertyBlock(relayProperties);
                 }
             }

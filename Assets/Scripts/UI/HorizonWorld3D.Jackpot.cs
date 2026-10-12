@@ -151,20 +151,24 @@ namespace Horizon.UI
             if(spectacle==null) return;
             spectacleFrame=spectacle.Sample(time,preferences.reducedMotion);
             RewardSpectacleFrame frame=spectacleFrame;
-            bool hero=frame.Hero>.001f;
+            float preview=tensionFrame.Preview;
+            bool heldReveal=cinemaTension!=null && cinemaTension.PreviewStart<cinemaTension.Reveal && time>=cinemaTension.RevealHold && time<moviePlan.Duration*.94f && !preferences.reducedMotion;
+            bool hero=frame.Hero>.001f || preview>.001f || heldReveal;
             showcaseCenter=showcaseHero!=null?new Vector3(0,1.6f,2):moviePlayer.localPosition+Vector3.up*1.15f;
             if(showcaseHero!=null)
             {
                 showcaseHero.gameObject.SetActive(hero);
-                float breath=preferences.reducedMotion?0:Mathf.Sin(time*2)*.02f;
+                float pose=preview>0?tensionFrame.PoseTime:time;
+                float breath=preferences.reducedMotion || tensionFrame.Silent?0:Mathf.Sin(pose*2)*.02f;
                 float age=time-spectacle.HeroTime;
                 float bounce=preferences.reducedMotion?0:age>=0?Mathf.Sin(Mathf.Min(1,age/.45f)*Mathf.PI)*.18f:0;
                 float scale=showcaseScale*(.72f+frame.Hero*.28f+breath+bounce);
+                if(preview>0) scale=showcaseScale*(.80f-preview*.055f);
                 showcaseHero.localScale=Vector3.one*scale;
-                showcaseHero.localRotation=Quaternion.Euler(0,preferences.reducedMotion?-15:-15+Mathf.Sin(time*.65f)*9,0);
+                showcaseHero.localRotation=Quaternion.Euler(0,preferences.reducedMotion?-15:-15+Mathf.Sin(pose*.65f)*9,0);
                 showcaseHero.localPosition=showcaseCenter-showcaseHero.localRotation*(showcaseOffset*scale);
                 SampleRewardDevice(showcaseHero,spectacle.HeroReward,frame.Lid);
-                SampleRewardDetail(showcaseHero,time,frame.Lid);
+                SampleRewardDetail(showcaseHero,pose,frame.Lid);
                 if(spectacle.HeroReward.Kind==RewardObjectKind.ReservoirCore)
                 {
                     Transform lid=showcaseHero.Find("Storage lid");
@@ -172,7 +176,7 @@ namespace Horizon.UI
                 }
                 if(spectacle.HeroReward.Kind==RewardObjectKind.BrokenLink)
                     showcaseHero.Find("Other link").localPosition=new Vector3(.2f+frame.Lid*.16f,.04f+frame.Lid*.1f,0);
-                if(frame.Hero>.95f && showcaseOccluders.Count==0)
+                if((frame.Hero>.95f || preview>.1f) && showcaseOccluders.Count==0)
                 {
                     // The narrative bodies remain in the earlier shots. In the
                     // final product shot keep their state alive while hiding the
@@ -196,16 +200,17 @@ namespace Horizon.UI
                 Vector3 closeLook=showcaseCenter-Vector3.up*offset;
                 // The actual phone HUD covers the lower viewport, including the
                 // prediction receipt. Keep the physical asset above those panels.
-                if(!preferences.reducedMotion) camera=Vector3.Lerp(camera,closeCamera,frame.Hero);
-                look=preferences.reducedMotion?closeLook:Vector3.Lerp(look,closeLook,frame.Hero);
+                float framing=heldReveal?1:preview>0?preview:frame.Hero;
+                if(!preferences.reducedMotion) camera=Vector3.Lerp(camera,closeCamera,framing);
+                look=preferences.reducedMotion?closeLook:Vector3.Lerp(look,closeLook,framing);
             }
-            int budget=spectacle.MoteBudget(preferences.batterySaver,adaptiveBudget.Level,preferences.reducedMotion);
+            int budget=tensionFrame.Silent?0:spectacle.MoteBudget(preferences.batterySaver,adaptiveBudget.Level,preferences.reducedMotion);
             for(int i=0;i<rewardMotes.Length;i++) SampleRewardMote(i,time,budget);
             int stars=preferences.reducedMotion?0:moviePlan.Event.tier==RewardTier.Micro?3:LowCostEffects?4:16;
             for(int i=0;i<jackpotStars.Length;i++)
             {
                 float age=time-spectacle.ImpactTime-i*.023f, life=Mathf.Min(1.5f,Mathf.Max(.1f,moviePlan.Duration-spectacle.ImpactTime-.04f));
-                bool visible=i<stars && age>=0 && age<life && spectacle.Style!=RewardSpectacleStyle.Loss;
+                bool visible=!tensionFrame.Silent && i<stars && age>=0 && age<life && spectacle.Style!=RewardSpectacleStyle.Loss;
                 jackpotStars[i].gameObject.SetActive(visible);
                 if(!visible) continue;
                 float p=age/life, angle=i*2.39996f;
@@ -256,7 +261,7 @@ namespace Horizon.UI
             if(spectacle==null) return;
             RewardSpectacleFrame frame=spectacleFrame; Color tint=RewardEffectTint();
             Vector3 center=cinematicStage.TransformPoint(showcaseCenter);
-            float strength=moviePlan.Event.tier>=RewardTier.Epic?1:moviePlan.Event.tier>=RewardTier.Combo?.55f:.23f;
+            float strength=(moviePlan.Event.tier>=RewardTier.Epic?1:moviePlan.Event.tier>=RewardTier.Combo?.55f:.23f)*(1-tensionFrame.Preview*.94f);
             Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.18f+frame.Charge*.2f+frame.Hero*.4f)*frame.Fade*strength);
             Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,(frame.Burst+frame.Hero*.65f)*strength);
             Aura(jackpotFlare,center,1.2f+frame.Burst*3,0,Color.Lerp(tint,Color.white,.65f),frame.Burst*strength);

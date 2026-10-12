@@ -10,7 +10,7 @@
 - 最多 24 个中继器、64 条连接，重复播放复用模型与材质。省电保留全部来源和连接，只限制同时显示的装饰光柱；减弱动效使用静态亮环。光柱不依赖 HDR 或 Bloom，GLES3 使用同一着色器，流动只读取导演时钟。
 - 暂停冻结光柱、光环与节点；跳过及取消清空演出。新字段只保存演出证据，不更改资源、奖励额度、概率或胜负。旧收据没有父节点记录时保留节点，不臆造连接；隐藏来路仍不展示其父节点。
 
-便携测试 `CausalRelayTests` 验证真实 Long Run 的 CASCADE / Causal Singularity、多父节点、快照与存档、隐藏来源、旧收据、暂停和对象上限。`CausalRelayRenderingTests` 在 Unity 中验证实际事件、光柱着色器、暂停、减弱动效、清理和原文保留，输出 `artifacts/cinematics/causal-relays-*.png` 及 360×640 / 20fps 动图。
+便携测试 `CausalRelayTests` 验证真实 Long Run 的 CASCADE / Causal Singularity、多父节点、快照与存档、隐藏来源、旧收据、暂停和对象上限。`CausalRelayRenderingTests` 在 Unity 中验证实际事件、光柱着色器、暂停、减弱动效、清理和原文保留，输出 `artifacts/cinematics/causal-relays-*.png`、540×960 / 20fps 动图、全色帧序列与游戏内触发音效 PCM。注意力、蓄力与悬停的时间编排见 `CINEMATIC_ATTENTION_TENSION.md`。
 
 Android 开发检查包另外从原规则生成两种因果事件，在实际 GLES3 后缓冲中录制首次光柱与最终汇聚画面，检查材质支持和演出返回。验证脚本要求这四张原生截图齐全。
 

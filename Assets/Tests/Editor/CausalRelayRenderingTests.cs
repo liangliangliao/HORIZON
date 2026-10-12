@@ -24,6 +24,10 @@ namespace Horizon.Tests
         public void OpticalCinemaBackdropImportsWithoutErrors()
         { Shader shader=Resources.Load<Shader>("HorizonCinemaBackdrop"); Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader)); }
 
+        [Test]
+        public void AttentionIrisImportsWithoutErrors()
+        { Shader shader=Resources.Load<Shader>("HorizonCinemaIris"); Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader)); }
+
         [UnityTest]
         public IEnumerator ActualCascadeRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
         {
@@ -72,6 +76,15 @@ namespace Horizon.Tests
                     Transform rotor=production.Find("Architectural horizon aperture/Rotating time coordinate rim"); Quaternion rotation=rotor.localRotation;
                     world.Cinematics.Advance(.7f); yield return null; Assert.AreEqual(rotation,rotor.localRotation);
                     world.Cinematics.SetPaused(false);
+                    var tension=new CinematicTension(world.Cinematics.Current);
+                    world.Cinematics.Advance(tension.RevealHold+.02f-world.Cinematics.Elapsed); yield return null;
+                    Transform subject=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Reward showcase CausalChain");
+                    Assert.IsTrue(subject.gameObject.activeInHierarchy);
+                    Vector3 heldPosition=subject.localPosition; Quaternion heldAngle=subject.localRotation;
+                    Vector3 heldCamera=world.WorldCamera.transform.position; float heldFov=world.WorldCamera.fieldOfView;
+                    world.Cinematics.Advance(.15f); yield return null;
+                    Assert.AreEqual(heldPosition,subject.localPosition); Assert.AreEqual(heldAngle,subject.localRotation);
+                    Assert.AreEqual(heldCamera,world.WorldCamera.transform.position); Assert.AreEqual(heldFov,world.WorldCamera.fieldOfView);
                     world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false,reducedMotion=true}); world.Cinematics.Advance(.001f);
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     Assert.AreEqual(relay.Nodes.Count,stage.Cast<Transform>().Count(t=>t.gameObject.activeSelf && t.name.StartsWith("Causal relay ·")));
@@ -108,6 +121,12 @@ namespace Horizon.Tests
                             yield return null;
                         }
                     }
+                    byte[] pcm=world.RecordedCinemaPcm();
+                    File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+".pcm",pcm);
+                    Assert.AreEqual(Mathf.CeilToInt(duration*22050)*2,pcm.Length);
+                    Assert.AreEqual(0,PcmPeak(pcm,tension.RevealHold+.05f,tension.Reveal-.05f),"The held subject must have a real silent interval.");
+                    Assert.Greater(PcmPeak(pcm,tension.PreviewStart+.1f,tension.RevealHold-.05f),50,"Charge must be audible before silence.");
+                    Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
                     Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                     Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
                     foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})
@@ -128,6 +147,13 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
 
+        private static int PcmPeak(byte[] pcm,float from,float to)
+        {
+            int peak=0;
+            for(int i=Mathf.RoundToInt(from*22050)*2;i<Mathf.RoundToInt(to*22050)*2 && i+1<pcm.Length;i+=2)
+                peak=Math.Max(peak,Math.Abs((int)(short)(pcm[i]|pcm[i+1]<<8)));
+            return peak;
+        }
         private static void AssertSourceInsideCamera(HorizonWorld3D world)
         {
             Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
