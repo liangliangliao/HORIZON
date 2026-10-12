@@ -1,3 +1,4 @@
+using System.Linq;
 using Horizon.Game;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -12,6 +13,8 @@ namespace Horizon.UI
         private readonly Transform[] relayRings = new Transform[CausalRelayPlan.MaximumNodes];
         private readonly Transform[] relayCrowns = new Transform[CausalRelayPlan.MaximumNodes];
         private readonly Renderer[,] relayBeams = new Renderer[CausalRelayPlan.MaximumNodes,2];
+        private readonly Renderer[][] relaySolids = new Renderer[CausalRelayPlan.MaximumNodes][];
+        private readonly Color[][] relaySolidColors = new Color[CausalRelayPlan.MaximumNodes][];
         private readonly LineRenderer[] relayEdges = new LineRenderer[CausalRelayPlan.MaximumEdges];
         private MaterialPropertyBlock relayProperties;
         private int currentRelaySource = -1;
@@ -48,6 +51,8 @@ namespace Horizon.UI
                         shaft.localRotation=Quaternion.Euler(0,plane*90,0);
                         relayBeams[i,plane]=shaft.GetComponent<Renderer>();
                     }
+                    relaySolids[i]=relay.GetComponentsInChildren<Renderer>().Where(r=>!(r is LineRenderer) && !r.name.StartsWith("Director driven causal light shaft")).ToArray();
+                    relaySolidColors[i]=relaySolids[i].Select(r=>r.sharedMaterial.GetColor("_Color")).ToArray();
                 }
                 for(int i=0;i<relayEdges.Length;i++)
                     relayEdges[i]=CausalLine(relayStage,"Recorded causal edge "+i,Vector3.zero,Vector3.zero,portalLight,.018f);
@@ -84,7 +89,7 @@ namespace Horizon.UI
             {
                 CausalRelayNode source=relayPlan.Nodes[0]; Vector3 center=new Vector3(source.X,source.Y,source.Z);
                 float push=Smooth(0,cinemaTension.FirstHold,tensionFrame.PoseTime);
-                Vector3 eye=center+Vector3.Lerp(new Vector3(1.15f,1.2f,-2.9f),new Vector3(.8f,1f,-2.35f),push);
+                Vector3 eye=center+Vector3.Lerp(new Vector3(.6f,1.1f,-2.1f),new Vector3(.32f,.9f,-1.5f),push);
                 camera=Vector3.Lerp(camera,eye,tensionFrame.Focus);
                 look=Vector3.Lerp(look,center+Vector3.up*.08f,tensionFrame.Focus);
             }
@@ -92,8 +97,13 @@ namespace Horizon.UI
             for(int i=0;i<relayPlan.Nodes.Count;i++)
             {
                 CausalRelayFrame frame=relayPlan.Sample(i,time,preferences.reducedMotion);
+                bool primary=i==0 && cinemaTension!=null && time<cinemaTension.FirstRelease+1.10f;
+                float weight=1-(primary?tensionFrame.Preview:tensionFrame.Focus)*.90f;
+                for(int part=0;part<relaySolids[i].Length;part++)
+                    if(weight<.999f) SetMovieColor(relaySolids[i][part].transform,relaySolidColors[i][part]*weight);
+                    else ResetMovieColor(relaySolids[i][part].transform);
                 Color tint=relayPlan.Nodes[i].Evidence.kind==CausalNodeKind.Action?Palette.Gold:Palette.Mint;
-                SetMovieColor(movieNodes[i],frame.Lit?Color.Lerp(tint,tint*1.6f,frame.Pulse)*frame.Fade:Palette.Muted*.25f);
+                SetMovieColor(movieNodes[i],(frame.Lit?Color.Lerp(tint,tint*1.6f,frame.Pulse)*frame.Fade:Palette.Muted*.25f)*weight);
                 movieNodes[i].localScale=Vector3.one*(.24f+frame.Pulse*.16f);
                 if(i==0 && cinemaTension!=null && cinemaTension.SourceCloseup && time<cinemaTension.FirstRelease && !preferences.reducedMotion)
                 {
@@ -106,7 +116,7 @@ namespace Horizon.UI
                 relayCrowns[i].localPosition=Vector3.up*(.08f+frame.Pulse*.33f);
                 relayCrowns[i].localRotation=Quaternion.Euler(0,preferences.reducedMotion?0:frame.Pulse*90,0);
                 relayRings[i].localScale=Vector3.one*(1+frame.Pulse*1.1f);
-                SetMovieColor(relayRings[i],(frame.Lit?tint:Palette.Muted*.15f)*frame.Fade);
+                SetMovieColor(relayRings[i],(frame.Lit?tint:Palette.Muted*.15f)*frame.Fade*weight);
                 if(i==0 && cinemaTension!=null && cinemaTension.SourceCloseup && time<cinemaTension.FirstRelease && !preferences.reducedMotion)
                 {
                     relayCrowns[i].localPosition=Vector3.up*(.08f-tensionFrame.Charge*.055f);
@@ -136,13 +146,16 @@ namespace Horizon.UI
                 CausalRelayFrame from=relayPlan.Sample(edge.From,time,preferences.reducedMotion),to=relayPlan.Sample(edge.To,time,preferences.reducedMotion);
                 bool lit=from.Lit && to.Lit;
                 relayEdges[i].widthMultiplier=lit?.022f+to.Pulse*.035f:.012f;
-                SetMovieColor(relayEdges[i].transform,(lit?final?Palette.Gold:Palette.Mint:Palette.Muted*.2f)*to.Fade);
+                SetMovieColor(relayEdges[i].transform,(lit?final?Palette.Gold:Palette.Mint:Palette.Muted*.2f)*to.Fade*(1-tensionFrame.Focus*.9f));
             }
+            foreach(Transform tile in movieTiles)
+                if(tensionFrame.Focus>.001f) SetMovieColor(tile,floor.GetColor("_Color")*(1-tensionFrame.Focus*.8f));
+                else ResetMovieColor(tile);
             // One full source at a time keeps the actual action readable on a
             // narrow phone while all physical nodes remain present in the graph.
             int current=-1;
             for(int i=0;i<relayPlan.Nodes.Count;i++) if(time>=relayPlan.Nodes[i].ActivationTime) current=i;
-            if(spectacle!=null && time>=spectacle.HeroTime)
+            if((spectacle!=null && time>=spectacle.HeroTime) || tensionFrame.Preview>.08f)
             { movieLabels[25].gameObject.SetActive(false); return; }
             if(current>=0 && currentRelaySource!=current)
             {

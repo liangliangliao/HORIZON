@@ -59,6 +59,7 @@ namespace Horizon.Tests
                     typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
                     var relay=new CausalRelayPlan(world.Cinematics.Current);
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled actual causal relays");
+                    AssertOpeningCloseup(world,stage);
                     Assert.AreEqual(relay.Nodes.Count,stage.Cast<Transform>().Count(t=>t.gameObject.activeSelf && t.name.StartsWith("Causal relay ·")));
                     Assert.AreEqual(relay.Edges.Count,stage.GetComponentsInChildren<LineRenderer>().Count(l=>l.name.StartsWith("Recorded cause ·")));
                     Assert.IsFalse(world.GetComponentsInChildren<LineRenderer>().Any(l=>l.name.StartsWith("Cause beam")),"Independent chronological neighbours must not be linked.");
@@ -80,6 +81,8 @@ namespace Horizon.Tests
                     world.Cinematics.Advance(tension.RevealHold+.02f-world.Cinematics.Elapsed); yield return null;
                     Transform subject=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Reward showcase CausalChain");
                     Assert.IsTrue(subject.gameObject.activeInHierarchy);
+                    Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf);
+                    Assert.IsFalse(world.GetComponentsInChildren<TextMesh>(true).Single(t=>t.name=="Cinematic evidence label 25").gameObject.activeSelf);
                     Vector3 heldPosition=subject.localPosition; Quaternion heldAngle=subject.localRotation;
                     Vector3 heldCamera=world.WorldCamera.transform.position; float heldFov=world.WorldCamera.fieldOfView;
                     world.Cinematics.Advance(.15f); yield return null;
@@ -124,6 +127,7 @@ namespace Horizon.Tests
                     byte[] pcm=world.RecordedCinemaPcm();
                     File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+".pcm",pcm);
                     Assert.AreEqual(Mathf.CeilToInt(duration*22050)*2,pcm.Length);
+                    Assert.Greater(PcmPeak(pcm,first,first+.1f),50,"The first node release must retain its sound, including fractional sample timestamps.");
                     Assert.AreEqual(0,PcmPeak(pcm,tension.RevealHold+.05f,tension.Reveal-.05f),"The held subject must have a real silent interval.");
                     Assert.Greater(PcmPeak(pcm,tension.PreviewStart+.1f,tension.RevealHold-.05f),50,"Charge must be audible before silence.");
                     Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
@@ -153,6 +157,24 @@ namespace Horizon.Tests
             for(int i=Mathf.RoundToInt(from*22050)*2;i<Mathf.RoundToInt(to*22050)*2 && i+1<pcm.Length;i+=2)
                 peak=Math.Max(peak,Math.Abs((int)(short)(pcm[i]|pcm[i+1]<<8)));
             return peak;
+        }
+        private static void AssertOpeningCloseup(HorizonWorld3D world,Transform stage)
+        {
+            Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
+            RenderTexture target=RenderTexture.GetTemporary(540,614,24);
+            try
+            {
+                camera.rect=new Rect(0,0,1,1); camera.targetTexture=target;
+                Bounds bounds=stage.Cast<Transform>().First(t=>t.gameObject.activeSelf).Find("Evidence metal base").GetComponent<Renderer>().bounds;
+                float left=1,right=0;
+                for(int i=0;i<8;i++)
+                {
+                    Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
+                    float x=camera.WorldToViewportPoint(corner).x; left=Mathf.Min(left,x); right=Mathf.Max(right,x);
+                }
+                Assert.Greater(right-left,.4f,"The first source must dominate the initial shot, including same-frame replay.");
+            }
+            finally { camera.rect=viewport; camera.targetTexture=prior; RenderTexture.ReleaseTemporary(target); world.FrameCinematicLabels(); }
         }
         private static void AssertSourceInsideCamera(HorizonWorld3D world)
         {

@@ -343,6 +343,11 @@ namespace Horizon.UI
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;
             cinematicCamera.Lens.NearClipPlane = .1f; cinematicCamera.Lens.FarClipPlane = 80;
             cinematicBrain.ManualUpdate();
+            // Manual replay can sample several shots in the same Unity frame.
+            // Keep the physical camera on this sampled pose even when the rig
+            // returns its earlier same-frame state.
+            WorldCamera.transform.SetPositionAndRotation(cinematicCamera.transform.position,cinematicCamera.transform.rotation);
+            WorldCamera.fieldOfView=CinematicFieldOfView(time);
             if(optics.Active && focusTarget!=null && focusTarget.gameObject.activeSelf)
                 optics.FocusDistance=Mathf.Max(.1f,WorldCamera.WorldToViewportPoint(focusTarget.position).z);
             FrameCinematicLabels();

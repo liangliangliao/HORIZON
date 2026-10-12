@@ -20,6 +20,10 @@ namespace Horizon.UI
 #endif
             cinemaTension=new CinematicTension(moviePlan); tensionStopped=false; tensionPreviewCharged=false;
             if(!cinemaTension.Enabled) return;
+            if(cinemaTension.SourceCloseup)
+            {
+                HideShowcaseOccluder(moviePlayer); HideShowcaseOccluder(movieFuture); HideShowcaseOccluder(movieFriend);
+            }
             if(attentionIris==null)
             {
                 attentionMaterial=new Material(Resources.Load<Shader>("HorizonCinemaIris")); materials.Add(attentionMaterial);
@@ -42,7 +46,8 @@ namespace Horizon.UI
             foreach(RecordedCinemaSound cue in recordedCinemaSounds)
             {
                 var samples=new float[cue.Clip.samples*cue.Clip.channels]; cue.Clip.GetData(samples,0);
-                int start=Mathf.RoundToInt(cue.Time*rate);
+                // Never place a release cue one sample before its hold ends.
+                int start=(int)System.Math.Ceiling((double)cue.Time*rate);
                 for(int i=0;i<samples.Length && start+i<mixed.Length;i++)
                 {
                     float time=(start+i)/(float)rate;

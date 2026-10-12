@@ -23,7 +23,7 @@ namespace Horizon.UI
         private int displayedJackpotMultiplier=-1;
         private float jackpotNumberChangedAt, showcaseScale;
         private Vector3 showcaseOffset, showcaseCenter;
-        private bool showcaseFullscreen;
+        private bool showcaseFullscreen, showcaseFramingClean;
         private HorizonRewardSparkPool rewardSparkPool;
 
         private void InitializeJackpotStage()
@@ -139,6 +139,7 @@ namespace Horizon.UI
             spectacle=null; showcaseHero=null;
             foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
             showcaseOccluders.Clear();
+            showcaseFramingClean=false;
             if(jackpotStage==null) return;
             jackpotStage.gameObject.SetActive(false); showcasePlatform.gameObject.SetActive(false); jackpotPlaque.gameObject.SetActive(false);
             foreach(Transform item in showcasePool.Values) item.gameObject.SetActive(false);
@@ -176,8 +177,9 @@ namespace Horizon.UI
                 }
                 if(spectacle.HeroReward.Kind==RewardObjectKind.BrokenLink)
                     showcaseHero.Find("Other link").localPosition=new Vector3(.2f+frame.Lid*.16f,.04f+frame.Lid*.1f,0);
-                if((frame.Hero>.95f || preview>.1f) && showcaseOccluders.Count==0)
+                if((frame.Hero>.95f || preview>.1f) && !showcaseFramingClean)
                 {
+                    showcaseFramingClean=true;
                     // The narrative bodies remain in the earlier shots. In the
                     // final product shot keep their state alive while hiding the
                     // renderers that would occlude the actual receipt asset.
@@ -265,8 +267,9 @@ namespace Horizon.UI
             Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.18f+frame.Charge*.2f+frame.Hero*.4f)*frame.Fade*strength);
             Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,(frame.Burst+frame.Hero*.65f)*strength);
             Aura(jackpotFlare,center,1.2f+frame.Burst*3,0,Color.Lerp(tint,Color.white,.65f),frame.Burst*strength);
-            jackpotPlaque.gameObject.SetActive(frame.ShowMultiplier);
-            if(!frame.ShowMultiplier) return;
+            bool showMultiplier=frame.ShowMultiplier && tensionFrame.Preview<=.1f;
+            jackpotPlaque.gameObject.SetActive(showMultiplier);
+            if(!showMultiplier) return;
             if(displayedJackpotMultiplier!=frame.Multiplier)
             {
                 displayedJackpotMultiplier=frame.Multiplier; jackpotNumberChangedAt=frame.Time;
