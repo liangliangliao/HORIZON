@@ -221,7 +221,13 @@ namespace Horizon.UI
                 foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) SetMovieColor(node,Palette.Mint);
             }
             if(cue.Phase==CinematicPhase.SecondReveal && moviePlan.Event.tier>=RewardTier.Epic)
-            { movieFuture.gameObject.SetActive(true); movieFuture.GetComponent<HorizonActor>().Pointing=true; CueSound(nodeTone,.5f); }
+            {
+                movieFuture.gameObject.SetActive(true); movieFuture.GetComponent<HorizonActor>().Pointing=true;
+                CueSound(nodeTone,.5f);
+                if(cinemaTension!=null && cinemaTension.SourceCloseup) CueSound(impactTone,.65f);
+            }
+            if(cue.Phase==CinematicPhase.Jackpot && cinemaTension!=null && cinemaTension.SourceCloseup)
+                CueSound(impactTone,.95f);
         }
         private void CueSound(AudioClip clip,float volume)
         {

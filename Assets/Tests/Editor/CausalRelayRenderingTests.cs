@@ -131,6 +131,8 @@ namespace Horizon.Tests
                     Assert.AreEqual(0,PcmPeak(pcm,tension.RevealHold+.05f,tension.Reveal-.05f),"The held subject must have a real silent interval.");
                     Assert.Greater(PcmPeak(pcm,tension.PreviewStart+.1f,tension.RevealHold-.05f),50,"Charge must be audible before silence.");
                     Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
+                    float jackpot=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot).Time;
+                    Assert.Greater(PcmPeak(pcm,jackpot,jackpot+.15f),50,"The final network burst must have its synchronized impact sound.");
                     Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                     Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
                     foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})
