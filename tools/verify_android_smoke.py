@@ -12,6 +12,9 @@ assert report["graphics"] == "OpenGLES3", report["graphics"]
 frames = report["frames"]
 assert {"01-home", "03-returned-home", "04-resumed-home", "05-reward-visible", "06-reward-back-home", "07-battery-home"}.issubset(frames)
 assert "01b-depth-focus" in frames, "GLES depth focus was not rendered"
+for kind in ("Cascade", "CausalSingularity"):
+    for phase in ("first", "impact"):
+        assert f"08-causal-{kind}-{phase}" in frames, f"Native causal relay was not rendered: {kind}/{phase}"
 assert any(name.endswith("-Complete") for name in frames), "The actual imagination flow did not finish"
 assert any(name.endswith("-Recover") for name in frames), "Recovery was not exercised"
 assert len(frames) >= 9, frames

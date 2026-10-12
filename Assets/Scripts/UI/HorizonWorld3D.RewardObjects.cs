@@ -112,7 +112,7 @@ namespace Horizon.UI
                     Sculpt(item,"Orbit carrier",rewardRing,Vector3.zero,Vector3.one,gold);
                     Shape(item,"Future node",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.18f,portalLight); break;
                 case RewardObjectKind.CausalChain:
-                    for(int i=0;i<3;i++) { Sculpt(item,"Causal link "+i,rewardRing,new Vector3((i-1)*.35f,0,0),Vector3.one*.55f,teal).localRotation=Quaternion.Euler(0,i%2*75,0); } break;
+                    for(int i=0;i<3;i++) { Sculpt(item,"Causal link "+i,rewardRing,new Vector3((i-1)*.33f,(i-1)*.32f,0),Vector3.one*.84f,i==1?gold:teal).localRotation=Quaternion.Euler(0,i%2*75,-25); } break;
                 case RewardObjectKind.PredictionPanel:
                     Box(item,"Transparent prediction",Vector3.zero,new Vector3(.8f,.52f,.025f),glass);
                     CausalLine(item,"Predicted trajectory",new Vector3(-.3f,-.12f,-.035f),new Vector3(.3f,.18f,-.035f),glass,.025f);
@@ -131,6 +131,7 @@ namespace Horizon.UI
                         CausalLine(item,"Convergence inlet "+i,new Vector3((i-1)*.65f,-.4f,.15f),new Vector3(0,0,0),i==2?warmLight:portalLight,.04f);
                     break;
             }
+            DetailRewardObject(item,kind);
             foreach(Renderer renderer in item.GetComponentsInChildren<Renderer>()) { renderer.shadowCastingMode=ShadowCastingMode.Off; renderer.receiveShadows=false; }
             foreach (Transform part in item.GetComponentsInChildren<Transform>(true))
                 if (part != item) { rewardRestPositions[part] = part.localPosition; rewardRestRotations[part] = part.localRotation; rewardRestScales[part]=part.localScale; }
