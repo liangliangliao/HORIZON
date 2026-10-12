@@ -36,6 +36,8 @@ namespace Horizon.Tests
             Assert.IsFalse(reduced.Silent); Assert.AreEqual(0,reduced.Focus); Assert.AreEqual(0,reduced.Preview);
             foreach(DomainEventKind kind in new[] {DomainEventKind.FailAndAgain,DomainEventKind.PredictionLocked})
                 Assert.IsFalse(new CinematicTension(RewardDirector.Direct(new DomainEvent { id="quiet",tier=RewardTier.Mythic,kind=kind })).Enabled);
+            var legacy=new CinematicTension(RewardDirector.Direct(new DomainEvent {id="no-source",kind=DomainEventKind.Cascade,tier=RewardTier.Epic}));
+            Assert.IsFalse(legacy.SourceCloseup); Assert.AreEqual(0,legacy.Sample(0).Focus);
             Assert.AreEqual(0,tension.Sample(plan.Duration).Focus);
             Assert.Throws<ArgumentOutOfRangeException>(()=>tension.Sample(float.NaN));
         }

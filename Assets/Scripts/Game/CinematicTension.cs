@@ -15,7 +15,8 @@ namespace Horizon.Game
             plan=value ?? throw new ArgumentNullException(nameof(value));
             var visual=new RewardSpectacle(value);
             Enabled=visual.HasHero && value.Event.tier>=RewardTier.Epic;
-            SourceCloseup=Enabled && (value.Event.kind==DomainEventKind.Cascade || value.Event.kind==DomainEventKind.CausalSingularity);
+            SourceCloseup=Enabled && value.Cues.Any(c=>c.NodeHit) &&
+                (value.Event.kind==DomainEventKind.Cascade || value.Event.kind==DomainEventKind.CausalSingularity);
             FirstRelease=value.Cues.FirstOrDefault(c=>c.NodeHit)?.Time ?? visual.ImpactTime;
             FirstHold=Math.Max(0,FirstRelease-Math.Min(.22f,FirstRelease*.18f));
             ChargeAt=value.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge)?.Time ?? 0;
