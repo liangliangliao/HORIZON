@@ -251,22 +251,29 @@ namespace Horizon.UI
             float age=time-launch-stagger, life=Mathf.Min(2.15f,available-stagger);
             bool visible=index<budget && age>=0 && age<life && life>.01f;
             mote.gameObject.SetActive(visible); if(!visible) return;
-            float p=age/life, angle=index*2.39996f, travel=p*2.1f;
-            mote.localPosition=showcaseCenter+new Vector3(Mathf.Cos(angle)*travel*(.9f+index%4*.2f),
-                Mathf.Sin(p*Mathf.PI)*(1.25f+index%5*.15f)-p*.55f,Mathf.Sin(angle)*travel*.7f);
+            float p=age/life, angle=index*2.39996f;
+            float scatter=ImmersiveMotion.Smooth(p/.38f), collect=ImmersiveMotion.Flight((p-.48f)/.52f);
+            Vector3 outward=new Vector3(Mathf.Cos(angle)*scatter*(1.5f+index%4*.23f),
+                Mathf.Sin(scatter*Mathf.PI*.65f)*(1.25f+index%5*.15f),Mathf.Sin(angle)*scatter*.95f);
+            // Decorative motes close their journey on the displayed resource.
+            // Actual wallet flights and receipt counters remain the payout proof.
+            Vector3 gathered=showcaseCenter+Vector3.up*.12f;
+            mote.localPosition=Vector3.Lerp(showcaseCenter+outward,gathered,collect)+Vector3.up*Mathf.Sin(collect*Mathf.PI)*.35f;
             mote.localRotation=Quaternion.Euler(time*(130+index%3*30)+index*21,time*90+index*37,time*45);
-            mote.localScale=Vector3.one*Mathf.Sin(p*Mathf.PI)*(.23f+(int)moviePlan.Event.tier*.04f);
+            mote.localScale=Vector3.one*Mathf.Sin(p*Mathf.PI)*(.23f+(int)moviePlan.Event.tier*.04f)*(1-collect*.85f);
         }
 
         private void FrameJackpotStage()
         {
             if(spectacle==null) return;
             RewardSpectacleFrame frame=spectacleFrame; Color tint=RewardEffectTint();
+            float burst=tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(frame.Burst,energyFrame.Burst);
+            float afterglow=1-energyFrame.Settlement*.9f;
             Vector3 center=cinematicStage.TransformPoint(showcaseCenter);
             float strength=(moviePlan.Event.tier>=RewardTier.Epic?1:moviePlan.Event.tier>=RewardTier.Combo?.55f:.23f)*(1-tensionFrame.Preview*.94f);
-            Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.18f+frame.Charge*.2f+frame.Hero*.4f)*frame.Fade*strength);
-            Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,(frame.Burst+frame.Hero*.65f)*strength);
-            Aura(jackpotFlare,center,1.2f+frame.Burst*3,0,Color.Lerp(tint,Color.white,.65f),frame.Burst*strength);
+            Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.12f+frame.Charge*.12f+frame.Hero*.3f)*frame.Fade*strength*afterglow);
+            Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,(burst+frame.Hero*.3f)*strength*afterglow);
+            Aura(jackpotFlare,center,1.2f+burst*3,0,Color.Lerp(tint,Color.white,.65f),burst*strength);
             bool showMultiplier=frame.ShowMultiplier && tensionFrame.Preview<=.1f;
             jackpotPlaque.gameObject.SetActive(showMultiplier);
             if(!showMultiplier) return;

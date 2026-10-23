@@ -276,9 +276,12 @@ namespace Horizon.UI
                 dueDay > 0 && dueDay <= timelineLength ? DayPoint(dueDay) + Vector3.up * 0.25f : new Vector3(0, 2.3f, 6);
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.65f)
             {
-                symbol.position = Vector3.Lerp(from, to, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.2f;
-                symbol.Rotate(60 * Time.unscaledDeltaTime, 180 * Time.unscaledDeltaTime, 0);
-                symbol.localScale = Vector3.one * Mathf.Lerp(0.25f, 0.07f, t);
+                while(paused) yield return null;
+                if(symbol==null) yield break;
+                float flight=preferences.reducedMotion?1:ImmersiveMotion.Flight(t);
+                symbol.position = Vector3.Lerp(from, to, flight) + Vector3.up * Mathf.Sin(flight * Mathf.PI) * 1.2f;
+                symbol.localRotation=preferences.reducedMotion?Quaternion.identity:Quaternion.Euler(t*60,t*180,0);
+                symbol.localScale = Vector3.one * Mathf.Lerp(0.25f, 0.07f, flight);
                 yield return null;
             }
             if (kind == CardKind.Growth) WorldRipple(to, portalLight, 0.22f);

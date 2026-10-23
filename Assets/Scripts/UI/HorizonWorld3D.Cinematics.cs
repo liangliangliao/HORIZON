@@ -144,6 +144,7 @@ namespace Horizon.UI
             PrepareCausalRelays();
             PrepareCinemaProduction();
             PrepareCinemaTension();
+            PrepareImmersion();
             movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
                 spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -188,7 +189,7 @@ namespace Horizon.UI
             if(cue.NodeHit)
             {
                 if(cue.NodeIndex<movieNodes.Count) { SetMovieColor(movieNodes[cue.NodeIndex],Palette.Mint); MovieBurst(movieNodes[cue.NodeIndex].position,8); }
-                CueSound(nodeTone,.65f); MasterHaptics.Cue(28,80,preferences); return;
+                CueSound(RelayVoice(cue.NodeIndex),.65f); MasterHaptics.Cue(28,80,preferences); return;
             }
             moviePhase=cue.Phase; moviePhaseTime=cue.Time;
             if(cue.Phase==CinematicPhase.Charge) PlayTensionCharge();
@@ -211,6 +212,8 @@ namespace Horizon.UI
                 float strength=Mathf.Clamp01(Mathf.Log10(Mathf.Max(1,moviePlan.PresentationMultiplier))/2.7f);
                 MovieBurst(hit,Mathf.RoundToInt(8+56*strength));
                 CueSound(ImpactVoice(moviePlan.Event.kind),.25f+.75f*strength);
+                if(cinematicEnergy!=null && cinematicEnergy.Celebrates && moviePlan.Event.tier>=RewardTier.Major)
+                    PlayRevealShimmer(.22f+.3f*strength);
                 if(moviePlan.PresentationMultiplier>=50) CueSound(nodeTone,.3f);
                 if(moviePlan.PresentationMultiplier>=100) CueSound(heartbeatTone,.35f);
                 MasterHaptics.Impact(moviePlan.Event,preferences);
@@ -225,6 +228,7 @@ namespace Horizon.UI
                 movieFuture.gameObject.SetActive(true); movieFuture.GetComponent<HorizonActor>().Pointing=true;
                 CueSound(nodeTone,.5f);
                 if(cinemaTension!=null && cinemaTension.SourceCloseup) CueSound(impactTone,.65f);
+                if(cinematicEnergy!=null && cinematicEnergy.Celebrates) PlayRevealShimmer(.6f);
             }
             if(cue.Phase==CinematicPhase.Jackpot && cinemaTension!=null && cinemaTension.SourceCloseup)
                 CueSound(impactTone,.95f);
@@ -340,6 +344,7 @@ namespace Horizon.UI
             SampleCinematicStaging(time,impact,ref camera,ref look);
             SampleCausalRelays(time,ref camera,ref look);
             SampleJackpotStage(time,ref camera,ref look);
+            SampleImmersion(time,ref camera,ref look);
             SampleCinemaProduction(time);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
@@ -360,7 +365,11 @@ namespace Horizon.UI
             shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
         }
         private float CinematicFieldOfView(float time)
-        { if(tensionFrame.Silent) time=tensionFrame.PoseTime; return moviePlan.Event.tier>=RewardTier.Epic?Mathf.Lerp(39,48,Smooth(.55f,.85f,time/moviePlan.Duration)):38; }
+        {
+            if(tensionFrame.Silent) time=tensionFrame.PoseTime;
+            float authored=moviePlan.Event.tier>=RewardTier.Epic?Mathf.Lerp(39,48,Smooth(.55f,.85f,time/moviePlan.Duration)):38;
+            return preferences.reducedMotion?authored:authored-energyFrame.Inward*2.4f+energyFrame.Recoil*1.5f;
+        }
         private void SampleRewardObjects(float time,float impact)
         {
             float progress=time/moviePlan.Duration;
@@ -406,6 +415,7 @@ namespace Horizon.UI
             if(moviePlan==null) return;
             ResetCinematicStaging();
             ResetCinemaTension();
+            ResetImmersion();
             ResetCinemaProduction();
             ResetCausalRelays();
             ResetJackpotStage();

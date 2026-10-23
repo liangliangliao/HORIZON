@@ -11,6 +11,7 @@ on:
       - codex/playable-feedback-3d
       - fix/apk-rewards-animation
       - feat/3d-jackpot-animation
+      - feature/reward-cinematic-upgrade
   workflow_dispatch:
     inputs:
       native_check_run:

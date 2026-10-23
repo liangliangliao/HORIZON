@@ -139,8 +139,29 @@ namespace Horizon.UI
             if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor) position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
             imaginationPerformance.Play(action,beat);
             moviePlayer.localPosition=position;
+            float lens=39;
+            if(!preferences.reducedMotion)
+            {
+                // Shot-specific contrast: effort closes in, recovery opens out,
+                // victory releases. A simulated victory remains a simulation.
+                ImaginationShot shot=CurrentImaginationFrame.Shot;
+                float pressure=shot==ImaginationShot.Difficulty?Smooth(0,.8f,beat)*.65f:
+                    shot==ImaginationShot.FinalPush?Smooth(0,.8f,beat):
+                    shot==ImaginationShot.Failure?(1-Smooth(.65f,1,beat))*.4f:0;
+                float release=shot==ImaginationShot.ImaginedVictory?Smooth(0,.8f,beat):0;
+                Vector3 toward=(look-camera).normalized;
+                camera+=toward*(pressure*.65f-release*.32f);
+                lens-=pressure*2.2f; lens+=release*1.2f;
+                if(shot==ImaginationShot.Recovery)
+                {
+                    movieLight.intensity=Mathf.Lerp(.2f,.75f,Smooth(.18f,1,beat));
+                    movieLight.color=Color.Lerp(new Color(.25f,.4f,.65f),new Color(1,.68f,.38f),beat);
+                }
+                if(shot==ImaginationShot.ImaginedVictory)
+                    movieLight.intensity=1.1f+Mathf.Sin(beat*Mathf.PI)*.6f;
+            }
             if(preferences.reducedMotion) camera=new Vector3(5,4,-6);
-            WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=39;
+            WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=lens;
         }
         public void EndImaginationScene()
         {

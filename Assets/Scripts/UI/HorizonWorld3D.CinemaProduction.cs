@@ -79,11 +79,12 @@ namespace Horizon.UI
             Vector3 burstCenter=relayPlan!=null && relayPlan.Nodes.Count>0 && time<spectacle.HeroTime?new Vector3(0,1.3f,2):showcaseCenter;
             bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
             float pose=cinemaTension!=null && cinemaTension.Enabled?tensionFrame.PoseTime:time;
-            cinemaBackdropMaterial.SetColor("_Color",tint*(1-tensionFrame.Focus*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
+            float attention=Mathf.Max(tensionFrame.Focus,energyFrame.Focus*.8f);
+            cinemaBackdropMaterial.SetColor("_Color",tint*(1-attention*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
             cinemaRotor.localRotation=Quaternion.Euler(0,0,preferences.reducedMotion?0:pose*7);
-            if(!Mathf.Approximately(architectureFocus,tensionFrame.Focus))
+            if(!Mathf.Approximately(architectureFocus,attention))
             {
-                architectureFocus=tensionFrame.Focus;
+                architectureFocus=attention;
                 for(int i=0;i<cinemaArchitecture.Length;i++)
                     if(architectureFocus>.001f) SetMovieColor(cinemaArchitecture[i].transform,cinemaArchitectureColors[i]*(1-architectureFocus*.78f));
                     else ResetMovieColor(cinemaArchitecture[i].transform);
