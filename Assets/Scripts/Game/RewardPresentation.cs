@@ -169,7 +169,8 @@ namespace Horizon.Game
                 // multiplier compete for attention. The multiplier now follows
                 // impact instead of sharing its first frame.
                 float[] fractions = { 0, .10f, .23f, .36f, .47f, .50f, .64f, .74f, .84f, .92f, 1 };
-                for (int i = 0; i < fractions.Length; i++) cues.Add(new CinematicCue(fractions[i] * duration, (CinematicPhase)i, copy[i]));
+                for (int i = 0; i < fractions.Length; i++)
+                    cues.Add(new CinematicCue(fractions[i] * duration,(CinematicPhase)i,SafeCopy(copy[i],(CinematicPhase)i)));
                 cues.RemoveAll(c => c.Phase == CinematicPhase.HitStop);
                 cues.Add(new CinematicCue(duration*.50f-HoldDuration(e.tier),CinematicPhase.HitStop,copy[4]));
                 // One cue fires all senses on the same frame. Hit-stop ends at Impact.
@@ -182,17 +183,19 @@ namespace Horizon.Game
                     // Final network impact follows the final node and a visible
                     // breath-hold. This used to be 150ms and read as a dropped
                     // frame on a phone rather than intentional suspense.
-                    cues.RemoveAll(c => !c.NodeHit && c.Phase >= CinematicPhase.HeroMoment);
+                    cues.RemoveAll(c => !c.NodeHit && c.Phase >= CinematicPhase.Escalation);
                     float hit = count == 0 ? duration * .45f : cues.Where(c => c.NodeHit).Max(c => c.Time) + .001f;
-                    cues.Add(new CinematicCue(Math.Max(0, hit - .0005f), CinematicPhase.HeroMoment, e.title));
+                    cues.Add(new CinematicCue(Math.Max(0,Math.Min(hit-.001f,duration*.19f)),CinematicPhase.Escalation,
+                        SafeCopy(copy[2],CinematicPhase.Escalation)));
+                    cues.Add(new CinematicCue(Math.Max(0, hit - .0005f), CinematicPhase.HeroMoment,SafeCopy(e.title,CinematicPhase.HeroMoment)));
                     cues.Add(new CinematicCue(hit, CinematicPhase.HitStop, "每一条光，都有真实的来路。"));
                     float release=hit+HoldDuration(e.tier);
-                    cues.Add(new CinematicCue(release, CinematicPhase.Impact, e.detail));
+                    cues.Add(new CinematicCue(release,CinematicPhase.Impact,SafeCopy(e.detail,CinematicPhase.Impact)));
                     float remaining = duration - release;
                     cues.Add(new CinematicCue(release + remaining * .18f, CinematicPhase.Multiplication, "真实因果深度 ×" + Math.Max(1, e.chainSize)));
                     cues.Add(new CinematicCue(release + remaining * .40f, CinematicPhase.SecondReveal, "整个时间网络被点亮。"));
-                    cues.Add(new CinematicCue(release + remaining * .64f, CinematicPhase.Jackpot, e.title));
-                    cues.Add(new CinematicCue(release + remaining * .84f, CinematicPhase.Settlement, e.detail));
+                    cues.Add(new CinematicCue(release + remaining * .64f,CinematicPhase.Jackpot,SafeCopy(e.title,CinematicPhase.Jackpot)));
+                    cues.Add(new CinematicCue(release + remaining * .84f,CinematicPhase.Settlement,SafeCopy(e.detail,CinematicPhase.Settlement)));
                     cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
                 }
             }
@@ -258,7 +261,26 @@ namespace Horizon.Game
             {
                 float time=fractions[i]*duration;
                 if((CinematicPhase)i==CinematicPhase.HitStop) time=duration*.50f-HoldDuration(tier);
-                cues.Add(new CinematicCue(Math.Max(0,time),(CinematicPhase)i,i<copy.Length?copy[i]:""));
+                CinematicPhase phase=(CinematicPhase)i;
+                cues.Add(new CinematicCue(Math.Max(0,time),phase,SafeCopy(i<copy.Length?copy[i]:"",phase)));
+            }
+        }
+
+        private static string SafeCopy(string copy,CinematicPhase phase)
+        {
+            if(!string.IsNullOrWhiteSpace(copy) || phase==CinematicPhase.ReturnToGame) return copy??"";
+            switch(phase)
+            {
+                case CinematicPhase.Anticipation:return "一个新的变化即将发生。";
+                case CinematicPhase.Charge:return "光正在聚向这次变化。";
+                case CinematicPhase.Escalation:return "它的来路逐渐清晰。";
+                case CinematicPhase.HeroMoment:return "把注意力留在这里。";
+                case CinematicPhase.HitStop:return "屏息 · 即将揭晓。";
+                case CinematicPhase.Impact:return "结果抵达。";
+                case CinematicPhase.Multiplication:return "演出强度正在显现。";
+                case CinematicPhase.SecondReveal:return "第二重变化展开。";
+                case CinematicPhase.Jackpot:return "完整结果已经出现。";
+                default:return "这次变化已经被记录。";
             }
         }
 
