@@ -25,6 +25,7 @@ namespace Horizon.UI
         private RewardPlan plan;
         private Color accent;
         private readonly Dictionary<CanvasGroup,Vector3> hiddenPage=new Dictionary<CanvasGroup,Vector3>();
+        private readonly Dictionary<Transform,CanvasGroup> isolationGroups=new Dictionary<Transform,CanvasGroup>();
 
         private void IsolatePage()
         {
@@ -34,7 +35,11 @@ namespace Horizon.UI
             foreach(Transform sibling in transform.parent)
             {
                 if(sibling==transform || !sibling.gameObject.activeSelf) continue;
-                CanvasGroup group=sibling.GetComponent<CanvasGroup>() ?? sibling.gameObject.AddComponent<CanvasGroup>();
+                // Own a separate group. Never capture/overwrite PanelEntrance's
+                // group while its alpha is still zero: its animation must finish
+                // behind the film and remain visible when the film is dismissed.
+                if(!isolationGroups.TryGetValue(sibling,out CanvasGroup group) || group==null)
+                { group=sibling.gameObject.AddComponent<CanvasGroup>(); isolationGroups[sibling]=group; }
                 if(!hiddenPage.ContainsKey(group)) hiddenPage.Add(group,new Vector3(group.alpha,group.interactable?1:0,group.blocksRaycasts?1:0));
                 group.alpha=0; group.interactable=false; group.blocksRaycasts=false;
             }
@@ -151,7 +156,7 @@ namespace Horizon.UI
             if(Phase!=null) Phase.text=frame.PhaseCopy;
             if(Story!=null) Story.text=frame.Narration;
             CinematicTypography.Reveal(Story,VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt(frame.Narration.Length*frame.CharacterProgress)));
-            CinematicTypography.Sweep(Multiplier,frame.Time-choreography.MultiplierTime);
+            CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:frame.Time-choreography.MultiplierTime);
             float receipt=1-frame.ReceiptVeil;
             if(Explanation!=null) Explanation.text=receipt>.001f?plan.Event.detail:"";
             if(Resources!=null) Resources.text=receipt>.001f?plan.ResourceCopy:"";
@@ -191,7 +196,10 @@ namespace Horizon.UI
         }
 
         private void OnDestroy()
-        { RestorePage(); if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; director.Cancelled-=OnCancelled; }
+        {
+            RestorePage(); foreach(var group in isolationGroups.Values) if(group!=null) Destroy(group);
+            if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; director.Cancelled-=OnCancelled;
+        }
     }
 
     // Transparent edge gradients preserve full-screen motion behind the copy.

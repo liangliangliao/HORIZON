@@ -203,7 +203,7 @@ namespace Horizon.Game
             {
                 string origin=r.sourceDay>0?"D"+r.sourceDay+" · "+r.action:e.detail;
                 string provenance=r.sourceDay>0?"这个结果来自 D"+r.sourceDay+" 的行动。":e.detail;
-                string[] copy={"TIME ECHO","沿时间线，回到原来的行动。",origin,e.title,provenance,
+                string[] copy={"过去的一次行动，正在向你靠近。","沿时间线，回到原来的行动。",origin,origin,provenance,
                     e.detail,multiplier>1?"演出倍率即将显现。":e.detail,
                     string.Join(" · ",objects.Select(o=>o.Copy)),e.title,
                     r.sourceDay>0?"这个结果来自 Day "+r.sourceDay+" 的行动。\n"+e.detail:e.detail,""};

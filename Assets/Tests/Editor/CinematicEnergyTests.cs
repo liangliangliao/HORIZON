@@ -168,8 +168,11 @@ namespace Horizon.Tests
                     Assert.AreEqual(1,text.Sample(end-.1f).CharacterProgress);
                 }
                 float reveal=plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
-                Assert.GreaterOrEqual(reveal-text.MultiplierTime,2.4f-.001f);
-                if(plan.PresentationMultiplier>1) Assert.Greater(text.Sample(text.MultiplierTime+1.5f).MultiplierAlpha,.9f);
+                if(plan.PresentationMultiplier>1)
+                {
+                    Assert.GreaterOrEqual(reveal-text.MultiplierTime,2.4f-.001f);
+                    Assert.Greater(text.Sample(text.MultiplierTime+1.5f).MultiplierAlpha,.9f);
+                }
                 Assert.GreaterOrEqual(plan.Duration-text.SettlementTime,3.4f-.001f);
             }
         }

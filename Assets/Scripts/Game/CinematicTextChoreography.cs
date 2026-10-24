@@ -121,7 +121,9 @@ namespace Horizon.Game
 
         public static float Retime(DomainEvent e,System.Collections.Generic.List<CinematicCue> cues,float duration)
         {
-            var anchors=cues.Where(c=>!c.NodeHit && (IsChapter(e,c.Phase) || c.Phase==CinematicPhase.Multiplication || c.Phase==CinematicPhase.SecondReveal || c.Phase==CinematicPhase.ReturnToGame)).OrderBy(c=>c.Time).ToArray();
+            var anchors=cues.Where(c=>!c.NodeHit && (IsChapter(e,c.Phase) ||
+                e.tier>RewardTier.Micro && (c.Phase==CinematicPhase.Multiplication || c.Phase==CinematicPhase.SecondReveal) ||
+                c.Phase==CinematicPhase.ReturnToGame)).OrderBy(c=>c.Time).ToArray();
             float[] original=anchors.Select(c=>c.Time).ToArray(), mapped=new float[anchors.Length];
             bool cascade=e.kind==DomainEventKind.Cascade || e.kind==DomainEventKind.CausalSingularity;
             for(int i=1;i<anchors.Length;i++)

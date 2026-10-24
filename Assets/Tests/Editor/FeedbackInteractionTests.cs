@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
 using NUnit.Framework;
@@ -102,15 +103,16 @@ namespace Horizon.Tests
             world.ShowBoard();
             Call(app,"BindLocalCinematicCopy");
             var card=View.Panel(root,"Late receipt card",Palette.Panel,.05f,.1f,.95f,.6f).gameObject;
+            card.AddComponent<PanelEntrance>();
             var button=View.Button(card.transform,"Must not accept input","继续",()=>{},0,0,1,.2f,Palette.Mint,Palette.Ink);
             var e=new DomainEvent {id="isolation",kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,title="TIME ECHO",detail="来自过去的行动。",receipt=new RewardReceipt {sourceDay=2}};
             world.PresentMasterEvent(e);
             var late=View.Panel(root,"Created after Started",Palette.Panel,.05f,.65f,.95f,.9f).gameObject;
             yield return null; yield return null;
             Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
-            Assert.AreEqual(0,card.GetComponent<CanvasGroup>().alpha);
+            Assert.IsTrue(card.GetComponents<CanvasGroup>().Any(g=>g.alpha==0));
             Assert.AreEqual(0,late.GetComponent<CanvasGroup>().alpha);
-            Assert.IsFalse(card.GetComponent<CanvasGroup>().blocksRaycasts);
+            Assert.IsTrue(card.GetComponents<CanvasGroup>().Any(g=>!g.blocksRaycasts));
             Assert.IsFalse(button.IsInteractable());
             Canvas canvas=root.GetComponentInParent<Canvas>();
             var target=new RenderTexture(540,960,24); target.Create();
@@ -134,8 +136,9 @@ namespace Horizon.Tests
                 canvas.renderMode=mode; canvas.worldCamera=old; canvas.planeDistance=distance;
                 target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
             }
+            yield return new WaitForSecondsRealtime(.35f);
             world.Cinematics.SkipPending(); yield return null;
-            Assert.AreEqual(1,card.GetComponent<CanvasGroup>().alpha); Assert.IsTrue(button.IsInteractable());
+            Assert.IsTrue(card.GetComponents<CanvasGroup>().All(g=>g.alpha==1)); Assert.IsTrue(button.IsInteractable());
             e.id="cancel-isolation"; world.PresentMasterEvent(e); yield return null;
             world.Cinematics.CancelAll(); yield return null;
             Assert.AreEqual(1,late.GetComponent<CanvasGroup>().alpha);
