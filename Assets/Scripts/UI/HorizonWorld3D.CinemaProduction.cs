@@ -21,7 +21,6 @@ namespace Horizon.UI
 
         private void PrepareCinemaProduction()
         {
-            if(moviePlan.Event.tier<RewardTier.Major) return;
             if(cinemaProduction==null)
             {
                 cinemaProduction=Group("HORIZON optical cinema production",cinematicStage);
@@ -74,7 +73,8 @@ namespace Horizon.UI
         private void SampleCinemaProduction(float time)
         {
             if(cinemaProduction==null || !cinemaProduction.gameObject.activeSelf || spectacle==null) return;
-            Color tint=RewardEffectTint();
+            Color tint=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
+                Mathf.Clamp01(energyFrame.Inward*.66f+energyFrame.Burst*.45f));
             bool golden=spectacle.Style==RewardSpectacleStyle.Golden || spectacle.Style==RewardSpectacleStyle.Legendary;
             Vector3 burstCenter=relayPlan!=null && relayPlan.Nodes.Count>0 && time<spectacle.HeroTime?new Vector3(0,1.3f,2):showcaseCenter;
             bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
@@ -98,7 +98,8 @@ namespace Horizon.UI
                 pulse=Mathf.Max(pulse,Mathf.Exp(-age*3.2f)); burstTime=Mathf.Max(burstTime,cue.Time);
             }
             if(tensionFrame.Silent) pulse=0;
-            int ribbonBudget=preferences.reducedMotion?0:LowCostEffects?5:cinemaRibbons.Length;
+            int authoredRibbonBudget=moviePlan.Event.tier<=RewardTier.Local?4:moviePlan.Event.tier==RewardTier.Combo?8:cinemaRibbons.Length;
+            int ribbonBudget=preferences.reducedMotion?0:LowCostEffects?Mathf.Min(5,authoredRibbonBudget):authoredRibbonBudget;
             for(int i=0;i<cinemaRibbons.Length;i++)
             {
                 LineRenderer line=cinemaRibbons[i]; bool visible=i<ribbonBudget && pulse>.025f;
@@ -111,7 +112,7 @@ namespace Horizon.UI
                     Vector3 center=burstCenter;
                     line.SetPosition(segment,center+new Vector3(Mathf.Cos(turn)*radius,Mathf.Sin(turn)*radius*.78f,Mathf.Sin(a)*.45f+p*.6f));
                 }
-                line.widthMultiplier=Mathf.Max(.008f,.015f+Mathf.Sin(timeSince*Mathf.PI)*.025f)*pulse;
+                line.widthMultiplier=Mathf.Max(.006f,.011f+Mathf.Sin(timeSince*Mathf.PI)*.018f)*pulse;
                 SetMovieColor(line.transform,Color.Lerp(tint,golden && i%3==0?Palette.Gold:Color.white,.4f)*pulse);
             }
             for(int i=0;i<cinemaWaves.Length;i++)
@@ -122,7 +123,8 @@ namespace Horizon.UI
                 wave.localRotation=Quaternion.Euler(10+i*12,0,0); wave.localScale=Vector3.one*(.12f+age*(3.5f+i*.4f));
                 SetMovieColor(wave,Color.Lerp(tint,Color.white,.45f)*(1-age/.85f));
             }
-            int starBudget=!celebrates || preferences.reducedMotion?0:LowCostEffects?8:cinemaGlints.Length;
+            int authoredStars=moviePlan.Event.tier<=RewardTier.Local?6:moviePlan.Event.tier==RewardTier.Combo?12:cinemaGlints.Length;
+            int starBudget=!celebrates || preferences.reducedMotion?0:LowCostEffects?Mathf.Min(8,authoredStars):authoredStars;
             for(int i=0;i<cinemaGlints.Length;i++)
             {
                 Transform star=cinemaGlints[i]; bool show=i<starBudget && time>=movieImpactTime && tensionFrame.Focus<.1f && time<moviePlan.Duration*.94f;

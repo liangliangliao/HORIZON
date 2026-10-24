@@ -90,5 +90,59 @@ namespace Horizon.Tests
             Assert.Throws<ArgumentOutOfRangeException>(()=>energy.Sample(float.NaN));
             Assert.Throws<ArgumentOutOfRangeException>(()=>energy.Sample(float.PositiveInfinity));
         }
+
+        [Test]
+        public void EveryTierHasTimeToReadAndUsesTheCompleteSynchronizedTextGrammar()
+        {
+            float previous=0;
+            foreach(RewardTier tier in Enum.GetValues(typeof(RewardTier)))
+            {
+                RewardPlan plan=Plan(DomainEventKind.Breakthrough,tier);
+                Assert.GreaterOrEqual(plan.Duration,2.6f);
+                Assert.Greater(plan.Duration,previous); previous=plan.Duration;
+                CollectionAssert.AreEqual(Enum.GetValues(typeof(CinematicPhase)),
+                    plan.Cues.Where(c=>!c.NodeHit).Select(c=>c.Phase));
+                Assert.IsTrue(plan.Cues.Where(c=>!c.NodeHit && c.Phase!=CinematicPhase.ReturnToGame)
+                    .All(c=>!string.IsNullOrWhiteSpace(c.Copy)));
+            }
+        }
+
+        [Test]
+        public void MultiplierWaitsForItsOwnRevealAndTypographyHoldsStillBeforeImpact()
+        {
+            RewardPlan plan=Plan(DomainEventKind.Breakthrough,RewardTier.Mythic);
+            var text=new CinematicTextChoreography(plan);
+            float stop=plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+            Assert.AreEqual(0,text.Sample(text.ImpactTime+.02f).MultiplierAlpha,
+                "The impact must land before the multiplier takes over the screen.");
+            Assert.Greater(text.Sample(text.MultiplierTime+.2f).MultiplierAlpha,.5f);
+            CinematicTextFrame held=text.Sample(stop+.02f);
+            Assert.AreEqual(CinematicPhase.HitStop,held.Phase); Assert.AreEqual(0,held.Tremor);
+            Assert.IsNotEmpty(held.Narration); Assert.Greater(held.Glow,0);
+            Assert.AreEqual(0,text.Sample(text.MultiplierTime+.2f,true).Tremor);
+        }
+
+        [Test]
+        public void QuietAndLossEventsKeepMatchingCopyAndNeverPretendToAwardAMultiplier()
+        {
+            foreach(DomainEventKind kind in new[] {DomainEventKind.PredictionLocked,DomainEventKind.FailAndAgain,
+                DomainEventKind.OpportunityExpired,DomainEventKind.MomentumExpired})
+            {
+                RewardPlan plan=Plan(kind,RewardTier.Mythic);
+                var energy=new CinematicEnergy(plan); var text=new CinematicTextChoreography(plan);
+                Assert.IsFalse(energy.Celebrates,kind.ToString());
+                Assert.AreEqual(0,text.Sample(text.MultiplierTime+.2f).MultiplierAlpha,kind.ToString());
+                Assert.IsFalse(plan.Cues.Any(c=>c.Copy=="整个时间网络被点亮。"),kind.ToString());
+            }
+        }
+
+        [Test]
+        public void TimeEchoRewindDayCanUseTheExpandedCueWindow()
+        {
+            var e=new DomainEvent {day=12,receipt=new RewardReceipt {sourceDay=4}};
+            Assert.AreEqual(12,CinematicStoryboard.DayDuringRewind(e,1,1,4));
+            Assert.AreEqual(4,CinematicStoryboard.DayDuringRewind(e,4,1,4));
+            Assert.That(CinematicStoryboard.DayDuringRewind(e,2.5f,1,4),Is.InRange(7,9));
+        }
     }
 }

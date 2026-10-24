@@ -36,7 +36,8 @@ namespace Horizon.Tests
                         id="preview-fixture-"+kind,kind=kind,tier=RewardTier.Major,title=kind.ToString(),
                         receipt=new RewardReceipt {resourcesRecorded=true,sourceDay=2,resources=new ResourceDelta(3)} };
                     string before=JsonUtility.ToJson(source);
-                    world.Cinematics.Enqueue(source,true);
+                    world.Cinematics.Enqueue(source,false);
+                    Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
                     var plan=world.Cinematics.Current; var visual=new RewardSpectacle(plan);
                     float at=Mathf.Min(plan.Duration*.9f,visual.HeroTime+.25f);
                     world.Cinematics.Advance(at); yield return null;

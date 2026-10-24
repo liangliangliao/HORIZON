@@ -35,14 +35,17 @@ namespace Horizon.Game
                 CinematicCue cue=accents[i];
                 float weight=cue.NodeHit?.25f+.25f*(cue.NodeIndex+1)/Math.Max(1,plan.Event.receipt?.causes.Count??1):
                     cue.Phase==CinematicPhase.Jackpot?1:cue.Phase==CinematicPhase.SecondReveal?.86f:.72f;
-                float window=cue.NodeHit?.14f:Math.Min(.95f,plan.Duration*.23f);
+                // A sub-second charge looked like another flash on a phone.
+                // Major releases now grow for long enough to be read, while
+                // individual causal nodes keep their quicker relay rhythm.
+                float window=cue.NodeHit?.18f:Math.Min(2.4f,Math.Max(1.15f,plan.Duration*.22f));
                 float from=Math.Max(i==0?0:accents[i-1].Time+.06f,cue.Time-window);
                 if(time>=from && time<cue.Time)
                     charge=Math.Max(charge,ImmersiveMotion.Smooth((time-from)/Math.Max(.001f,cue.Time-from))*weight);
                 float age=time-cue.Time;
                 if(age<0) continue;
                 last=cue.Time;
-                burst=Math.Max(burst,weight*(float)Math.Exp(-age/(cue.NodeHit?.13f:.27f)));
+                burst=Math.Max(burst,weight*(float)Math.Exp(-age/(cue.NodeHit?.16f:.42f)));
                 recoil+=ImmersiveMotion.Punch(age,cue.NodeHit?.22f:.46f)*weight;
             }
             float afterglow=ImmersiveMotion.Smooth((time-spectacle.ImpactTime)/.4f)*(1-settle);

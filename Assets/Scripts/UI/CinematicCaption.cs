@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Horizon.Game;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,35 +7,79 @@ namespace Horizon.UI
 {
     public sealed class CinematicCaption : MonoBehaviour
     {
-        public Text Title, Story, Multiplier, Resources, Explanation, Prediction;
+        private sealed class TextPose
+        {
+            public RectTransform Rect;
+            public Vector2 Position;
+            public Vector3 Scale;
+            public Color Color;
+        }
+
+        public Text Phase,Title,Story,Multiplier,MultiplierCaption,Resources,Explanation,Prediction;
         public Image Flash;
         public string EventId;
+        public bool HideWhenIdle;
+        private readonly Dictionary<Text,TextPose> poses=new Dictionary<Text,TextPose>();
         private CinematicDirector director;
-        private float flashAmount, numberPunch;
+        private CinematicTextChoreography choreography;
+        private RewardPlan plan;
+        private Color accent;
+
         public void Bind(CinematicDirector value)
         {
-            CinematicTypography.Upgrade(Title); CinematicTypography.Upgrade(Story); CinematicTypography.Upgrade(Multiplier); CinematicTypography.Upgrade(Resources); CinematicTypography.Upgrade(Explanation);
+            CinematicTypography.Upgrade(Phase);
+            CinematicTypography.Upgrade(Title,true);
+            CinematicTypography.Upgrade(Story,true);
+            CinematicTypography.Upgrade(Multiplier,true);
+            CinematicTypography.Upgrade(MultiplierCaption);
+            CinematicTypography.Upgrade(Resources);
+            CinematicTypography.Upgrade(Explanation);
             CinematicTypography.Upgrade(Prediction);
-            director=value; director.Started+=OnStarted; director.Cue+=OnCue;
+            Remember(Phase); Remember(Title); Remember(Story); Remember(Multiplier); Remember(MultiplierCaption);
+            Remember(Resources); Remember(Explanation); Remember(Prediction);
+            director=value; director.Started+=OnStarted; director.Cue+=OnCue; director.Completed+=OnCompleted;
             if(director.Current!=null) OnStarted(director.Current);
+            else if(HideWhenIdle) gameObject.SetActive(false);
         }
-        private void OnStarted(RewardPlan plan)
-        {
-            if(!string.IsNullOrEmpty(EventId) && plan.Event.id!=EventId) return;
-            if(Title!=null) Title.text=plan.Event.title;
-            if(Story!=null) Story.text=plan.Event.detail;
-            if(Resources!=null) Resources.text=plan.ResourceCopy;
-            if(Explanation!=null) Explanation.text=plan.Event.detail;
-            if(Prediction!=null) Prediction.text=PredictionCopy(plan.Event.receipt);
-            UpdateMultiplier(plan);
 
+        private void Remember(Text text)
+        {
+            if(text==null || poses.ContainsKey(text)) return;
+            var rect=(RectTransform)text.transform;
+            poses.Add(text,new TextPose {Rect=rect,Position=rect.anchoredPosition,Scale=rect.localScale,Color=text.color});
         }
+
+        private void OnStarted(RewardPlan value)
+        {
+            if(!string.IsNullOrEmpty(EventId) && value.Event.id!=EventId) return;
+            if(HideWhenIdle) gameObject.SetActive(true);
+            plan=value; choreography=new CinematicTextChoreography(value);
+            accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
+            if(Title!=null) Title.text=value.Event.title;
+            if(Story!=null) Story.text="";
+            if(Phase!=null) Phase.text=CinematicTextChoreography.PhaseCopy(CinematicPhase.Anticipation);
+            if(Resources!=null) Resources.text="";
+            if(Explanation!=null) Explanation.text="";
+            if(Prediction!=null) Prediction.text=PredictionCopy(value.Event.receipt);
+            if(MultiplierCaption!=null) MultiplierCaption.text=MultiplierContext(value);
+            if(Multiplier!=null) Multiplier.text="";
+            if(Flash!=null) Flash.color=Color.clear;
+            ApplyFrame(choreography.Sample(0,VisualPreferences.ReducedMotion));
+        }
+
+        private void OnCompleted(RewardPlan value)
+        {
+            if(!HideWhenIdle || !string.IsNullOrEmpty(EventId) && value.Event.id!=EventId) return;
+            plan=null; choreography=null; gameObject.SetActive(false);
+        }
+
         public static string PredictionCopy(RewardReceipt receipt)
         {
             if(receipt==null || !receipt.predictionRecorded) return "";
             string copy="原预测 · "+AxesCopy(receipt.predicted);
             return receipt.predictionResolved?copy+"\n实际变化 · "+AxesCopy(receipt.actual):copy;
         }
+
         private static string AxesCopy(ResourceDelta values)
         {
             string[] names={"精力","心情","专注","金钱","关系","能力"};
@@ -42,33 +87,106 @@ namespace Horizon.UI
             for(int i=0;i<axes.Length;i++) copy[i]=names[i]+(axes[i]>=0?"+":"")+axes[i];
             return string.Join("  ",copy);
         }
+
+        private static string MultiplierContext(RewardPlan value)
+        {
+            if(value.PresentationMultiplier<=1) return "";
+            if(value.Event.kind==DomainEventKind.Cascade || value.Event.kind==DomainEventKind.CausalSingularity)
+                return "演出倍率 · 真实因果深度 "+value.Event.chainSize;
+            if(value.Event.kind==DomainEventKind.Comeback || value.Event.kind==DomainEventKind.PatternBroken)
+                return "演出倍率 · 韧性链 "+Mathf.Max(1,value.Event.multiplier);
+            return "演出倍率 · 视觉强度，不改变实际结算";
+        }
+
         private void OnCue(CinematicCue cue)
         {
             if(director.Current==null || !string.IsNullOrEmpty(EventId) && director.Current.Event.id!=EventId) return;
-            if(Story!=null && !string.IsNullOrEmpty(cue.Copy)) Story.text=cue.Copy;
-            if(cue.Phase==CinematicPhase.Impact && !cue.NodeHit && !VisualPreferences.ReducedMotion) flashAmount=.18f;
-            if(cue.Phase==CinematicPhase.Impact && !cue.NodeHit) numberPunch=.16f;
-            UpdateMultiplier(director.Current);
+            // Copy and its entrance are sampled from the director clock in
+            // Update, so seeking and slow frames reproduce the same typography.
         }
-        private void UpdateMultiplier(RewardPlan plan)
-        {
-            if(Multiplier==null) return;
-            int strength=plan.PresentationMultiplierAt(director.Elapsed);
-            string actual=plan.Event.kind==DomainEventKind.Cascade || plan.Event.kind==DomainEventKind.CausalSingularity ? " · 因果深度 "+plan.Event.chainSize :
-                plan.Event.kind==DomainEventKind.Comeback ? " · 韧性链 "+plan.Event.multiplier : "";
-            Multiplier.text=strength>1?"演出 ×"+strength+actual:"";
-        }
+
         private void Update()
         {
-            if(VisualPreferences.Paused) return;
-            if(director!=null && director.Current!=null) UpdateMultiplier(director.Current);
-            numberPunch=Mathf.MoveTowards(numberPunch,0,Time.unscaledDeltaTime*.8f);
-            if(Multiplier!=null) Multiplier.transform.localScale=Vector3.one*(1+numberPunch);
-            if(Flash==null) return;
-            flashAmount=Mathf.MoveTowards(flashAmount,0,Time.unscaledDeltaTime*1.6f);
-            Flash.color=new Color(.72f,1,.91f,flashAmount);
+            if(VisualPreferences.Paused || director==null || director.Current==null || choreography==null) return;
+            ApplyFrame(choreography.Sample(director.Elapsed,VisualPreferences.ReducedMotion));
         }
+
+        private void ApplyFrame(CinematicTextFrame frame)
+        {
+            if(plan==null) return;
+            if(Phase!=null) Phase.text=frame.PhaseCopy;
+            if(Story!=null) Story.text=frame.Narration;
+            float receipt=1-frame.ReceiptVeil;
+            if(Explanation!=null) Explanation.text=receipt>.001f?plan.Event.detail:"";
+            if(Resources!=null) Resources.text=receipt>.001f?plan.ResourceCopy:"";
+            if(Multiplier!=null) Multiplier.text=frame.MultiplierAlpha>.001f && plan.PresentationMultiplier>1?"×"+plan.PresentationMultiplier:"";
+
+            float sx=VisualPreferences.ReducedMotion?0:
+                (Mathf.Sin(frame.Time*71)+Mathf.Sin(frame.Time*113)*.45f)*frame.Tremor;
+            float sy=VisualPreferences.ReducedMotion?0:
+                (Mathf.Cos(frame.Time*83)+Mathf.Sin(frame.Time*47)*.35f)*frame.Tremor;
+            Style(Title,frame.TitleScale,new Vector2(sx*2.2f,sy*1.35f),frame.EndAlpha,
+                Color.Lerp(accent,Color.white,frame.Flash*.52f),frame.Glow,.08f,8,true);
+            Style(Phase,.96f+frame.CopyAlpha*.04f,new Vector2(-sx*.45f,sy*.25f),frame.CopyAlpha*frame.EndAlpha,
+                Color.Lerp(accent,Palette.Gold,frame.Glow*.42f),frame.Glow*.72f,.035f,4,false);
+            Style(Story,frame.CopyScale,new Vector2(sx*.68f,-sy*.42f),frame.CopyAlpha*frame.EndAlpha,
+                Color.Lerp(Palette.Text,Color.white,frame.Flash*.45f),frame.Glow*.82f,.045f,2,true);
+            Style(Multiplier,frame.MultiplierScale,new Vector2(sx*5.5f,sy*3.5f),frame.MultiplierAlpha,
+                Color.Lerp(Palette.Gold,Color.white,frame.Flash*.66f),Mathf.Max(frame.Glow,frame.MultiplierAlpha),.13f,7,true);
+            Style(MultiplierCaption,.94f+frame.MultiplierAlpha*.06f,Vector2.zero,frame.MultiplierAlpha,
+                Palette.Gold,frame.Glow*.8f,.04f,3,false);
+            Style(Explanation,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.16f,.025f,0,false);
+            Style(Resources,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Mint,.22f,.03f,1,true);
+            Style(Prediction,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.12f,.02f,0,false);
+            if(Flash!=null)
+            {
+                float alpha=Mathf.Clamp01(frame.Flash*.26f);
+                Flash.color=new Color(1,.82f,.36f,alpha);
+            }
+        }
+
+        private void Style(Text text,float scale,Vector2 offset,float alpha,Color tint,float glow,float outline,float tracking,bool bold)
+        {
+            if(text==null || !poses.TryGetValue(text,out TextPose pose)) return;
+            pose.Rect.localScale=pose.Scale*scale;
+            pose.Rect.anchoredPosition=pose.Position+offset;
+            tint.a=pose.Color.a*Mathf.Clamp01(alpha); text.color=tint;
+            CinematicTypography.Present(text,Color.Lerp(accent,Palette.Gold,.58f),glow,outline,tracking,bold);
+        }
+
         private void OnDestroy()
-        { if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; }
+        { if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; }
+    }
+
+    // Transparent edge gradients preserve full-screen motion behind the copy.
+    // They replace the former opaque top and bottom letterbox panels.
+    public sealed class CinematicCurtainGraphic : MaskableGraphic
+    {
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear(); Rect r=rectTransform.rect;
+            Color clear=new Color(.002f,.007f,.018f,0), deep=new Color(.002f,.007f,.018f,.88f), side=new Color(.002f,.007f,.018f,.23f);
+            Quad(mesh,new Vector2(r.xMin,r.yMin+r.height*.62f),new Vector2(r.xMax,r.yMax),clear,deep);
+            Quad(mesh,new Vector2(r.xMin,r.yMin),new Vector2(r.xMax,r.yMin+r.height*.34f),deep,clear);
+            SideQuad(mesh,new Vector2(r.xMin,r.yMin),new Vector2(r.xMin+r.width*.12f,r.yMax),side,clear);
+            SideQuad(mesh,new Vector2(r.xMax-r.width*.12f,r.yMin),new Vector2(r.xMax,r.yMax),clear,side);
+        }
+
+        private static void Quad(VertexHelper mesh,Vector2 min,Vector2 max,Color bottom,Color top)
+        {
+            int n=mesh.currentVertCount;
+            Add(mesh,new Vector2(min.x,min.y),bottom); Add(mesh,new Vector2(min.x,max.y),top);
+            Add(mesh,new Vector2(max.x,max.y),top); Add(mesh,new Vector2(max.x,min.y),bottom);
+            mesh.AddTriangle(n,n+1,n+2); mesh.AddTriangle(n,n+2,n+3);
+        }
+        private static void SideQuad(VertexHelper mesh,Vector2 min,Vector2 max,Color left,Color right)
+        {
+            int n=mesh.currentVertCount;
+            Add(mesh,new Vector2(min.x,min.y),left); Add(mesh,new Vector2(min.x,max.y),left);
+            Add(mesh,new Vector2(max.x,max.y),right); Add(mesh,new Vector2(max.x,min.y),right);
+            mesh.AddTriangle(n,n+1,n+2); mesh.AddTriangle(n,n+2,n+3);
+        }
+        private static void Add(VertexHelper mesh,Vector2 p,Color color)
+        { UIVertex v=UIVertex.simpleVert; v.position=p; v.color=color; mesh.AddVert(v); }
     }
 }

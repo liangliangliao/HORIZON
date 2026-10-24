@@ -120,7 +120,10 @@ namespace Horizon.UI
             savedCameraPosition=cameraPosition; savedCameraLook=cameraLook; savedCameraRect=WorldCamera.rect;
             savedFov=WorldCamera.fieldOfView; savedFog=RenderSettings.fogDensity;
             if(systemScenery!=null) systemScenery.gameObject.SetActive(false);
-            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=fullscreen?new Rect(0,.18f,1,.64f):new Rect(0,.543f,1,.245f);
+            // The scene itself occupies the complete phone. Typography and
+            // controls are translucent overlays; they no longer crop the movie
+            // into a narrow strip between two black UI regions.
+            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,0,1,1);
             cinematicCamera.gameObject.SetActive(true);
             movieFuture.localPosition = new Vector3(0,0,6); movieFuture.localScale = Vector3.one;
             movieAnchor.localPosition = Vector3.zero; ResetMovieColor(movieAnchor);
@@ -140,7 +143,7 @@ namespace Horizon.UI
             foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
             movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
-            PrepareJackpotStage(plan,fullscreen);
+            PrepareJackpotStage(plan,true);
             PrepareCausalRelays();
             PrepareCinemaProduction();
             PrepareCinemaTension();
@@ -288,11 +291,15 @@ namespace Horizon.UI
             }
             if(kind==DomainEventKind.TimeEcho)
             {
+                float rewindAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Escalation).Time;
+                float sourceAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.HeroMoment).Time;
+                float returnAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                float attributionAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
                 Vector3 source=new Vector3(0,1,-1); foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) { source=node.localPosition; break; }
-                look=Vector3.Lerp(new Vector3(0,1,2),source,Smooth(.35f,.8f,time));
-                look=Vector3.Lerp(look,new Vector3(0,1,2),Smooth(1.05f,2.15f,time));
+                look=Vector3.Lerp(new Vector3(0,1,2),source,Smooth(rewindAt,sourceAt,time));
+                look=Vector3.Lerp(look,new Vector3(0,1,2),Smooth(returnAt,attributionAt,time));
                 int count=receipt?.causes.Count??0;
-                for(int i=0;i<Mathf.Min(count,24);i++) if(time>=1.05f+(i/(float)Mathf.Max(1,count))*.95f) SetMovieColor(movieNodes[i],Palette.Mint);
+                for(int i=0;i<Mathf.Min(count,24);i++) if(time>=returnAt+(i/(float)Mathf.Max(1,count))*(attributionAt-returnAt)) SetMovieColor(movieNodes[i],Palette.Mint);
             }
             if(kind==DomainEventKind.PatternBroken)
             {
@@ -348,7 +355,11 @@ namespace Horizon.UI
             SampleCinemaProduction(time);
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
-            if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent) WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*shake;
+            if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
+            {
+                float anticipation=Mathf.Pow(energyFrame.Inward,4)*(.008f+.018f*(int)moviePlan.Event.tier/6f);
+                WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*(shake+anticipation);
+            }
             WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=CinematicFieldOfView(time);
             cinematicCamera.transform.SetPositionAndRotation(WorldCamera.transform.position, WorldCamera.transform.rotation);
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;

@@ -12,7 +12,7 @@ namespace Horizon.Game
         public readonly RewardPlan Plan;
         public readonly RewardSpectacleStyle Style;
         public readonly MaterialReward HeroReward;
-        public readonly float ImpactTime, HeroTime, SettlementTime, JackpotTime;
+        public readonly float ImpactTime, MultiplierTime, HeroTime, SettlementTime, JackpotTime;
         public bool HasHero => Plan.Event.tier >= RewardTier.Major && Style != RewardSpectacleStyle.Quiet && Style != RewardSpectacleStyle.Loss;
         public bool HasMotes => Style == RewardSpectacleStyle.Golden || Style == RewardSpectacleStyle.Legendary;
 
@@ -20,6 +20,7 @@ namespace Horizon.Game
         {
             Plan = plan ?? throw new ArgumentNullException(nameof(plan));
             ImpactTime = CueTime(CinematicPhase.Impact, plan.Duration * .52f);
+            MultiplierTime = CueTime(CinematicPhase.Multiplication, ImpactTime);
             HeroTime = plan.Event.tier >= RewardTier.Epic ? CueTime(CinematicPhase.SecondReveal, ImpactTime) : ImpactTime;
             SettlementTime = CueTime(CinematicPhase.Settlement, plan.Duration * .86f);
             JackpotTime = CueTime(CinematicPhase.Jackpot, HeroTime);
@@ -37,7 +38,8 @@ namespace Horizon.Game
             DomainEventKind kind = plan.Event.kind;
             bool positive = plan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount > 0);
             bool negative = plan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount < 0);
-            if (kind == DomainEventKind.FailAndAgain || negative && !positive) return RewardSpectacleStyle.Loss;
+            if (kind == DomainEventKind.FailAndAgain || kind == DomainEventKind.OpportunityExpired ||
+                kind == DomainEventKind.MomentumExpired || negative && !positive) return RewardSpectacleStyle.Loss;
             if (kind == DomainEventKind.PredictionLocked || kind == DomainEventKind.DecisionLocked ||
                 kind == DomainEventKind.DecisionReopened || kind == DomainEventKind.VictoryAnchor ||
                 kind == DomainEventKind.TriggerEquipped) return RewardSpectacleStyle.Quiet;
@@ -61,7 +63,7 @@ namespace Horizon.Game
             return new RewardSpectacleFrame(time, charge, burst * fade, hero,
                 Ease(HeroTime, HeroTime + span * 1.6f, time), fade,
                 Plan.PresentationMultiplierAt(time),
-                Plan.Event.tier >= RewardTier.Combo && Style != RewardSpectacleStyle.Loss && Style != RewardSpectacleStyle.Quiet && time >= ImpactTime && fade > 0,
+                Plan.Event.tier >= RewardTier.Combo && Style != RewardSpectacleStyle.Loss && Style != RewardSpectacleStyle.Quiet && time >= MultiplierTime && fade > 0,
                 (.12f * charge + .65f * burst + .28f * hero) * fade);
         }
 

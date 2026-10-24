@@ -123,7 +123,7 @@ namespace Horizon.UI
                     if(renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
                     if(!found) { bounds=renderer.bounds; found=true; } else bounds.Encapsulate(renderer.bounds);
                 }
-                showcaseScale=(fullscreen?2.15f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
+                showcaseScale=(fullscreen?1.92f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
                 showcaseOffset=found?showcaseHero.InverseTransformPoint(bounds.center):Vector3.zero;
             }
             bool money=plan.Objects.Any(o=>o.Kind==RewardObjectKind.MoneyWallet && o.Amount>0);
@@ -160,14 +160,18 @@ namespace Horizon.UI
             {
                 showcaseHero.gameObject.SetActive(hero);
                 float pose=preview>0?tensionFrame.PoseTime:time;
-                float breath=preferences.reducedMotion || tensionFrame.Silent?0:Mathf.Sin(pose*2)*.02f;
+                float breath=preferences.reducedMotion || tensionFrame.Silent?0:Mathf.Sin(pose*2)*.016f;
                 float age=time-spectacle.HeroTime;
                 float bounce=preferences.reducedMotion?0:age>=0?Mathf.Sin(Mathf.Min(1,age/.45f)*Mathf.PI)*.18f:0;
+                float detailTremor=preferences.reducedMotion || tensionFrame.Silent?0:Mathf.Pow(energyFrame.Inward,4)*.035f;
                 float scale=showcaseScale*(.72f+frame.Hero*.28f+breath+bounce);
                 if(preview>0) scale=showcaseScale*(.80f-preview*.055f);
                 showcaseHero.localScale=Vector3.one*scale;
-                showcaseHero.localRotation=Quaternion.Euler(0,preferences.reducedMotion?-15:-15+Mathf.Sin(pose*.65f)*9,0);
-                showcaseHero.localPosition=showcaseCenter-showcaseHero.localRotation*(showcaseOffset*scale);
+                showcaseHero.localRotation=Quaternion.Euler(Mathf.Sin(time*61)*detailTremor*42,
+                    preferences.reducedMotion?-15:-15+Mathf.Sin(pose*.65f)*7+Mathf.Sin(time*73)*detailTremor*55,
+                    Mathf.Cos(time*67)*detailTremor*28);
+                showcaseHero.localPosition=showcaseCenter-showcaseHero.localRotation*(showcaseOffset*scale)+
+                    new Vector3(Mathf.Sin(time*79),Mathf.Cos(time*71),0)*detailTremor;
                 SampleRewardDevice(showcaseHero,spectacle.HeroReward,frame.Lid);
                 SampleRewardDetail(showcaseHero,pose,frame.Lid);
                 if(spectacle.HeroReward.Kind==RewardObjectKind.ReservoirCore)
@@ -196,7 +200,7 @@ namespace Horizon.UI
             {
                 Vector3 closeCamera=preferences.reducedMotion?new Vector3(5,4,-8):showcaseCenter+new Vector3(1.1f,1.05f,-6.3f);
                 Vector3 eye=closeCamera-showcaseCenter;
-                float q=2*Mathf.Tan(CinematicFieldOfView(time)*Mathf.Deg2Rad*.5f)*((showcaseFullscreen?.70f:.64f)-.5f);
+                float q=2*Mathf.Tan(CinematicFieldOfView(time)*Mathf.Deg2Rad*.5f)*((showcaseFullscreen?.61f:.64f)-.5f);
                 float horizontal=Mathf.Sqrt(eye.x*eye.x+eye.z*eye.z);
                 float offset=q*eye.sqrMagnitude/Mathf.Max(.1f,horizontal-q*eye.y);
                 Vector3 closeLook=showcaseCenter-Vector3.up*offset;
@@ -272,7 +276,8 @@ namespace Horizon.UI
             Vector3 center=cinematicStage.TransformPoint(showcaseCenter);
             float strength=(moviePlan.Event.tier>=RewardTier.Epic?1:moviePlan.Event.tier>=RewardTier.Combo?.55f:.23f)*(1-tensionFrame.Preview*.94f);
             Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.12f+frame.Charge*.12f+frame.Hero*.3f)*frame.Fade*strength*afterglow);
-            Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,(burst+frame.Hero*.3f)*strength*afterglow);
+            Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,
+                (burst+frame.Hero*.08f+energyFrame.Afterglow*.16f)*strength*afterglow);
             Aura(jackpotFlare,center,1.2f+burst*3,0,Color.Lerp(tint,Color.white,.65f),burst*strength);
             bool showMultiplier=frame.ShowMultiplier && tensionFrame.Preview<=.1f;
             jackpotPlaque.gameObject.SetActive(showMultiplier);

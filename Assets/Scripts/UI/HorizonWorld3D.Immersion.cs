@@ -50,17 +50,17 @@ namespace Horizon.UI
                 Vector3 direction=(look-camera).normalized;
                 camera+=direction*(energyFrame.Inward*.48f-energyFrame.Recoil*.24f);
             }
-            movieLight.intensity+=energyFrame.Burst*1.4f;
+            movieLight.intensity+=energyFrame.Inward*.42f+energyFrame.Burst*1.25f;
         }
 
         private void FrameImmersion()
         {
             if(immersionStage==null || cinematicEnergy==null) return;
-            bool visible=cinematicEnergy.Celebrates && !preferences.reducedMotion &&
-                moviePlan.Event.tier>=RewardTier.Combo;
+            bool visible=cinematicEnergy.Celebrates && !preferences.reducedMotion;
             immersionStage.gameObject.SetActive(visible);
             if(!visible) return;
-            int budget=LowCostEffects?1:3;
+            int tierBudget=moviePlan.Event.tier<=RewardTier.Local?1:moviePlan.Event.tier==RewardTier.Combo?2:3;
+            int budget=LowCostEffects?1:tierBudget;
             // Align with the visible authored subject, including the current
             // causal close-up. Keep every membrane behind it in camera space.
             Vector3 localCenter=showcaseCenter;
@@ -75,9 +75,11 @@ namespace Horizon.UI
                 if(i>=budget) continue;
                 layer.position=center+WorldCamera.transform.forward*(.7f+i*1.35f);
                 layer.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,0,i*31);
-                layer.localScale=Vector3.one*(4.4f+i*1.8f+energyFrame.Burst*.65f);
+                layer.localScale=Vector3.one*(4.9f+i*1.9f+energyFrame.Burst*.72f);
                 Material material=immersionMaterials[i];
-                material.SetColor("_Color",RewardEffectTint());
+                Color charged=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
+                    Mathf.Clamp01(energyFrame.Inward*.72f+energyFrame.Burst*.48f));
+                material.SetColor("_Color",charged);
                 material.SetFloat("_Clock",energyFrame.Time);
                 material.SetFloat("_Charge",energyFrame.Inward*(1-energyFrame.Settlement));
                 material.SetFloat("_Burst",tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:energyFrame.Burst);

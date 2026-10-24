@@ -60,8 +60,13 @@ namespace Horizon.Tests
             Rect viewport=world.WorldCamera.rect; var probe=new CueProbe(); DomainEvent reward=Pattern();
             typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { reward,new Action(probe.Completed) });
             Assert.IsTrue(home.All(g=>!g.activeInHierarchy));
+            Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect,"Reward movies must use the complete phone viewport.");
+            Assert.IsFalse(root.GetComponentsInChildren<Button>(true).Single(b=>b.name=="Continue master event").gameObject.activeSelf);
+            Assert.IsNotNull(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Cinematic phase copy"));
+            Assert.IsNotNull(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Presentation multiplier meaning"));
             world.Cinematics.enabled=false; world.Cinematics.Advance(30); yield return null;
             Assert.IsTrue(root.GetComponentsInChildren<Button>().Single(b=>b.name=="Continue master event").interactable);
+            Assert.IsFalse(root.GetComponentsInChildren<Button>(true).Single(b=>b.name=="Skip cinematic").gameObject.activeSelf);
             typeof(HorizonApp).GetMethod("HandleBack",flags).Invoke(app,null); yield return null;
             Assert.AreEqual(1,probe.Completions,"System back must run the reward continuation, rather than just destroy its page.");
             Assert.IsTrue(reward.acknowledged); Assert.IsNull(typeof(HorizonApp).GetField("overlay",flags).GetValue(app));
@@ -141,7 +146,8 @@ namespace Horizon.Tests
             DomainEvent e=Pattern(); string before=JsonUtility.ToJson(e); var probe=new CueProbe();
             var director=world.Cinematics; director.enabled=false;
             director.Cue+=probe.Cue;
-            Assert.IsTrue(director.Enqueue(e,true,probe.Completed)); Assert.IsFalse(director.Enqueue(e,true,probe.Completed));
+            Assert.IsTrue(director.Enqueue(e,false,probe.Completed)); Assert.IsFalse(director.Enqueue(e,true,probe.Completed));
+            Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect,"Even legacy embedded requests must play full screen.");
             float stop=director.Current.Cues.Single(c=>c.Phase==CinematicPhase.HitStop).Time;
             director.Advance(stop); Vector3 position=world.WorldCamera.transform.position;
             director.SetPaused(true);

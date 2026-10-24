@@ -35,7 +35,9 @@ namespace Horizon.UI
         public bool Enqueue(DomainEvent e, bool fullscreen = false, Action completed = null)
         {
             if (e == null || string.IsNullOrEmpty(e.id) || !scheduled.Add(e.id)) return false;
-            queue.Enqueue(new Request { plan = RewardDirector.Direct(e), completed = completed, fullscreen = fullscreen });
+            // Every authored reward is now a full-screen movie. Keep the
+            // parameter for source compatibility with older callers/replays.
+            queue.Enqueue(new Request { plan = RewardDirector.Direct(e), completed = completed, fullscreen = true });
             if (active == null) BeginNext(); return true;
         }
         private void BeginNext()

@@ -140,7 +140,7 @@ namespace Horizon.Game
     // Presentation only: no wallet, session, RNG, probability or ApplyEffect access.
     public static class RewardDirector
     {
-        public const string Version = "1.0";
+        public const string Version = "1.1";
         public static RewardPlan Direct(DomainEvent source)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
@@ -165,10 +165,13 @@ namespace Horizon.Game
             if (e.tier >= RewardTier.Epic)
             {
                 string[] copy = Story(e, r);
-                float[] fractions = { 0, .09f, .20f, .31f, .43f, .45f, .54f, .63f, .75f, .86f, 1 };
+                // Give the viewer time to identify the subject before light and
+                // multiplier compete for attention. The multiplier now follows
+                // impact instead of sharing its first frame.
+                float[] fractions = { 0, .10f, .23f, .36f, .47f, .50f, .64f, .74f, .84f, .92f, 1 };
                 for (int i = 0; i < fractions.Length; i++) cues.Add(new CinematicCue(fractions[i] * duration, (CinematicPhase)i, copy[i]));
-                if (e.kind == DomainEventKind.RealityConvergence)
-                { cues.RemoveAll(c => c.Phase == CinematicPhase.HitStop); cues.Add(new CinematicCue(duration * .45f - .2f, CinematicPhase.HitStop, copy[4])); }
+                cues.RemoveAll(c => c.Phase == CinematicPhase.HitStop);
+                cues.Add(new CinematicCue(duration*.50f-HoldDuration(e.tier),CinematicPhase.HitStop,copy[4]));
                 // One cue fires all senses on the same frame. Hit-stop ends at Impact.
                 if (e.kind == DomainEventKind.Cascade || e.kind == DomainEventKind.CausalSingularity)
                 {
@@ -176,44 +179,37 @@ namespace Horizon.Game
                     float time = duration * .20f;
                     for (int i = 0; i < count; i++)
                     { cues.Add(new CinematicCue(time, CinematicPhase.Escalation, r.causes[i].label, i)); time += i == 0 ? .35f : i == 1 ? .28f : i == 2 ? .21f : .15f; }
-                    // Final network impact follows the final node and a deliberate 150ms silence.
+                    // Final network impact follows the final node and a visible
+                    // breath-hold. This used to be 150ms and read as a dropped
+                    // frame on a phone rather than intentional suspense.
                     cues.RemoveAll(c => !c.NodeHit && c.Phase >= CinematicPhase.HeroMoment);
                     float hit = count == 0 ? duration * .45f : cues.Where(c => c.NodeHit).Max(c => c.Time) + .001f;
                     cues.Add(new CinematicCue(Math.Max(0, hit - .0005f), CinematicPhase.HeroMoment, e.title));
                     cues.Add(new CinematicCue(hit, CinematicPhase.HitStop, "每一条光，都有真实的来路。"));
-                    cues.Add(new CinematicCue(hit + .15f, CinematicPhase.Impact, e.detail));
-                    float remaining = duration - hit - .15f;
-                    cues.Add(new CinematicCue(hit + .15f + remaining * .15f, CinematicPhase.Multiplication, "真实因果深度 ×" + Math.Max(1, e.chainSize)));
-                    cues.Add(new CinematicCue(hit + .15f + remaining * .36f, CinematicPhase.SecondReveal, "整个时间网络被点亮。"));
-                    cues.Add(new CinematicCue(hit + .15f + remaining * .58f, CinematicPhase.Jackpot, e.title));
-                    cues.Add(new CinematicCue(hit + .15f + remaining * .8f, CinematicPhase.Settlement, e.detail));
+                    float release=hit+HoldDuration(e.tier);
+                    cues.Add(new CinematicCue(release, CinematicPhase.Impact, e.detail));
+                    float remaining = duration - release;
+                    cues.Add(new CinematicCue(release + remaining * .18f, CinematicPhase.Multiplication, "真实因果深度 ×" + Math.Max(1, e.chainSize)));
+                    cues.Add(new CinematicCue(release + remaining * .40f, CinematicPhase.SecondReveal, "整个时间网络被点亮。"));
+                    cues.Add(new CinematicCue(release + remaining * .64f, CinematicPhase.Jackpot, e.title));
+                    cues.Add(new CinematicCue(release + remaining * .84f, CinematicPhase.Settlement, e.detail));
                     cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
                 }
             }
             else if (e.kind == DomainEventKind.TimeEcho)
             {
-                cues.Add(new CinematicCue(0, CinematicPhase.Anticipation, "TIME ECHO"));
-                cues.Add(new CinematicCue(.12f, CinematicPhase.Charge, "沿时间线，回到原来的行动。"));
-                cues.Add(new CinematicCue(.35f, CinematicPhase.Escalation, r.sourceDay > 0 ? "D" + r.sourceDay + " · " + r.action : e.detail));
-                cues.Add(new CinematicCue(.8f, CinematicPhase.HitStop, r.sourceDay > 0 ? "这个结果来自 D" + r.sourceDay + " 的行动。" : e.detail));
-                cues.Add(new CinematicCue(1.05f, CinematicPhase.HeroMoment, e.detail));
-                cues.Add(new CinematicCue(2.15f, CinematicPhase.Impact, string.Join(" · ", objects.Select(o => o.Copy))));
-                cues.Add(new CinematicCue(2.5f, CinematicPhase.Settlement, r.sourceDay > 0 ? "这个结果来自 Day " + r.sourceDay + " 的行动。\n" + e.detail : e.detail));
-                cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
+                string origin=r.sourceDay>0?"D"+r.sourceDay+" · "+r.action:e.detail;
+                string provenance=r.sourceDay>0?"这个结果来自 D"+r.sourceDay+" 的行动。":e.detail;
+                string[] copy={"TIME ECHO","沿时间线，回到原来的行动。",origin,e.title,provenance,
+                    e.detail,multiplier>1?"演出倍率即将显现。":e.detail,
+                    string.Join(" · ",objects.Select(o=>o.Copy)),e.title,
+                    r.sourceDay>0?"这个结果来自 Day "+r.sourceDay+" 的行动。\n"+e.detail:e.detail,""};
+                AddCues(cues,duration,copy,e.tier);
             }
             else
             {
-                cues.Add(new CinematicCue(0, CinematicPhase.Anticipation, e.detail));
-                cues.Add(new CinematicCue(duration * .32f, CinematicPhase.HeroMoment, e.title));
-                cues.Add(new CinematicCue(duration * .52f, CinematicPhase.Impact, e.detail));
-                cues.Add(new CinematicCue(duration * .78f, CinematicPhase.Settlement, e.detail));
-                cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
+                AddCues(cues,duration,Story(e,r),e.tier);
             }
-            if(e.kind==DomainEventKind.Synchronized && e.tier<RewardTier.Epic)
-                cues.Add(new CinematicCue(duration*.52f-.1f,CinematicPhase.HitStop,"预测与现实，正在重合。"));
-            if(e.tier<RewardTier.Epic && (e.kind==DomainEventKind.RealityConvergence || e.kind==DomainEventKind.PatternBroken))
-                cues.Add(new CinematicCue(Math.Max(0,duration*.52f-(e.kind==DomainEventKind.RealityConvergence?.2f:.12f)),
-                    CinematicPhase.HitStop,e.kind==DomainEventKind.RealityConvergence?"三条路径锁定同一个事件。":"这一刻，时间停住。"));
             var beats = new List<PresentationBeat>();
             if (e.kind == DomainEventKind.PatternBroken && e.tier == RewardTier.Mythic)
             {
@@ -253,7 +249,22 @@ namespace Horizon.Game
             }
         }
         public static float Duration(RewardTier tier)
-        { switch (tier) { case RewardTier.Micro: return .24f; case RewardTier.Local: return .75f; case RewardTier.Combo: return 1.6f; case RewardTier.Major: return 3.6f; case RewardTier.Epic: return 6.8f; default: return 11.8f; } }
+        { switch (tier) { case RewardTier.Micro: return 2.6f; case RewardTier.Local: return 3.4f; case RewardTier.Combo: return 4.6f; case RewardTier.Major: return 6.2f; case RewardTier.Epic: return 9.2f; default: return 14.2f; } }
+
+        private static void AddCues(List<CinematicCue> cues,float duration,string[] copy,RewardTier tier)
+        {
+            float[] fractions={0,.10f,.23f,.36f,.47f,.50f,.64f,.74f,.84f,.92f,1};
+            for(int i=0;i<fractions.Length;i++)
+            {
+                float time=fractions[i]*duration;
+                if((CinematicPhase)i==CinematicPhase.HitStop) time=duration*.50f-HoldDuration(tier);
+                cues.Add(new CinematicCue(Math.Max(0,time),(CinematicPhase)i,i<copy.Length?copy[i]:""));
+            }
+        }
+
+        private static float HoldDuration(RewardTier tier)
+        { switch(tier) { case RewardTier.Micro:return .12f; case RewardTier.Local:return .16f; case RewardTier.Combo:return .22f;
+            case RewardTier.Major:return .32f; case RewardTier.Epic:return .42f; default:return .55f; } }
         public static RewardObjectKind? ObjectFor(DomainEventKind kind)
         {
             switch (kind)
@@ -291,6 +302,20 @@ namespace Horizon.Game
             if (e.kind == DomainEventKind.Overdrive) return new[] {
                 "远处的未来，开始清晰。", "噪点减少，因果线浮现。", "你能看见更多隐藏的来路。", "短时间，看得极清楚。", "视野展开。", e.title, e.detail,
                 "过去与未来，第一次同时清晰。", e.title, e.detail, "" };
+            if(e.kind==DomainEventKind.PredictionLocked || e.kind==DomainEventKind.DecisionLocked ||
+                e.kind==DomainEventKind.DecisionReopened || e.kind==DomainEventKind.TriggerEquipped ||
+                e.kind==DomainEventKind.VictoryAnchor)
+                return new[] { e.title, "这一步正在被记录。", e.detail, "把注意力放在这一次选择。", "动作暂时停住。",
+                    e.detail, "结果即将确认。", "它将进入之后的时间线。", e.title, e.detail, "" };
+            if(e.kind==DomainEventKind.FailAndAgain || e.kind==DomainEventKind.OpportunityExpired || e.kind==DomainEventKind.MomentumExpired)
+                return new[] { e.title, "时间线正在收紧。", e.detail, "看清这一次发生了什么。", "这一刻，先停住。",
+                    e.detail, "影响正在落下。", "这次变化会被如实保留。", e.title, e.detail, "" };
+            if(e.kind==DomainEventKind.Synchronized || e.kind==DomainEventKind.Surprise)
+                return new[] { "预测与现实，即将相遇。", "两条记录开始靠近。", "原预测正在显现。", e.title,
+                    "屏息 · 对照即将完成。", e.detail, "差异已经可以看见。", "来源逐一展开。", e.title, e.detail, "" };
+            if(e.kind==DomainEventKind.PatternReinforced)
+                return new[] { e.title, "熟悉的路线再次出现。", e.detail, "重复正在形成形状。", "这一刻，先看清它。",
+                    e.detail, "重复次数正在显现。", "这条模式被留下记录。", e.title, e.detail, "" };
             return new[] { e.title, "积累的因果，开始回应。", e.detail, e.title, "每一次改变，都有来路。", e.detail,
                 e.chainSize > 0 ? "真实因果深度 ×" + e.chainSize : e.detail, "整个时间网络被点亮。", e.title, e.detail, "" };
         }

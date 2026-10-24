@@ -132,22 +132,28 @@ namespace Horizon.UI
             if(e.kind==DomainEventKind.PatternBroken) SamplePatternStoryboard(time,ref camera,ref look);
             else if(e.kind==DomainEventKind.TimeEcho)
             {
-                CurrentCinematicShot=time<.12f?"Slow present":time<.35f?"Desaturate":time<.8f?"Rewind actual days":time<1.05f?"Original action stop":time<2.15f?"Cause returns":"Attribution";
+                float chargeAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge).Time;
+                float rewindAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Escalation).Time;
+                float sourceAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.HeroMoment).Time;
+                float returnAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                float attributionAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
+                CurrentCinematicShot=time<chargeAt?"Slow present":time<rewindAt?"Desaturate":time<sourceAt?"Rewind actual days":
+                    time<returnAt?"Original action stop":time<attributionAt?"Cause returns":"Attribution";
                 int count=Mathf.Min(24,receipt?.causes.Count??0); Vector3 source=count>0?movieNodes[0].localPosition:new Vector3(0,.65f,-3);
-                float rewind=(receipt?.sourceDay??0)>0?Smooth(.35f,.8f,time):0, forward=Smooth(1.05f,2.15f,time);
+                float rewind=(receipt?.sourceDay??0)>0?Smooth(rewindAt,sourceAt,time):0, forward=Smooth(returnAt,attributionAt,time);
                 look=Vector3.Lerp(new Vector3(0,1,2),source,rewind*(1-forward));
                 camera=Vector3.Lerp(new Vector3(3.7f,2.8f,-4.8f),source+new Vector3(1.8f,1.5f,-2.5f),rewind);
                 bool connection=receipt?.resourcesRecorded==true && receipt.resources.relation!=0;
                 camera=Vector3.Lerp(camera,connection?new Vector3(3.8f,3.5f,-7):new Vector3(3.7f,2.8f,-4.8f),forward);
                 if(connection) look=Vector3.Lerp(look,new Vector3(.8f,1.2f,1.5f),forward);
-                movieLabels[24].text=(receipt?.sourceDay??0)>0?"Day "+CinematicStoryboard.DayDuringRewind(e,time):"来路暂未显现";
+                movieLabels[24].text=(receipt?.sourceDay??0)>0?"Day "+CinematicStoryboard.DayDuringRewind(e,time,rewindAt,sourceAt):"来路暂未显现";
                 movieLabels[24].transform.localPosition=look+Vector3.up*1.1f;
-                float saturation=time<1.05f?1-Smooth(.12f,.35f,time)*.85f:Smooth(1.05f,2.15f,time);
+                float saturation=time<returnAt?1-Smooth(chargeAt,rewindAt,time)*.85f:Smooth(returnAt,attributionAt,time);
                 foreach(Transform tile in movieTiles) SetMovieColor(tile,Color.Lerp(Palette.Muted*.3f,Palette.Mint*.4f,saturation));
                 if(saturation>=.995f) ResetMovieColor(moviePlayer);
                 else SetMovieColor(moviePlayer,Color.Lerp(Palette.Muted*.5f,Color.white,saturation));
-                moviePlayer.GetComponent<HorizonActor>().MotionRate=time<.12f?Mathf.Lerp(1,.18f,time/.12f):time<1.05f?0:1;
-                causalPulse.gameObject.SetActive(time>=1.05f && time<2.15f);
+                moviePlayer.GetComponent<HorizonActor>().MotionRate=time<chargeAt?Mathf.Lerp(1,.18f,time/Mathf.Max(.001f,chargeAt)):time<returnAt?0:1;
+                causalPulse.gameObject.SetActive(time>=returnAt && time<attributionAt);
                 float nodeProgress=forward*Mathf.Max(1,count-1); int node=Mathf.Min(Mathf.FloorToInt(nodeProgress),Mathf.Max(0,count-2));
                 causalPulse.localPosition=count>1?Vector3.Lerp(movieNodes[node].localPosition,movieNodes[node+1].localPosition,nodeProgress-node):Vector3.Lerp(source,new Vector3(0,1,2),forward);
                 for(int i=0;i<count;i++) if(i<=nodeProgress) { SetMovieColor(movieNodes[i],Palette.Mint); if(i>0) SetMovieColor(movieLines[i].transform,Palette.Mint); }
