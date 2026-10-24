@@ -208,14 +208,33 @@ namespace Horizon.Tests
                 for(int i=0;i<events.Length;i++)
                 {
                     typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { events[i],(Action)(()=>{}) });
-                    world.Cinematics.enabled=false; float reveal=world.Cinematics.Current.Cues.Single(c=>c.Phase==CinematicPhase.SecondReveal).Time;
-                    world.Cinematics.Advance(reveal+.1f); yield return null;
-                    foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
-                    canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
-                    Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,image);
-                    RenderTexture previous=RenderTexture.active; RenderTexture.active=image; pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=previous;
-                    File.WriteAllBytes(Path.Combine(directory,names[i]+".png"),pixels.EncodeToPNG());
-                    Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text);
+                    world.Cinematics.enabled=false;
+                    RewardPlan playing=world.Cinematics.Current;
+                    float reveal=playing.Cues.Single(c=>c.Phase==CinematicPhase.SecondReveal).Time;
+                    float[] samples=i==0?new[] {
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge).Time+.12f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time+.05f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time+.08f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Multiplication).Time+.18f,
+                        reveal+.12f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Settlement).Time+.08f
+                    }:new[] {reveal+.1f};
+                    string[] beats=i==0?new[] {"charge","breath-hold","impact","multiplier","second-reveal","settlement"}:new[] {"second-reveal"};
+                    for(int sample=0;sample<samples.Length;sample++)
+                    {
+                        world.Cinematics.Advance(Mathf.Max(0,samples[sample]-world.Cinematics.Elapsed)); yield return null;
+                        foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                        canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                        Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,image);
+                        RenderTexture previous=RenderTexture.active; RenderTexture.active=image; pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=previous;
+                        string filename=i==0?"92-pattern-fullscreen-"+(sample+1).ToString("00")+"-"+beats[sample]:names[i];
+                        File.WriteAllBytes(Path.Combine(directory,filename+".png"),pixels.EncodeToPNG());
+                        Text phase=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Cinematic phase copy");
+                        Assert.IsNotEmpty(phase.text); Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text);
+                        Text multiplier=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience");
+                        if(i==0 && beats[sample]=="impact") Assert.IsEmpty(multiplier.text,"Impact must remain readable before the multiplier reveal.");
+                        if(i==0 && beats[sample]=="multiplier") Assert.That(multiplier.text,Does.StartWith("×"));
+                    }
                     Assert.IsTrue(saved.rewardCollection.Capture(events[i],i==0?3:0)); Assert.IsFalse(saved.rewardCollection.Capture(events[i],i==0?3:0));
                     world.Cinematics.Skip(); Assert.IsTrue(events[i].acknowledged);
                 }
