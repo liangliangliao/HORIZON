@@ -155,7 +155,8 @@ namespace Horizon.Tests
             Quaternion head=actor.Head.localRotation; yield return null; Assert.AreEqual(head,actor.Head.localRotation);
             director.Advance(10); Assert.AreEqual(stop,director.Elapsed);
             Assert.AreEqual(position,world.WorldCamera.transform.position); Assert.AreEqual(0,probe.Impacts);
-            director.SetPaused(false); director.Advance(.5f); Assert.AreEqual(1,probe.Impacts);
+            float release=director.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            director.SetPaused(false); director.Advance(release-director.Elapsed+.01f); Assert.AreEqual(1,probe.Impacts);
             director.Skip(); director.Skip(); Assert.AreEqual(1,probe.Completions); Assert.AreEqual(rect,world.WorldCamera.rect); Assert.AreEqual(fov,world.WorldCamera.fieldOfView);
             Assert.AreEqual(before,JsonUtility.ToJson(e));
             Assert.IsTrue(director.Enqueue(e,true,probe.Completed)); director.CancelAll(); Assert.AreEqual(1,probe.Completions); Assert.AreEqual(rect,world.WorldCamera.rect);

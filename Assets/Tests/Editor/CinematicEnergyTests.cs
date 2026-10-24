@@ -123,6 +123,21 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void NewChaptersStayReadableOnTheirFirstFrameAndSettlementArrivesPromptly()
+        {
+            RewardPlan plan=Plan(DomainEventKind.PatternBroken,RewardTier.Mythic);
+            var text=new CinematicTextChoreography(plan);
+            foreach(CinematicCue cue in plan.Cues.Where(c=>!c.NodeHit && c.Phase!=CinematicPhase.ReturnToGame))
+            {
+                CinematicTextFrame frame=text.Sample(cue.Time);
+                Assert.GreaterOrEqual(frame.CopyAlpha,.55f,cue.Phase+" must not disappear while its copy changes.");
+                Assert.IsNotEmpty(frame.Narration,cue.Phase.ToString());
+            }
+            Assert.Less(text.Sample(text.SettlementTime+.08f).ReceiptVeil,.25f,
+                "The exact receipt should already be legible shortly after the settlement beat.");
+        }
+
+        [Test]
         public void QuietAndLossEventsKeepMatchingCopyAndNeverPretendToAwardAMultiplier()
         {
             foreach(DomainEventKind kind in new[] {DomainEventKind.PredictionLocked,DomainEventKind.FailAndAgain,

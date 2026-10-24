@@ -25,7 +25,11 @@ namespace Horizon
         private bool TryMasterSpectacle(Action resume)
         {
             MasterRunState state = CurrentMaster; if (state == null) return false;
-            DomainEvent e = state.events.FirstOrDefault(x => !x.acknowledged);
+            // Preserve the product's feedback density: ordinary receipts stay
+            // on their compact result page.  "Every animation is full-screen"
+            // applies whenever a spectacle is authored; it must not convert
+            // every minor bookkeeping event into another confirmation movie.
+            DomainEvent e = state.events.FirstOrDefault(x => !x.acknowledged && x.tier >= RewardTier.Epic);
             if (e == null) return false;
             PlayMasterSpectacle(e, () => { if (!TryMasterSpectacle(resume)) resume(); }); return true;
         }

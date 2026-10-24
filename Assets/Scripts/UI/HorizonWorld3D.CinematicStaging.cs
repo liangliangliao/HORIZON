@@ -298,7 +298,19 @@ namespace Horizon.UI
             look=moviePlayer.localPosition+Vector3.up*1.2f;
             switch(shot.Framing)
             {
-                case CinematicFraming.Close: camera=look+new Vector3(1.4f,.35f,-2.2f); break;
+                case CinematicFraming.Close:
+                    if(index==6)
+                    {
+                        // The silent beat is about the choice meeting the old
+                        // interruption.  A conventional character close-up put
+                        // the avatar's back and legs across the entire phone and
+                        // hid that relationship.  Keep both body and barrier in
+                        // the portrait frame while the sound and motion stop.
+                        look=Vector3.Lerp(moviePlayer.localPosition+Vector3.up*.95f,new Vector3(0,.24f,2),.58f);
+                        camera=look+new Vector3(2.45f,1.18f,-4.75f);
+                    }
+                    else camera=look+new Vector3(1.4f,.35f,-2.2f);
+                    break;
                 case CinematicFraming.ObjectDetail:
                     look=index==5?new Vector3(0,.2f,2):new Vector3(0,1.2f,1.1f);
                     camera=look+new Vector3(index==11?-1.8f:1,.6f,-3.4f); break;

@@ -37,7 +37,12 @@ namespace Horizon.Game
             }
             float started=chapter?.Time??0;
             float available=Math.Max(.12f,next-started);
-            float entrance=Smooth(started,started+Math.Min(.38f,available*.44f),time);
+            // A chapter change must never make its meaning disappear.  The
+            // reference rhythm swaps copy on the beat, then brightens it; a
+            // fade from zero made Impact and Settlement look unlabelled in a
+            // still frame even though the strings were technically present.
+            float entrance=Smooth(started,started+Math.Min(.22f,available*.32f),time);
+            float readableEntrance=.56f+entrance*.44f;
             CinematicEnergyFrame e=energy.Sample(time,reducedMotion);
             float flash=0;
             foreach(CinematicCue cue in chapters)
@@ -54,10 +59,12 @@ namespace Horizon.Game
                 Smooth(0,.16f,multiplierAge)*multiplierLinger*ending:0;
             float multiplierPunch=multiplierAge<0?0:(float)Math.Exp(-multiplierAge/Math.Max(.12f,plan.Duration*.025f));
             string narration=chapter!=null && !string.IsNullOrEmpty(chapter.Copy)?chapter.Copy:plan.Event.detail;
+            float receiptStart=Math.Max(0,SettlementTime-.08f);
+            float receiptEnd=Math.Min(plan.Duration,SettlementTime+.14f);
             return new CinematicTextFrame(time,chapter?.Phase??CinematicPhase.Anticipation,
                 PhaseCopy(chapter?.Phase??CinematicPhase.Anticipation),narration,
-                entrance*ending,Clamp(.12f+e.Inward*.72f+e.Afterglow*.24f+flash*.72f,0,1),
-                tremor,flash,1-Smooth(SettlementTime,SettlementTime+Math.Max(.2f,(plan.Duration-SettlementTime)*.38f),time),
+                readableEntrance*ending,Clamp(.12f+e.Inward*.72f+e.Afterglow*.24f+flash*.72f,0,1),
+                tremor,flash,1-Smooth(receiptStart,receiptEnd,time),
                 multiplierAlpha,.78f+.22f*Smooth(0,.24f,multiplierAge)+multiplierPunch*.24f,
                 .9f+.1f*Smooth(0,.42f,time)+flash*.055f,
                 .95f+.05f*entrance,ending);

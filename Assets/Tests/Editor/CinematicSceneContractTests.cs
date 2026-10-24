@@ -62,7 +62,8 @@ namespace Horizon.Tests
             world.Cinematics.Enqueue(CinematicEventCoverageTests.RealEvents().Single(e=>e.kind==DomainEventKind.PatternBroken),true);
             var body=world.GetComponentsInChildren<HorizonActorPerformance>().Single(x=>x.name=="Cinematic player");
             var actor=body.GetComponent<HorizonActor>();
-            world.Cinematics.Advance(world.Cinematics.Current.Duration*.54f);
+            IReadOnlyList<CinematicShot> shots=CinematicStoryboard.Pattern(world.Cinematics.Current);
+            world.Cinematics.Advance(shots[(int)PatternShot.ShatterHistory].Time+.01f);
             Assert.IsTrue(body.GraphReady);
             Assert.Greater(body.transform.localPosition.z,3.5f,"The character must cross the old break at z=2 before the memento shot.");
             Vector3 crossed=body.transform.localPosition; yield return null;
@@ -122,7 +123,9 @@ namespace Horizon.Tests
             {
                 var e=new DomainEvent { id="resource"+value,kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,
                     receipt=new RewardReceipt { resourcesRecorded=true,resources=new ResourceDelta(value,5,3,9,value,value),sourceDay=1 },day=4 };
-                world.Cinematics.Enqueue(e,true); world.Cinematics.Advance(2.7f);
+                world.Cinematics.Enqueue(e,true);
+                float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                world.Cinematics.Advance(impact+.25f);
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="EnergyCell"));
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Assembled tool 0"));
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Relationship other person"));
@@ -131,7 +134,8 @@ namespace Horizon.Tests
             }
             world.Cinematics.Enqueue(new DomainEvent { id="major-energy",kind=DomainEventKind.PatternBroken,tier=RewardTier.Mythic,
                 receipt=new RewardReceipt { resourcesRecorded=true,resources=new ResourceDelta(1) } },true);
-            world.Cinematics.Advance(7);
+            float mythicImpact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            world.Cinematics.Advance(mythicImpact+.2f);
             Assert.AreEqual(1,world.Cinematics.Current.Objects.Single(o=>o.Kind==RewardObjectKind.EnergyCell).Amount);
             Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Energy presentation amplifier 2"));
             Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Scene power distribution 0"));

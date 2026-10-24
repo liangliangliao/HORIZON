@@ -149,7 +149,9 @@ namespace Horizon.Tests
                     var source=new DomainEvent { id="resource-render-"+i,kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,day=7,
                         receipt=new RewardReceipt { resourcesRecorded=true,resources=changes[i],sourceDay=3,action="实际行动" } };
                     string before=JsonUtility.ToJson(source);
-                    Assert.IsTrue(world.Cinematics.Enqueue(source,true)); world.Cinematics.Advance(2.85f);
+                    Assert.IsTrue(world.Cinematics.Enqueue(source,true));
+                    float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                    world.Cinematics.Advance(impact+.25f);
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
                     Assert.IsNotNull(stage.Find("Reward showcase "+kinds[i]));
                     Assert.IsTrue(stage.Find("Reward showcase "+kinds[i]).gameObject.activeInHierarchy);
