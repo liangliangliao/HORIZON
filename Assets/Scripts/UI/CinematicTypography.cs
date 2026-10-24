@@ -52,9 +52,10 @@ namespace Horizon.UI
             if(rendered==null) return;
             bool effectiveBold=headline || bold;
             float boundedOutline=Mathf.Clamp(outline,0,.35f);
+            Color colorDelta=lastGlowColor-glowColor;
             bool changed=Mathf.Abs(lastGlow-glow)>.008f || Mathf.Abs(lastOutline-boundedOutline)>.002f ||
                 Mathf.Abs(lastTracking-tracking)>.01f || lastBold!=effectiveBold ||
-                (lastGlowColor-glowColor).sqrMagnitude>.0001f;
+                colorDelta.r*colorDelta.r+colorDelta.g*colorDelta.g+colorDelta.b*colorDelta.b+colorDelta.a*colorDelta.a>.0001f;
             if(!changed) return;
             lastGlow=glow; lastOutline=boundedOutline; lastTracking=tracking; lastBold=effectiveBold; lastGlowColor=glowColor;
             rendered.characterSpacing=tracking;
