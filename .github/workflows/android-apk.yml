@@ -308,7 +308,7 @@ jobs:
         with:
           name: HORIZON-Cinematic-Reward-Previews
           path: |
-            artifacts/visuals/9[01]-*.png
+            artifacts/visuals/9[0-2]-*.png
             artifacts/cinematics/
           if-no-files-found: ignore
           retention-days: 14
