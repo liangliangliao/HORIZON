@@ -232,6 +232,9 @@ namespace Horizon.Tests
             Button(app, "Complete reality quest").onClick.Invoke(); yield return new WaitForSecondsRealtime(0.2f);
             Assert.AreEqual(1, archive.reality.quests.Count(q => q.completed));
             Assert.IsFalse(archive.reality.events.Any(e => e.kind == DomainEventKind.RealityConvergence), "An imagined path still needs a simulated action.");
+            Button skip=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>()
+                .FirstOrDefault(b=>b.name=="Skip cinematic" && b.interactable);
+            if(skip!=null) { skip.onClick.Invoke(); yield return null; }
             Button(app, "Continue master event").onClick.Invoke(); yield return null;
             Assert.IsFalse(Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Complete reality quest"));
             Button(app, "Reality constellation").onClick.Invoke(); yield return null;

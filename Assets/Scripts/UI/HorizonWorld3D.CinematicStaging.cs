@@ -259,9 +259,14 @@ namespace Horizon.UI
         }
         private void SamplePatternStoryboard(float time,ref Vector3 camera,ref Vector3 look)
         {
-            CinematicShot shot=patternStoryboard.Last(s=>s.Time<=time); int index=(int)shot.Beat;
+            // Slow motion may hold the actor on an earlier pose, but editorial
+            // time must still cut to the authored Silence shot.  Using pose
+            // time for both left the phone trapped in the preceding crack
+            // close-up, with the avatar's back filling the frame.
+            float shotTime=moviePhase==CinematicPhase.HitStop?moviePhaseTime:time;
+            CinematicShot shot=patternStoryboard.Last(s=>s.Time<=shotTime); int index=(int)shot.Beat;
             float next=index+1<patternStoryboard.Count?patternStoryboard[index+1].Time:moviePlan.Duration;
-            float p=Smooth(shot.Time,next,time); CurrentCinematicShot=shot.Beat.ToString(); CurrentCinematicFraming=shot.Framing;
+            float p=Smooth(shot.Time,next,shotTime); CurrentCinematicShot=shot.Beat.ToString(); CurrentCinematicFraming=shot.Framing;
             moviePlayer.gameObject.SetActive(index!=11);
             float crossing=Smooth(patternStoryboard[7].Time,patternStoryboard[8].Time,time);
             float shatter=Smooth(patternStoryboard[8].Time,patternStoryboard[9].Time,time);
@@ -306,14 +311,25 @@ namespace Horizon.UI
                         // the avatar's back and legs across the entire phone and
                         // hid that relationship.  Keep both body and barrier in
                         // the portrait frame while the sound and motion stop.
-                        look=Vector3.Lerp(moviePlayer.localPosition+Vector3.up*.95f,new Vector3(0,.24f,2),.58f);
-                        camera=look+new Vector3(2.45f,1.18f,-4.75f);
+                        look=new Vector3(0,.96f,1.84f);
+                        camera=look+new Vector3(3.05f,1.42f,-5.85f);
                     }
                     else camera=look+new Vector3(1.4f,.35f,-2.2f);
                     break;
                 case CinematicFraming.ObjectDetail:
-                    look=index==5?new Vector3(0,.2f,2):new Vector3(0,1.2f,1.1f);
-                    camera=look+new Vector3(index==11?-1.8f:1,.6f,-3.4f); break;
+                    if(index==5)
+                    {
+                        // See the crack, the approaching choice and enough
+                        // negative space for the synchronized story copy.
+                        look=new Vector3(0,.66f,1.94f);
+                        camera=look+new Vector3(2.72f,1.5f,-5.25f);
+                    }
+                    else
+                    {
+                        look=new Vector3(0,1.2f,1.1f);
+                        camera=look+new Vector3(index==11?-1.8f:1,.6f,-3.4f);
+                    }
+                    break;
                 case CinematicFraming.Medium: camera=look+new Vector3(index==3?0:2.4f,1,index==3?4.4f:-4.4f); break;
                 case CinematicFraming.ExtremeWide: look=new Vector3(0,1.3f,3); camera=new Vector3(7,6,-12); break;
                 default: look=new Vector3(0,1,2); camera=new Vector3(4.7f,3.8f,-6.8f); break;

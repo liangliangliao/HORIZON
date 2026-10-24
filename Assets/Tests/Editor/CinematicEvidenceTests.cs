@@ -65,6 +65,8 @@ namespace Horizon.Tests
                     for (int frame=0; frame<3; frame++)
                     {
                         float time=plan.Duration*(frame==0?.12f:frame==1?.54f:.94f);
+                        if(source.kind==DomainEventKind.PatternBroken && frame==1)
+                            time=CinematicStoryboard.Pattern(plan)[(int)PatternShot.ShatterHistory].Time+.01f;
                         world.Cinematics.Advance(Mathf.Max(0,time-world.Cinematics.Elapsed));
                         yield return null;
                         Assert.IsTrue(world.Cinematics.IsPlaying);

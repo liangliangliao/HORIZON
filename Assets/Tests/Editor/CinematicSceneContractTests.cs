@@ -63,7 +63,14 @@ namespace Horizon.Tests
             var body=world.GetComponentsInChildren<HorizonActorPerformance>().Single(x=>x.name=="Cinematic player");
             var actor=body.GetComponent<HorizonActor>();
             IReadOnlyList<CinematicShot> shots=CinematicStoryboard.Pattern(world.Cinematics.Current);
-            world.Cinematics.Advance(shots[(int)PatternShot.ShatterHistory].Time+.01f);
+            float stop=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+            world.Cinematics.Advance(stop+.01f);
+            Assert.AreEqual(PatternShot.Silence.ToString(),world.CurrentCinematicShot,
+                "Holding the actor pose must not rewind the authored camera cut.");
+            Assert.Greater(Vector3.Distance(world.WorldCamera.transform.position,body.transform.position),5.5f,
+                "The breath-hold must frame the actor and interruption together instead of filling the phone with the avatar's back.");
+            float crossedAt=shots[(int)PatternShot.ShatterHistory].Time+.01f;
+            world.Cinematics.Advance(crossedAt-world.Cinematics.Elapsed);
             Assert.IsTrue(body.GraphReady);
             Assert.Greater(body.transform.localPosition.z,3.5f,"The character must cross the old break at z=2 before the memento shot.");
             Vector3 crossed=body.transform.localPosition; yield return null;
