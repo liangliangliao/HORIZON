@@ -294,6 +294,8 @@ namespace Horizon
             Clear();
             if (session == null) return;
             world.ShowBoard();
+            View.Fill(root,"Board information dock",Palette.Ink,0,.78f,1,1);
+            View.Fill(root,"Board action dock",Palette.Ink,0,0,1,.54f);
             FutureRegion();
             PresentRegion();
             BuildDailyGuide();
@@ -591,7 +593,7 @@ namespace Horizon
 
         private void FutureRegion()
         {
-            View.Panel(root, "Future readability", new Color(0.012f, 0.03f, 0.047f, 0.7f),
+            View.Panel(root, "Future readability", new Color(0.012f, 0.03f, 0.047f, 1),
                 0.035f, 0.788f, 0.965f, 0.913f, 22);
             Image hit = View.Fill(root, "Hold future", new Color(0, 0, 0, 0), 0.01f, 0.81f, 0.99f, 0.925f, true);
             hit.gameObject.AddComponent<FutureHold>().Activated = ShowFocus;
@@ -617,18 +619,17 @@ namespace Horizon
             ActionRecord recent = session.Actions.FindLast(a => a.day < session.Day);
             View.Label(root, "Scene time", weekdays[(session.Day - 1) % 7] + " · " +
                 (recent?.kind == CardKind.Temptation ? "夜" : recent?.kind == CardKind.Growth ? "午后" : "清晨"),
-                23, Palette.Muted, TextAnchor.MiddleCenter, 0.065f, 0.754f, 0.49f, 0.788f);
-            destinationBeacon = View.Rect(root, "Play destination", 0.075f, 0.665f, 0.925f, 0.75f);
-            View.Panel(destinationBeacon, "Drop interior", new Color(0.012f, 0.08f, 0.11f, 0.16f),
-                0.02f, 0.07f, 0.98f, 0.93f, 75);
+                23, Palette.Muted, TextAnchor.MiddleCenter, 0.065f, 0.762f, 0.49f, 0.788f);
+            // Scene is a clear viewing/drag surface. Instructions belong to the
+            // action dock, never a text-filled card over the character's face.
+            destinationBeacon = View.Rect(root, "Play destination", 0.075f, 0.55f, 0.925f, 0.755f);
             dropRing = destinationBeacon.gameObject.AddComponent<DropRingGraphic>();
-            dropRing.color = Palette.Gold;
+            dropRing.color = new Color(Palette.Gold.r,Palette.Gold.g,Palette.Gold.b,.25f);
             dropRing.raycastTarget = false;
-            dropTitle = View.Label(destinationBeacon, "Drop title", "选一张牌，送进未来", 32,
-                Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.46f, 0.92f, 0.87f);
-            dragHint = View.Label(destinationBeacon, "Destination", "点牌查看 / 拖到这里行动", 24,
-                Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.13f, 0.94f, 0.48f);
-            destinationBeacon.gameObject.AddComponent<GuidePulse>();
+            dropTitle = View.Label(root, "Drop title", "选一张牌，送进未来", 26,
+                Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.516f, 0.92f, 0.54f);
+            dragHint = View.Label(root, "Destination", "点牌查看 / 向上拖进场景行动", 22,
+                Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.006f, 0.94f, 0.028f);
         }
 
         private void ResourceRegion()

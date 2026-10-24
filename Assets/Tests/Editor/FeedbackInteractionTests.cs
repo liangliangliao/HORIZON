@@ -90,6 +90,60 @@ namespace Horizon.Tests
         }
 
         [UnityTest]
+        public IEnumerator LocalMovieHidesLateCreatedReceiptAndRestoresItOnSkipAndCancel()
+        {
+            yield return new EnterPlayMode();
+            var app=Object.FindObjectOfType<HorizonApp>();
+            if(app==null) app=new GameObject("Local movie isolation test").AddComponent<HorizonApp>();
+            yield return null;
+            typeof(HorizonApp).GetMethod("Clear",Private).Invoke(app,new object[] {false});
+            var root=(RectTransform)typeof(HorizonApp).GetField("root",Private).GetValue(app);
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",Private).GetValue(app);
+            world.ShowBoard();
+            Call(app,"BindLocalCinematicCopy");
+            var card=View.Panel(root,"Late receipt card",Palette.Panel,.05f,.1f,.95f,.6f).gameObject;
+            var button=View.Button(card.transform,"Must not accept input","继续",()=>{},0,0,1,.2f,Palette.Mint,Palette.Ink);
+            var e=new DomainEvent {id="isolation",kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,title="TIME ECHO",detail="来自过去的行动。",receipt=new RewardReceipt {sourceDay=2}};
+            world.PresentMasterEvent(e);
+            var late=View.Panel(root,"Created after Started",Palette.Panel,.05f,.65f,.95f,.9f).gameObject;
+            yield return null; yield return null;
+            Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
+            Assert.AreEqual(0,card.GetComponent<CanvasGroup>().alpha);
+            Assert.AreEqual(0,late.GetComponent<CanvasGroup>().alpha);
+            Assert.IsFalse(card.GetComponent<CanvasGroup>().blocksRaycasts);
+            Assert.IsFalse(button.IsInteractable());
+            Canvas canvas=root.GetComponentInParent<Canvas>();
+            var target=new RenderTexture(540,960,24); target.Create();
+            var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
+            var ui=new GameObject("Local isolation evidence camera",typeof(Camera)).GetComponent<Camera>();
+            ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20; ui.targetTexture=target;
+            RenderMode mode=canvas.renderMode; Camera old=canvas.worldCamera; float distance=canvas.planeDistance;
+            try
+            {
+                foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
+                RenderTexture previous=RenderTexture.active; RenderTexture.active=target;
+                pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=previous;
+                string directory=System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(),"artifacts","cinematics");
+                System.IO.Directory.CreateDirectory(directory);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory,"fixture-local-receipt-isolation.png"),pixels.EncodeToPNG());
+            }
+            finally
+            {
+                canvas.renderMode=mode; canvas.worldCamera=old; canvas.planeDistance=distance;
+                target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
+            }
+            world.Cinematics.SkipPending(); yield return null;
+            Assert.AreEqual(1,card.GetComponent<CanvasGroup>().alpha); Assert.IsTrue(button.IsInteractable());
+            e.id="cancel-isolation"; world.PresentMasterEvent(e); yield return null;
+            world.Cinematics.CancelAll(); yield return null;
+            Assert.AreEqual(1,late.GetComponent<CanvasGroup>().alpha);
+            Assert.IsFalse(root.Find("Reward cinematic captions").gameObject.activeSelf);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator MultipleEchoReceiptsWaitAndResumeAtTheUnreadBeat()
         {
             yield return new EnterPlayMode();

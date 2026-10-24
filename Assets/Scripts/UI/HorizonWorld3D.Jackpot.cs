@@ -198,7 +198,12 @@ namespace Horizon.UI
             // The final close-up highlights the actual resource or memento.
             if(hero)
             {
-                Vector3 closeCamera=preferences.reducedMotion?new Vector3(5,4,-8):showcaseCenter+new Vector3(1.1f,1.05f,-6.3f);
+                float revealed=Smooth(spectacle.HeroTime+.6f,spectacle.HeroTime+2.4f,time);
+                // After the light releases, stay with the actual object: a slow
+                // product-shot arc, not another flash followed by an idle wide.
+                float angle=preferences.reducedMotion?0:Mathf.Lerp(-.12f,.15f,revealed);
+                Vector3 closeCamera=preferences.reducedMotion?new Vector3(5,4,-8):showcaseCenter+
+                    new Vector3(1.1f+Mathf.Sin(angle)*2,1.05f,Mathf.Lerp(-6.3f,-5.3f,revealed));
                 Vector3 eye=closeCamera-showcaseCenter;
                 float q=2*Mathf.Tan(CinematicFieldOfView(time)*Mathf.Deg2Rad*.5f)*((showcaseFullscreen?.61f:.64f)-.5f);
                 float horizontal=Mathf.Sqrt(eye.x*eye.x+eye.z*eye.z);

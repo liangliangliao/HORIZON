@@ -76,6 +76,7 @@ namespace Horizon
         private void BindLocalCinematicCopy()
         {
             RectTransform layer = View.Rect(root, "Reward cinematic captions", 0,0,1,1);
+            View.Fill(layer,"Cinematic input shield",Color.clear,0,0,1,1,true);
             var curtain=layer.gameObject.AddComponent<CinematicCurtainGraphic>(); curtain.raycastTarget=false;
             var caption = layer.gameObject.AddComponent<CinematicCaption>(); caption.HideWhenIdle=true;
             caption.Flash = View.Fill(layer, "Synchronous impact flash",Color.clear,0,0,1,1); caption.Flash.raycastTarget = false;
@@ -86,6 +87,8 @@ namespace Horizon
             caption.MultiplierCaption=View.Label(layer,"Presentation multiplier meaning","",21,Palette.Gold,TextAnchor.MiddleCenter,.08f,.35f,.92f,.395f);
             caption.Resources = View.Label(layer, "Physical resource copy", "",24,Palette.Gold,TextAnchor.MiddleCenter,.06f,.11f,.94f,.15f);
             caption.Explanation=View.Label(layer,"Reward original explanation","",24,Palette.Text,TextAnchor.MiddleCenter,.06f,.15f,.94f,.21f);
+            View.Button(layer,"Local cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.06f,.018f,.40f,.064f,Palette.Deep,Palette.Text,23);
+            View.Button(layer,"Local cinematic skip","跳过 · 保留结果",()=>world.Cinematics.SkipPending(),.60f,.018f,.94f,.064f,Palette.Deep,Palette.Text,23);
             caption.Bind(world.Cinematics);
         }
     }

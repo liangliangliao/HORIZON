@@ -152,6 +152,29 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void ReadingChaptersHaveRealDwellTimeAndDoNotChangeOnTechnicalCues()
+        {
+            foreach(RewardTier tier in Enum.GetValues(typeof(RewardTier)))
+            {
+                RewardPlan plan=Plan(DomainEventKind.PatternBroken,tier);
+                var text=new CinematicTextChoreography(plan);
+                var reading=plan.Cues.Where(c=>!c.NodeHit && CinematicReading.IsChapter(plan.Event,c.Phase)).ToArray();
+                for(int i=0;i<reading.Length;i++)
+                {
+                    float end=i+1<reading.Length?reading[i+1].Time:plan.Duration;
+                    Assert.GreaterOrEqual(end-reading[i].Time,CinematicReading.ReadSeconds(reading[i].Copy)-.001f);
+                    string sentence=text.Sample(reading[i].Time+.01f).Narration;
+                    Assert.AreEqual(sentence,text.Sample(end-.1f).Narration,"A full thought must survive the technical sub-beats.");
+                    Assert.AreEqual(1,text.Sample(end-.1f).CharacterProgress);
+                }
+                float reveal=plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
+                Assert.GreaterOrEqual(reveal-text.MultiplierTime,2.4f-.001f);
+                if(plan.PresentationMultiplier>1) Assert.Greater(text.Sample(text.MultiplierTime+1.5f).MultiplierAlpha,.9f);
+                Assert.GreaterOrEqual(plan.Duration-text.SettlementTime,3.4f-.001f);
+            }
+        }
+
+        [Test]
         public void TimeEchoRewindDayCanUseTheExpandedCueWindow()
         {
             var e=new DomainEvent {day=12,receipt=new RewardReceipt {sourceDay=4}};

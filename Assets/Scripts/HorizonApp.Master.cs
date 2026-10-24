@@ -34,13 +34,13 @@ namespace Horizon
             {
                 if (boardHint != null) boardHint.text = "EXECUTION MODE · 决定已锁定，完成下一步执行";
                 View.Button(root, "Resume execution", "决定好了 · 继续执行", () => { executionFromBoard = true; ShowExecution(); },
-                    0.065f, 0.754f, 0.49f, 0.788f, Palette.Mint, Palette.Ink, 22);
+                    0.065f, 0.762f, 0.49f, 0.788f, Palette.Mint, Palette.Ink, 22);
             }
             if (session.RunNumber >= 2 || session.Day >= 3)
                 View.Button(root, "Master hub", "ME · 想象", ShowMasterHub, 0.52f, 0.877f, 0.725f, 0.911f, Palette.Deep, Palette.Mint, 20);
             if (CanPrepareMaster && (session.Day >= 3 || session.RunNumber >= 2))
                 View.Button(root, "Prepare with imagination", archive.imagination == null ? "先练一次失败与恢复" : "继续上次失败预演", BeginBoardImagination,
-                    0.52f, 0.754f, 0.945f, 0.788f, Palette.Panel, Palette.Mint, 22);
+                    0.52f, 0.762f, 0.945f, 0.788f, Palette.Panel, Palette.Mint, 22);
             int energy = session.Master.overdriveEnergy;
             bool overdrive = session.Day <= session.Master.overdriveUntilDay;
             world.SetInsightState(energy, overdrive);

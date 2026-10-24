@@ -24,6 +24,31 @@ namespace Horizon.UI
         private CinematicTextChoreography choreography;
         private RewardPlan plan;
         private Color accent;
+        private readonly Dictionary<CanvasGroup,Vector3> hiddenPage=new Dictionary<CanvasGroup,Vector3>();
+
+        private void IsolatePage()
+        {
+            if(!HideWhenIdle || transform.parent==null) return;
+            // The receipt can be built after Started fires. Re-scan in LateUpdate
+            // so late-created cards, lists and their input never cover the film.
+            foreach(Transform sibling in transform.parent)
+            {
+                if(sibling==transform || !sibling.gameObject.activeSelf) continue;
+                CanvasGroup group=sibling.GetComponent<CanvasGroup>() ?? sibling.gameObject.AddComponent<CanvasGroup>();
+                if(!hiddenPage.ContainsKey(group)) hiddenPage.Add(group,new Vector3(group.alpha,group.interactable?1:0,group.blocksRaycasts?1:0));
+                group.alpha=0; group.interactable=false; group.blocksRaycasts=false;
+            }
+            transform.SetAsLastSibling();
+        }
+        private void RestorePage()
+        {
+            foreach(var entry in hiddenPage)
+                if(entry.Key!=null) { entry.Key.alpha=entry.Value.x; entry.Key.interactable=entry.Value.y>0; entry.Key.blocksRaycasts=entry.Value.z>0; }
+            hiddenPage.Clear();
+        }
+        private void OnCancelled()
+        { RestorePage(); plan=null; choreography=null; if(HideWhenIdle) gameObject.SetActive(false); }
+        private void LateUpdate() { if(plan!=null && director!=null && director.IsPlaying) IsolatePage(); }
 
         public void Bind(CinematicDirector value)
         {
@@ -38,6 +63,7 @@ namespace Horizon.UI
             Remember(Phase); Remember(Title); Remember(Story); Remember(Multiplier); Remember(MultiplierCaption);
             Remember(Resources); Remember(Explanation); Remember(Prediction);
             director=value; director.Started+=OnStarted; director.Cue+=OnCue; director.Completed+=OnCompleted;
+            director.Cancelled+=OnCancelled;
             if(director.Current!=null) OnStarted(director.Current);
             else if(HideWhenIdle) gameObject.SetActive(false);
         }
@@ -53,6 +79,7 @@ namespace Horizon.UI
         {
             if(!string.IsNullOrEmpty(EventId) && value.Event.id!=EventId) return;
             if(HideWhenIdle) gameObject.SetActive(true);
+            IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
             accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
             if(Title!=null) Title.text=value.Event.title;
@@ -69,8 +96,15 @@ namespace Horizon.UI
 
         private void OnCompleted(RewardPlan value)
         {
-            if(!HideWhenIdle || !string.IsNullOrEmpty(EventId) && value.Event.id!=EventId) return;
-            plan=null; choreography=null; gameObject.SetActive(false);
+            if(!string.IsNullOrEmpty(EventId) && value.Event.id!=EventId) return;
+            if(!HideWhenIdle)
+            {
+                // A finished movie leaves a readable result, not its nearly
+                // transparent last fade frame, while the user decides to go on.
+                if(choreography!=null) ApplyFrame(choreography.Sample(choreography.SettlementTime+.3f,VisualPreferences.ReducedMotion));
+                return;
+            }
+            RestorePage(); plan=null; choreography=null; gameObject.SetActive(false);
         }
 
         public static string PredictionCopy(RewardReceipt receipt)
@@ -116,6 +150,8 @@ namespace Horizon.UI
             if(plan==null) return;
             if(Phase!=null) Phase.text=frame.PhaseCopy;
             if(Story!=null) Story.text=frame.Narration;
+            CinematicTypography.Reveal(Story,VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt(frame.Narration.Length*frame.CharacterProgress)));
+            CinematicTypography.Sweep(Multiplier,frame.Time-choreography.MultiplierTime);
             float receipt=1-frame.ReceiptVeil;
             if(Explanation!=null) Explanation.text=receipt>.001f?plan.Event.detail:"";
             if(Resources!=null) Resources.text=receipt>.001f?plan.ResourceCopy:"";
@@ -155,7 +191,7 @@ namespace Horizon.UI
         }
 
         private void OnDestroy()
-        { if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; }
+        { RestorePage(); if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; director.Cancelled-=OnCancelled; }
     }
 
     // Transparent edge gradients preserve full-screen motion behind the copy.

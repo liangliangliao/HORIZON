@@ -31,6 +31,7 @@ namespace Horizon.UI
         public event Action<CinematicCue> Cue;
         public event Action<RewardPlan> Started;
         public event Action<RewardPlan> Completed;
+        public event Action Cancelled;
         public void Initialize(HorizonWorld3D target) { world = target; }
         public bool Enqueue(DomainEvent e, bool fullscreen = false, Action completed = null)
         {
@@ -95,6 +96,7 @@ namespace Horizon.UI
         {
             queue.Clear(); scheduled.Clear(); active = null; clock = null;
             if (graph.IsValid()) graph.Destroy(); world?.EndCinematic();
+            Cancelled?.Invoke();
         }
         private void OnDestroy() { CancelAll(); }
     }

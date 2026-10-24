@@ -213,6 +213,7 @@ namespace Horizon.Game
             {
                 AddCues(cues,duration,Story(e,r),e.tier);
             }
+            duration=CinematicReading.Retime(e,cues,duration);
             var beats = new List<PresentationBeat>();
             if (e.kind == DomainEventKind.PatternBroken && e.tier == RewardTier.Mythic)
             {

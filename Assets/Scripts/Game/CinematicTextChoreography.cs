@@ -11,6 +11,7 @@ namespace Horizon.Game
     {
         private readonly RewardPlan plan;
         private readonly CinematicCue[] chapters;
+        private readonly CinematicCue[] readingChapters;
         private readonly CinematicEnergy energy;
         public readonly float ImpactTime, MultiplierTime, SettlementTime;
 
@@ -18,6 +19,7 @@ namespace Horizon.Game
         {
             plan=value ?? throw new ArgumentNullException(nameof(value));
             chapters=plan.Cues.Where(c=>!c.NodeHit).OrderBy(c=>c.Time).ToArray();
+            readingChapters=chapters.Where(c=>CinematicReading.IsChapter(plan.Event,c.Phase)).ToArray();
             energy=new CinematicEnergy(plan);
             ImpactTime=TimeOf(CinematicPhase.Impact,plan.Duration*.52f);
             MultiplierTime=TimeOf(CinematicPhase.Multiplication,ImpactTime);
@@ -35,7 +37,12 @@ namespace Horizon.Game
                 if(chapters[i].Time<=time) chapter=chapters[i];
                 else { next=chapters[i].Time; break; }
             }
-            float started=chapter?.Time??0;
+            // Technical cues keep firing, but do not replace a sentence every
+            // 120ms. A complete thought spans charge / detail / silent hold.
+            CinematicCue reading=readingChapters.LastOrDefault(c=>c.Time<=time) ?? readingChapters.First();
+            float readingNext=readingChapters.FirstOrDefault(c=>c.Time>time)?.Time ?? plan.Duration;
+            float started=reading.Time;
+            next=readingNext;
             float available=Math.Max(.12f,next-started);
             // A chapter change must never make its meaning disappear.  The
             // reference rhythm swaps copy on the beat, then brightens it; a
@@ -54,20 +61,21 @@ namespace Horizon.Game
             bool held=chapter!=null && chapter.Phase==CinematicPhase.HitStop && time<ImpactTime;
             float tremor=reducedMotion || held?0:(float)Math.Pow(e.Inward,3.2f);
             float multiplierAge=time-MultiplierTime;
-            float multiplierLinger=1-Smooth(Math.Max(.72f,plan.Duration*.065f),Math.Max(1.12f,plan.Duration*.11f),multiplierAge);
+            float secondReveal=TimeOf(CinematicPhase.SecondReveal,SettlementTime);
+            float multiplierLinger=1-Smooth(secondReveal-.36f,secondReveal-.08f,time);
             float multiplierAlpha=energy.Celebrates && plan.PresentationMultiplier>1 && multiplierAge>=0?
                 Smooth(0,.16f,multiplierAge)*multiplierLinger*ending:0;
             float multiplierPunch=multiplierAge<0?0:(float)Math.Exp(-multiplierAge/Math.Max(.12f,plan.Duration*.025f));
-            string narration=chapter!=null && !string.IsNullOrEmpty(chapter.Copy)?chapter.Copy:plan.Event.detail;
+            string narration=!string.IsNullOrEmpty(reading.Copy)?reading.Copy:plan.Event.detail;
             float receiptStart=Math.Max(0,SettlementTime-.08f);
             float receiptEnd=Math.Min(plan.Duration,SettlementTime+.14f);
             return new CinematicTextFrame(time,chapter?.Phase??CinematicPhase.Anticipation,
-                PhaseCopy(chapter?.Phase??CinematicPhase.Anticipation),narration,
+                PhaseCopy(reading.Phase),narration,
                 readableEntrance*ending,Clamp(.12f+e.Inward*.72f+e.Afterglow*.24f+flash*.72f,0,1),
                 tremor,flash,1-Smooth(receiptStart,receiptEnd,time),
                 multiplierAlpha,.78f+.22f*Smooth(0,.24f,multiplierAge)+multiplierPunch*.24f,
                 .9f+.1f*Smooth(0,.42f,time)+flash*.055f,
-                .95f+.05f*entrance,ending);
+                .95f+.05f*entrance,ending,Smooth(started,started+Math.Min(.85f,available*.22f),time));
         }
 
         private float TimeOf(CinematicPhase phase,float fallback)
@@ -97,15 +105,61 @@ namespace Horizon.Game
         { return Math.Max(minimum,Math.Min(maximum,value)); }
     }
 
+    // Human reading chapters are deliberately fewer than sensory cues. Add
+    // time to presentation only, preserve node spacing and the hit-stop gap.
+    public static class CinematicReading
+    {
+        public static bool IsChapter(DomainEvent e,CinematicPhase phase)
+        {
+            if(phase==CinematicPhase.Anticipation || phase==CinematicPhase.Impact || phase==CinematicPhase.Settlement) return true;
+            if(e.tier<RewardTier.Major) return false;
+            return phase==CinematicPhase.SecondReveal || phase==CinematicPhase.HeroMoment &&
+                e.kind!=DomainEventKind.Cascade && e.kind!=DomainEventKind.CausalSingularity;
+        }
+        public static float ReadSeconds(string copy)
+        { return Math.Max(2.2f,Math.Min(6f,1.15f+(copy?.Length??0)*.085f)); }
+
+        public static float Retime(DomainEvent e,System.Collections.Generic.List<CinematicCue> cues,float duration)
+        {
+            var anchors=cues.Where(c=>!c.NodeHit && (IsChapter(e,c.Phase) || c.Phase==CinematicPhase.Multiplication || c.Phase==CinematicPhase.SecondReveal || c.Phase==CinematicPhase.ReturnToGame)).OrderBy(c=>c.Time).ToArray();
+            float[] original=anchors.Select(c=>c.Time).ToArray(), mapped=new float[anchors.Length];
+            bool cascade=e.kind==DomainEventKind.Cascade || e.kind==DomainEventKind.CausalSingularity;
+            for(int i=1;i<anchors.Length;i++)
+            {
+                CinematicCue prior=anchors[i-1];
+                float span=original[i]-original[i-1];
+                float minimum=prior.Phase==CinematicPhase.Multiplication?2.4f:ReadSeconds(prior.Copy)+.12f*(int)e.tier;
+                if(prior.Phase==CinematicPhase.Settlement) minimum=Math.Max(minimum,Math.Max(3.4f,ReadSeconds(e.detail)));
+                // Actual causal nodes retain their authored accelerating gaps.
+                if(cascade && anchors[i].Phase==CinematicPhase.Impact) minimum=span;
+                mapped[i]=mapped[i-1]+Math.Max(span,minimum);
+            }
+            float oldStop=cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+            float oldImpact=cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            for(int i=0;i<cues.Count;i++)
+            {
+                CinematicCue cue=cues[i]; int segment=0;
+                while(segment+1<original.Length-1 && original[segment+1]<=cue.Time) segment++;
+                float p=(cue.Time-original[segment])/Math.Max(.0001f,original[segment+1]-original[segment]);
+                float time=mapped[segment]+p*(mapped[segment+1]-mapped[segment]);
+                cues[i]=new CinematicCue(time,cue.Phase,cue.Copy,cue.NodeIndex);
+            }
+            float impact=cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            int stop=cues.FindIndex(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop);
+            cues[stop]=new CinematicCue(impact-(oldImpact-oldStop),CinematicPhase.HitStop,cues[stop].Copy);
+            return mapped[mapped.Length-1];
+        }
+    }
+
     public readonly struct CinematicTextFrame
     {
-        public readonly float Time,CopyAlpha,Glow,Tremor,Flash,ReceiptVeil,MultiplierAlpha,MultiplierScale,TitleScale,CopyScale,EndAlpha;
+        public readonly float Time,CopyAlpha,Glow,Tremor,Flash,ReceiptVeil,MultiplierAlpha,MultiplierScale,TitleScale,CopyScale,EndAlpha,CharacterProgress;
         public readonly CinematicPhase Phase;
         public readonly string PhaseCopy,Narration;
         public CinematicTextFrame(float time,CinematicPhase phase,string phaseCopy,string narration,float copyAlpha,float glow,
-            float tremor,float flash,float receiptVeil,float multiplierAlpha,float multiplierScale,float titleScale,float copyScale,float endAlpha)
+            float tremor,float flash,float receiptVeil,float multiplierAlpha,float multiplierScale,float titleScale,float copyScale,float endAlpha,float characterProgress)
         { Time=time; Phase=phase; PhaseCopy=phaseCopy; Narration=narration; CopyAlpha=copyAlpha; Glow=glow; Tremor=tremor;
             Flash=flash; ReceiptVeil=receiptVeil; MultiplierAlpha=multiplierAlpha; MultiplierScale=multiplierScale;
-            TitleScale=titleScale; CopyScale=copyScale; EndAlpha=endAlpha; }
+            TitleScale=titleScale; CopyScale=copyScale; EndAlpha=endAlpha; CharacterProgress=characterProgress; }
     }
 }

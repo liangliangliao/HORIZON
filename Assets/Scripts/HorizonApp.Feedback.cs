@@ -30,7 +30,7 @@ namespace Horizon
             bool newPage = firstPresentation || receipt.page > 0 && (receipt.presentedPages & (1 << receipt.page)) == 0;
             receipt.presentedPages |= 1 << receipt.page;
             FeedbackBeat beat = hasBeats ? beats[receipt.page] : null;
-            PresentLocalMasterFeedback(); Save();
+            Save();
             bool action = receipt.kind == FeedbackKind.Choice;
             bool difficult = !action && beat != null && PlayExperience.IsDifficult(beat.delta);
             bool quiet = action && beat != null && beat.intent == CardKind.Growth;
@@ -106,6 +106,8 @@ namespace Horizon
                 ReceiptPulse(root, new Vector2(0.5f, 0.665f), accent);
             }
             View.RefreshText(root);
+            // Build the page first, then lend the entire surface to the movie.
+            PresentLocalMasterFeedback();
         }
 
         private int PreparedGateChanges(RunSnapshot before)
@@ -138,6 +140,7 @@ namespace Horizon
         {
             // Also prevents a double tap on one receipt from skipping the next receipt.
             yield return new WaitForSecondsRealtime(0.24f);
+            while(generation==viewGeneration && world.Cinematics.IsPlaying) yield return null;
             if (generation != viewGeneration || button == null) yield break;
             busy = false;
             button.interactable = true;

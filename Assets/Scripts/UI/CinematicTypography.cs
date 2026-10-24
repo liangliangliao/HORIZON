@@ -22,6 +22,11 @@ namespace Horizon.UI
         private float lastGlow=-1,lastOutline=-1,lastTracking=float.MinValue;
         private Color lastGlowColor=new Color(-1,-1,-1,-1);
         private bool lastBold;
+        private float sweep=-1;
+        public static void Reveal(Text text,int count)
+        { var t=text!=null?text.GetComponent<CinematicTypography>():null; if(t!=null && t.rendered!=null) t.rendered.maxVisibleCharacters=count; }
+        public static void Sweep(Text text,float time)
+        { var t=text!=null?text.GetComponent<CinematicTypography>():null; if(t!=null) t.sweep=time; }
         public static void Upgrade(Text text,bool asHeadline=false)
         {
             if(text==null || text.font==null) return;
@@ -77,7 +82,29 @@ namespace Horizon.UI
         }
         private void Copy()
         { if(source==null || rendered==null) return; if(rendered.text!=source.text) rendered.text=source.text; rendered.color=source.color; }
-        private void LateUpdate() { Copy(); }
+        private void LateUpdate()
+        {
+            Copy();
+            if(sweep<0 || rendered==null || string.IsNullOrEmpty(rendered.text)) return;
+            // A moving white specular stripe over a gold-to-amber face. This
+            // follows the director clock, including pause and deterministic seek.
+            rendered.ForceMeshUpdate(); var info=rendered.textInfo;
+            float shine=Mathf.Repeat(sweep*.42f,1.8f)-.3f;
+            for(int i=0;i<info.characterCount;i++)
+            {
+                var c=info.characterInfo[i]; if(!c.isVisible) continue;
+                var colors=info.meshInfo[c.materialReferenceIndex].colors32;
+                for(int v=0;v<4;v++)
+                {
+                    bool top=v==1 || v==2;
+                    Color face=top?new Color(1,.94f,.57f):new Color(1,.43f,.055f);
+                    float glint=Mathf.Clamp01(1-Mathf.Abs((i+(v>=2?1:0))/(float)Mathf.Max(1,info.characterCount)-shine)/.16f);
+                    face=Color.Lerp(face,Color.white,glint*.92f); face.a=source.color.a;
+                    colors[c.vertexIndex+v]=face;
+                }
+            }
+            rendered.UpdateVertexData(TMP_VertexDataUpdateFlags.Colors32);
+        }
         private void OnDestroy()
         { if(source!=null) source.enabled=true; if(styledMaterial!=null) Destroy(styledMaterial); }
     }
