@@ -84,7 +84,7 @@ namespace Horizon
                 Palette.Gold, TextAnchor.MiddleCenter, 0.32f, 0.5f, 0.68f, 0.64f);
             View.Button(overlay, "Causal reservoir", "长期积累  " + state.reservoir + "/6 · 查看四类储备与条件", ShowReservoir,
                 0.075f, 0.23f, 0.925f, 0.31f, Palette.Panel, Palette.Text, 26);
-            View.Label(overlay, "Overdrive state", "OVERDRIVE  " + state.overdriveEnergy + "%  ·  Resilience ×" + state.resilienceChain,
+            View.Label(overlay, "Overdrive state", "行动能量 " + state.overdriveEnergy + "%  ·  韧性积累 " + state.resilienceChain + "/10",
                 26, Palette.Mint, TextAnchor.MiddleCenter, 0.075f, 0.12f, 0.925f, 0.19f);
         }
         private void ShowReality()

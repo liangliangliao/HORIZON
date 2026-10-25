@@ -252,8 +252,9 @@ namespace Horizon
             var edge=View.Rect(overlay,"Imagination full-screen reading light",0,0,1,1).gameObject.AddComponent<CinematicCurtainGraphic>(); edge.raycastTarget=false;
             Text goalTitle=View.Label(overlay, "Imagine goal title", run.goal, 55, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.78f, 0.925f, 0.86f);
             CinematicTypography.Upgrade(goalTitle,true); CinematicTypography.Emboss(goalTitle);
-            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.418f, 0.925f, 0.475f);
-            var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=run.timeline.Last().text;
+            string phaseReading=ImaginationStoryboard.Reading(run);
+            Text beatCopy=View.Label(overlay, "Imagine beat", phaseReading, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.418f, 0.925f, 0.475f);
+            var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=phaseReading;
             CinematicTypography.Upgrade(beatCopy,true);
             View.Label(overlay, "Imagine resilience", "预演 · 经历挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  恢复后再行动 " + run.recovered + " 次", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.325f, 0.925f, 0.362f);
             if (run.pathVersion >= 2)

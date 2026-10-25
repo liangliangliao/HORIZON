@@ -15,6 +15,14 @@ namespace Horizon.UI
     }
     public static class ImaginationStoryboard
     {
+        public static string Reading(ImagineRun run)
+        {
+            // Preserve the historical timeline in saves, but never present its
+            // obsolete AGAIN multiplier as a rehearsal result or payout.
+            if(run.phase==ImaginePhase.Retry && run.memories.Count>0)
+                return run.memories[run.memories.Count-1].text+" 已恢复后再次行动 "+run.recovered+" 次。";
+            return CinematicOutcome.Readable(run.timeline.Count>0?run.timeline[run.timeline.Count-1].text:"");
+        }
         public static ImaginationFrame Sample(ImagineRun run, float elapsed)
         {
             ImaginationShot shot; float start=0, duration=2.8f;

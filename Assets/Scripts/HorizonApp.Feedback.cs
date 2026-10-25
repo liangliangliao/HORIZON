@@ -44,7 +44,7 @@ namespace Horizon
                 TextAnchor.MiddleRight, 0.6f, 0.951f, 0.94f, 0.986f);
             View.Panel(root, "Outcome ribbon", new Color(0.015f, 0.045f, 0.065f, 0.92f),
                 0.05f, 0.791f, 0.95f, 0.917f, 28);
-            View.Label(root, "Outcome type", action ? "行动完成 · 今天已记录" : chain ? "因果连锁 · CASCADE ×" + beat.chainSize : difficult ?
+            View.Label(root, "Outcome type", action ? "行动完成 · 今天已记录" : chain ? "因果连锁 · " + beat.chainSize + " 个真实节点" : difficult ?
                 "回声抵达 · 现在仍可以调整" : "回声抵达 · 过去正在回应你", 29, accent,
                 TextAnchor.MiddleCenter, 0.085f, 0.861f, 0.915f, 0.903f);
             string origin = beat == null ? "" : "D" + beat.sourceDay.ToString("00") + " · " + beat.source;

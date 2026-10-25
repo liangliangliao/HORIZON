@@ -1063,7 +1063,7 @@ namespace Horizon
                 yield return new WaitForSeconds(i == 0 ? 0.25f : 0.25f / i);
             }
             View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
-            View.Label(root, "Cascade", "C A S C A D E  × " + chainSize, 51, Palette.Gold,
+            View.Label(root, "Cascade", "因果连锁 · " + chainSize + " 个节点", 51, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.06f, vertical ? 0.08f : 0.28f,
                 0.94f, vertical ? 0.16f : 0.37f);
             if (!vertical)

@@ -27,6 +27,20 @@ namespace Horizon.Tests
                 Assert.IsFalse(ShaderUtil.ShaderHasError(shader),name);
             }
         }
+        [Test]
+        public void RehearsalRetryShowsActualRecoveryMeaningWithoutChangingItsSavedEvidence()
+        {
+            var run=ImaginationEngine.Begin("actual-retry","portfolio","整理作品",1,2);
+            ImaginationEngine.Continue(run);
+            ImaginationEngine.Prepare(run,PreparationAction.SmallStep);
+            ImaginationEngine.Continue(run); ImaginationEngine.Continue(run);
+            ImaginationEngine.Recover(run,RecoveryAction.Rest);
+            string evidence=JsonUtility.ToJson(run), reading=ImaginationStoryboard.Reading(run);
+            Assert.That(reading,Does.StartWith(run.memories.Last().text));
+            Assert.That(reading,Does.Contain("再次行动 1 次"));
+            Assert.That(reading,Does.Not.Contain("×").And.Not.Contain("AGAIN"));
+            Assert.AreEqual(evidence,JsonUtility.ToJson(run));
+        }
         [UnityTest]
         public IEnumerator ActualActionRevealsItsChangesAndDateWithoutAnyFictionalMultiplier()
         {
