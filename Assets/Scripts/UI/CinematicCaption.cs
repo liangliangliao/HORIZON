@@ -75,7 +75,8 @@ namespace Horizon.UI
 
         public void Bind(CinematicDirector value)
         {
-            var lightRect=View.Rect(transform,"Outcome optical radiance",.015f,.24f,.985f,.57f);
+            var lightRect=View.Rect(transform,"Outcome optical radiance",.015f,
+                HorizonCinemaLayout.MultiplierBottom-.08f,.985f,HorizonCinemaLayout.MultiplierTop+.08f);
             lightRect.SetSiblingIndex(1); outcomeLight=lightRect.gameObject.AddComponent<OutcomeRadianceGraphic>(); outcomeLight.raycastTarget=false;
             CinematicTypography.Upgrade(Phase);
             CinematicTypography.Upgrade(Title,true);

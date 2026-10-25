@@ -54,8 +54,8 @@ namespace Horizon
             caption.Title = View.Label(overlay, "Reward event title", e.title, e.tier == RewardTier.Mythic ? 76 : 62, accent, TextAnchor.MiddleCenter, .035f,HorizonCinemaLayout.TitleBottom,.965f,HorizonCinemaLayout.TitleTop);
             caption.Story = View.Label(overlay, "Reward story", e.detail,35,Palette.Text,TextAnchor.MiddleCenter,.055f,HorizonCinemaLayout.StoryBottom,.945f,HorizonCinemaLayout.StoryTop);
             caption.Multiplier = View.Label(overlay, "Reward resilience", "",104,Palette.Gold,TextAnchor.MiddleCenter,.06f,HorizonCinemaLayout.MultiplierBottom,.94f,HorizonCinemaLayout.MultiplierTop);
-            caption.MultiplierCaption=View.Label(overlay,"Presentation multiplier meaning","",29,Palette.Gold,TextAnchor.MiddleCenter,.075f,.478f,.925f,.522f);
-            caption.OutcomeContext=View.Label(overlay,"Outcome evidence qualifier","",22,Palette.Text,TextAnchor.MiddleCenter,.075f,.297f,.925f,.335f);
+            caption.MultiplierCaption=View.Label(overlay,"Presentation multiplier meaning","",29,Palette.Gold,TextAnchor.MiddleCenter,.075f,.365f,.925f,.40f);
+            caption.OutcomeContext=View.Label(overlay,"Outcome evidence qualifier","",22,Palette.Text,TextAnchor.MiddleCenter,.075f,.19f,.925f,.225f);
             caption.Explanation = View.Label(overlay, "Reward original explanation", "",25,Palette.Text,TextAnchor.MiddleCenter,.065f,.145f,.935f,.205f);
             caption.Resources = View.Label(overlay, "Reward actual resources", "",25,Palette.Mint,TextAnchor.MiddleCenter,.065f,.11f,.935f,.15f);
             if(e.receipt!=null && e.receipt.predictionRecorded)
@@ -85,8 +85,8 @@ namespace Horizon
             caption.Title = View.Label(layer, "Joined reward event", "",58,Palette.Mint,TextAnchor.MiddleCenter,.04f,HorizonCinemaLayout.TitleBottom,.96f,HorizonCinemaLayout.TitleTop);
             caption.Story = View.Label(layer, "Cinematic meaning", "",31,Palette.Text,TextAnchor.MiddleCenter,.06f,HorizonCinemaLayout.StoryBottom,.94f,HorizonCinemaLayout.StoryTop);
             caption.Multiplier=View.Label(layer,"Reward resilience","",104,Palette.Gold,TextAnchor.MiddleCenter,.06f,HorizonCinemaLayout.MultiplierBottom,.94f,HorizonCinemaLayout.MultiplierTop);
-            caption.MultiplierCaption=View.Label(layer,"Presentation multiplier meaning","",29,Palette.Gold,TextAnchor.MiddleCenter,.075f,.478f,.925f,.522f);
-            caption.OutcomeContext=View.Label(layer,"Outcome evidence qualifier","",22,Palette.Text,TextAnchor.MiddleCenter,.075f,.297f,.925f,.335f);
+            caption.MultiplierCaption=View.Label(layer,"Presentation multiplier meaning","",29,Palette.Gold,TextAnchor.MiddleCenter,.075f,.365f,.925f,.40f);
+            caption.OutcomeContext=View.Label(layer,"Outcome evidence qualifier","",22,Palette.Text,TextAnchor.MiddleCenter,.075f,.19f,.925f,.225f);
             caption.Resources = View.Label(layer, "Physical resource copy", "",24,Palette.Gold,TextAnchor.MiddleCenter,.06f,.11f,.94f,.15f);
             caption.Explanation=View.Label(layer,"Reward original explanation","",24,Palette.Text,TextAnchor.MiddleCenter,.06f,.15f,.94f,.21f);
             View.Button(layer,"Local cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.06f,.018f,.40f,.064f,Palette.Deep,Palette.Text,23);
