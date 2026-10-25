@@ -115,6 +115,7 @@ namespace Horizon.Tests
                 foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                 canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                 float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
+                string lossless="artifacts/cinematics/frames-actual-outcome"; Directory.CreateDirectory(lossless);
                 using(var stream=File.Create("artifacts/cinematics/actual-outcome-motion.gif"))
                 using(var gif=new TimelineGifWriter(stream,540,960))
                     for(int frame=0;frame<frames;frame++)
@@ -125,6 +126,7 @@ namespace Horizon.Tests
                         RenderTexture old=RenderTexture.active; RenderTexture.active=target;
                         pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=old;
                         gif.Frame(pixels.GetPixels32(),5);
+                        File.WriteAllBytes(Path.Combine(lossless,"frame-"+frame.ToString("D5")+".png"),pixels.EncodeToPNG());
                     }
                 File.WriteAllBytes("artifacts/cinematics/actual-outcome-motion.pcm",world.RecordedCinemaPcm());
                 Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
