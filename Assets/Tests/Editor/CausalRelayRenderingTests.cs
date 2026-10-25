@@ -127,6 +127,9 @@ namespace Horizon.Tests
                                 Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf);
                                 Assert.That(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience").text,Does.Not.Contain("×"),
                                     "The foreground reveal must describe this causal event rather than invent a payout.");
+                                Assert.AreNotEqual(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience").text,
+                                    root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text,
+                                    "The context must add provenance instead of repeating the large revealed sentence.");
                             }
                             if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2 || frame==Mathf.CeilToInt(heroTime*20)+8)
                                 File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+"-"+frame+".png",pixels.EncodeToPNG());

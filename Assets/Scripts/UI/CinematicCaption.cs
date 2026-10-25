@@ -175,7 +175,14 @@ namespace Horizon.UI
             string narration=CinematicOutcome.Readable(frame.Narration);
             if((plan.Event.kind==DomainEventKind.Cascade || plan.Event.kind==DomainEventKind.CausalSingularity) &&
                 frame.Narration==plan.Event.title) narration=plan.Outcome.Title;
-            if(Story!=null) Story.text=outcome.Visible?string.IsNullOrWhiteSpace(outcome.Context)?plan.Outcome.Meaning:outcome.Context:narration;
+            string context=outcome.Visible?string.IsNullOrWhiteSpace(outcome.Context)?plan.Outcome.Meaning:outcome.Context:narration;
+            if(outcome.Visible && context==outcome.Copy)
+            {
+                context=plan.Outcome.Origin;
+                if(string.IsNullOrWhiteSpace(context) || context==outcome.Copy)
+                    context=plan.Event.day>0?"第 "+plan.Event.day+" 天 · 原始记录":"原始记录已保留";
+            }
+            if(Story!=null) Story.text=context;
             CinematicTypography.Reveal(Story,outcome.Visible || VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
             CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;
