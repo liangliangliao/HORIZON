@@ -90,6 +90,12 @@ namespace Horizon.Tests
             Assert.IsTrue(graphVisible);
             Texture2D image=Capture(world.WorldCamera,"projecting"); Object.Destroy(image);
             world.SampleImaginationAt(4); Assert.IsTrue(layers.All(t=>t.gameObject.activeSelf && t.localScale.y>.99f));
+            Transform people=layers.Single(t=>t.name=="Projection layer People");
+            Assert.IsFalse(people.GetComponentsInChildren<Renderer>().Any(r=>r.enabled),
+                "Background people stay materialized but must not invade a close-up's title band.");
+            world.ToggleImaginationOverview();
+            Assert.IsTrue(people.GetComponentsInChildren<Renderer>().Any(r=>r.enabled),
+                "The full overview must recover the scene, including its neighbours.");
             Assert.IsTrue(futureRoom.gameObject.activeSelf);
             image=Capture(world.WorldCamera,"projected-world"); Object.Destroy(image);
             foreach(Transform layer in layers) foreach(Renderer renderer in layer.GetComponentsInChildren<Renderer>())

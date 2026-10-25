@@ -315,6 +315,21 @@ jobs:
           path: |
             artifacts/visuals/9[0-2]-*.png
             artifacts/cinematics/
+            !artifacts/cinematics/frames-actual-outcome/**
+            !artifacts/cinematics/frames-walk-outcome/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload full-colour action frames separately for video review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Action-RGB-Frames
+          path: |
+            artifacts/cinematics/frames-actual-outcome/
+            artifacts/cinematics/frames-walk-outcome/
+            artifacts/cinematics/actual-outcome-motion.pcm
+            artifacts/cinematics/walk-outcome-motion.pcm
           if-no-files-found: ignore
           retention-days: 14
 

@@ -779,7 +779,8 @@ namespace Horizon.Tests
             yield return Capture(app, "32-long-life-network");
             ButtonNamed(app, "Close causal network").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Share life").onClick.Invoke(); yield return null;
-            Assert.That(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().First(t => t.name == "Share run").text, Does.Contain("30 DAYS"));
+            Assert.That(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().First(t => t.name == "Share run").text,
+                Does.Contain("第 1 段人生").And.Contain("30 天").And.Not.Contain("DAYS"));
             yield return Capture(app, "33-long-life-share");
             yield return new ExitPlayMode();
         }

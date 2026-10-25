@@ -156,8 +156,10 @@ namespace Horizon.UI
             if(walking)
             {
                 actorPosition=p<.32f?Vector3.Lerp(new Vector3(-1.65f,0,-.85f),new Vector3(-1.65f,0,1.25f),Smooth(0,.32f,p)):
-                    Vector3.Lerp(new Vector3(-1.65f,0,1.25f),new Vector3(.65f,0,4.35f),Smooth(.32f,.96f,p));
-                body=p<.12f?HorizonBodyAction.Reach:p<.96f?HorizonBodyAction.Walk:HorizonBodyAction.Rest;
+                    Vector3.Lerp(new Vector3(-1.65f,0,1.25f),new Vector3(.65f,0,4.35f),Smooth(.32f,.72f,p));
+                // The Arrive shot says "stop and breathe". Reach the park and
+                // stop the walk cycle at that SAME cue, not 1.7 seconds later.
+                body=p<.12f?HorizonBodyAction.Reach:p<.72f?HorizonBodyAction.Walk:HorizonBodyAction.Rest;
                 moviePlayer.localRotation=Quaternion.Euler(0,p<.32f?180:216,0);
                 lifeDoor.localRotation=Quaternion.Euler(0,-Mathf.Lerp(0,102,Smooth(0,.25f,p)),0);
             }

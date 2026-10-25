@@ -11,6 +11,7 @@ namespace Horizon.UI
         private HorizonActorPerformance imaginationPerformance;
         private Renderer[] imaginationSubjectRenderers;
         private Renderer[] imaginationOverviewRenderers;
+        private Renderer[] imaginationScenicRenderers;
         private bool imaginationOverview;
         public bool ImaginationOverview => imaginationOverview;
         public void ToggleImaginationOverview()
@@ -35,6 +36,7 @@ namespace Horizon.UI
             movieMuted=run.phase==ImaginePhase.Failure; if(movieMuted) audioSource.Stop(); UpdateAudio();
             cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,0,1,1);
             PrepareProjectionWorld();
+            imaginationScenicRenderers=projectionLayers[2].GetComponentsInChildren<Renderer>(true);
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
             imaginationSubjectRenderers=moviePlayer.GetComponentsInChildren<Renderer>(true);
@@ -160,7 +162,10 @@ namespace Horizon.UI
             SampleProjectionWorld(preferences.reducedMotion?1:beat,CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor || CurrentImaginationFrame.Shot==ImaginationShot.BuildThePath);
             // Scenic neighbours are not the action. Keep them out of the
             // title band in detail shots; the optional overview fits them too.
-            projectionLayers[2].gameObject.SetActive(!imaginationWalkSet && imaginationOverview);
+            // Preserve all five materializing layers and their original
+            // progress. Only hide background bodies in a subject close-up.
+            foreach(Renderer renderer in imaginationScenicRenderers)
+                renderer.enabled=!imaginationWalkSet && imaginationOverview;
             if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor) position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
             SampleImaginationLifeSet(ref position);
             imaginationPerformance.Play(action,beat);

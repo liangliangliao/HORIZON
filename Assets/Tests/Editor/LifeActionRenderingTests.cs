@@ -36,6 +36,13 @@ namespace Horizon.Tests
                 foreach(float time in new[] {0,story.ActionEnd*.45f,story.ActionEnd*.85f,story.Impact-.1f,story.Settlement+1})
                 {
                     world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
+                    if(world.CurrentLifeActionShot==LifeActionShot.Arrive)
+                    {
+                        Assert.Less(Vector3.Distance(actor.localPosition,new Vector3(.65f,0,4.35f)),.001f,
+                            "The stop-and-breathe caption must not appear while the actor is still travelling.");
+                        Assert.AreEqual(HorizonBodyAction.Rest,actor.GetComponent<HorizonActorPerformance>().CurrentAction,
+                            "Arrival copy and the actual performance must share a cut point.");
+                    }
                     bool full=reduced || world.CurrentLifeActionShot==LifeActionShot.Establish ||
                         world.CurrentLifeActionShot==LifeActionShot.Arrive || world.CurrentLifeActionShot==LifeActionShot.Overview;
                     foreach(Renderer renderer in (full?set:actor).GetComponentsInChildren<Renderer>())
@@ -80,6 +87,9 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(3.2f);
             Assert.IsFalse(completion.Done,"A reading page must never auto-dismiss.");
             Button next=Field<RectTransform>(app,"root").GetComponentsInChildren<Button>().Single(b=>b.name=="Continue story checkpoint");
+            Text hint=Field<RectTransform>(app,"root").GetComponentsInChildren<Text>().Single(t=>t.name=="Story checkpoint hint");
+            Assert.Less(hint.rectTransform.anchorMax.y,((RectTransform)next.transform).anchorMin.y,
+                "The waiting hint belongs below the continue button, not on the third gate result.");
             Assert.IsTrue(next.interactable); next.onClick.Invoke(); yield return null; yield return null;
             Assert.IsTrue(completion.Done);
             var life=new GameSession(1,15);

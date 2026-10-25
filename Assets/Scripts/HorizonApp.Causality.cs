@@ -156,7 +156,7 @@ namespace Horizon
             },.10f,.045f,.90f,.115f,Palette.Mint,Palette.Ink,30);
             next.interactable=false;
             View.Label(root,"Story checkpoint hint","画面会留在这里，等你看清。",23,Palette.Muted,
-                TextAnchor.MiddleCenter,.08f,.118f,.92f,.15f);
+                TextAnchor.MiddleCenter,.08f,.009f,.92f,.039f);
             yield return new WaitForSecondsRealtime(.35f);
             if(generation!=viewGeneration || next==null) yield break;
             next.interactable=true;
