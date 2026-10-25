@@ -72,6 +72,26 @@ namespace Horizon.Tests
                 }
                 Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
                 world.Cinematics.Skip(); Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
+                // Record the complete actual-content sequence too. Static key
+                // frames alone cannot prove counter timing or readable holds.
+                typeof(HorizonApp).GetMethod("PlayMasterSpectacle",Private).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
+                world.Cinematics.enabled=false;
+                foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
+                using(var stream=File.Create("artifacts/cinematics/actual-outcome-motion.gif"))
+                using(var gif=new TimelineGifWriter(stream,540,960))
+                    for(int frame=0;frame<frames;frame++)
+                    {
+                        if(frame>0) world.Cinematics.Advance(duration/frames);
+                        yield return null; yield return null;
+                        Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
+                        RenderTexture old=RenderTexture.active; RenderTexture.active=target;
+                        pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=old;
+                        gif.Frame(pixels.GetPixels32(),5);
+                    }
+                File.WriteAllBytes("artifacts/cinematics/actual-outcome-motion.pcm",world.RecordedCinemaPcm());
+                Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
             }
             finally
             {
