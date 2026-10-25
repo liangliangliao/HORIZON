@@ -57,7 +57,18 @@ namespace Horizon.UI
             parkedPage.Clear();
         }
         private void OnCancelled()
-        { RestorePage(); plan=null; choreography=null; if(HideWhenIdle) gameObject.SetActive(false); }
+        {
+            RestorePage(); plan=null; choreography=null;
+            // Clear/Close destroys the old page at end-of-frame. Detach now,
+            // otherwise a new Started in that same frame can resurrect the old
+            // caption and let it park the new page inside a doomed container.
+            Unbind(); if(HideWhenIdle) gameObject.SetActive(false);
+        }
+        private void Unbind()
+        {
+            if(director==null) return;
+            director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; director.Cancelled-=OnCancelled; director=null;
+        }
         private void LateUpdate() { if(plan!=null && director!=null && director.IsPlaying) IsolatePage(); }
 
         public void Bind(CinematicDirector value)
@@ -203,7 +214,7 @@ namespace Horizon.UI
         private void OnDestroy()
         {
             RestorePage(); if(pageParking!=null) Destroy(pageParking.gameObject);
-            if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; director.Cancelled-=OnCancelled;
+            Unbind();
         }
     }
 

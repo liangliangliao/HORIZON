@@ -143,6 +143,11 @@ namespace Horizon.Tests
             world.Cinematics.CancelAll(); yield return null;
             Assert.AreEqual(root,late.transform.parent);
             Assert.IsFalse(root.Find("Reward cinematic captions").gameObject.activeSelf);
+            Call(app,"BindLocalCinematicCopy"); e.id="new-page-before-old-destroy"; world.PresentMasterEvent(e);
+            yield return null;
+            Assert.AreEqual(1,root.GetComponentsInChildren<CinematicCaption>(true).Count(c=>c.gameObject.activeInHierarchy),
+                "A cancelled caption must not resurrect when the replacement page starts in the same frame.");
+            world.Cinematics.SkipPending();
             yield return new ExitPlayMode();
         }
 
