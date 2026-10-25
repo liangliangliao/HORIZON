@@ -122,7 +122,7 @@ namespace Horizon.UI
             {
                 // A finished movie leaves a readable result, not its nearly
                 // transparent last fade frame, while the user decides to go on.
-                if(choreography!=null) ApplyFrame(choreography.Sample(choreography.SettlementTime+.3f,VisualPreferences.ReducedMotion));
+                if(choreography!=null) ApplyFrame(choreography.Sample(choreography.SettlementTime+1.1f,VisualPreferences.ReducedMotion));
                 return;
             }
             RestorePage(); plan=null; choreography=null; gameObject.SetActive(false);

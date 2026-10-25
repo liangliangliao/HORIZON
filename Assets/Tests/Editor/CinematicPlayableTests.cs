@@ -243,6 +243,10 @@ namespace Horizon.Tests
                     }
                     Assert.IsTrue(saved.rewardCollection.Capture(events[i],i==0?3:0)); Assert.IsFalse(saved.rewardCollection.Capture(events[i],i==0?3:0));
                     world.Cinematics.Skip(); Assert.IsTrue(events[i].acknowledged);
+                    Text finalStory=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story");
+                    var finalTypography=finalStory.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                    Assert.GreaterOrEqual(finalTypography.maxVisibleCharacters,finalStory.text.Length,
+                        "The completed result must retain the whole sentence, not a partially typed entrance frame.");
                 }
                 var restored=JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(saved)); restored.RepairMasterArchive();
                 Assert.AreEqual(2,restored.rewardCollection.items.Count);
