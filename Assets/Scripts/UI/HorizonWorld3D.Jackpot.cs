@@ -22,6 +22,8 @@ namespace Horizon.UI
         private MaterialPropertyBlock auraProperties;
         private float showcaseScale;
         private float outcomeSubjectFocus;
+        private float showcaseCameraWeight;
+        private Renderer[] showcaseSubjectRenderers;
         private Vector3 showcaseOffset, showcaseCenter;
         private bool showcaseFullscreen, showcaseFramingClean;
         private HorizonRewardSparkPool rewardSparkPool;
@@ -112,6 +114,7 @@ namespace Horizon.UI
                 RestoreRewardObject(showcaseHero,receipt.Kind);
                 showcaseHero.gameObject.SetActive(true);
                 showcaseHero.localScale=Vector3.one; showcaseHero.localPosition=Vector3.zero;
+                showcaseSubjectRenderers=showcaseHero.GetComponentsInChildren<Renderer>(true);
                 // Frame the actual asset at a readable size, rather than inventing
                 // a larger reward form or changing its receipt amount.
                 Bounds bounds=new Bounds(); bool found=false;
@@ -127,6 +130,7 @@ namespace Horizon.UI
         private void ResetJackpotStage()
         {
             spectacle=null; showcaseHero=null; activeHeroReward=null; outcomeResources=null; outcomeSubjectFocus=0;
+            showcaseCameraWeight=0; showcaseSubjectRenderers=null;
             foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
             showcaseOccluders.Clear();
             showcaseFramingClean=false;
@@ -158,6 +162,7 @@ namespace Horizon.UI
             float preview=tensionFrame.Preview;
             bool heldReveal=cinemaTension!=null && cinemaTension.PreviewStart<cinemaTension.Reveal && time>=cinemaTension.RevealHold && time<moviePlan.Duration*.94f && !preferences.reducedMotion;
             bool hero=heroFocus>.001f || preview>.001f || heldReveal;
+            showcaseCameraWeight=hero?(heldReveal?1:preview>0?preview:heroFocus):0;
             showcaseCenter=showcaseHero!=null?new Vector3(0,1.6f,2):moviePlayer.localPosition+Vector3.up*1.15f;
             if(showcaseHero!=null)
             {
@@ -241,6 +246,16 @@ namespace Horizon.UI
         {
             foreach(Renderer renderer in item.GetComponentsInChildren<Renderer>(true))
                 if(renderer.enabled) { showcaseOccluders.Add(renderer); renderer.enabled=false; }
+        }
+
+        private void FrameShowcaseInReadingAperture(float time,ref Vector3 camera,ref Vector3 look)
+        {
+            if(showcaseCameraWeight<=0 || showcaseSubjectRenderers==null) return;
+            Vector3 fittedCamera=camera,fittedLook=look;
+            FitPortraitSubject(showcaseSubjectRenderers,HorizonCinemaLayout.SubjectAperture,
+                CinematicFieldOfView(time),ref fittedCamera,ref fittedLook);
+            camera=Vector3.Lerp(camera,fittedCamera,showcaseCameraWeight);
+            look=Vector3.Lerp(look,fittedLook,showcaseCameraWeight);
         }
 
         private Color RewardEffectTint()

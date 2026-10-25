@@ -357,6 +357,7 @@ namespace Horizon.UI
             optics.Glow=SystemInfo.graphicsDeviceType==GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?
                 Mathf.Clamp01(.24f+energyFrame.Inward*.2f+energyFrame.Burst*.36f):0;
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
+            FrameShowcaseInReadingAperture(time,ref camera,ref look);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
             {

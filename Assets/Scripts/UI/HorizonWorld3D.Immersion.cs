@@ -16,6 +16,43 @@ namespace Horizon.UI
         private AudioClip revealShimmer;
         private Vector3 immersionFocus;
 
+        private void FitPortraitSubject(Renderer[] renderers,Rect aperture,float lens,ref Vector3 camera,ref Vector3 look)
+        {
+            bool found=false; Bounds bounds=default(Bounds);
+            foreach(Renderer renderer in renderers)
+            {
+                if(renderer==null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
+                    renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
+                if(!found) {bounds=renderer.bounds; found=true;} else bounds.Encapsulate(renderer.bounds);
+            }
+            if(!found) return;
+            Vector3 eye=cinematicStage.TransformPoint(camera),target=cinematicStage.TransformPoint(look);
+            Quaternion rotation=Quaternion.LookRotation(target-eye,Vector3.up),inverse=Quaternion.Inverse(rotation);
+            float tangent=Mathf.Tan(lens*Mathf.Deg2Rad*.5f);
+            // Captures may replace an editor target after sampling. Frame for
+            // 20:9 as well as 9:16, never for the editor's landscape Game view.
+            float aspect=Mathf.Max(.1f,Mathf.Min(WorldCamera.aspect,9f/20));
+            float horizontal=tangent*aspect,cx=aperture.center.x,cy=aperture.center.y;
+            float distance=Vector3.Distance(eye,target);
+            for(int corner=0;corner<8;corner++)
+            {
+                Vector3 point=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
+                    (corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                Vector3 p=inverse*(point-bounds.center);
+                distance=Mathf.Max(distance,.3f-p.z);
+                distance=Mathf.Max(distance,(p.x-2*horizontal*(aperture.xMax-.5f)*p.z)/(2*horizontal*(aperture.xMax-cx)));
+                distance=Mathf.Max(distance,(2*horizontal*(aperture.xMin-.5f)*p.z-p.x)/(2*horizontal*(cx-aperture.xMin)));
+                distance=Mathf.Max(distance,(p.y-2*tangent*(aperture.yMax-.5f)*p.z)/(2*tangent*(aperture.yMax-cy)));
+                distance=Mathf.Max(distance,(2*tangent*(aperture.yMin-.5f)*p.z-p.y)/(2*tangent*(cy-aperture.yMin)));
+            }
+            distance*=1.06f; // Leave room for the small authored lens recoil.
+            Vector3 forward=rotation*Vector3.forward;
+            eye=bounds.center-forward*distance-rotation*new Vector3(
+                2*(cx-.5f)*horizontal*distance,2*(cy-.5f)*tangent*distance,0);
+            camera=cinematicStage.InverseTransformPoint(eye);
+            look=cinematicStage.InverseTransformPoint(eye+forward*distance);
+        }
+
         private void PrepareImmersion()
         {
             cinematicEnergy=new CinematicEnergy(moviePlan);

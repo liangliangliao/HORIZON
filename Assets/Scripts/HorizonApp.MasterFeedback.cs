@@ -63,7 +63,7 @@ namespace Horizon
                 caption.Prediction=View.Label(overlay,"Reward original prediction","",22,Palette.Text,TextAnchor.MiddleCenter,.05f,HorizonCinemaLayout.PredictionBottom,.95f,HorizonCinemaLayout.PredictionTop);
             }
             if (e.kind == DomainEventKind.RealityConvergence)
-                View.Label(overlay, "Convergence evidence labels", "IMAGINATION · SIMULATION · REALITY",24,Palette.Gold,TextAnchor.MiddleCenter,.035f,.665f,.965f,.72f);
+                View.Label(overlay, "Convergence evidence labels", "IMAGINATION · SIMULATION · REALITY",24,Palette.Gold,TextAnchor.MiddleCenter,.035f,.768f,.965f,.798f);
             Button next = View.Button(overlay, "Continue master event", "让时间继续",finish,.075f,.027f,.925f,.095f,accent,Palette.Ink,30);
             next.interactable=false; next.gameObject.SetActive(false); busy = true;
             Button skip=View.Button(overlay,"Skip cinematic","跳过 · 保留结果",()=> { world.Cinematics.Skip(); },.54f,.012f,.925f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
@@ -81,9 +81,9 @@ namespace Horizon
             var curtain=layer.gameObject.AddComponent<CinematicCurtainGraphic>(); curtain.raycastTarget=false;
             var caption = layer.gameObject.AddComponent<CinematicCaption>(); caption.HideWhenIdle=true;
             caption.Flash = View.Fill(layer, "Synchronous impact flash",Color.clear,0,0,1,1); caption.Flash.raycastTarget = false;
-            caption.Phase=View.Label(layer,"Cinematic phase copy","",21,Palette.Mint,TextAnchor.MiddleCenter,.06f,.905f,.94f,.94f);
-            caption.Title = View.Label(layer, "Joined reward event", "",58,Palette.Mint,TextAnchor.MiddleCenter,.04f,.815f,.96f,.905f);
-            caption.Story = View.Label(layer, "Cinematic meaning", "",31,Palette.Text,TextAnchor.MiddleCenter,.06f,.715f,.94f,.81f);
+            caption.Phase=View.Label(layer,"Cinematic phase copy","",21,Palette.Mint,TextAnchor.MiddleCenter,.06f,HorizonCinemaLayout.PhaseBottom,.94f,HorizonCinemaLayout.PhaseTop);
+            caption.Title = View.Label(layer, "Joined reward event", "",58,Palette.Mint,TextAnchor.MiddleCenter,.04f,HorizonCinemaLayout.TitleBottom,.96f,HorizonCinemaLayout.TitleTop);
+            caption.Story = View.Label(layer, "Cinematic meaning", "",31,Palette.Text,TextAnchor.MiddleCenter,.06f,HorizonCinemaLayout.StoryBottom,.94f,HorizonCinemaLayout.StoryTop);
             caption.Multiplier=View.Label(layer,"Reward resilience","",104,Palette.Gold,TextAnchor.MiddleCenter,.06f,HorizonCinemaLayout.MultiplierBottom,.94f,HorizonCinemaLayout.MultiplierTop);
             caption.MultiplierCaption=View.Label(layer,"Presentation multiplier meaning","",29,Palette.Gold,TextAnchor.MiddleCenter,.075f,.478f,.925f,.522f);
             caption.OutcomeContext=View.Label(layer,"Outcome evidence qualifier","",22,Palette.Text,TextAnchor.MiddleCenter,.075f,.297f,.925f,.335f);

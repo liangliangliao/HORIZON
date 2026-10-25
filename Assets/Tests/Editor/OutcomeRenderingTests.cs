@@ -91,6 +91,7 @@ namespace Horizon.Tests
                         var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
                         Assert.IsTrue(hero.gameObject.activeInHierarchy);
                         Assert.IsTrue(hero.GetComponentsInChildren<Renderer>().Any(r=>r.enabled));
+                        AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
                         Transform actor=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player");
                         Assert.IsTrue(actor.GetComponentsInChildren<Renderer>(true).All(r=>!r.enabled));
                     }
@@ -144,6 +145,61 @@ namespace Horizon.Tests
             var life=GameSession.StartMasterLife(1,15,RunMode.Quick);
             CardSpec card=life.Hand.First(c=>life.CanPlay(c) && !life.NeedsImagination(c) && c.Delay>0);
             life.Choose(card.Id); return life;
+        }
+        private static void AssertSubjectAperture(HorizonWorld3D world,Transform subject,Rect aperture)
+        {
+            foreach(Renderer renderer in subject.GetComponentsInChildren<Renderer>())
+            {
+                if(!renderer.enabled || renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
+                Bounds bounds=renderer.bounds;
+                for(int corner=0;corner<8;corner++)
+                {
+                    Vector3 p=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
+                        (corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                    Vector3 point=world.WorldCamera.WorldToViewportPoint(p);
+                    Assert.Greater(point.z,world.WorldCamera.nearClipPlane,renderer.name);
+                    Assert.That(point.x,Is.InRange(aperture.xMin-.006f,aperture.xMax+.006f),renderer.name+" horizontal crop");
+                    Assert.That(point.y,Is.InRange(aperture.yMin-.006f,aperture.yMax+.006f),renderer.name+" invades the reading bands");
+                }
+            }
+        }
+        [UnityTest]
+        public IEnumerator MovingRehearsalActorsStayInsideTheirReadingApertureOnBothPhoneShapes()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Portrait subject framing regression").AddComponent<HorizonWorld3D>(); world.Initialize();
+            var run=ImaginationEngine.Begin("portrait-framing","portfolio","找工作",1,2);
+            try
+            {
+                for(int step=0;step<20;step++)
+                {
+                    string before=JsonUtility.ToJson(run);
+                    foreach(float aspect in new[] {9f/16,9f/20})
+                        foreach(bool reduced in new[] {false,true})
+                        {
+                            world.WorldCamera.aspect=aspect;
+                            world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false,reducedMotion=reduced});
+                            world.ShowImaginationScene(run);
+                            Transform actor=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player");
+                            foreach(float time in new[] {0f,.5f,1.5f,2.9f,3.4f,6.5f,10f})
+                            {
+                                world.SampleImaginationAt(time);
+                                AssertSubjectAperture(world,actor,HorizonCinemaLayout.ImaginationAperture);
+                                Vector3 head=world.WorldCamera.WorldToViewportPoint(actor.position+Vector3.up*1.3f);
+                                Assert.That(head.x,Is.InRange(.09f,.91f),run.phase+" native focus point");
+                            }
+                            world.EndImaginationScene();
+                        }
+                    Assert.AreEqual(before,JsonUtility.ToJson(run));
+                    if(run.phase==ImaginePhase.Complete) break;
+                    if(run.phase==ImaginePhase.Preparation) ImaginationEngine.Prepare(run,PreparationAction.SmallStep);
+                    else if(run.phase==ImaginePhase.Recover) ImaginationEngine.Recover(run,RecoveryAction.Rest);
+                    else ImaginationEngine.Continue(run);
+                }
+                Assert.AreEqual(ImaginePhase.Complete,run.phase);
+            }
+            finally {world.EndImaginationScene(); Object.Destroy(world.gameObject);}
+            yield return new ExitPlayMode();
         }
         [UnityTest]
         public IEnumerator RehearsalUsesTheWholePhoneAndRetainsItsCompleteThought()

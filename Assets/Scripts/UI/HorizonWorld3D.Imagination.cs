@@ -9,6 +9,7 @@ namespace Horizon.UI
         public bool ImaginationPlaying { get { return imaginationSceneActive && imaginedScene!=null; } }
         public ImaginationFrame CurrentImaginationFrame { get; private set; }
         private HorizonActorPerformance imaginationPerformance;
+        private Renderer[] imaginationSubjectRenderers;
         public void SampleImaginationAt(float seconds)
         { if(!imaginationSceneActive || imaginedScene==null || paused) return; imaginationTime=Mathf.Max(0,seconds); SampleImaginationScene(); }
         private ImagineRun imaginedScene;
@@ -30,6 +31,7 @@ namespace Horizon.UI
             PrepareProjectionWorld();
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
+            imaginationSubjectRenderers=moviePlayer.GetComponentsInChildren<Renderer>(true);
             moviePlayer.gameObject.SetActive(true); movieFuture.gameObject.SetActive(true); moviePlayer.localRotation=Quaternion.Euler(0,180,0);
             movieFuture.localScale=Vector3.one; movieFuture.localPosition=new Vector3(0,0,6); movieFuture.GetComponent<HorizonActor>().Pointing=false;
             movieAnchor.gameObject.SetActive(true); movieBarrier.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false);
@@ -162,12 +164,9 @@ namespace Horizon.UI
                     movieLight.intensity=1.1f+Mathf.Sin(beat*Mathf.PI)*.6f;
             }
             if(preferences.reducedMotion) camera=new Vector3(5,4,-6);
-            // Reserve the lower reading band without cropping the scene. Keep
-            // the actor's upper body in the central optical opening.
-            Vector3 eye=camera-look;
-            float q=2*Mathf.Tan(lens*Mathf.Deg2Rad*.5f)*.12f;
-            float horizontal=Mathf.Sqrt(eye.x*eye.x+eye.z*eye.z);
-            look-=Vector3.up*(q*eye.sqrMagnitude/Mathf.Max(.1f,horizontal-q*eye.y));
+            // Follow the actual moving actor, rather than looking past them at
+            // a fixed victory coordinate that clips on a tall full-screen phone.
+            FitPortraitSubject(imaginationSubjectRenderers,HorizonCinemaLayout.ImaginationAperture,lens,ref camera,ref look);
             optics.Glow=SystemInfo.graphicsDeviceType==UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?.25f:0;
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=lens;
         }
