@@ -284,7 +284,10 @@ namespace Horizon.UI
             Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,
                 (burst+frame.Hero*.08f+energyFrame.Afterglow*.16f)*strength*afterglow);
             Aura(jackpotFlare,center,1.2f+burst*3,0,Color.Lerp(tint,Color.white,.65f),burst*strength);
-            bool showMultiplier=frame.ShowMultiplier && tensionFrame.Preview<=.1f;
+            float handoff=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time-.08f;
+            // The central animated numeral reveals first; its physical receipt
+            // takes over only after it fades. Never show two competing × values.
+            bool showMultiplier=frame.ShowMultiplier && frame.Time>=handoff && tensionFrame.Preview<=.1f;
             jackpotPlaque.gameObject.SetActive(showMultiplier);
             if(!showMultiplier) return;
             if(displayedJackpotMultiplier!=frame.Multiplier)

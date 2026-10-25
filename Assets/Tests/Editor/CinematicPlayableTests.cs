@@ -218,7 +218,7 @@ namespace Horizon.Tests
                         playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time+.08f,
                         playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Multiplication).Time+.18f,
                         reveal+.12f,
-                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Settlement).Time+.08f
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Settlement).Time+.95f
                     }:new[] {reveal+.1f};
                     string[] beats=i==0?new[] {"charge","breath-hold","impact","multiplier","second-reveal","settlement"}:new[] {"second-reveal"};
                     for(int sample=0;sample<samples.Length;sample++)
@@ -234,7 +234,12 @@ namespace Horizon.Tests
                         Assert.IsNotEmpty(phase.text); Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text);
                         Text multiplier=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience");
                         if(i==0 && beats[sample]=="impact") Assert.IsEmpty(multiplier.text,"Impact must remain readable before the multiplier reveal.");
-                        if(i==0 && beats[sample]=="multiplier") Assert.That(multiplier.text,Does.StartWith("×"));
+                        if(i==0 && beats[sample]=="multiplier")
+                        {
+                            Assert.That(multiplier.text,Does.StartWith("×"));
+                            Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf,
+                                "Only the central typography should reveal the multiplier before the physical plaque takes over.");
+                        }
                     }
                     Assert.IsTrue(saved.rewardCollection.Capture(events[i],i==0?3:0)); Assert.IsFalse(saved.rewardCollection.Capture(events[i],i==0?3:0));
                     world.Cinematics.Skip(); Assert.IsTrue(events[i].acknowledged);
