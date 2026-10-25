@@ -34,7 +34,7 @@ namespace Horizon.Tests
         [UnityTest]
         public IEnumerator ActualSingularityRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
         { return ExportActualRelay(DomainEventKind.CausalSingularity); }
-        private IEnumerator ExportActualRelay(DomainEventKind subject)
+        private IEnumerator ExportActualRelay(DomainEventKind relayKind)
         {
             yield return new EnterPlayMode(); yield return null;
             var app=Object.FindObjectOfType<HorizonApp>();
@@ -57,7 +57,7 @@ namespace Horizon.Tests
             Directory.CreateDirectory("artifacts/cinematics");
             try
             {
-                foreach(DomainEventKind kind in new[] {subject})
+                foreach(DomainEventKind kind in new[] {relayKind})
                 {
                     DomainEvent source=CausalRelayTests.ActualCascade(kind); string before=JsonUtility.ToJson(source);
                     CameraClearFlags clear=world.WorldCamera.clearFlags; Color background=world.WorldCamera.backgroundColor;
