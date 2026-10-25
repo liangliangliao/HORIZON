@@ -30,6 +30,11 @@ namespace Horizon.Tests
 
         [UnityTest]
         public IEnumerator ActualCascadeRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
+        { return ExportActualRelay(DomainEventKind.Cascade); }
+        [UnityTest]
+        public IEnumerator ActualSingularityRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
+        { return ExportActualRelay(DomainEventKind.CausalSingularity); }
+        private IEnumerator ExportActualRelay(DomainEventKind subject)
         {
             yield return new EnterPlayMode(); yield return null;
             var app=Object.FindObjectOfType<HorizonApp>();
@@ -52,7 +57,7 @@ namespace Horizon.Tests
             Directory.CreateDirectory("artifacts/cinematics");
             try
             {
-                foreach(DomainEventKind kind in new[] {DomainEventKind.Cascade,DomainEventKind.CausalSingularity})
+                foreach(DomainEventKind kind in new[] {subject})
                 {
                     DomainEvent source=CausalRelayTests.ActualCascade(kind); string before=JsonUtility.ToJson(source);
                     CameraClearFlags clear=world.WorldCamera.clearFlags; Color background=world.WorldCamera.backgroundColor;
@@ -133,7 +138,7 @@ namespace Horizon.Tests
                     Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
                     float jackpot=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot).Time;
                     Assert.Greater(PcmPeak(pcm,jackpot,jackpot+.15f),50,"The final network burst must have its synchronized impact sound.");
-                    Assert.AreEqual(CinematicOutcome.EventTitle(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
+                    Assert.AreEqual(CinematicOutcome.EventHeading(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                     Assert.AreEqual(CinematicOutcome.Readable(source.detail),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
                     foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})
                     {

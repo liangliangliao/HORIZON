@@ -252,13 +252,13 @@ namespace Horizon
             var edge=View.Rect(overlay,"Imagination full-screen reading light",0,0,1,1).gameObject.AddComponent<CinematicCurtainGraphic>(); edge.raycastTarget=false;
             Text goalTitle=View.Label(overlay, "Imagine goal title", run.goal, 55, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.78f, 0.925f, 0.86f);
             CinematicTypography.Upgrade(goalTitle,true); CinematicTypography.Emboss(goalTitle);
-            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.31f, 0.925f, 0.475f);
+            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.418f, 0.925f, 0.475f);
             var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=run.timeline.Last().text;
             CinematicTypography.Upgrade(beatCopy,true);
-            View.Label(overlay, "Imagine resilience", "预演 · 经历挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  恢复后再行动 " + run.recovered + " 次", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.27f, 0.925f, 0.31f);
+            View.Label(overlay, "Imagine resilience", "预演 · 经历挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  恢复后再行动 " + run.recovered + " 次", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.325f, 0.925f, 0.362f);
             if (run.pathVersion >= 2)
             {
-                shotCaption.StateLabel=View.Label(overlay, "Imagine resources", "预演中的状态",27,Palette.Mint,TextAnchor.MiddleCenter,.075f,.478f,.925f,.525f);
+                shotCaption.StateLabel=View.Label(overlay, "Imagine resources", "预演中的状态",27,Palette.Mint,TextAnchor.MiddleCenter,.075f,.37f,.925f,.41f);
                 shotCaption.To=run.Copy(); shotCaption.From=lastCinematicImagination?.id==run.id?lastCinematicImagination:run.Copy();
             }
             lastCinematicImagination=run.Copy();

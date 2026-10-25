@@ -111,7 +111,7 @@ namespace Horizon.UI
             IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
             accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
-            if(Title!=null) Title.text=value.Outcome.Title;
+            if(Title!=null) Title.text=CinematicOutcome.EventHeading(value.Event);
             if(Story!=null) Story.text="";
             if(Phase!=null) Phase.text=CinematicTextChoreography.PhaseCopy(CinematicPhase.Anticipation);
             if(Resources!=null) Resources.text="";

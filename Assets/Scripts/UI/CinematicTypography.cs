@@ -84,6 +84,8 @@ namespace Horizon.UI
                 Mathf.Abs(lastTracking-tracking)>.01f || lastBold!=effectiveBold ||
                 colorDelta.r*colorDelta.r+colorDelta.g*colorDelta.g+colorDelta.b*colorDelta.b+colorDelta.a*colorDelta.a>.0001f;
             if(!changed) return;
+            bool geometryChanged=styledMaterial==null || Mathf.Abs(lastOutline-boundedOutline)>.002f ||
+                Mathf.Abs(lastTracking-tracking)>.01f || lastBold!=effectiveBold;
             lastGlow=glow; lastOutline=boundedOutline; lastTracking=tracking; lastBold=effectiveBold; lastGlowColor=glowColor;
             rendered.characterSpacing=tracking;
             rendered.fontStyle=effectiveBold?FontStyles.Bold:FontStyles.Normal;
@@ -100,16 +102,19 @@ namespace Horizon.UI
             if(styledMaterial.HasProperty(GlowInner)) styledMaterial.SetFloat(GlowInner,.05f);
             if(styledMaterial.HasProperty(GlowOuter)) styledMaterial.SetFloat(GlowOuter,.08f+glow*.34f);
             if(styledMaterial.HasProperty(GlowPower)) styledMaterial.SetFloat(GlowPower,.72f);
-            rendered.UpdateMeshPadding();
+            if(geometryChanged) rendered.UpdateMeshPadding();
         }
         private void Copy()
         { if(source==null || rendered==null) return; if(rendered.text!=source.text) rendered.text=source.text; rendered.color=source.color; }
         private void LateUpdate()
         {
             Copy();
+            if(rendered==null) return;
+            // TMP already owns mesh dirtiness. Rebuilding a static headline
+            // twice per frame was costly on phones and software render capture.
+            if(rendered.havePropertiesChanged) rendered.ForceMeshUpdate();
             if(relief!=null)
             {
-                rendered.ForceMeshUpdate();
                 relief.text=rendered.text; relief.fontSize=rendered.fontSize; relief.characterSpacing=rendered.characterSpacing;
                 relief.maxVisibleCharacters=rendered.maxVisibleCharacters;
                 Color depth=Color.Lerp(new Color(.18f,.055f,.012f),source.color,.16f); depth.a=source.color.a;
@@ -118,7 +123,7 @@ namespace Horizon.UI
             if(sweep<0 || rendered==null || string.IsNullOrEmpty(rendered.text)) return;
             // A moving white specular stripe over a gold-to-amber face. This
             // follows the director clock, including pause and deterministic seek.
-            rendered.ForceMeshUpdate(); var info=rendered.textInfo;
+            var info=rendered.textInfo;
             float shine=Mathf.Repeat(sweep*.42f,1.8f)-.3f;
             for(int i=0;i<info.characterCount;i++)
             {
@@ -127,7 +132,7 @@ namespace Horizon.UI
                 for(int v=0;v<4;v++)
                 {
                     bool top=v==1 || v==2;
-                    Color face=top?Color.Lerp(source.color,Color.white,.68f):source.color*.72f;
+                    Color face=top?Color.Lerp(source.color,Color.white,.76f):source.color*.9f;
                     float glint=Mathf.Clamp01(1-Mathf.Abs((i+(v>=2?1:0))/(float)Mathf.Max(1,info.characterCount)-shine)/.16f);
                     face=Color.Lerp(face,Color.white,glint*.92f); face.a=source.color.a;
                     colors[c.vertexIndex+v]=face;

@@ -78,6 +78,21 @@ namespace Horizon.Game
                 default:return Readable(e.title);
             }
         }
+        public static string EventHeading(DomainEvent e)
+        {
+            switch(e.kind)
+            {
+                case DomainEventKind.PatternBroken:return "模式突破";
+                case DomainEventKind.TimeEcho:return "时间回声";
+                case DomainEventKind.Cascade:return "因果连锁";
+                case DomainEventKind.CausalSingularity:return "因果汇聚";
+                case DomainEventKind.Comeback:return "再次开始";
+                case DomainEventKind.FutureMemory:return "未来记忆";
+                case DomainEventKind.RealityConvergence:return "现实汇流";
+                case DomainEventKind.OrbitActivated:return "未来轨道";
+                default:return Readable(e.title);
+            }
+        }
         private static float Ease(float p) { p=Math.Max(0,Math.Min(1,p)); return p*p*(3-2*p); }
     }
     public sealed class OutcomeChange

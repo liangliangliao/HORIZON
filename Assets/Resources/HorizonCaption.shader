@@ -66,7 +66,7 @@ Shader "HORIZON/Embossed Outcome SDF"
                 float2 gradient=float2(ddx(d),ddy(d));
                 float slope=dot(normalize(gradient+float2(.0001,.0002)),normalize(float2(-.65,.76)));
                 float bevel=(1-smoothstep(.51,.65,d))*face;
-                half3 metal=i.color.rgb*(.88+bevel*slope*.32)+bevel*pow(saturate(slope),6)*half3(1,.93,.72)*.55;
+                half3 metal=i.color.rgb*(1.02+bevel*slope*.24)+bevel*pow(saturate(slope),6)*half3(1,.93,.72)*.6;
                 half3 color=lerp(_OutlineColor.rgb,metal,face);
                 float halo=exp(-pow((d-.44)/max(.025,_GlowOuter*.28),2))*(1-edge)*_GlowColor.a*.32;
                 float alpha=saturate(edge+halo)*i.color.a;
