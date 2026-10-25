@@ -28,6 +28,7 @@ namespace Horizon.UI
         private readonly List<Transform> parkedPage=new List<Transform>();
         private RectTransform pageParking;
         private OutcomeRadianceGraphic outcomeLight;
+        private LifeActionStoryboard actionStory;
 
         private void IsolatePage()
         {
@@ -111,6 +112,7 @@ namespace Horizon.UI
             if(HideWhenIdle) gameObject.SetActive(true);
             IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
+            actionStory=new LifeActionStoryboard(value);
             accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
             if(Title!=null) Title.text=CinematicOutcome.EventHeading(value.Event);
             if(Story!=null) Story.text="";
@@ -172,7 +174,16 @@ namespace Horizon.UI
             OutcomeFrame outcome=plan.Outcome.Sample(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion);
             if(Phase!=null) Phase.text=outcome.Visible?(outcome.Future?
                 plan.Event.receipt?.destinationDay>plan.Event.day?"接下来，回声会抵达":"变化留下的含义":"把这次变化，看清楚"):frame.PhaseCopy;
+            if(Phase!=null && actionStory!=null && actionStory.Enabled && frame.Time<actionStory.Reveal)
+            {
+                LifeActionShot shot=actionStory.Sample(frame.Time,VisualPreferences.ReducedMotion).Shot;
+                Phase.text=shot==LifeActionShot.Suspense?"等一等 · 变化即将显现":shot==LifeActionShot.Establish?"看见这次行动":
+                    shot==LifeActionShot.Arrive?"这一步，已经发生":"正在行动";
+            }
             string narration=CinematicOutcome.Readable(frame.Narration);
+            if(plan.Event.kind==DomainEventKind.TimeEcho && !outcome.Visible && plan.Event.receipt?.sourceDay>0 &&
+                frame.Phase>=CinematicPhase.HeroMoment)
+                narration="第 "+plan.Event.receipt.sourceDay+" 天 · 「"+PresentationCopy.Chinese(plan.Event.receipt.action)+"」\n"+narration;
             if((plan.Event.kind==DomainEventKind.Cascade || plan.Event.kind==DomainEventKind.CausalSingularity) &&
                 frame.Narration==plan.Event.title) narration=plan.Outcome.Title;
             string context=outcome.Visible?string.IsNullOrWhiteSpace(outcome.Context)?plan.Outcome.Meaning:outcome.Context:narration;

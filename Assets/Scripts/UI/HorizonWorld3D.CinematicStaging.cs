@@ -107,10 +107,14 @@ namespace Horizon.UI
             PrepareCinematicEffects();
         }
         private void EvidenceLabel(int index,string text,Vector3 position)
-        { TextMesh label=movieLabels[index]; label.gameObject.SetActive(true); label.text=text; label.transform.localPosition=position; }
+        { TextMesh label=movieLabels[index]; label.gameObject.SetActive(true); label.text=PresentationCopy.Chinese(text); label.transform.localPosition=position; }
         public void FrameCinematicLabels()
         {
             if(WorldCamera==null) return;
+            // A travelling day label on every 3D node becomes an unreadable
+            // stack in perspective. Time-echo provenance lives in the caption.
+            if(moviePlan?.Event.kind==DomainEventKind.TimeEcho)
+                for(int i=0;i<25;i++) movieLabels[i].gameObject.SetActive(false);
             foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
             FrameJackpotStage();
             FrameImmersion();
@@ -122,7 +126,7 @@ namespace Horizon.UI
             // portrait camera rather than the depth of the world-space rays.
             // Keep them between the event heading and the prediction panel.
             for(int i=0;i<3;i++) if(movieLabels[i].gameObject.activeSelf)
-                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.70f:.78f,6));
+                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.77f:.69f,6));
         }
         private void SampleCinematicStaging(float time,float impact,ref Vector3 camera,ref Vector3 look)
         {
@@ -146,7 +150,7 @@ namespace Horizon.UI
                 bool connection=receipt?.resourcesRecorded==true && receipt.resources.relation!=0;
                 camera=Vector3.Lerp(camera,connection?new Vector3(3.8f,3.5f,-7):new Vector3(3.7f,2.8f,-4.8f),forward);
                 if(connection) look=Vector3.Lerp(look,new Vector3(.8f,1.2f,1.5f),forward);
-                movieLabels[24].text=(receipt?.sourceDay??0)>0?"Day "+CinematicStoryboard.DayDuringRewind(e,time,rewindAt,sourceAt):"来路暂未显现";
+                movieLabels[24].text=(receipt?.sourceDay??0)>0?"第 "+CinematicStoryboard.DayDuringRewind(e,time,rewindAt,sourceAt)+" 天":"来路暂未显现";
                 movieLabels[24].transform.localPosition=look+Vector3.up*1.1f;
                 float saturation=time<returnAt?1-Smooth(chargeAt,rewindAt,time)*.85f:Smooth(returnAt,attributionAt,time);
                 foreach(Transform tile in movieTiles) SetMovieColor(tile,Color.Lerp(Palette.Muted*.3f,Palette.Mint*.4f,saturation));

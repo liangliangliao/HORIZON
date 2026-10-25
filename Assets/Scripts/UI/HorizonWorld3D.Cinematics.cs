@@ -117,6 +117,7 @@ namespace Horizon.UI
         public void BeginCinematic(RewardPlan plan,bool fullscreen)
         {
             EndImaginationScene(); moviePlan=plan; moviePhase=CinematicPhase.Anticipation; moviePhaseTime=0;
+            cinematicOverviewRequested=false;
             movieImpactTime=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
             savedCameraPosition=cameraPosition; savedCameraLook=cameraLook; savedCameraRect=WorldCamera.rect;
             savedFov=WorldCamera.fieldOfView; savedFog=RenderSettings.fogDensity;
@@ -149,6 +150,8 @@ namespace Horizon.UI
             PrepareCinemaProduction();
             PrepareCinemaTension();
             PrepareImmersion();
+            PrepareLifeAction();
+            PrepareCinematicOverview();
             movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
                 spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -226,6 +229,13 @@ namespace Horizon.UI
                 if (losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
                 else if(moviePlan.Event.kind!=DomainEventKind.FailAndAgain) moviePlayer.GetComponent<HorizonActor>().Celebrate();
                 foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) SetMovieColor(node,Palette.Mint);
+            }
+            if(LifeActionPlaying && cue.Phase==CinematicPhase.HeroMoment && !preferences.reducedMotion &&
+                (cinemaTension==null || !cinemaTension.Enabled))
+            {
+                float silence=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+                if(silence>cue.Time) PlayTensionCharge(silence-cue.Time);
+                MasterHaptics.Cue(24,45,preferences);
             }
             if(cue.Phase==CinematicPhase.SecondReveal && moviePlan.Event.tier>=RewardTier.Epic)
             {
@@ -362,6 +372,8 @@ namespace Horizon.UI
                 Mathf.Clamp01(.24f+energyFrame.Inward*.2f+energyFrame.Burst*.36f):0;
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             FrameShowcaseInReadingAperture(time,ref camera,ref look);
+            FrameCinematicOverview(time,ref camera,ref look);
+            SampleLifeAction(time,ref camera,ref look);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
             {
@@ -438,6 +450,8 @@ namespace Horizon.UI
             ResetCinemaProduction();
             ResetCausalRelays();
             ResetJackpotStage();
+            EndLifeAction();
+            cinematicOverviewRequested=false;
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             cinematicCamera.gameObject.SetActive(false);
             cameraPosition=savedCameraPosition; cameraLook=savedCameraLook; WorldCamera.rect=savedCameraRect; WorldCamera.fieldOfView=savedFov;

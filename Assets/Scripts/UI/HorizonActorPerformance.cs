@@ -4,7 +4,7 @@ using UnityEngine.Playables;
 
 namespace Horizon.UI
 {
-    public enum HorizonBodyAction { Wait, Walk, Reach, Operate, Rest, Stumble, Stand, Celebrate, Point }
+    public enum HorizonBodyAction { Wait, Walk, Reach, Operate, Rest, Stumble, Stand, Celebrate, Point, Sit }
 
     // The director supplies progress: no private clock can drift through Hit Stop or pause.
     // RigBuilder's Animator graph synchronizes the procedural body pose and solves gaze.
@@ -60,6 +60,7 @@ namespace Horizon.UI
                 case HorizonBodyAction.Reach:left=20;right=Mathf.Sin(p*Mathf.PI)*85*e;head=12;break;
                 case HorizonBodyAction.Operate:left=48+Mathf.Sin(p*24)*8;right=55+Mathf.Cos(p*24)*12;head=16;break;
                 case HorizonBodyAction.Rest:left=18;right=18;head=22-14*p;break;
+                case HorizonBodyAction.Sit:left=18;right=18;head=14-7*p;spread=8;break;
                 case HorizonBodyAction.Stumble:left=65*p;right=90*p;leg=-25*p;head=22*p;spread=12+20*p;break;
                 case HorizonBodyAction.Stand:left=45*(1-p);right=55*(1-p);leg=-20*(1-p);head=20*(1-p);break;
                 case HorizonBodyAction.Celebrate:left=65*Mathf.Sin(p*Mathf.PI*.5f);right=left;spread=22;head=-6;break;
@@ -69,8 +70,10 @@ namespace Horizon.UI
             actor.LeftArm.localRotation=Quaternion.Euler(left,0,-spread);
             actor.RightArm.localRotation=Quaternion.Euler(right,0,spread);
             actor.LeftLeg.localRotation=Quaternion.Euler(-leg,0,0); actor.RightLeg.localRotation=Quaternion.Euler(leg,0,0);
+            if(action==HorizonBodyAction.Sit)
+            { actor.LeftLeg.localRotation=Quaternion.Euler(70,0,0); actor.RightLeg.localRotation=Quaternion.Euler(70,0,0); }
             actor.Head.localRotation=Quaternion.Euler(head,0,0);
-            actor.SampleBreath(p*4,action==HorizonBodyAction.Rest?p:0);
+            actor.SampleBreath(p*4,action==HorizonBodyAction.Rest || action==HorizonBodyAction.Sit?p:0);
             target.localPosition=new Vector3(action==HorizonBodyAction.Point?.7f:0,1.65f-Mathf.Sin(head*Mathf.Deg2Rad)*3,-3);
             if(!GraphReady && gameObject.activeInHierarchy) { builder.Build(); if(GraphReady) builder.graph.SetTimeUpdateMode(DirectorUpdateMode.Manual); }
             if(GraphReady)

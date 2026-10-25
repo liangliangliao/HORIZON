@@ -32,7 +32,7 @@ namespace Horizon
             if (!session.UsesMasterRules) return;
             if (session.InExecutionMode)
             {
-                if (boardHint != null) boardHint.text = "EXECUTION MODE · 决定已锁定，完成下一步执行";
+                if (boardHint != null) boardHint.text = "执行模式 · 决定已锁定，完成下一步执行";
                 View.Button(root, "Resume execution", "决定好了 · 继续执行", () => { executionFromBoard = true; ShowExecution(); },
                     0.065f, 0.762f, 0.49f, 0.788f, Palette.Mint, Palette.Ink, 22);
             }
@@ -250,7 +250,7 @@ namespace Horizon
             overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f,.023f,.04f,.04f);
             world.ShowImaginationScene(run);
             var edge=View.Rect(overlay,"Imagination full-screen reading light",0,0,1,1).gameObject.AddComponent<CinematicCurtainGraphic>(); edge.raycastTarget=false;
-            Text goalTitle=View.Label(overlay, "Imagine goal title", run.goal, 55, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.78f, 0.925f, 0.86f);
+            Text goalTitle=View.Label(overlay, "Imagine goal title", run.goal, 55, Palette.Gold, TextAnchor.MiddleLeft, 0.075f, 0.78f, 0.70f, 0.86f);
             CinematicTypography.Upgrade(goalTitle,true); CinematicTypography.Emboss(goalTitle);
             string phaseReading=ImaginationStoryboard.Reading(run);
             Text beatCopy=View.Label(overlay, "Imagine beat", phaseReading, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.418f, 0.925f, 0.475f);
@@ -263,6 +263,11 @@ namespace Horizon
                 shotCaption.To=run.Copy(); shotCaption.From=lastCinematicImagination?.id==run.id?lastCinematicImagination:run.Copy();
             }
             lastCinematicImagination=run.Copy();
+            UnityEngine.UI.Button framing=null;
+            framing=View.Button(overlay,"Imagination framing","查看全景",()=> {
+                world.ToggleImaginationOverview();
+                framing.GetComponentInChildren<Text>().text=world.ImaginationOverview?"回到特写":"查看全景";
+            },.73f,.795f,.93f,.85f,Palette.Deep,Palette.Mint,23);
             if (run.phase == ImaginePhase.Recover)
             {
                 string[] names = { "休息并安排下一步", "请求帮助", "缩小目标", "改变方法" };

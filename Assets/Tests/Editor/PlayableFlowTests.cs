@@ -744,7 +744,7 @@ namespace Horizon.Tests
             while (s.CompletedRun == null || Get<bool>(app, "busy") || Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Continue master event")) {
                 Assert.Less(Time.realtimeSinceStartup - began, 150, "Long UI flow stalled.");
                 if (Get<bool>(app, "busy")) {
-                    Button skipMovie=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>b.name=="Skip cinematic" && b.IsInteractable());
+                    Button skipMovie=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>(b.name=="Skip cinematic" || b.name=="Continue story checkpoint") && b.IsInteractable());
                     if(skipMovie!=null) skipMovie.onClick.Invoke();
                     yield return null; continue;
                 }
@@ -855,7 +855,7 @@ namespace Horizon.Tests
                 // Readability now intentionally exceeds the harness's input
                 // timeout. Exercise the real, visible skip control; never invoke
                 // a covered receipt button or shorten the production movie.
-                Button skip=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>b.name=="Skip cinematic" && b.IsInteractable());
+                Button skip=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>(b.name=="Skip cinematic" || b.name=="Continue story checkpoint") && b.IsInteractable());
                 if(skip!=null) skip.onClick.Invoke();
                 Assert.Less(Time.realtimeSinceStartup - began, 8, "The result did not become readable and actionable.");
                 yield return null;

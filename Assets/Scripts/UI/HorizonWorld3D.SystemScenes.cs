@@ -34,7 +34,7 @@ namespace Horizon.UI
             comfortSeat=Box(systemScenery,"Comfortable resting place",new Vector3(0,.3f,0),new Vector3(2,.6f,1.3f),ivory);
         }
         private void SystemLabel(int index,string text,Vector3 at)
-        { TextMesh label=systemLabels[index]; label.gameObject.SetActive(true); label.text=text; label.color=Palette.Text; label.transform.localPosition=at; }
+        { TextMesh label=systemLabels[index]; label.gameObject.SetActive(true); label.text=PresentationCopy.Chinese(text); label.color=Palette.Text; label.transform.localPosition=at; }
 
         private void BeginSystemScene(string system, Rect viewport)
         {

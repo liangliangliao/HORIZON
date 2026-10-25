@@ -198,25 +198,18 @@ namespace Horizon
 
         private void DrawDeadlineConstellation(RunRecord run)
         {
+            // This is a reading checkpoint, not an overlay on a moving actor.
+            // Keep the action history planar and give each day one clear cell.
+            View.Fill(root,"Deadline reading background",Palette.Ink,0,0,1,1).transform.SetAsFirstSibling();
             View.Panel(root, "Constellation glass", new Color(0.012f, 0.035f, 0.055f, 0.89f),
                 0.035f, 0.35f, 0.965f, 0.766f, 28);
             var positions = new Dictionary<int, Vector2>();
             for (int day = 1; day <= GameSession.RunLength(run); day++) positions[day] = ConstellationPoint(day, GameSession.RunLength(run));
-            foreach (CausalNode node in GameSession.GraphForRun(run))
-                foreach (string parent in CausalGraph.Parents(node))
-                {
-                    CausalNode origin = run.causalNodes.Find(n => n.id == parent);
-                    if (origin == null || origin.day == node.day || !positions.ContainsKey(node.day) || !positions.ContainsKey(origin.day) ||
-                        node.type == CausalNodeKind.Gate) continue;
-                    TimeThreadGraphic line = View.Rect(root, "Constellation cause", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
-                    line.From = positions[origin.day]; line.To = positions[node.day]; line.color = new Color(0.52f, 0.95f, 0.8f, 0.23f);
-                    line.raycastTarget = false;
-                }
             foreach (ActionRecord action in run.actions)
             {
                 Vector2 p = positions[action.day]; Color c = action.kind == CardKind.Growth ? Palette.Mint : action.kind == CardKind.Recovery ? Palette.Gold : Palette.Coral;
                 View.Panel(root, "Boss day " + action.day, c, p.x - 0.012f, p.y - 0.007f, p.x + 0.012f, p.y + 0.007f, 14);
-                View.Label(root, "Boss action", "D" + action.day + "\n" + action.cardName, GameSession.RunLength(run) == 30 ? 15 : 24, Palette.Text,
+                View.Label(root, "Boss action", "第" + action.day + "天\n" + action.cardName, GameSession.RunLength(run) == 30 ? 15 : 24, Palette.Text,
                     TextAnchor.MiddleCenter, p.x - 0.101f, p.y - 0.084f, p.x + 0.101f, p.y - 0.01f);
             }
         }
@@ -227,8 +220,8 @@ namespace Horizon
             foreach (int day in days)
             {
                 Vector2 p = ConstellationPoint(day, length);
-                TimeThreadGraphic line = View.Rect(root, "History reaches gate", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
-                line.From = p; line.To = new Vector2(0.5f, 0.32f - gate * 0.08f); line.color = new Color(1, 0.76f, 0.49f, 0.38f); line.raycastTarget = false;
+                Transform mark=root.Find("Boss day "+day);
+                if(mark!=null) mark.GetComponent<RoundedGraphic>().color=Palette.Gold;
                 yield return new WaitForSeconds(0.022f);
             }
         }

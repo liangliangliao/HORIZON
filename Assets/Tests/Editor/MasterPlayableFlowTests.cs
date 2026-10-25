@@ -37,7 +37,7 @@ namespace Horizon.Tests
             {
                 if (!Get<bool>(app, "busy") && Get<ArchiveData>(app, "archive").pendingFeedback == null && Get<GameSession>(app, "session").Day > fromDay) yield break;
                 var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b =>
-                    b.interactable && (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
+                    b.interactable && (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat" || b.name=="Continue story checkpoint"));
                 if (next != null) next.onClick.Invoke();
                 yield return new WaitForSecondsRealtime(0.15f);
             }
@@ -321,7 +321,7 @@ namespace Horizon.Tests
                     if (!sawBundle && archive.pendingFeedback?.kind == FeedbackKind.Echoes && archive.pendingFeedback.beats.Count > 1 && !Get<bool>(app, "busy"))
                     { sawBundle = true; yield return Capture(app, "60-grouped-time-echo"); }
                     var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.interactable &&
-                        (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
+                        (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat" || b.name=="Continue story checkpoint"));
                     if (next != null)
                     {
                         bool confirmation=next.name!="Skip cinematic";

@@ -206,65 +206,67 @@ namespace Horizon
         }
 
         private void ShowCausalNetworkOverview(RunRecord run, bool duringRun)
+        { RenderFocusedCausalNetwork(run,duringRun,null,false); }
+
+        private void RenderFocusedCausalNetwork(RunRecord run,bool duringRun,string selectedId,bool relatedOnly)
         {
             ArchiveSurface("Causal network");
             List<CausalNode> graph = CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
-            View.Label(overlay, "Network title", "你留下的因果网络", 43, Palette.Text,
+            CausalNode selected=graph.Find(n=>n.id==selectedId) ?? graph.LastOrDefault(n=>n.resolved);
+            var related=new HashSet<string>();
+            if(selected!=null)
+            {
+                related.Add(selected.id);
+                foreach(string id in CausalGraph.ObservedParents(selected)) related.Add(id);
+                foreach(CausalNode n in graph.Where(n=>CausalGraph.ObservedParents(n).Contains(selected.id))) related.Add(n.id);
+            }
+            View.Label(overlay, "Network title", "行动怎样变成了结果", 43, Palette.Text,
                 TextAnchor.MiddleCenter, 0.06f, 0.865f, 0.94f, 0.955f);
-            View.Label(overlay, "Network guide", "拖动查看，点一个节点追溯来路。", 25, Palette.Muted,
+            View.Label(overlay, "Network guide", "按天阅读。点选一件事，再看它的来源与后续。", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.07f, 0.806f, 0.93f, 0.862f);
-            RectTransform viewport = View.Rect(overlay, "Network window", 0.025f, 0.14f, 0.975f, 0.794f);
+            View.Button(overlay,"Network relation filter",relatedOnly?"正在看：这一件事的前后联系 · 查看全部":"全部经历 · 只看选中事件的前后联系",
+                ()=>RenderFocusedCausalNetwork(run,duringRun,selected?.id,!relatedOnly),.06f,.737f,.94f,.791f,Palette.Panel,Palette.Mint,24);
+            RectTransform viewport = View.Rect(overlay, "Network window", 0.05f, 0.25f, 0.95f, 0.72f);
             viewport.gameObject.AddComponent<RectMask2D>();
             Image hit = viewport.gameObject.AddComponent<Image>(); hit.color = Palette.Deep;
             ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>();
-            scroll.viewport = viewport; scroll.horizontal = scroll.vertical = true;
+            scroll.viewport = viewport; scroll.horizontal=false; scroll.vertical=true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            int columns = Mathf.Max(3, graph.GroupBy(n => n.day).Select(g => g.Count()).DefaultIfEmpty(3).Max());
-            float width = columns * 260 + 100, height = GameSession.RunLength(run) * 135 + 60;
-            RectTransform content = View.Rect(viewport, "Network canvas", 0, 1, 0, 1);
-            content.pivot = new Vector2(0, 1); content.sizeDelta = new Vector2(width, height);
+            List<CausalNode> shown=graph.Where(n=>!relatedOnly || related.Contains(n.id)).OrderBy(n=>n.day).ThenBy(n=>n.depth).ToList();
+            float height=Mathf.Max(600,shown.Sum(n=>Mathf.Max(150,80+Mathf.Ceil((n.label?.Length??0)/24f)*36))+shown.Select(n=>n.day).Distinct().Count()*70+20);
+            RectTransform content = View.Rect(viewport, "Network canvas", 0, 1, 1, 1);
+            content.pivot = new Vector2(.5f, 1); content.sizeDelta = new Vector2(0, height);
             scroll.content = content;
-            var positions = new Dictionary<string, Vector2>();
-            for (int day = 1; day <= GameSession.RunLength(run); day++)
+            int previous=-1; float cursor=10;
+            foreach(CausalNode node in shown)
             {
-                int col = 0;
-                foreach (CausalNode node in graph.FindAll(n => n.day == day))
+                if(previous!=node.day)
                 {
-                    positions[node.id] = new Vector2((60 + col++ * 260 + 105) / width, (height - 45 - (day - 1) * 135 - 40) / height);
+                    View.Label(content,"Network day group "+node.day,"第 "+node.day+" 天",27,Palette.Muted,
+                        TextAnchor.MiddleLeft,.035f,1-(cursor+60)/height,.965f,1-cursor/height);
+                    cursor+=70; previous=node.day;
                 }
+                float rowHeight=Mathf.Max(150,80+Mathf.Ceil((node.label?.Length??0)/24f)*36);
+                bool active=node==selected;
+                string relation=active?"当前选中":selected!=null && CausalGraph.ObservedParents(selected).Contains(node.id)?"这件事的来源":
+                    selected!=null && CausalGraph.ObservedParents(node).Contains(selected.id)?"它带来的后续":CausalKindCopy(node);
+                View.Button(content,"Inspect node "+node.id,relation+" · "+(node.resolved?node.label:"回声尚未到来")+"\n"+
+                    (node.resolved && node.effectRecorded?PlayExperience.NowLabel(node.effect):node.resolved?"已发生":"仍在路上"),
+                    ()=>RenderFocusedCausalNetwork(run,duringRun,node.id,relatedOnly),.025f,1-(cursor+rowHeight-12)/height,.975f,1-cursor/height,
+                    active?new Color(.035f,.15f,.17f,1):Palette.Panel,active?Palette.Mint:Palette.Text,28);
+                cursor+=rowHeight;
             }
-            foreach (CausalNode node in graph)
-            {
-                if (!positions.ContainsKey(node.id)) continue;
-                foreach (string id in CausalGraph.Parents(node))
-                {
-                    if (!positions.ContainsKey(id)) continue;
-                    TimeThreadGraphic line = View.Rect(content, "Network edge", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
-                    Vector2 parent = positions[id], child = positions[node.id];
-                    bool sameColumn = Mathf.Abs(parent.x - child.x) < 0.001f;
-                    float direction = child.x >= parent.x ? 1 : -1;
-                    line.RightLane = sameColumn;
-                    line.From = parent + Vector2.right * (105 / width) * (sameColumn ? 1 : direction);
-                    line.To = child + Vector2.right * (105 / width) * (sameColumn ? 1 : -direction);
-                    line.color = NodeColor(node); line.Thickness = 3;
-                    line.raycastTarget = false;
-                }
-            }
-            foreach (CausalNode node in graph)
-            {
-                if (!positions.TryGetValue(node.id, out Vector2 pos)) continue;
-                Button button = View.Button(content, "Inspect node " + node.id, "D" + node.day + " · " +
-                    (node.resolved ? node.label : "回声尚未到来"), () =>
-                {
-                    ActionRecord action = run.actions.Find(a => a.nodeId == node.id);
-                    if (action != null) ShowActionDetail(action, graph, run.actions);
-                    else ShowArchiveDetail(node.label, "它的来路\n" + (node.originHidden ? "还没看清，D9 再回来看看。" :
-                        NodeList(CausalGraph.Ancestors(graph, node.id))) +
-                        (node.effectRecorded ? "\n\n抵达时的实际变化\n" + PlayExperience.NowLabel(node.effect) : "") +
-                        "\n\n接下来的连接\n" + NodeList(CausalGraph.Descendants(graph, node.id)));
-                }, pos.x - 105 / width, pos.y - 40 / height, pos.x + 105 / width, pos.y + 40 / height,
-                    Palette.Panel, NodeColor(node), 23);
-            }
+            View.Label(overlay,"Selected causal summary",selected==null?"还没有记录。":
+                "已选：第 "+selected.day+" 天 · "+CausalKindCopy(selected)+"\n"+CausalGraph.ObservedParents(selected).Count+" 条已知来源 · "+
+                graph.Count(n=>CausalGraph.ObservedParents(n).Contains(selected.id))+" 条直接后续",23,Palette.Muted,
+                TextAnchor.MiddleLeft,.075f,.145f,.64f,.235f);
+            View.Button(overlay,"Inspect selected cause","查看这件事",()=> {
+                if(selected==null) return;
+                ActionRecord action=run.actions.Find(a=>a.nodeId==selected.id);
+                if(action!=null) ShowActionDetail(action,graph,run.actions);
+                else ShowArchiveDetail(selected.label,"实际来路\n"+NodeList(CausalGraph.Ancestors(graph,selected.id))+
+                    (selected.resolved && selected.effectRecorded?"\n\n实际变化\n"+PlayExperience.NowLabel(selected.effect):""));
+            },.66f,.16f,.94f,.22f,Palette.Panel,Palette.Gold,24).interactable=selected!=null;
             View.Button(overlay, "Close causal network", "回到时间地图", () => RenderMap(duringRun),
                 0.14f, 0.045f, 0.86f, 0.112f, Palette.Mint, Palette.Ink, 29);
             View.RefreshText(overlay);

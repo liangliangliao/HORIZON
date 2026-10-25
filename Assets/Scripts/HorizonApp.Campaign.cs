@@ -159,7 +159,7 @@ namespace Horizon
             RectTransformUtility.ScreenPointToLocalPointInRectangle(root, pointer, null, out Vector2 local);
             float height = (local.y - root.rect.yMin) / root.rect.height;
             float progress = Mathf.InverseLerp(0.31f, 0.70f, height);
-            journeyCursor.text = card.Delay == 0 ? "回到此刻" : "经过 D" + (session.Day + Mathf.RoundToInt(card.Delay * progress));
+            journeyCursor.text = card.Delay == 0 ? "回到此刻" : "经过第 " + (session.Day + Mathf.RoundToInt(card.Delay * progress))+" 天";
         }
     }
 }

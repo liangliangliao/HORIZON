@@ -107,7 +107,7 @@ namespace Horizon.UI
         {
             Text label = Rect(parent, name, x0, y0, x1, y1).gameObject.AddComponent<Text>();
             label.font = Font;
-            label.text = value;
+            label.text = Horizon.Game.PresentationCopy.Chinese(value);
             label.fontSize = size;
             label.color = color;
             label.alignment = alignment;
@@ -143,6 +143,7 @@ namespace Horizon.UI
         {
             Canvas.ForceUpdateCanvases();
             Text[] labels = parent.GetComponentsInChildren<Text>();
+            foreach(Text label in labels) if(label.GetComponentInParent<InputField>()==null) label.text=Horizon.Game.PresentationCopy.Chinese(label.text);
             foreach (Text label in labels)
                 if (label.font != null) label.font.RequestCharactersInTexture(label.text, label.fontSize, label.fontStyle);
             foreach (Text label in labels) label.SetAllDirty();

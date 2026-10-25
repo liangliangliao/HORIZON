@@ -29,11 +29,11 @@ namespace Horizon.Tests
             {
                 float time=Mathf.Lerp(impact+.005f,duration*.88f,sample/12f);
                 world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
-                var captions=world.GetComponentsInChildren<TextMesh>().Where(t=>t.name.StartsWith("Cinematic evidence label ") && t.text.StartsWith("Day ")).ToArray();
+                var captions=world.GetComponentsInChildren<TextMesh>().Where(t=>t.name.StartsWith("Cinematic evidence label ") && t.text.StartsWith("第 ")).ToArray();
                 Assert.AreEqual(1,captions.Length,"Only the current source should occupy the caption area.");
                 string copy=captions[0].text.Replace("\n",""); if(!seen.Contains(copy)) seen.Add(copy);
             }
-            CollectionAssert.AreEqual(source.receipt.causes.Take(6).Select(c=>"Day "+c.day+c.label).Distinct(),seen);
+            CollectionAssert.AreEqual(source.receipt.causes.Take(6).Select(c=>"第 "+c.day+" 天"+PresentationCopy.Chinese(c.label)).Distinct(),seen);
             Camera camera=world.WorldCamera; float originalAspect=camera.aspect;
             foreach(float aspect in new[] { .45f/.64f,.5625f/.64f })
             {

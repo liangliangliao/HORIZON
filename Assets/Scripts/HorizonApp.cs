@@ -981,7 +981,7 @@ namespace Horizon
                 float x = EchoX(day, echo.sourceDay, echo.dueDay);
                 tracer.anchorMin = new Vector2(x - 0.023f, 0.529f);
                 tracer.anchorMax = new Vector2(x + 0.023f, 0.555f);
-                dayLabel.text = "DAY " + day;
+                dayLabel.text = "第 " + day+" 天";
                 yield return new WaitForSeconds(total * 0.29f /
                     (echo.dueDay - echo.sourceDay + 1));
             }
@@ -1013,21 +1013,26 @@ namespace Horizon
             Clear();
             busy = true;
             world.ShowBoard();
-            View.Fill(root, "Chain darkness", new Color(0.009f, 0.026f, 0.045f, chainSize >= 7 ? 1 : 0.7f),
+            View.Fill(root, "Chain darkness", Palette.Ink,
                 0, 0, 1, 1);
-            View.Label(root, "Chain title", "C H A I N   F O U N D", 45, Palette.Gold,
+            View.Label(root, "Chain title", "这些行动，连成了一条路", 43, Palette.Gold,
                 TextAnchor.MiddleCenter, 0.05f, 0.82f, 0.95f, 0.91f);
             bool network = chainSize >= 7;
-            bool vertical = path.Count >= 5;
+            bool vertical = true;
             View.Label(root, "Chain clue", path.Count < chainSize ? "有些来路，还在雾中。D9 再回头看看。" :
                 network ? "这一刻，只剩下你走出的因果网络。" :
                 "一个选择，正在改变后来的选择。", 30, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.08f, 0.74f, 0.92f, 0.81f);
+            RectTransform window=View.Rect(root,"Chain reading window",.055f,.235f,.945f,.725f);
+            window.gameObject.AddComponent<RectMask2D>(); window.gameObject.AddComponent<Image>().color=Palette.Ink;
+            ScrollRect reading=window.gameObject.AddComponent<ScrollRect>(); reading.horizontal=false;
+            reading.viewport=window; reading.movementType=ScrollRect.MovementType.Clamped;
+            RectTransform chainContent=View.Rect(window,"Readable actual chain",0,1,1,1);
+            chainContent.pivot=new Vector2(.5f,1); float chainHeight=Mathf.Max(720,path.Count*158);
+            chainContent.sizeDelta=new Vector2(0,chainHeight); reading.content=chainContent;
             var positions = new Dictionary<string, Vector2>();
             for (int i = 0; i < path.Count; i++)
-                positions[path[i].id] = vertical ? new Vector2(0.145f + i % 3 * 0.055f,
-                    0.706f - i * (0.49f / Mathf.Max(1, path.Count - 1))) :
-                    new Vector2(0.15f + i * (0.7f / (path.Count - 1)), 0.522f);
+                positions[path[i].id] = new Vector2(.045f,1-(i*158+62)/chainHeight);
             for (int i = 0; i < path.Count; i++)
             {
                 CausalNode node = path[i];
@@ -1036,20 +1041,20 @@ namespace Horizon
                 foreach (string parent in CausalGraph.Parents(node))
                 {
                     if (!positions.ContainsKey(parent)) continue;
-                    TimeThreadGraphic edge = View.Rect(root, "True chain connection", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
+                    TimeThreadGraphic edge = View.Rect(chainContent, "True chain connection", 0, 0, 1, 1).gameObject.AddComponent<TimeThreadGraphic>();
                     edge.From = positions[parent]; edge.To = positions[node.id];
                     edge.color = new Color(color.r, color.g, color.b, 0.62f);
                     edge.Thickness = 4; edge.raycastTarget = false;
                 }
                 if (vertical)
                 {
-                    float y = 0.69f - i * (0.49f / Mathf.Max(1, path.Count - 1));
+                    float y = positions[node.id].y;
                     float x = positions[node.id].x;
-                    View.Panel(root, "Causal node", color, x - 0.014f, y, x + 0.014f, y + 0.032f, 18);
-                    View.Label(root, "Causal day", "D" + node.day, 24, color,
-                        TextAnchor.MiddleLeft, 0.32f, y - 0.005f, 0.41f, y + 0.038f);
-                    View.Label(root, "Causal event", node.label, 26, Palette.Text,
-                        TextAnchor.MiddleLeft, 0.43f, y - 0.005f, 0.91f, y + 0.038f);
+                    View.Panel(chainContent, "Causal node", color, x-.011f,y-.009f,x+.011f,y+.009f,18);
+                    View.Label(chainContent,"Causal day","第 "+node.day+" 天 · "+CausalKindCopy(node),23,color,
+                        TextAnchor.MiddleLeft,.13f,y+.005f,.94f,y+48/chainHeight);
+                    View.Label(chainContent,"Causal event",node.label,29,Palette.Text,
+                        TextAnchor.UpperLeft,.13f,y-68/chainHeight,.94f,y+.002f);
                 }
                 else
                 {
@@ -1063,9 +1068,8 @@ namespace Horizon
                 yield return new WaitForSeconds(i == 0 ? 0.25f : 0.25f / i);
             }
             View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
-            View.Label(root, "Cascade", "因果连锁 · " + chainSize + " 个节点", 51, Palette.Gold,
-                TextAnchor.MiddleCenter, 0.06f, vertical ? 0.08f : 0.28f,
-                0.94f, vertical ? 0.16f : 0.37f);
+            View.Label(root, "Cascade", "因果连锁 · " + chainSize + " 个真实节点", 32, Palette.Gold,
+                TextAnchor.MiddleCenter, 0.06f,.155f,0.94f,.205f);
             if (!vertical)
             {
                 CardSpec replacement = CardCatalog.FindById(echo.replacementId);
@@ -1079,6 +1083,9 @@ namespace Horizon
             else { world.Reward(chainSize, true); EchoCrown(new Vector2(0.5f, 0.522f), Palette.Gold, network ? 5 : 3);
                 StarBurst(path.Count, new Vector2(0.5f, 0.48f)); }
             yield return new WaitForSeconds(network ? 0.95f : 0.66f);
+            int checkpoint=viewGeneration;
+            yield return WaitForStoryCheckpoint("看清来路了 · 继续");
+            if(checkpoint!=viewGeneration) yield break;
         }
 
         private static float EchoX(int day, int source, int due)
@@ -1196,6 +1203,9 @@ namespace Horizon
                 if (gates[i]) Haptic();
                 yield return new WaitForSeconds(0.5f);
             }
+            int checkpoint=viewGeneration;
+            yield return WaitForStoryCheckpoint("看完这段人生 · 查看结果");
+            if(checkpoint!=viewGeneration) yield break;
             ShowDeadlineResult(run);
         }
 

@@ -43,12 +43,18 @@ namespace Horizon.Tests
         }
         [UnityTest]
         public IEnumerator ActualActionRevealsItsChangesAndDateWithoutAnyFictionalMultiplier()
+        { return CaptureActualOutcome(false); }
+        [UnityTest]
+        public IEnumerator ActualWalkPlaysTheHomeParkSuspenseAndRecordedRecoveryInFullColor()
+        { return CaptureActualOutcome(true); }
+        private IEnumerator CaptureActualOutcome(bool walk)
         {
             yield return new EnterPlayMode();
             var app=Object.FindObjectOfType<HorizonApp>(); if(app==null) app=new GameObject("Outcome capture app").AddComponent<HorizonApp>();
             yield return null; yield return null;
             Assert.IsNotNull(app,"The real application must finish startup before recording.");
-            var life=CreateActualLife();
+            var life=walk?CreateWalkLife():CreateActualLife();
+            string prefix=walk?"walk-outcome":"actual-outcome";
             Assert.IsNotNull(life); Assert.IsNotNull(life.Master);
             DomainEvent source=life.Master.events.Last(e=>e.kind==DomainEventKind.ActionTaken);
             string receipt=JsonUtility.ToJson(source.receipt);
@@ -104,7 +110,7 @@ namespace Horizon.Tests
                     RenderTexture old=RenderTexture.active; RenderTexture.active=target;
                     pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=old;
                     Directory.CreateDirectory("artifacts/cinematics");
-                    File.WriteAllBytes("artifacts/cinematics/actual-outcome-"+(next?"future":i.ToString())+".png",pixels.EncodeToPNG());
+                    File.WriteAllBytes("artifacts/cinematics/"+prefix+"-"+(next?"future":i.ToString())+".png",pixels.EncodeToPNG());
                 }
                 Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
                 world.Cinematics.Skip(); Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
@@ -115,8 +121,8 @@ namespace Horizon.Tests
                 foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                 canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                 float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
-                string lossless="artifacts/cinematics/frames-actual-outcome"; Directory.CreateDirectory(lossless);
-                using(var stream=File.Create("artifacts/cinematics/actual-outcome-motion.gif"))
+                string lossless="artifacts/cinematics/frames-"+prefix; Directory.CreateDirectory(lossless);
+                using(var stream=File.Create("artifacts/cinematics/"+prefix+"-motion.gif"))
                 using(var gif=new TimelineGifWriter(stream,540,960))
                     for(int frame=0;frame<frames;frame++)
                     {
@@ -128,7 +134,7 @@ namespace Horizon.Tests
                         gif.Frame(pixels.GetPixels32(),5);
                         File.WriteAllBytes(Path.Combine(lossless,"frame-"+frame.ToString("D5")+".png"),pixels.EncodeToPNG());
                     }
-                File.WriteAllBytes("artifacts/cinematics/actual-outcome-motion.pcm",world.RecordedCinemaPcm());
+                File.WriteAllBytes("artifacts/cinematics/"+prefix+"-motion.pcm",world.RecordedCinemaPcm());
                 Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
             }
             finally
@@ -147,6 +153,18 @@ namespace Horizon.Tests
             var life=GameSession.StartMasterLife(1,15,RunMode.Quick);
             CardSpec card=life.Hand.First(c=>life.CanPlay(c) && !life.NeedsImagination(c) && c.Delay>0);
             life.Choose(card.Id); return life;
+        }
+        private static GameSession CreateWalkLife()
+        {
+            // Real hand and real Choose, never a fabricated +3 receipt.
+            for(int seed=0;seed<1024;seed++)
+            {
+                var life=GameSession.StartMasterLife(2,seed,RunMode.Quick);
+                CardSpec walk=life.Hand.FirstOrDefault(c=>c.Id=="walk" && life.CanPlay(c) && !life.NeedsImagination(c));
+                if(walk==null) continue;
+                life.Choose(walk.Id); return life;
+            }
+            Assert.Fail("A recorded walk must come from a playable hand."); return null;
         }
         private static void AssertSubjectAperture(HorizonWorld3D world,Transform subject,Rect aperture)
         {

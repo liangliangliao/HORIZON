@@ -19,12 +19,12 @@ namespace Horizon.Game
         {
             RewardReceipt r=e.receipt;
             Title=EventTitle(e); Recorded=r?.resourcesRecorded==true;
-            Origin=r?.sourceDay>0 && !string.IsNullOrWhiteSpace(r.action)?"第 "+r.sourceDay+" 天 · 「"+r.action+"」":
-                !string.IsNullOrWhiteSpace(r?.action)?"「"+r.action+"」":"";
+            Origin=r?.sourceDay>0 && !string.IsNullOrWhiteSpace(r.action)?"第 "+r.sourceDay+" 天 · 「"+Readable(r.action)+"」":
+                !string.IsNullOrWhiteSpace(r?.action)?"「"+Readable(r.action)+"」":"";
             Heading=e.kind==DomainEventKind.ActionTaken?"今天 · 已发生":e.kind==DomainEventKind.TimeEcho?"回声抵达 · 实际变化":"这一次 · 已记录";
             Meaning=!string.IsNullOrWhiteSpace(e.detail)?Readable(e.detail):!string.IsNullOrWhiteSpace(r?.action)?Readable(r.action):Title;
             FutureHeading=r?.destinationDay>e.day?"第 "+r.destinationDay+" 天 · 回声":e.kind==DomainEventKind.TimeEcho?"从过去，到今天":"留下这次变化";
-            FutureMeaning=!string.IsNullOrWhiteSpace(r?.futureMeaning)?r.futureMeaning:
+            FutureMeaning=!string.IsNullOrWhiteSpace(r?.futureMeaning)?Readable(r.futureMeaning):
                 e.kind==DomainEventKind.TimeEcho && !string.IsNullOrWhiteSpace(Origin)?Origin:Meaning;
             var changes=new List<OutcomeChange>();
             if(Recorded)
@@ -53,8 +53,8 @@ namespace Horizon.Game
         {
             // Old saved event titles may contain resilience/causal × counters.
             // Preserve the evidence, not the obsolete multiplier notation.
-            return (text??"").Replace("倍率代表重新开始的韧性链，提升理解与演出。","你在挫折之后重新开始了。")
-                .Replace("×"," · ");
+            return PresentationCopy.Chinese((text??"").Replace("倍率代表重新开始的韧性链，提升理解与演出。","你在挫折之后重新开始了。")
+                .Replace("×"," · "));
         }
         public static string EventTitle(DomainEvent e)
         {

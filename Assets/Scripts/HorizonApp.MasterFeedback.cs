@@ -63,14 +63,19 @@ namespace Horizon
                 caption.Prediction=View.Label(overlay,"Reward original prediction","",22,Palette.Text,TextAnchor.MiddleCenter,.05f,HorizonCinemaLayout.PredictionBottom,.95f,HorizonCinemaLayout.PredictionTop);
             }
             if (e.kind == DomainEventKind.RealityConvergence)
-                View.Label(overlay, "Convergence evidence labels", "IMAGINATION · SIMULATION · REALITY",24,Palette.Gold,TextAnchor.MiddleCenter,.035f,.768f,.965f,.798f);
+                View.Label(overlay, "Convergence evidence labels", "想象 · 游戏预演 · 现实",24,Palette.Gold,TextAnchor.MiddleCenter,.035f,.768f,.965f,.798f);
             Button next = View.Button(overlay, "Continue master event", "让时间继续",finish,.075f,.027f,.925f,.095f,accent,Palette.Ink,30);
             next.interactable=false; next.gameObject.SetActive(false); busy = true;
             Button skip=View.Button(overlay,"Skip cinematic","跳过 · 保留结果",()=> { world.Cinematics.Skip(); },.54f,.012f,.925f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
             Button pause=View.Button(overlay,"Cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.075f,.012f,.46f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
             caption.Bind(world.Cinematics);
+            UnityEngine.UI.Button framing=null;
+            framing=View.Button(overlay,"Cinematic framing","查看全景",()=> {
+                world.ToggleCinematicOverview(); framing.GetComponentInChildren<Text>().text=world.CinematicOverview?"自动镜头":"查看全景";
+            },.735f,.958f,.935f,.994f,Palette.Deep,Palette.Mint,21);
             world.PresentMasterEvent(e, () => { if (next == null) return; next.gameObject.SetActive(true); next.interactable=true;
                 if(skip!=null) skip.gameObject.SetActive(false); if(pause!=null) pause.gameObject.SetActive(false);
+                if(framing!=null) framing.gameObject.SetActive(false);
                 busy=false; e.acknowledged=true; PersistMasterAction(); }, true);
             View.RefreshText(overlay);
         }
@@ -92,6 +97,10 @@ namespace Horizon
             View.Button(layer,"Local cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.06f,.018f,.40f,.064f,Palette.Deep,Palette.Text,23);
             View.Button(layer,"Skip cinematic","跳过 · 保留结果",()=>world.Cinematics.SkipPending(),.60f,.018f,.94f,.064f,Palette.Deep,Palette.Text,23);
             caption.Bind(world.Cinematics);
+            UnityEngine.UI.Button framing=null;
+            framing=View.Button(layer,"Cinematic framing","查看全景",()=> {
+                world.ToggleCinematicOverview(); framing.GetComponentInChildren<Text>().text=world.CinematicOverview?"自动镜头":"查看全景";
+            },.735f,.958f,.935f,.994f,Palette.Deep,Palette.Mint,21);
         }
     }
 }

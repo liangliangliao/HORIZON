@@ -13,6 +13,7 @@ namespace Horizon.Game
         private readonly CinematicCue[] chapters;
         private readonly CinematicCue[] readingChapters;
         private readonly CinematicEnergy energy;
+        private readonly LifeActionStoryboard action;
         public readonly float ImpactTime, MultiplierTime, SettlementTime;
 
         public CinematicTextChoreography(RewardPlan value)
@@ -21,6 +22,7 @@ namespace Horizon.Game
             chapters=plan.Cues.Where(c=>!c.NodeHit).OrderBy(c=>c.Time).ToArray();
             readingChapters=chapters.Where(c=>CinematicReading.IsChapter(plan.Event,c.Phase)).ToArray();
             energy=new CinematicEnergy(plan);
+            action=new LifeActionStoryboard(plan);
             ImpactTime=TimeOf(CinematicPhase.Impact,plan.Duration*.52f);
             MultiplierTime=TimeOf(CinematicPhase.Multiplication,ImpactTime);
             SettlementTime=TimeOf(CinematicPhase.Settlement,plan.Duration*.86f);
@@ -67,6 +69,7 @@ namespace Horizon.Game
                 Smooth(0,.16f,multiplierAge)*multiplierLinger*ending:0;
             float multiplierPunch=multiplierAge<0?0:(float)Math.Exp(-multiplierAge/Math.Max(.12f,plan.Duration*.025f));
             string narration=!string.IsNullOrEmpty(reading.Copy)?reading.Copy:plan.Event.detail;
+            if(action.Enabled && time<MultiplierTime) narration=action.Sample(time,reducedMotion).Copy;
             float receiptStart=Math.Max(0,SettlementTime-.08f);
             float receiptEnd=Math.Min(plan.Duration,SettlementTime+.14f);
             return new CinematicTextFrame(time,chapter?.Phase??CinematicPhase.Anticipation,
@@ -131,6 +134,13 @@ namespace Horizon.Game
                 CinematicCue prior=anchors[i-1];
                 float span=original[i]-original[i-1];
                 float minimum=prior.Phase==CinematicPhase.Multiplication?new CinematicOutcome(e).RevealSeconds+.12f*(int)e.tier:ReadSeconds(prior.Copy)+.12f*(int)e.tier;
+                if(LifeActionStoryboard.ThemeFor(e)!=LifeActionTheme.None)
+                {
+                    // An actual action needs an establishing/action/arrival
+                    // sequence, followed by a distinct sustained reveal build.
+                    if(prior.Phase==CinematicPhase.Anticipation) minimum=Math.Max(minimum,9.4f);
+                    if(prior.Phase==CinematicPhase.Impact) minimum=Math.Max(minimum,3.2f);
+                }
                 if(prior.Phase==CinematicPhase.SecondReveal) minimum=Math.Max(minimum,ReadSeconds(new CinematicOutcome(e).FutureMeaning)+.6f);
                 if(prior.Phase==CinematicPhase.Settlement) minimum=Math.Max(minimum,Math.Max(3.4f,ReadSeconds(e.detail)));
                 // Actual causal nodes retain their authored accelerating gaps.
@@ -149,7 +159,9 @@ namespace Horizon.Game
             }
             float impact=cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
             int stop=cues.FindIndex(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop);
-            cues[stop]=new CinematicCue(impact-(oldImpact-oldStop),CinematicPhase.HitStop,cues[stop].Copy);
+            float hold=oldImpact-oldStop;
+            if(LifeActionStoryboard.ThemeFor(e)!=LifeActionTheme.None) hold=Math.Max(hold,.62f);
+            cues[stop]=new CinematicCue(impact-hold,CinematicPhase.HitStop,cues[stop].Copy);
             return mapped[mapped.Length-1];
         }
     }

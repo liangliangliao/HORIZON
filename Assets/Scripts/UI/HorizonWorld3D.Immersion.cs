@@ -15,14 +15,52 @@ namespace Horizon.UI
         private readonly Dictionary<int,AudioClip> relayVoices=new Dictionary<int,AudioClip>();
         private AudioClip revealShimmer;
         private Vector3 immersionFocus;
+        private Renderer[] cinematicOverviewRenderers;
+        private bool cinematicOverviewRequested;
+        public bool CinematicOverview => cinematicOverviewRequested;
+        public void ToggleCinematicOverview()
+        {
+            if(moviePlan==null) return;
+            cinematicOverviewRequested=!cinematicOverviewRequested;
+            if(!cinematicOverviewRequested) showcaseFramingClean=false;
+            SampleCinematic(Cinematics.Elapsed);
+        }
 
-        private void FitPortraitSubject(Renderer[] renderers,Rect aperture,float lens,ref Vector3 camera,ref Vector3 look)
+        private void PrepareCinematicOverview()
+        {
+            var renderers=new List<Renderer>();
+            foreach(Transform item in new[] {moviePlayer,movieFuture,movieFriend,movieAnchor,movieBarrier,cinemaNarrative})
+                renderers.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            foreach(Transform item in movieNodes) renderers.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            foreach(Transform item in movieTiles) renderers.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            foreach(Transform item in movieOrbit) renderers.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            foreach(Transform item in movieObjects) renderers.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            if(relayStage!=null) renderers.AddRange(relayStage.GetComponentsInChildren<Renderer>(true));
+            cinematicOverviewRenderers=renderers.ToArray();
+        }
+        private void FrameCinematicOverview(float time,ref Vector3 camera,ref Vector3 look)
+        {
+            if(moviePlan==null || LifeActionPlaying) return;
+            float start=spectacle.SettlementTime, weight=cinematicOverviewRequested?1:Smooth(start,start+.85f,time);
+            if(weight<=0) return;
+            foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
+            showcaseOccluders.Clear();
+            if(showcaseHero!=null) showcaseHero.gameObject.SetActive(false);
+            if(showcasePlatform!=null) showcasePlatform.gameObject.SetActive(false);
+            Vector3 wide=new Vector3(5.8f,5.2f,-8.5f),wideLook=new Vector3(0,1.1f,2.6f);
+            FitPortraitSubject(cinematicOverviewRenderers,HorizonCinemaLayout.SubjectAperture,
+                CinematicFieldOfView(time),ref wide,ref wideLook,false);
+            camera=Vector3.Lerp(camera,wide,weight); look=Vector3.Lerp(look,wideLook,weight);
+            CurrentCinematicFraming=CinematicFraming.ExtremeWide;
+        }
+
+        private void FitPortraitSubject(Renderer[] renderers,Rect aperture,float lens,ref Vector3 camera,ref Vector3 look,bool preserveDistance=true)
         {
             bool found=false; Bounds bounds=default(Bounds);
             foreach(Renderer renderer in renderers)
             {
                 if(renderer==null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
-                    renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
+                    renderer is LineRenderer || renderer is ParticleSystemRenderer || renderer.GetComponent<TextMesh>()!=null) continue;
                 if(!found) {bounds=renderer.bounds; found=true;} else bounds.Encapsulate(renderer.bounds);
             }
             if(!found) return;
@@ -33,7 +71,7 @@ namespace Horizon.UI
             // 20:9 as well as 9:16, never for the editor's landscape Game view.
             float aspect=Mathf.Max(.1f,Mathf.Min(WorldCamera.aspect,9f/20));
             float horizontal=tangent*aspect,cx=aperture.center.x,cy=aperture.center.y;
-            float distance=Vector3.Distance(eye,target);
+            float distance=preserveDistance?Vector3.Distance(eye,target):.5f;
             for(int corner=0;corner<8;corner++)
             {
                 Vector3 point=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
@@ -92,7 +130,9 @@ namespace Horizon.UI
         private void FrameImmersion()
         {
             if(immersionStage==null || cinematicEnergy==null) return;
-            bool visible=cinematicEnergy.Celebrates && !preferences.reducedMotion;
+            float lifeBurst=LifeActionPlaying && energyFrame.Time>=lifeAction.Impact && energyFrame.Time<lifeAction.Reveal?
+                Mathf.Exp(-(energyFrame.Time-lifeAction.Impact)/.48f)*.78f:0;
+            bool visible=(cinematicEnergy.Celebrates || lifePressure>0 || lifeBurst>.003f) && !preferences.reducedMotion;
             immersionStage.gameObject.SetActive(visible);
             if(!visible) return;
             int tierBudget=moviePlan.Event.tier<=RewardTier.Local?1:moviePlan.Event.tier==RewardTier.Combo?2:3;
@@ -100,6 +140,7 @@ namespace Horizon.UI
             // Align with the visible authored subject, including the current
             // causal close-up. Keep every membrane behind it in camera space.
             Vector3 localCenter=showcaseCenter;
+            if(LifeActionPlaying && energyFrame.Time<lifeAction.Reveal) localCenter=moviePlayer.localPosition+Vector3.up;
             if(relayPlan!=null && relayPlan.Nodes.Count>0 && energyFrame.Time<spectacle.HeroTime)
                 localCenter=immersionFocus;
             Vector3 center=cinematicStage.TransformPoint(localCenter);
@@ -114,11 +155,11 @@ namespace Horizon.UI
                 layer.localScale=Vector3.one*(4.9f+i*1.9f+energyFrame.Burst*.72f);
                 Material material=immersionMaterials[i];
                 Color charged=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
-                    Mathf.Clamp01(energyFrame.Inward*.72f+energyFrame.Burst*.48f));
+                    Mathf.Clamp01(Mathf.Max(energyFrame.Inward,lifePressure)*.72f+Mathf.Max(energyFrame.Burst,lifeBurst)*.48f));
                 material.SetColor("_Color",charged);
                 material.SetFloat("_Clock",energyFrame.Time);
-                material.SetFloat("_Charge",energyFrame.Inward*(1-energyFrame.Settlement));
-                material.SetFloat("_Burst",tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:energyFrame.Burst);
+                material.SetFloat("_Charge",Mathf.Max(energyFrame.Inward,lifePressure*.92f)*(1-energyFrame.Settlement));
+                material.SetFloat("_Burst",tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(energyFrame.Burst,lifeBurst));
                 material.SetFloat("_Afterglow",energyFrame.Afterglow);
             }
         }
