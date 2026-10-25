@@ -73,6 +73,8 @@ namespace Horizon.Tests
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     world.Cinematics.Advance(.04f); yield return null;
                     AssertSourceInsideCamera(world);
+                    Assert.That(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text,
+                        Does.Not.Contain("CASCADE").And.Not.Contain("CAUSAL SINGULARITY").And.Not.Contain("×"));
                     var beam=stage.GetComponentsInChildren<Renderer>().First(r=>r.name.StartsWith("Director driven causal light shaft"));
                     Vector3 scale=beam.transform.localScale; var properties=new MaterialPropertyBlock(); beam.GetPropertyBlock(properties);
                     float clock=properties.GetFloat("_Clock");
@@ -199,6 +201,7 @@ namespace Horizon.Tests
                     Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
                     Vector3 projected=camera.WorldToViewportPoint(source.transform.TransformPoint(corner));
                     Assert.That(projected.y,Is.InRange(.02f,.98f),"The full day and source must remain inside the rendered scene.");
+                    Assert.Less(projected.y,.795f,"Source labels must not overlap the event title or narration.");
                 }
             }
             finally { camera.rect=viewport; camera.targetTexture=prior; world.FrameCinematicLabels(); RenderTexture.ReleaseTemporary(target); }

@@ -166,7 +166,8 @@ namespace Horizon.UI
                 for(int start=0;start<label.Length;start+=14)
                     wrapped+=(start==0?"":"\n")+label.Substring(start,Mathf.Min(14,label.Length-start));
                 EvidenceLabel(25,"Day "+evidence.day+"\n"+wrapped,new Vector3(0,2.8f,2));
-                movieLabels[25].characterSize=.05f/Mathf.Max(1,Mathf.CeilToInt(label.Length/56f));
+                int lines=1+Mathf.Max(1,Mathf.CeilToInt(label.Length/14f));
+                movieLabels[25].characterSize=.05f*Mathf.Min(1,2.5f/lines);
                 movieLabels[25].color=Palette.Text;
             }
         }

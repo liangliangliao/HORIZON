@@ -172,7 +172,10 @@ namespace Horizon.UI
             OutcomeFrame outcome=plan.Outcome.Sample(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion);
             if(Phase!=null) Phase.text=outcome.Visible?(outcome.Future?
                 plan.Event.receipt?.destinationDay>plan.Event.day?"接下来，回声会抵达":"变化留下的含义":"把这次变化，看清楚"):frame.PhaseCopy;
-            if(Story!=null) Story.text=outcome.Visible?string.IsNullOrWhiteSpace(outcome.Context)?plan.Outcome.Meaning:outcome.Context:CinematicOutcome.Readable(frame.Narration);
+            string narration=CinematicOutcome.Readable(frame.Narration);
+            if((plan.Event.kind==DomainEventKind.Cascade || plan.Event.kind==DomainEventKind.CausalSingularity) &&
+                frame.Narration==plan.Event.title) narration=plan.Outcome.Title;
+            if(Story!=null) Story.text=outcome.Visible?string.IsNullOrWhiteSpace(outcome.Context)?plan.Outcome.Meaning:outcome.Context:narration;
             CinematicTypography.Reveal(Story,outcome.Visible || VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
             CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;
