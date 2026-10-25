@@ -34,10 +34,9 @@ namespace Horizon.Tests
             var app=Object.FindObjectOfType<HorizonApp>(); if(app==null) app=new GameObject("Outcome capture app").AddComponent<HorizonApp>();
             yield return null; yield return null;
             Assert.IsNotNull(app,"The real application must finish startup before recording.");
-            var life=GameSession.StartMasterLife(1,15,RunMode.Quick);
+            var life=CreateActualLife();
             Assert.IsNotNull(life); Assert.IsNotNull(life.Master);
-            CardSpec card=life.Hand.First(c=>life.CanPlay(c) && !life.NeedsImagination(c) && c.Delay>0);
-            life.Choose(card.Id); DomainEvent source=life.Master.events.Last(e=>e.kind==DomainEventKind.ActionTaken);
+            DomainEvent source=life.Master.events.Last(e=>e.kind==DomainEventKind.ActionTaken);
             string receipt=JsonUtility.ToJson(source.receipt);
             var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",Private).GetValue(app);
             var root=(RectTransform)typeof(HorizonApp).GetField("root",Private).GetValue(app);
@@ -111,6 +110,15 @@ namespace Horizon.Tests
                 target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
             }
             yield return new ExitPlayMode();
+        }
+        private static GameSession CreateActualLife()
+        {
+            // Keep the captured predicate OUT of the EnterPlayMode coroutine.
+            // Its display class would otherwise be allocated before the domain
+            // reload even though the source declaration follows that yield.
+            var life=GameSession.StartMasterLife(1,15,RunMode.Quick);
+            CardSpec card=life.Hand.First(c=>life.CanPlay(c) && !life.NeedsImagination(c) && c.Delay>0);
+            life.Choose(card.Id); return life;
         }
         [UnityTest]
         public IEnumerator RehearsalUsesTheWholePhoneAndRetainsItsCompleteThought()
