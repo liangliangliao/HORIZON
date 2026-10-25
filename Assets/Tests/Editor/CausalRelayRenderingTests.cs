@@ -90,9 +90,11 @@ namespace Horizon.Tests
                     Assert.IsFalse(world.GetComponentsInChildren<TextMesh>(true).Single(t=>t.name=="Cinematic evidence label 25").gameObject.activeSelf);
                     Vector3 heldPosition=subject.localPosition; Quaternion heldAngle=subject.localRotation;
                     Vector3 heldCamera=world.WorldCamera.transform.position; float heldFov=world.WorldCamera.fieldOfView;
+                    Quaternion heldCameraAngle=world.WorldCamera.transform.rotation;
                     world.Cinematics.Advance(.15f); yield return null;
                     Assert.AreEqual(heldPosition,subject.localPosition); Assert.AreEqual(heldAngle,subject.localRotation);
                     Assert.AreEqual(heldCamera,world.WorldCamera.transform.position); Assert.AreEqual(heldFov,world.WorldCamera.fieldOfView);
+                    Assert.AreEqual(heldCameraAngle,world.WorldCamera.transform.rotation);
                     world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false,reducedMotion=true}); world.Cinematics.Advance(.001f);
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     Assert.AreEqual(relay.Nodes.Count,stage.Cast<Transform>().Count(t=>t.gameObject.activeSelf && t.name.StartsWith("Causal relay ·")));

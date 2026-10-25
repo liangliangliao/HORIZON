@@ -279,6 +279,10 @@ namespace Horizon.UI
             if (moviePhase == CinematicPhase.HitStop) time = moviePhaseTime;
             SampleCinemaTension(time);
             if(tensionFrame.Silent) time=tensionFrame.PoseTime;
+            // Every staging layer must see this sample, including a seek into
+            // the silent hold. A previous-frame envelope changed the fitted
+            // camera target once even though the subject pose was frozen.
+            energyFrame=cinematicEnergy?.Sample(time,preferences.reducedMotion) ?? default(CinematicEnergyFrame);
             float impactSpan=Mathf.Min(.75f,Mathf.Max(.02f,moviePlan.Duration*.78f-movieImpactTime));
             float progress=time/moviePlan.Duration, impact=Smooth(movieImpactTime,movieImpactTime+impactSpan,time);
             bool frozen=moviePhase==CinematicPhase.HitStop;

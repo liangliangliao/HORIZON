@@ -78,7 +78,6 @@ namespace Horizon.UI
         {
             if(cinematicEnergy==null) return;
             immersionFocus=look;
-            energyFrame=cinematicEnergy.Sample(time,preferences.reducedMotion);
             if(preferences.reducedMotion || tensionFrame.Silent || moviePhase==CinematicPhase.HitStop) return;
             // Lens-space push and recoil preserve the authored target and framing.
             // Existing source close-ups already own their camera position.
