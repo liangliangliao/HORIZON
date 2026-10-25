@@ -138,7 +138,7 @@ namespace Horizon.Game
                 {
                     // An actual action needs an establishing/action/arrival
                     // sequence, followed by a distinct sustained reveal build.
-                    if(prior.Phase==CinematicPhase.Anticipation) minimum=Math.Max(minimum,9.4f);
+                    if(prior.Phase==CinematicPhase.Anticipation) minimum=Math.Max(minimum,12f);
                     if(prior.Phase==CinematicPhase.Impact) minimum=Math.Max(minimum,3.2f);
                 }
                 if(prior.Phase==CinematicPhase.SecondReveal) minimum=Math.Max(minimum,ReadSeconds(new CinematicOutcome(e).FutureMeaning)+.6f);

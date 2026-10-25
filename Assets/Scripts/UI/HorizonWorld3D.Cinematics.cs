@@ -377,7 +377,7 @@ namespace Horizon.UI
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
             {
-                float anticipation=Mathf.Pow(energyFrame.Inward,4)*(.008f+.018f*(int)moviePlan.Event.tier/6f);
+                float anticipation=Mathf.Pow(Mathf.Max(energyFrame.Inward,lifePressure),4)*(.008f+.018f*(int)moviePlan.Event.tier/6f);
                 WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*(shake+anticipation);
             }
             WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=CinematicFieldOfView(time);

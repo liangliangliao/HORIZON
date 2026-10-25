@@ -175,7 +175,7 @@ namespace Horizon.UI
             // sampled, pausable, and absent from reduced-motion playback.
             float tug=preferences.reducedMotion || tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:
                 Mathf.Sin(time*(9+lifePressure*19))*lifePressure*lifePressure;
-            moviePlayer.localPosition+=new Vector3(tug*.012f,0,0);
+            moviePlayer.localPosition+=new Vector3(tug*.03f,0,0);
             movieLight.color=Color.Lerp(new Color(.58f,.78f,.9f),new Color(1,.72f,.28f),lifePressure);
             movieLight.intensity=Mathf.Max(movieLight.intensity,.65f+lifePressure*1.6f);
             immersionFocus=actorPosition+Vector3.up;

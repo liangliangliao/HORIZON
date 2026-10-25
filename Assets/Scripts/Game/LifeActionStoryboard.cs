@@ -21,7 +21,7 @@ namespace Horizon.Game
             Impact=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
             Reveal=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Multiplication).Time;
             Settlement=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Settlement).Time;
-            Duration=plan.Duration; ActionEnd=Math.Min(4.8f,Impact*.52f);
+            Duration=plan.Duration; ActionEnd=Math.Min(7.2f,Impact*.60f);
         }
         public static LifeActionTheme ThemeFor(DomainEvent e)
         {
@@ -50,7 +50,7 @@ namespace Horizon.Game
         {
             float t=Math.Max(0,Math.Min(Duration,seconds));
             float p=Math.Max(0,Math.Min(1,t/Math.Max(.01f,ActionEnd)));
-            LifeActionShot shot=t<ActionEnd*.24f?LifeActionShot.Establish:t<ActionEnd*.70f?LifeActionShot.Action:
+            LifeActionShot shot=t<ActionEnd*.32f?LifeActionShot.Establish:t<ActionEnd*.72f?LifeActionShot.Action:
                 t<ActionEnd?LifeActionShot.Arrive:t<Reveal?LifeActionShot.Suspense:t<Settlement?LifeActionShot.Reveal:LifeActionShot.Overview;
             float pressure=t>=ActionEnd && t<Impact?(t-ActionEnd)/Math.Max(.01f,Impact-ActionEnd):0;
             pressure=pressure*pressure*(3-2*pressure);
@@ -60,7 +60,7 @@ namespace Horizon.Game
         {
             if(shot==LifeActionShot.Suspense) return "行动已经留下痕迹。接着，看清它带来的变化。";
             if(shot==LifeActionShot.Overview) return "看完这一刻，再决定下一步。";
-            if(Theme==LifeActionTheme.Walk) return progress<.3f?"推开家门，先走出去。":progress<.7f?"沿着小路，走进公园。":"停下来，给自己一次呼吸。";
+            if(Theme==LifeActionTheme.Walk) return progress<.32f?"推开家门，先走出去。":progress<.72f?"沿着小路，走进公园。":"停下来，给自己一次呼吸。";
             if(Theme==LifeActionTheme.Rest) return "把手里的事放下，给自己留一点恢复的时间。";
             if(Theme==LifeActionTheme.Read) return "翻开书，把注意力放在眼前的一页。";
             if(Theme==LifeActionTheme.Connect) return Action.Contains("消息")?"写下一条消息，先把联系发出去。":"向另一个人靠近，让这次联系真正发生。";

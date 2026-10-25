@@ -30,7 +30,9 @@ namespace Horizon.Tests
         {
             DomainEvent source=Walk(); string evidence=JsonUtility.ToJson(source);
             RewardPlan plan=RewardDirector.Direct(source); var story=new LifeActionStoryboard(plan);
-            Assert.GreaterOrEqual(story.ActionEnd,4.5f);
+            Assert.GreaterOrEqual(story.ActionEnd,7.1f);
+            Assert.GreaterOrEqual(story.ActionEnd*.32f,2.2f,"The door-opening sentence needs a readable hold.");
+            Assert.GreaterOrEqual(story.ActionEnd*.28f,2f,"Arrival copy must not flash past.");
             Assert.GreaterOrEqual(story.Impact-story.ActionEnd,4f);
             Assert.GreaterOrEqual(story.Reveal-story.Impact,3.2f-.001f);
             Assert.AreEqual(LifeActionShot.Establish,story.Sample(0).Shot);

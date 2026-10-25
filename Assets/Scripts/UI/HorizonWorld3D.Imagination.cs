@@ -38,6 +38,10 @@ namespace Horizon.UI
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
             imaginationSubjectRenderers=moviePlayer.GetComponentsInChildren<Renderer>(true);
+            var people=new System.Collections.Generic.List<Renderer>(imaginationSubjectRenderers);
+            people.AddRange(movieFuture.GetComponentsInChildren<Renderer>(true));
+            people.AddRange(movieFriend.GetComponentsInChildren<Renderer>(true));
+            imaginationSubjectRenderers=people.ToArray();
             moviePlayer.gameObject.SetActive(true); movieFuture.gameObject.SetActive(true); moviePlayer.localRotation=Quaternion.Euler(0,180,0);
             movieFuture.localScale=Vector3.one; movieFuture.localPosition=new Vector3(0,0,6); movieFuture.GetComponent<HorizonActor>().Pointing=false;
             movieAnchor.gameObject.SetActive(true); movieBarrier.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false);
@@ -154,6 +158,9 @@ namespace Horizon.UI
                 case ImaginationShot.ImaginedVictory: action=HorizonBodyAction.Celebrate; position=new Vector3(0,0,5); camera=new Vector3(3.4f,2.7f,1.2f); look=new Vector3(0,1.2f,5.6f); break;
             }
             SampleProjectionWorld(preferences.reducedMotion?1:beat,CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor || CurrentImaginationFrame.Shot==ImaginationShot.BuildThePath);
+            // Scenic neighbours are not the action. Keep them out of the
+            // title band in detail shots; the optional overview fits them too.
+            projectionLayers[2].gameObject.SetActive(!imaginationWalkSet && imaginationOverview);
             if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor) position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
             SampleImaginationLifeSet(ref position);
             imaginationPerformance.Play(action,beat);
