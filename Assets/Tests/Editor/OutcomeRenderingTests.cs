@@ -83,6 +83,17 @@ namespace Horizon.Tests
                     Text main=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience");
                     Assert.AreEqual(next?plan.Outcome.FutureMeaning:plan.Outcome.Changes[i].Copy(),main.text);
                     Assert.That(main.text,Does.Not.Contain("×"));
+                    if(!next)
+                    {
+                        var resources=plan.Objects.Where(o=>o.Class==RewardObjectClass.Resource).ToArray();
+                        var subject=(MaterialReward)typeof(HorizonWorld3D).GetField("activeHeroReward",Private).GetValue(world);
+                        Assert.AreEqual(resources[i],subject,"Ordinary action copy must have its own actual resource close-up.");
+                        var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
+                        Assert.IsTrue(hero.gameObject.activeInHierarchy);
+                        Assert.IsTrue(hero.GetComponentsInChildren<Renderer>().Any(r=>r.enabled));
+                        Transform actor=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player");
+                        Assert.IsTrue(actor.GetComponentsInChildren<Renderer>(true).All(r=>!r.enabled));
+                    }
                     var rendered=main.GetComponentsInChildren<TextMeshProUGUI>().Single(t=>t.name=="Cinematic TMP text");
                     Assert.AreEqual("HORIZON/Embossed Outcome SDF",rendered.fontSharedMaterial.shader.name);
                     Assert.AreEqual(main.text,rendered.text); Assert.IsNotNull(main.transform.Find("Embossed text depth"));

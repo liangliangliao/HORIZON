@@ -21,6 +21,7 @@ namespace Horizon.UI
         private RewardSpectacleFrame spectacleFrame;
         private MaterialPropertyBlock auraProperties;
         private float showcaseScale;
+        private float outcomeSubjectFocus;
         private Vector3 showcaseOffset, showcaseCenter;
         private bool showcaseFullscreen, showcaseFramingClean;
         private HorizonRewardSparkPool rewardSparkPool;
@@ -85,8 +86,8 @@ namespace Horizon.UI
             showcaseFullscreen=fullscreen;
             jackpotStage.gameObject.SetActive(true);
             outcomeResources=plan.Objects.Where(o=>o.Class==RewardObjectClass.Resource).ToArray();
-            MaterialReward receipt=spectacle.HeroReward;
-            if(spectacle.HasHero && receipt!=null)
+            MaterialReward receipt=spectacle.HasHero?spectacle.HeroReward:outcomeResources.FirstOrDefault();
+            if(receipt!=null)
                 SelectShowcaseHero(receipt);
             bool money=plan.Objects.Any(o=>o.Kind==RewardObjectKind.MoneyWallet && o.Amount>0);
             foreach(Transform mote in rewardMotes)
@@ -125,7 +126,7 @@ namespace Horizon.UI
 
         private void ResetJackpotStage()
         {
-            spectacle=null; showcaseHero=null; activeHeroReward=null; outcomeResources=null;
+            spectacle=null; showcaseHero=null; activeHeroReward=null; outcomeResources=null; outcomeSubjectFocus=0;
             foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
             showcaseOccluders.Clear();
             showcaseFramingClean=false;
@@ -142,13 +143,21 @@ namespace Horizon.UI
             spectacleFrame=spectacle.Sample(time,preferences.reducedMotion);
             float outcomeSecond=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
             OutcomeFrame outcome=moviePlan.Outcome.Sample(time,spectacle.MultiplierTime,outcomeSecond,spectacle.SettlementTime,preferences.reducedMotion);
+            MaterialReward defaultSubject=spectacle.HasHero?spectacle.HeroReward:outcomeResources.FirstOrDefault();
             MaterialReward subject=outcome.Visible && !outcome.Future && outcome.Index>=0 && outcome.Index<outcomeResources.Length?
-                outcomeResources[outcome.Index]:spectacle.HeroReward;
-            if(spectacle.HasHero && subject!=null && subject!=activeHeroReward) SelectShowcaseHero(subject);
+                outcomeResources[outcome.Index]:defaultSubject;
+            if(subject!=null && subject!=activeHeroReward) SelectShowcaseHero(subject);
             RewardSpectacleFrame frame=spectacleFrame;
+            // Ordinary actions and losses deserve a readable product shot too.
+            // This is attention, not a promotion to a reward tier: their sound,
+            // particles and celebration budgets remain unchanged.
+            outcomeSubjectFocus=!spectacle.HasHero && outcomeResources.Length>0?
+                Smooth(spectacle.MultiplierTime-.8f,spectacle.MultiplierTime,time)*
+                (1-Smooth(moviePlan.Duration*.94f,moviePlan.Duration,time)):0;
+            float heroFocus=Mathf.Max(frame.Hero,outcomeSubjectFocus);
             float preview=tensionFrame.Preview;
             bool heldReveal=cinemaTension!=null && cinemaTension.PreviewStart<cinemaTension.Reveal && time>=cinemaTension.RevealHold && time<moviePlan.Duration*.94f && !preferences.reducedMotion;
-            bool hero=frame.Hero>.001f || preview>.001f || heldReveal;
+            bool hero=heroFocus>.001f || preview>.001f || heldReveal;
             showcaseCenter=showcaseHero!=null?new Vector3(0,1.6f,2):moviePlayer.localPosition+Vector3.up*1.15f;
             if(showcaseHero!=null)
             {
@@ -158,7 +167,7 @@ namespace Horizon.UI
                 float age=time-spectacle.HeroTime;
                 float bounce=preferences.reducedMotion?0:age>=0?Mathf.Sin(Mathf.Min(1,age/.45f)*Mathf.PI)*.18f:0;
                 float detailTremor=preferences.reducedMotion || tensionFrame.Silent?0:Mathf.Pow(energyFrame.Inward,4)*.035f;
-                float scale=showcaseScale*(.72f+frame.Hero*.28f+breath+bounce);
+                float scale=showcaseScale*(.72f+heroFocus*.28f+breath+bounce);
                 if(preview>0) scale=showcaseScale*(.80f-preview*.055f);
                 showcaseHero.localScale=Vector3.one*scale;
                 showcaseHero.localRotation=Quaternion.Euler(Mathf.Sin(time*61)*detailTremor*42,
@@ -175,7 +184,7 @@ namespace Horizon.UI
                 }
                 if(activeHeroReward.Kind==RewardObjectKind.BrokenLink)
                     showcaseHero.Find("Other link").localPosition=new Vector3(.2f+frame.Lid*.16f,.04f+frame.Lid*.1f,0);
-                if((frame.Hero>.95f || preview>.1f) && !showcaseFramingClean)
+                if((heroFocus>.95f || preview>.1f) && !showcaseFramingClean)
                 {
                     showcaseFramingClean=true;
                     // The narrative bodies remain in the earlier shots. In the
@@ -187,7 +196,7 @@ namespace Horizon.UI
             }
             showcasePlatform.gameObject.SetActive(hero);
             showcasePlatform.localPosition=new Vector3(showcaseCenter.x,.08f,showcaseCenter.z);
-            showcasePlatform.localScale=Vector3.one*(.8f+frame.Hero*.25f);
+            showcasePlatform.localScale=Vector3.one*(.8f+heroFocus*.25f);
             // Original narrative shots remain intact until their second reveal.
             // The final close-up highlights the actual resource or memento.
             if(hero)
@@ -205,7 +214,7 @@ namespace Horizon.UI
                 Vector3 closeLook=showcaseCenter-Vector3.up*offset;
                 // The actual phone HUD covers the lower viewport, including the
                 // prediction receipt. Keep the physical asset above those panels.
-                float framing=heldReveal?1:preview>0?preview:frame.Hero;
+                float framing=heldReveal?1:preview>0?preview:heroFocus;
                 if(!preferences.reducedMotion) camera=Vector3.Lerp(camera,closeCamera,framing);
                 look=preferences.reducedMotion?closeLook:Vector3.Lerp(look,closeLook,framing);
             }
@@ -215,7 +224,8 @@ namespace Horizon.UI
             for(int i=0;i<jackpotStars.Length;i++)
             {
                 float age=time-spectacle.ImpactTime-i*.023f, life=Mathf.Min(1.5f,Mathf.Max(.1f,moviePlan.Duration-spectacle.ImpactTime-.04f));
-                bool visible=!tensionFrame.Silent && i<stars && age>=0 && age<life && spectacle.Style!=RewardSpectacleStyle.Loss;
+                bool visible=!tensionFrame.Silent && i<stars && age>=0 && age<life && spectacle.Style!=RewardSpectacleStyle.Loss &&
+                    !(activeHeroReward?.Class==RewardObjectClass.Resource && activeHeroReward.Amount<0);
                 jackpotStars[i].gameObject.SetActive(visible);
                 if(!visible) continue;
                 float p=age/life, angle=i*2.39996f;
@@ -224,7 +234,7 @@ namespace Horizon.UI
                 jackpotStars[i].localScale=Vector3.one*Mathf.Sin(p*Mathf.PI)*(.07f+(i%3)*.025f);
             }
             movieLight.color=RewardEffectTint();
-            movieLight.intensity=Mathf.Max(movieLight.intensity,frame.Light*(moviePlan.Event.tier>=RewardTier.Epic?3.5f:1.3f));
+            movieLight.intensity=Mathf.Max(movieLight.intensity,(frame.Light+outcomeSubjectFocus*.28f)*(moviePlan.Event.tier>=RewardTier.Epic?3.5f:1.3f));
         }
 
         private void HideShowcaseOccluder(Transform item)
@@ -271,13 +281,14 @@ namespace Horizon.UI
         {
             if(spectacle==null) return;
             RewardSpectacleFrame frame=spectacleFrame; Color tint=RewardEffectTint();
+            float heroFocus=Mathf.Max(frame.Hero,outcomeSubjectFocus);
             float burst=tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(frame.Burst,energyFrame.Burst);
             float afterglow=1-energyFrame.Settlement*.9f;
             Vector3 center=cinematicStage.TransformPoint(showcaseCenter);
             float strength=(moviePlan.Event.tier>=RewardTier.Epic?1:moviePlan.Event.tier>=RewardTier.Combo?.55f:.23f)*(1-tensionFrame.Preview*.94f);
-            Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.12f+frame.Charge*.12f+frame.Hero*.3f)*frame.Fade*strength*afterglow);
-            Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,
-                (burst+frame.Hero*.08f+energyFrame.Afterglow*.16f)*strength*afterglow);
+            Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.12f+frame.Charge*.12f+heroFocus*.3f)*frame.Fade*strength*afterglow);
+            Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+heroFocus*2,1,tint,
+                (burst+heroFocus*.08f+energyFrame.Afterglow*.16f)*strength*afterglow);
             Aura(jackpotFlare,center,1.2f+burst*3,0,Color.Lerp(tint,Color.white,.65f),burst*strength);
             jackpotPlaque.gameObject.SetActive(false);
             jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,HorizonCinemaLayout.PlaqueViewportY,2));
