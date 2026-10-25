@@ -49,7 +49,7 @@ namespace Horizon.UI
                 case ImaginationShot.Difficulty:return "DIFFICULTY · "+(!string.IsNullOrEmpty(run.adaptation)?run.adaptation:run.preparationKey=="WithSupport"?"约好的人暂时没空。":run.preparationKey=="FixedTime"?"提醒响起，疲劳和诱惑也在。":"下一步比预想困难，先停下来观察。");
                 case ImaginationShot.Failure:return "FAILURE · 这一次失败了。但模拟没有结束。";
                 case ImaginationShot.Recovery:return "RECOVERY · 喘息、观察、整理下一步；选择一个真实恢复动作。";
-                case ImaginationShot.Again:return "AGAIN · 抬头，再次前行。"+(run.recovered>0?" ×"+run.multiplier:"");
+                case ImaginationShot.Again:return "AGAIN · 抬头，再次前行。"+(run.recovered>0?" 已恢复后再行动 "+run.recovered+" 次。":"");
                 case ImaginationShot.ChangedStrategy:return "CHANGED STRATEGY · "+(run.memories.Count>0?run.memories[run.memories.Count-1].text:"保留有效部分，缩小下一步。");
                 case ImaginationShot.FinalPush:return "FINAL PUSH · 已恢复的精力、专注、支援和未来记忆一起抵达。";
                 default:return "IMAGINED VICTORY · 你已经在想象中完整走过一次。";
@@ -61,12 +61,23 @@ namespace Horizon.UI
         public HorizonWorld3D World;
         public Text Label;
         public string Original;
-        private ImaginationShot? last;
+        public Text StateLabel;
+        public ImagineRun From,To;
         private void Update()
         {
-            if(World==null || Label==null || !World.ImaginationPlaying || last==World.CurrentImaginationFrame.Shot) return;
-            last=World.CurrentImaginationFrame.Shot;
-            Label.text=World.CurrentImaginationFrame.Caption+"\n"+Original;
+            if(World==null || Label==null || !World.ImaginationPlaying) return;
+            float time=World.ImaginationElapsed;
+            // Shots may change internally; the current phase's thought stays
+            // intact until the PLAYER advances to the next rehearsal phase.
+            Label.text=Original;
+            CinematicTypography.Reveal(Label,VisualPreferences.ReducedMotion?int.MaxValue:Mathf.CeilToInt(Original.Length*Mathf.SmoothStep(0,1,time/.9f)));
+            if(StateLabel!=null && From!=null && To!=null)
+            {
+                float p=VisualPreferences.ReducedMotion?1:Mathf.SmoothStep(0,1,(time-.8f)/1.2f);
+                StateLabel.text="预演 · 精力 "+State(From.energy,To.energy,p)+"  ·  专注 "+State(From.focus,To.focus,p)+"  ·  支援 "+State(From.support,To.support,p);
+            }
         }
+        private static string State(int from,int to,float p)
+        { int value=Mathf.RoundToInt(Mathf.Lerp(from,to,p)); return value+(from==to?"":p<1?"":"（"+(to>from?"+":"−")+Mathf.Abs(to-from)+"）"); }
     }
 }

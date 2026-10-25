@@ -31,7 +31,10 @@ namespace Horizon.UI
             public HorizonOptics Optics;
             public RTHandle Target;
             private Material material;
+            private Material bloom;
             private readonly int source = Shader.PropertyToID("_HorizonOpticsSource");
+            private readonly int bloomA=Shader.PropertyToID("_HorizonSafeBloomA"), bloomB=Shader.PropertyToID("_HorizonSafeBloomB");
+            private bool bloomAllocated;
             public OpticsPass() { ConfigureInput(ScriptableRenderPassInput.Color | ScriptableRenderPassInput.Depth); }
             public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData data)
             {
@@ -41,6 +44,14 @@ namespace Horizon.UI
                 descriptor.depthBufferBits = 0; descriptor.msaaSamples = 1;
                 descriptor.colorFormat = RenderTextureFormat.ARGB32;
                 cmd.GetTemporaryRT(source, descriptor, FilterMode.Bilinear);
+                bloomAllocated=Optics!=null && Optics.Glow>.001f;
+                if(bloomAllocated)
+                {
+                    if(bloom==null) bloom=CoreUtils.CreateEngineMaterial(Resources.Load<Shader>("HorizonBloom"));
+                    descriptor.width=Mathf.Clamp(descriptor.width/(Optics.LowPower?8:4),16,384);
+                    descriptor.height=Mathf.Clamp(descriptor.height/(Optics.LowPower?8:4),16,512);
+                    cmd.GetTemporaryRT(bloomA,descriptor,FilterMode.Bilinear); cmd.GetTemporaryRT(bloomB,descriptor,FilterMode.Bilinear);
+                }
             }
             public override void Execute(ScriptableRenderContext context, ref RenderingData data)
             {
@@ -49,11 +60,26 @@ namespace Horizon.UI
                     Optics.Distortion, Optics.LowPower ? 2 : 4));
                 CommandBuffer cmd = CommandBufferPool.Get("HORIZON depth focus and refraction");
                 cmd.Blit(Target.nameID, source);
-                cmd.Blit(source, Target.nameID, material, 0);
+                bool focus=Optics.Defocus>.001f || Optics.Distortion>.001f;
+                if(focus)
+                {
+                    cmd.Blit(source,Target.nameID,material,0);
+                    if(bloomAllocated) cmd.Blit(Target.nameID,source);
+                }
+                if(bloomAllocated && bloom!=null)
+                {
+                    // RGBA8 on GLES, never URP's broken packed HDR intermediates.
+                    bloom.SetFloat("_Intensity",Optics.Glow); bloom.SetFloat("_Echo",0);
+                    cmd.Blit(source,bloomA,bloom,0);
+                    cmd.SetGlobalVector("_Direction",new Vector4(1,0,0,0)); cmd.Blit(bloomA,bloomB,bloom,1);
+                    cmd.SetGlobalVector("_Direction",new Vector4(0,1,0,0)); cmd.Blit(bloomB,bloomA,bloom,1);
+                    cmd.SetGlobalTexture("_BloomTex",bloomA); cmd.Blit(source,Target.nameID,bloom,2);
+                }
                 context.ExecuteCommandBuffer(cmd); CommandBufferPool.Release(cmd);
             }
-            public override void OnCameraCleanup(CommandBuffer cmd) { cmd.ReleaseTemporaryRT(source); }
-            public void Dispose() { CoreUtils.Destroy(material); }
+            public override void OnCameraCleanup(CommandBuffer cmd)
+            { cmd.ReleaseTemporaryRT(source); if(bloomAllocated) {cmd.ReleaseTemporaryRT(bloomA); cmd.ReleaseTemporaryRT(bloomB);} }
+            public void Dispose() { CoreUtils.Destroy(material); CoreUtils.Destroy(bloom); }
         }
     }
 }

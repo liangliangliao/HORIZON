@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Horizon.Game;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Unity.Cinemachine;
 
 namespace Horizon.UI
@@ -353,6 +354,8 @@ namespace Horizon.UI
             SampleJackpotStage(time,ref camera,ref look);
             SampleImmersion(time,ref camera,ref look);
             SampleCinemaProduction(time);
+            optics.Glow=SystemInfo.graphicsDeviceType==GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?
+                Mathf.Clamp01(.24f+energyFrame.Inward*.2f+energyFrame.Burst*.36f):0;
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
@@ -370,7 +373,7 @@ namespace Horizon.UI
             // returns its earlier same-frame state.
             WorldCamera.transform.SetPositionAndRotation(cinematicCamera.transform.position,cinematicCamera.transform.rotation);
             WorldCamera.fieldOfView=CinematicFieldOfView(time);
-            if(optics.Active && focusTarget!=null && focusTarget.gameObject.activeSelf)
+            if(optics.Defocus>.001f && focusTarget!=null && focusTarget.gameObject.activeSelf)
                 optics.FocusDistance=Mathf.Max(.1f,WorldCamera.WorldToViewportPoint(focusTarget.position).z);
             FrameCinematicLabels();
             shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);

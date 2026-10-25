@@ -31,5 +31,6 @@
     <Compile Include="../Assets/Tests/Editor/CausalRelayTests.cs" />
     <Compile Include="../Assets/Tests/Editor/CinematicTensionTests.cs" />
     <Compile Include="../Assets/Tests/Editor/CinematicEnergyTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CinematicOutcomeTests.cs" />
   </ItemGroup>
 </Project>

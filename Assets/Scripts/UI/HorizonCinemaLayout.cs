@@ -9,7 +9,7 @@ namespace Horizon.UI
         public const float StoryBottom=.715f, StoryTop=.81f;
         public const float CopyBottom=.115f, CopyTop=.205f;
         public const float PredictionBottom=.215f, PredictionTop=.295f;
-        public const float MultiplierBottom=.39f, MultiplierTop=.56f;
+        public const float MultiplierBottom=.335f, MultiplierTop=.47f;
         public const float PlaqueViewportY=.34f;
     }
 }

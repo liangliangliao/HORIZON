@@ -91,7 +91,7 @@ namespace Horizon.Game
                 case CinematicPhase.HeroMoment: return "主体特写";
                 case CinematicPhase.HitStop: return "屏息 · 即将揭晓";
                 case CinematicPhase.Impact: return "结果抵达";
-                case CinematicPhase.Multiplication: return "演出倍率显现";
+                case CinematicPhase.Multiplication: return "变化逐一显现";
                 case CinematicPhase.SecondReveal: return "第二重揭晓";
                 case CinematicPhase.Jackpot: return "完整结果展开";
                 case CinematicPhase.Settlement: return "结果已记录";
@@ -122,7 +122,7 @@ namespace Horizon.Game
         public static float Retime(DomainEvent e,System.Collections.Generic.List<CinematicCue> cues,float duration)
         {
             var anchors=cues.Where(c=>!c.NodeHit && (IsChapter(e,c.Phase) ||
-                e.tier>RewardTier.Micro && (c.Phase==CinematicPhase.Multiplication || c.Phase==CinematicPhase.SecondReveal) ||
+                c.Phase==CinematicPhase.Multiplication || c.Phase==CinematicPhase.SecondReveal ||
                 c.Phase==CinematicPhase.ReturnToGame)).OrderBy(c=>c.Time).ToArray();
             float[] original=anchors.Select(c=>c.Time).ToArray(), mapped=new float[anchors.Length];
             bool cascade=e.kind==DomainEventKind.Cascade || e.kind==DomainEventKind.CausalSingularity;
@@ -130,7 +130,8 @@ namespace Horizon.Game
             {
                 CinematicCue prior=anchors[i-1];
                 float span=original[i]-original[i-1];
-                float minimum=prior.Phase==CinematicPhase.Multiplication?2.4f:ReadSeconds(prior.Copy)+.12f*(int)e.tier;
+                float minimum=prior.Phase==CinematicPhase.Multiplication?new CinematicOutcome(e).RevealSeconds+.12f*(int)e.tier:ReadSeconds(prior.Copy)+.12f*(int)e.tier;
+                if(prior.Phase==CinematicPhase.SecondReveal) minimum=Math.Max(minimum,ReadSeconds(new CinematicOutcome(e).FutureMeaning)+.6f);
                 if(prior.Phase==CinematicPhase.Settlement) minimum=Math.Max(minimum,Math.Max(3.4f,ReadSeconds(e.detail)));
                 // Actual causal nodes retain their authored accelerating gaps.
                 if(cascade && anchors[i].Phase==CinematicPhase.Impact) minimum=span;

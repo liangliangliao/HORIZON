@@ -236,9 +236,9 @@ namespace Horizon.Tests
                         if(i==0 && beats[sample]=="impact") Assert.IsEmpty(multiplier.text,"Impact must remain readable before the multiplier reveal.");
                         if(i==0 && beats[sample]=="multiplier")
                         {
-                            Assert.That(multiplier.text,Does.StartWith("×"));
+                            Assert.IsNotEmpty(multiplier.text); Assert.That(multiplier.text,Does.Not.Contain("×"));
                             Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf,
-                                "Only the central typography should reveal the multiplier before the physical plaque takes over.");
+                                "No decorative multiplier plaque may return during an actual outcome reveal.");
                         }
                     }
                     Assert.IsTrue(saved.rewardCollection.Capture(events[i],i==0?3:0)); Assert.IsFalse(saved.rewardCollection.Capture(events[i],i==0?3:0));

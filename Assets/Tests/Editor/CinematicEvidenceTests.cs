@@ -73,13 +73,13 @@ namespace Horizon.Tests
                         if(source.kind==DomainEventKind.PatternBroken && frame==1)
                             Assert.Greater(world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Cinematic player").localPosition.z,3.5f,
                                 "A rendered Pattern Broken must show the actor beyond the old interruption, not just changing effects.");
-                        Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
+                        Assert.AreEqual(CinematicOutcome.EventTitle(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                         Assert.AreEqual(source.detail,plan.Event.detail,"The immutable event explanation must survive direction.");
                         Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text,
                             "Every staged shot must say what the viewer is seeing.");
                         if(frame==2)
                         {
-                            Assert.AreEqual(source.detail,
+                            Assert.AreEqual(CinematicOutcome.Readable(source.detail),
                                 root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text,
                                 "The settlement shot must restore the exact receipt explanation.");
                             Assert.AreEqual(plan.ResourceCopy,

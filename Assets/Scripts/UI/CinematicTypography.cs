@@ -23,6 +23,28 @@ namespace Horizon.UI
         private Color lastGlowColor=new Color(-1,-1,-1,-1);
         private bool lastBold;
         private float sweep=-1;
+        private TextMeshProUGUI relief;
+        private Material reliefMaterial;
+        public static void Emboss(Text text)
+        {
+            var t=text!=null?text.GetComponent<CinematicTypography>():null;
+            if(t==null || t.rendered==null || t.relief!=null) return;
+            RectTransform rect=View.Rect(text.transform,"Embossed text depth",0,0,1,1);
+            rect.anchoredPosition=new Vector2(3,-7); rect.SetAsFirstSibling();
+            t.relief=rect.gameObject.AddComponent<TextMeshProUGUI>();
+            t.relief.font=t.rendered.font; t.relief.raycastTarget=false; t.relief.richText=false;
+            t.relief.alignment=TextAlignmentOptions.Center; t.relief.textWrappingMode=TextWrappingModes.Normal;
+            t.relief.fontStyle=FontStyles.Bold;
+            t.reliefMaterial=new Material(t.rendered.fontSharedMaterial);
+            t.relief.fontSharedMaterial=t.reliefMaterial; t.relief.outlineWidth=.22f;
+            t.relief.outlineColor=new Color(.015f,.009f,.025f,1);
+            Shader bevel=Resources.Load<Shader>("HorizonCaption");
+            if(bevel!=null && bevel.isSupported)
+            {
+                t.styledMaterial=new Material(t.rendered.fontSharedMaterial) {shader=bevel};
+                t.rendered.fontSharedMaterial=t.styledMaterial;
+            }
+        }
         public static void Reveal(Text text,int count)
         { var t=text!=null?text.GetComponent<CinematicTypography>():null; if(t!=null && t.rendered!=null) t.rendered.maxVisibleCharacters=count; }
         public static void Sweep(Text text,float time)
@@ -85,6 +107,14 @@ namespace Horizon.UI
         private void LateUpdate()
         {
             Copy();
+            if(relief!=null)
+            {
+                rendered.ForceMeshUpdate();
+                relief.text=rendered.text; relief.fontSize=rendered.fontSize; relief.characterSpacing=rendered.characterSpacing;
+                relief.maxVisibleCharacters=rendered.maxVisibleCharacters;
+                Color depth=Color.Lerp(new Color(.18f,.055f,.012f),source.color,.16f); depth.a=source.color.a;
+                relief.color=depth;
+            }
             if(sweep<0 || rendered==null || string.IsNullOrEmpty(rendered.text)) return;
             // A moving white specular stripe over a gold-to-amber face. This
             // follows the director clock, including pause and deterministic seek.
@@ -97,7 +127,7 @@ namespace Horizon.UI
                 for(int v=0;v<4;v++)
                 {
                     bool top=v==1 || v==2;
-                    Color face=top?new Color(1,.94f,.57f):new Color(1,.43f,.055f);
+                    Color face=top?Color.Lerp(source.color,Color.white,.68f):source.color*.72f;
                     float glint=Mathf.Clamp01(1-Mathf.Abs((i+(v>=2?1:0))/(float)Mathf.Max(1,info.characterCount)-shine)/.16f);
                     face=Color.Lerp(face,Color.white,glint*.92f); face.a=source.color.a;
                     colors[c.vertexIndex+v]=face;
@@ -106,6 +136,6 @@ namespace Horizon.UI
             rendered.UpdateVertexData(TMP_VertexDataUpdateFlags.Colors32);
         }
         private void OnDestroy()
-        { if(source!=null) source.enabled=true; if(styledMaterial!=null) Destroy(styledMaterial); }
+        { if(source!=null) source.enabled=true; if(styledMaterial!=null) Destroy(styledMaterial); if(reliefMaterial!=null) Destroy(reliefMaterial); }
     }
 }

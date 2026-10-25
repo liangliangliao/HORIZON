@@ -10,10 +10,11 @@ namespace Horizon.UI
     {
         [Range(0, 1)] public float Defocus;
         [Range(0, 1)] public float Distortion;
+        [Range(0, 1)] public float Glow;
         public float FocusDistance = 8;
         public bool LowPower;
-        public bool Active => enabled && (Defocus > .001f || Distortion > .001f);
-        public void Clear() { Defocus = Distortion = 0; }
+        public bool Active => enabled && (Defocus > .001f || Distortion > .001f || Glow > .001f);
+        public void Clear() { Defocus = Distortion = Glow = 0; }
     }
 
 }

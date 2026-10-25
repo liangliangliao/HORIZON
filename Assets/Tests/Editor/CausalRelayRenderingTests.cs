@@ -115,9 +115,9 @@ namespace Horizon.Tests
                             float heroTime=new RewardSpectacle(world.Cinematics.Current).HeroTime;
                             if(frame==Mathf.CeilToInt(heroTime*20)+8)
                             {
-                                Transform plaque=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="3D presentation multiplier plaque");
-                                foreach(Renderer carrier in stage.GetComponentsInChildren<Renderer>().Where(r=>r.name=="Evidence metal base"))
-                                    Assert.Greater(world.WorldCamera.WorldToViewportPoint(carrier.bounds.center).z,world.WorldCamera.WorldToViewportPoint(plaque.position).z+.3f,"Evidence carriers must not hide the physical multiplier.");
+                                Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf);
+                                Assert.That(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience").text,Does.Not.Contain("×"),
+                                    "The foreground reveal must describe this causal event rather than invent a payout.");
                             }
                             if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2 || frame==Mathf.CeilToInt(heroTime*20)+8)
                                 File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+"-"+frame+".png",pixels.EncodeToPNG());
@@ -133,8 +133,8 @@ namespace Horizon.Tests
                     Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
                     float jackpot=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot).Time;
                     Assert.Greater(PcmPeak(pcm,jackpot,jackpot+.15f),50,"The final network burst must have its synchronized impact sound.");
-                    Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
-                    Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
+                    Assert.AreEqual(CinematicOutcome.EventTitle(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
+                    Assert.AreEqual(CinematicOutcome.Readable(source.detail),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
                     foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})
                     {
                         Text text=root.GetComponentsInChildren<Text>(true).Single(t=>t.name==name);

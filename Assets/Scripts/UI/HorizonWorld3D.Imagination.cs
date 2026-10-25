@@ -13,6 +13,7 @@ namespace Horizon.UI
         { if(!imaginationSceneActive || imaginedScene==null || paused) return; imaginationTime=Mathf.Max(0,seconds); SampleImaginationScene(); }
         private ImagineRun imaginedScene;
         private float imaginationTime;
+        public float ImaginationElapsed => imaginationTime;
         private Vector3 imaginationSavedCamera, imaginationSavedLook;
         private Rect imaginationSavedRect;
         private float imaginationSavedFov;
@@ -25,7 +26,7 @@ namespace Horizon.UI
             inspectedSystem=null; if(systemScenery!=null) systemScenery.gameObject.SetActive(false);
             movieAnchor.localScale=Vector3.one; movieAnchor.localPosition=Vector3.zero;
             movieMuted=run.phase==ImaginePhase.Failure; if(movieMuted) audioSource.Stop(); UpdateAudio();
-            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,.44f,1,.38f);
+            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,0,1,1);
             PrepareProjectionWorld();
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
@@ -161,6 +162,13 @@ namespace Horizon.UI
                     movieLight.intensity=1.1f+Mathf.Sin(beat*Mathf.PI)*.6f;
             }
             if(preferences.reducedMotion) camera=new Vector3(5,4,-6);
+            // Reserve the lower reading band without cropping the scene. Keep
+            // the actor's upper body in the central optical opening.
+            Vector3 eye=camera-look;
+            float q=2*Mathf.Tan(lens*Mathf.Deg2Rad*.5f)*.12f;
+            float horizontal=Mathf.Sqrt(eye.x*eye.x+eye.z*eye.z);
+            look-=Vector3.up*(q*eye.sqrMagnitude/Mathf.Max(.1f,horizontal-q*eye.y));
+            optics.Glow=SystemInfo.graphicsDeviceType==UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?.25f:0;
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=lens;
         }
         public void EndImaginationScene()

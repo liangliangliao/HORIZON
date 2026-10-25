@@ -8,20 +8,19 @@ namespace Horizon.UI
 {
     public sealed partial class HorizonWorld3D
     {
-        private Transform jackpotStage, showcasePlatform, showcaseHero, jackpotPlaque, jackpotNumbers;
+        private Transform jackpotStage, showcasePlatform, showcaseHero, jackpotPlaque;
         private Transform jackpotHalo, jackpotRays, jackpotFlare;
         private readonly Transform[] rewardMotes=new Transform[48], jackpotStars=new Transform[16];
-        private readonly MeshFilter[] jackpotGlyphs=new MeshFilter[6];
         private readonly Dictionary<string,Transform> showcasePool=new Dictionary<string,Transform>();
         private readonly List<Renderer> showcaseOccluders=new List<Renderer>();
-        private HorizonRewardDigits rewardDigits;
         private Mesh embossedCoin, rewardStar;
         private Material showcaseEnamel, rewardCrystal, jackpotAura;
         private RewardSpectacle spectacle;
+        private MaterialReward activeHeroReward;
+        private MaterialReward[] outcomeResources;
         private RewardSpectacleFrame spectacleFrame;
         private MaterialPropertyBlock auraProperties;
-        private int displayedJackpotMultiplier=-1;
-        private float jackpotNumberChangedAt, showcaseScale;
+        private float showcaseScale;
         private Vector3 showcaseOffset, showcaseCenter;
         private bool showcaseFullscreen, showcaseFramingClean;
         private HorizonRewardSparkPool rewardSparkPool;
@@ -35,7 +34,6 @@ namespace Horizon.UI
             jackpotAura=new Material(Resources.Load<Shader>("HorizonRewardAura")); materials.Add(jackpotAura);
             auraProperties=new MaterialPropertyBlock();
             embossedCoin=Own(HorizonRewardMeshes.Coin()); rewardStar=Own(HorizonRewardMeshes.Star());
-            rewardDigits=new HorizonRewardDigits(mesh=>Own(mesh));
             jackpotStage=Group("Pooled 3D reward spectacle",cinematicStage);
             showcasePlatform=BuildRewardShowcasePlatform();
             jackpotHalo=Shape(jackpotStage,"Soft reward halo",PrimitiveType.Quad,Vector3.zero,Vector3.one,jackpotAura);
@@ -75,36 +73,34 @@ namespace Horizon.UI
 
         private void BuildJackpotPlaque()
         {
+            // An inactive compatibility anchor, NOT a visible reward or plaque.
+            // Actual changes are the only large reveal, owned by the caption.
             jackpotPlaque=Group("3D presentation multiplier plaque",jackpotStage);
-            Box(jackpotPlaque,"Gold bevel plaque",Vector3.zero,new Vector3(3.05f,.78f,.17f),gold);
-            Box(jackpotPlaque,"Horizon enamel plaque",new Vector3(0,0,-.1f),new Vector3(2.89f,.62f,.1f),showcaseEnamel);
-            for(int side=-1;side<=1;side+=2)
-            {
-                Sculpt(jackpotPlaque,"Stardust plaque ornament",rewardStar,new Vector3(side*1.6f,0,-.08f),Vector3.one*.25f,gold);
-                Shape(jackpotPlaque,"Plaque optical crystal",PrimitiveType.Cube,new Vector3(side*1.43f,0,-.18f),Vector3.one*.12f,rewardCrystal).localRotation=Quaternion.Euler(0,0,45);
-            }
-            var label=new GameObject("Presentation multiplier qualifier",typeof(TextMesh)).GetComponent<TextMesh>();
-            label.transform.SetParent(jackpotPlaque,false); label.transform.localPosition=new Vector3(0,.55f,-.15f);
-            label.anchor=TextAnchor.MiddleCenter; label.alignment=TextAlignment.Center; label.fontSize=32; label.characterSize=.032f;
-            label.text="演出倍率"; label.color=Palette.Gold;
-            if(View.Font!=null) { label.font=View.Font; label.GetComponent<MeshRenderer>().sharedMaterial=View.Font.material; }
-            jackpotNumbers=Group("Extruded multiplier numerals",jackpotPlaque);
-            for(int i=0;i<jackpotGlyphs.Length;i++)
-            {
-                Transform glyph=Group("Solid gold multiplier digit "+i,jackpotNumbers);
-                jackpotGlyphs[i]=glyph.gameObject.AddComponent<MeshFilter>(); glyph.gameObject.AddComponent<MeshRenderer>().sharedMaterial=gold;
-            }
+            jackpotPlaque.gameObject.SetActive(false);
         }
 
         private void PrepareJackpotStage(RewardPlan plan,bool fullscreen)
         {
             ResetJackpotStage(); spectacle=new RewardSpectacle(plan);
             showcaseFullscreen=fullscreen;
-            jackpotStage.gameObject.SetActive(true); displayedJackpotMultiplier=-1;
+            jackpotStage.gameObject.SetActive(true);
+            outcomeResources=plan.Objects.Where(o=>o.Class==RewardObjectClass.Resource).ToArray();
             MaterialReward receipt=spectacle.HeroReward;
             if(spectacle.HasHero && receipt!=null)
+                SelectShowcaseHero(receipt);
+            bool money=plan.Objects.Any(o=>o.Kind==RewardObjectKind.MoneyWallet && o.Amount>0);
+            foreach(Transform mote in rewardMotes)
             {
-                TriggerAppearance appearance=RewardDirector.TriggerForm(plan.Event.receipt?.triggerId);
+                mote.GetComponent<MeshFilter>().sharedMesh=money?embossedCoin:rewardStar;
+                mote.name=(money?"Decorative reward coin ":"Decorative reward star ")+mote.GetSiblingIndex();
+            }
+        }
+
+        private void SelectShowcaseHero(MaterialReward receipt)
+        {
+                if(showcaseHero!=null) showcaseHero.gameObject.SetActive(false);
+                activeHeroReward=receipt;
+                TriggerAppearance appearance=RewardDirector.TriggerForm(moviePlan.Event.receipt?.triggerId);
                 string key=receipt.Kind+":"+receipt.Form+":"+appearance;
                 if(!showcasePool.TryGetValue(key,out showcaseHero))
                 {
@@ -123,20 +119,13 @@ namespace Horizon.UI
                     if(renderer is LineRenderer || renderer is ParticleSystemRenderer) continue;
                     if(!found) { bounds=renderer.bounds; found=true; } else bounds.Encapsulate(renderer.bounds);
                 }
-                showcaseScale=(fullscreen?1.92f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
+                showcaseScale=(showcaseFullscreen?1.92f:1.75f)/Mathf.Max(.35f,Mathf.Max(bounds.size.x,bounds.size.y));
                 showcaseOffset=found?showcaseHero.InverseTransformPoint(bounds.center):Vector3.zero;
-            }
-            bool money=plan.Objects.Any(o=>o.Kind==RewardObjectKind.MoneyWallet && o.Amount>0);
-            foreach(Transform mote in rewardMotes)
-            {
-                mote.GetComponent<MeshFilter>().sharedMesh=money?embossedCoin:rewardStar;
-                mote.name=(money?"Decorative reward coin ":"Decorative reward star ")+mote.GetSiblingIndex();
-            }
         }
 
         private void ResetJackpotStage()
         {
-            spectacle=null; showcaseHero=null;
+            spectacle=null; showcaseHero=null; activeHeroReward=null; outcomeResources=null;
             foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
             showcaseOccluders.Clear();
             showcaseFramingClean=false;
@@ -151,6 +140,11 @@ namespace Horizon.UI
         {
             if(spectacle==null) return;
             spectacleFrame=spectacle.Sample(time,preferences.reducedMotion);
+            float outcomeSecond=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
+            OutcomeFrame outcome=moviePlan.Outcome.Sample(time,spectacle.MultiplierTime,outcomeSecond,spectacle.SettlementTime,preferences.reducedMotion);
+            MaterialReward subject=outcome.Visible && !outcome.Future && outcome.Index>=0 && outcome.Index<outcomeResources.Length?
+                outcomeResources[outcome.Index]:spectacle.HeroReward;
+            if(spectacle.HasHero && subject!=null && subject!=activeHeroReward) SelectShowcaseHero(subject);
             RewardSpectacleFrame frame=spectacleFrame;
             float preview=tensionFrame.Preview;
             bool heldReveal=cinemaTension!=null && cinemaTension.PreviewStart<cinemaTension.Reveal && time>=cinemaTension.RevealHold && time<moviePlan.Duration*.94f && !preferences.reducedMotion;
@@ -172,14 +166,14 @@ namespace Horizon.UI
                     Mathf.Cos(time*67)*detailTremor*28);
                 showcaseHero.localPosition=showcaseCenter-showcaseHero.localRotation*(showcaseOffset*scale)+
                     new Vector3(Mathf.Sin(time*79),Mathf.Cos(time*71),0)*detailTremor;
-                SampleRewardDevice(showcaseHero,spectacle.HeroReward,frame.Lid);
+                SampleRewardDevice(showcaseHero,activeHeroReward,frame.Lid);
                 SampleRewardDetail(showcaseHero,pose,frame.Lid);
-                if(spectacle.HeroReward.Kind==RewardObjectKind.ReservoirCore)
+                if(activeHeroReward.Kind==RewardObjectKind.ReservoirCore)
                 {
                     Transform lid=showcaseHero.Find("Storage lid");
                     if(lid!=null) lid.localPosition=new Vector3(0,.55f+frame.Lid*.7f,0);
                 }
-                if(spectacle.HeroReward.Kind==RewardObjectKind.BrokenLink)
+                if(activeHeroReward.Kind==RewardObjectKind.BrokenLink)
                     showcaseHero.Find("Other link").localPosition=new Vector3(.2f+frame.Lid*.16f,.04f+frame.Lid*.1f,0);
                 if((frame.Hero>.95f || preview>.1f) && !showcaseFramingClean)
                 {
@@ -242,9 +236,10 @@ namespace Horizon.UI
         private Color RewardEffectTint()
         {
             if(spectacle.Style==RewardSpectacleStyle.Loss) return new Color(.4f,.08f,.2f);
+            if(activeHeroReward!=null && activeHeroReward.Class==RewardObjectClass.Resource && activeHeroReward.Amount<0) return Palette.Coral;
             if(spectacle.Style==RewardSpectacleStyle.Mystery) return new Color(.65f,.16f,1);
             if(spectacle.Style==RewardSpectacleStyle.Legendary) return new Color(1,.66f,.14f);
-            RewardObjectKind? kind=spectacle.HeroReward?.Kind;
+            RewardObjectKind? kind=activeHeroReward?.Kind;
             if(kind==RewardObjectKind.MoneyWallet || kind==RewardObjectKind.WarmLamp) return new Color(1,.68f,.26f);
             if(kind==RewardObjectKind.FocusLens || kind==RewardObjectKind.HorizonLens || kind==RewardObjectKind.InsightPrism) return new Color(.25f,.6f,1);
             if(kind==RewardObjectKind.ConnectionRing) return new Color(.85f,.28f,.58f);
@@ -284,33 +279,8 @@ namespace Horizon.UI
             Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+frame.Hero*2,1,tint,
                 (burst+frame.Hero*.08f+energyFrame.Afterglow*.16f)*strength*afterglow);
             Aura(jackpotFlare,center,1.2f+burst*3,0,Color.Lerp(tint,Color.white,.65f),burst*strength);
-            float handoff=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time-.08f;
-            // The central animated numeral reveals first; its physical receipt
-            // takes over only after it fades. Never show two competing × values.
-            bool showMultiplier=frame.ShowMultiplier && frame.Time>=handoff && tensionFrame.Preview<=.1f;
-            jackpotPlaque.gameObject.SetActive(showMultiplier);
-            if(!showMultiplier) return;
-            if(displayedJackpotMultiplier!=frame.Multiplier)
-            {
-                displayedJackpotMultiplier=frame.Multiplier; jackpotNumberChangedAt=frame.Time;
-                string copy="×"+frame.Multiplier; float width=rewardDigits.Width(copy), pen=-width*.5f;
-                for(int i=0;i<jackpotGlyphs.Length;i++)
-                {
-                    jackpotGlyphs[i].gameObject.SetActive(i<copy.Length);
-                    if(i>=copy.Length) continue;
-                    jackpotGlyphs[i].sharedMesh=rewardDigits.Mesh(copy[i]);
-                    jackpotGlyphs[i].transform.localPosition=new Vector3(pen,-.37f,-.19f); pen+=rewardDigits.Advance(copy[i]);
-                }
-                jackpotNumbers.localScale=Vector3.one*Mathf.Min(.86f,2.35f/Mathf.Max(.1f,width));
-            }
-            // Keep the physical numeral mesh ahead of the nearest evidence
-            // carriers. Scale with depth to preserve its apparent phone size.
-            const float depth=2;
-            float viewWidth=2*depth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f)*WorldCamera.aspect;
-            float punch=preferences.reducedMotion?0:Mathf.Sin(Mathf.Clamp01((frame.Time-jackpotNumberChangedAt)/.3f)*Mathf.PI)*.12f;
-            jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,showcaseFullscreen?HorizonCinemaLayout.PlaqueViewportY:.50f,depth));
-            jackpotPlaque.rotation=WorldCamera.transform.rotation;
-            jackpotPlaque.localScale=Vector3.one*Mathf.Min(.78f,viewWidth*(showcaseFullscreen?.52f:.30f)/3.5f)*(1+punch)*frame.Fade;
+            jackpotPlaque.gameObject.SetActive(false);
+            jackpotPlaque.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,HorizonCinemaLayout.PlaqueViewportY,2));
         }
 
         private void Aura(Transform item,Vector3 center,float size,float mode,Color tint,float intensity)

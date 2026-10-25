@@ -39,7 +39,8 @@ namespace Horizon.Game
         public ResourceDelta predicted = new ResourceDelta(), actual = new ResourceDelta();
         public ResourceDelta resources = new ResourceDelta();
         public string action, triggerId;
-        public int sourceDay, orbitBits, orbitIndex = -1, horizonLevel;
+        public int sourceDay, destinationDay, orbitBits, orbitIndex = -1, horizonLevel;
+        public string futureMeaning;
         public List<RewardEvidence> causes = new List<RewardEvidence>();
         public List<RewardEvidence> pastFailures = new List<RewardEvidence>();
         public List<MemoryFrame> frames = new List<MemoryFrame>();
@@ -108,7 +109,7 @@ namespace Horizon.Game
     {
         public readonly float Time;
         public readonly int Multiplier;
-        public string Copy { get { return "演出 ×" + Multiplier; } }
+        public string Copy { get { return "光场强度档 " + Multiplier; } }
         public PresentationBeat(float time, int multiplier) { Time = time; Multiplier = multiplier; }
     }
     public sealed class CinematicCue
@@ -129,9 +130,10 @@ namespace Horizon.Game
         public readonly float Duration;
         public readonly int PresentationMultiplier;
         public readonly IReadOnlyList<PresentationBeat> PresentationBeats;
+        public readonly CinematicOutcome Outcome;
         public RewardPlan(DomainEvent e, List<MaterialReward> objects, List<CinematicCue> cues, float duration, int multiplier, List<PresentationBeat> beats = null)
         { Event = e.Copy(); Objects = objects.AsReadOnly(); Cues = cues.OrderBy(c => c.Time).ToList().AsReadOnly(); Duration = duration; PresentationMultiplier = multiplier;
-            PresentationBeats = (beats ?? new List<PresentationBeat> { new PresentationBeat(0, multiplier) }).AsReadOnly(); }
+            PresentationBeats = (beats ?? new List<PresentationBeat> { new PresentationBeat(0, multiplier) }).AsReadOnly(); Outcome=new CinematicOutcome(Event); }
         public int PresentationMultiplierAt(float time)
         { int value = 1; foreach (PresentationBeat beat in PresentationBeats) { if (beat.Time > time) break; value = beat.Multiplier; } return value; }
         public string ResourceCopy { get { return string.Join(" · ", Objects.Where(o => o.Class == RewardObjectClass.Resource).Select(o => o.Copy)); } }
@@ -192,7 +194,7 @@ namespace Horizon.Game
                     float release=hit+HoldDuration(e.tier);
                     cues.Add(new CinematicCue(release,CinematicPhase.Impact,SafeCopy(e.detail,CinematicPhase.Impact)));
                     float remaining = duration - release;
-                    cues.Add(new CinematicCue(release + remaining * .18f, CinematicPhase.Multiplication, "真实因果深度 ×" + Math.Max(1, e.chainSize)));
+                    cues.Add(new CinematicCue(release + remaining * .18f, CinematicPhase.Multiplication, "每条来路，都留下了变化。"));
                     cues.Add(new CinematicCue(release + remaining * .40f, CinematicPhase.SecondReveal, "整个时间网络被点亮。"));
                     cues.Add(new CinematicCue(release + remaining * .64f,CinematicPhase.Jackpot,SafeCopy(e.title,CinematicPhase.Jackpot)));
                     cues.Add(new CinematicCue(release + remaining * .84f,CinematicPhase.Settlement,SafeCopy(e.detail,CinematicPhase.Settlement)));
@@ -204,7 +206,7 @@ namespace Horizon.Game
                 string origin=r.sourceDay>0?"D"+r.sourceDay+" · "+r.action:e.detail;
                 string provenance=r.sourceDay>0?"这个结果来自 D"+r.sourceDay+" 的行动。":e.detail;
                 string[] copy={"过去的一次行动，正在向你靠近。","沿时间线，回到原来的行动。",origin,origin,provenance,
-                    e.detail,multiplier>1?"演出倍率即将显现。":e.detail,
+                    e.detail,"逐一看清这次回来的变化。",
                     string.Join(" · ",objects.Select(o=>o.Copy)),e.title,
                     r.sourceDay>0?"这个结果来自 Day "+r.sourceDay+" 的行动。\n"+e.detail:e.detail,""};
                 AddCues(cues,duration,copy,e.tier);
@@ -278,7 +280,7 @@ namespace Horizon.Game
                 case CinematicPhase.HeroMoment:return "把注意力留在这里。";
                 case CinematicPhase.HitStop:return "屏息 · 即将揭晓。";
                 case CinematicPhase.Impact:return "结果抵达。";
-                case CinematicPhase.Multiplication:return "演出强度正在显现。";
+                case CinematicPhase.Multiplication:return "这次变化，正在逐一显现。";
                 case CinematicPhase.SecondReveal:return "第二重变化展开。";
                 case CinematicPhase.Jackpot:return "完整结果已经出现。";
                 default:return "这次变化已经被记录。";
@@ -315,9 +317,20 @@ namespace Horizon.Game
             kind == DomainEventKind.OrbitActivated || kind == DomainEventKind.Cascade || kind == DomainEventKind.CausalSingularity; }
         private static string[] Story(DomainEvent e, RewardReceipt r)
         {
+            if(e.kind==DomainEventKind.ActionTaken)
+            {
+                string future=r.destinationDay>e.day?"回声已送往第 "+r.destinationDay+" 天。":r.futureMeaning??"今天的变化已留下。";
+                return new[] {"你选择了「"+(r.action??e.title)+"」。","这次行动，正在进入时间线。",
+                    "先看见今天的付出与变化。",r.action??e.title,"变化即将逐一显现。","今天，这些变化已经发生。",
+                    "每一项，都按实际记录揭晓。",future,r.futureMeaning??e.title,future+"\n"+(r.futureMeaning??""),""};
+            }
+            if(e.kind==DomainEventKind.OrbitActivated)
+                return new[] {"你的一次行动，改变了未来方向。","这次行动的来路正在显现。",r.action??e.title,
+                    r.action??e.title,"一个方向，正在被点亮。",CinematicOutcome.EventTitle(e),
+                    CinematicOutcome.EventTitle(e),e.detail,e.title,e.detail,""};
             if (e.kind == DomainEventKind.PatternBroken) return new[] {
                 "你又一次来到了这里。", "过去的时间线，从身后浮现。", "过去，你多次在这里中断。", r.action ?? e.detail,
-                "这一刻，时间停住。", "这一次，你穿过了旧中断点。", "韧性链 ×" + Math.Max(1, e.multiplier),
+                "这一刻，时间停住。", "这一次，你穿过了旧中断点。", "你在挫折之后重新开始了。",
                 "旧路线碎裂，当前路线继续生成。", "过去多次在这里停下。这一次，你没有。", "模式突破纪念物已留下。", "" };
             if (e.kind == DomainEventKind.RealityConvergence) return new[] {
                 "IMAGINATION · SIMULATION · REALITY", "你曾经想象。", "你曾经预演。", "现在，它真实发生了。", "三条路径锁定同一个事件。",
@@ -340,7 +353,7 @@ namespace Horizon.Game
                 return new[] { e.title, "熟悉的路线再次出现。", e.detail, "重复正在形成形状。", "这一刻，先看清它。",
                     e.detail, "重复次数正在显现。", "这条模式被留下记录。", e.title, e.detail, "" };
             return new[] { e.title, "积累的因果，开始回应。", e.detail, e.title, "每一次改变，都有来路。", e.detail,
-                e.chainSize > 0 ? "真实因果深度 ×" + e.chainSize : e.detail, "整个时间网络被点亮。", e.title, e.detail, "" };
+                e.chainSize > 0 ? e.chainSize+" 条真实来路，在这里连接。" : e.detail, "整个时间网络被点亮。", e.title, e.detail, "" };
         }
     }
 

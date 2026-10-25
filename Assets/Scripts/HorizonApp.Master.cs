@@ -242,20 +242,26 @@ namespace Horizon
             View.Button(overlay, "Personalize imagination situation", "按这个目标生成困难情境", () => ShowContentStudio(NarrativePurpose.Imagination, imagineGoal, ShowImagineSetup),
                 0.075f, 0.501f, 0.925f, 0.554f, Palette.Deep, Palette.Gold, 25);
         }
+        private ImagineRun lastCinematicImagination;
         private void ShowImagineRun()
         {
             ImagineRun run = archive.imagination; if (run == null) { ShowImagineSetup(); return; }
             MasterPage("Imagination run", run.phase == ImaginePhase.VictoryAnchor ? "看见抵达 · VICTORY ANCHOR" : run.phase == ImaginePhase.Recover ? "失败之后 · 选择恢复" : run.phase == ImaginePhase.Retry ? "再次开始 · FAIL & AGAIN" : "走过过程 · BUILD THE PATH", ReturnFromImagination);
             overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f,.023f,.04f,.04f);
             world.ShowImaginationScene(run);
-            View.Panel(overlay, "Imagine readable copy", new Color(.009f,.023f,.04f,.94f), .045f,.43f,.955f,.56f,20);
-            View.Label(overlay, "Imagine goal title", run.goal, 33, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.77f, 0.925f, 0.86f);
-            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 25, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.438f, 0.925f, 0.552f);
+            var edge=View.Rect(overlay,"Imagination full-screen reading light",0,0,1,1).gameObject.AddComponent<CinematicCurtainGraphic>(); edge.raycastTarget=false;
+            Text goalTitle=View.Label(overlay, "Imagine goal title", run.goal, 55, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.78f, 0.925f, 0.86f);
+            CinematicTypography.Upgrade(goalTitle,true); CinematicTypography.Emboss(goalTitle);
+            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.31f, 0.925f, 0.475f);
             var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=run.timeline.Last().text;
-            View.Label(overlay, "Imagine resilience", "挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  RECOVERY " + run.recovered + "  ·  ×" + run.multiplier, 26, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.345f, 0.925f, 0.415f);
+            CinematicTypography.Upgrade(beatCopy,true);
+            View.Label(overlay, "Imagine resilience", "预演 · 经历挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  恢复后再行动 " + run.recovered + " 次", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.27f, 0.925f, 0.31f);
             if (run.pathVersion >= 2)
-                View.Label(overlay, "Imagine resources", "预演中的状态 · 精力 " + run.energy + " / 专注 " + run.focus + " / 支援 " + run.support,
-                    24, Palette.Mint, TextAnchor.MiddleCenter, 0.075f, 0.405f, 0.925f, 0.443f);
+            {
+                shotCaption.StateLabel=View.Label(overlay, "Imagine resources", "预演中的状态",27,Palette.Mint,TextAnchor.MiddleCenter,.075f,.478f,.925f,.525f);
+                shotCaption.To=run.Copy(); shotCaption.From=lastCinematicImagination?.id==run.id?lastCinematicImagination:run.Copy();
+            }
+            lastCinematicImagination=run.Copy();
             if (run.phase == ImaginePhase.Recover)
             {
                 string[] names = { "休息并安排下一步", "请求帮助", "缩小目标", "改变方法" };

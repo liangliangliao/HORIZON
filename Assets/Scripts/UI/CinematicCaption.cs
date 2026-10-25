@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Horizon.Game;
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,7 +16,7 @@ namespace Horizon.UI
             public Color Color;
         }
 
-        public Text Phase,Title,Story,Multiplier,MultiplierCaption,Resources,Explanation,Prediction;
+        public Text Phase,Title,Story,Multiplier,MultiplierCaption,OutcomeContext,Resources,Explanation,Prediction;
         public Image Flash;
         public string EventId;
         public bool HideWhenIdle;
@@ -26,6 +27,7 @@ namespace Horizon.UI
         private Color accent;
         private readonly List<Transform> parkedPage=new List<Transform>();
         private RectTransform pageParking;
+        private OutcomeRadianceGraphic outcomeLight;
 
         private void IsolatePage()
         {
@@ -73,16 +75,22 @@ namespace Horizon.UI
 
         public void Bind(CinematicDirector value)
         {
+            var lightRect=View.Rect(transform,"Outcome optical radiance",.015f,.24f,.985f,.57f);
+            lightRect.SetSiblingIndex(1); outcomeLight=lightRect.gameObject.AddComponent<OutcomeRadianceGraphic>(); outcomeLight.raycastTarget=false;
             CinematicTypography.Upgrade(Phase);
             CinematicTypography.Upgrade(Title,true);
             CinematicTypography.Upgrade(Story,true);
             CinematicTypography.Upgrade(Multiplier,true);
             CinematicTypography.Upgrade(MultiplierCaption);
+            CinematicTypography.Upgrade(OutcomeContext);
+            CinematicTypography.Emboss(Multiplier);
+            CinematicTypography.Emboss(Title);
             CinematicTypography.Upgrade(Resources);
             CinematicTypography.Upgrade(Explanation);
             CinematicTypography.Upgrade(Prediction);
             Remember(Phase); Remember(Title); Remember(Story); Remember(Multiplier); Remember(MultiplierCaption);
             Remember(Resources); Remember(Explanation); Remember(Prediction);
+            Remember(OutcomeContext);
             director=value; director.Started+=OnStarted; director.Cue+=OnCue; director.Completed+=OnCompleted;
             director.Cancelled+=OnCancelled;
             if(director.Current!=null) OnStarted(director.Current);
@@ -103,13 +111,13 @@ namespace Horizon.UI
             IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
             accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
-            if(Title!=null) Title.text=value.Event.title;
+            if(Title!=null) Title.text=value.Outcome.Title;
             if(Story!=null) Story.text="";
             if(Phase!=null) Phase.text=CinematicTextChoreography.PhaseCopy(CinematicPhase.Anticipation);
             if(Resources!=null) Resources.text="";
             if(Explanation!=null) Explanation.text="";
             if(Prediction!=null) Prediction.text=PredictionCopy(value.Event.receipt);
-            if(MultiplierCaption!=null) MultiplierCaption.text=MultiplierContext(value);
+            if(MultiplierCaption!=null) MultiplierCaption.text="";
             if(Multiplier!=null) Multiplier.text="";
             if(Flash!=null) Flash.color=Color.clear;
             ApplyFrame(choreography.Sample(0,VisualPreferences.ReducedMotion));
@@ -143,16 +151,6 @@ namespace Horizon.UI
             return string.Join("  ",copy);
         }
 
-        private static string MultiplierContext(RewardPlan value)
-        {
-            if(value.PresentationMultiplier<=1) return "";
-            if(value.Event.kind==DomainEventKind.Cascade || value.Event.kind==DomainEventKind.CausalSingularity)
-                return "演出倍率 · 真实因果深度 "+value.Event.chainSize;
-            if(value.Event.kind==DomainEventKind.Comeback || value.Event.kind==DomainEventKind.PatternBroken)
-                return "演出倍率 · 韧性链 "+Mathf.Max(1,value.Event.multiplier);
-            return "演出倍率 · 视觉强度，不改变实际结算";
-        }
-
         private void OnCue(CinematicCue cue)
         {
             if(director.Current==null || !string.IsNullOrEmpty(EventId) && director.Current.Event.id!=EventId) return;
@@ -169,14 +167,20 @@ namespace Horizon.UI
         private void ApplyFrame(CinematicTextFrame frame)
         {
             if(plan==null) return;
-            if(Phase!=null) Phase.text=frame.PhaseCopy;
-            if(Story!=null) Story.text=frame.Narration;
-            CinematicTypography.Reveal(Story,VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt(frame.Narration.Length*frame.CharacterProgress)));
-            CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:frame.Time-choreography.MultiplierTime);
+            float second=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
+            OutcomeFrame outcome=plan.Outcome.Sample(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion);
+            if(Phase!=null) Phase.text=outcome.Visible?(outcome.Future?
+                plan.Event.receipt?.destinationDay>plan.Event.day?"接下来，回声会抵达":"变化留下的含义":"把这次变化，看清楚"):frame.PhaseCopy;
+            if(Story!=null) Story.text=outcome.Visible?string.IsNullOrWhiteSpace(outcome.Context)?plan.Outcome.Meaning:outcome.Context:CinematicOutcome.Readable(frame.Narration);
+            CinematicTypography.Reveal(Story,outcome.Visible || VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
+            CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;
-            if(Explanation!=null) Explanation.text=receipt>.001f?plan.Event.detail:"";
+            if(Explanation!=null) Explanation.text=receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
             if(Resources!=null) Resources.text=receipt>.001f?plan.ResourceCopy:"";
-            if(Multiplier!=null) Multiplier.text=frame.MultiplierAlpha>.001f && plan.PresentationMultiplier>1?"×"+plan.PresentationMultiplier:"";
+            if(Multiplier!=null) Multiplier.text=outcome.Visible?outcome.Copy:"";
+            if(MultiplierCaption!=null) MultiplierCaption.text=outcome.Visible?outcome.Heading:"";
+            if(OutcomeContext!=null) OutcomeContext.text=outcome.Visible && !outcome.Future && outcome.Index>=0?
+                (outcome.Index+1)+" / "+plan.Outcome.Changes.Count+" · 实际记录":"";
 
             float sx=VisualPreferences.ReducedMotion?0:
                 (Mathf.Sin(frame.Time*71)+Mathf.Sin(frame.Time*113)*.45f)*frame.Tremor;
@@ -188,10 +192,14 @@ namespace Horizon.UI
                 Color.Lerp(accent,Palette.Gold,frame.Glow*.42f),frame.Glow*.72f,.035f,4,false);
             Style(Story,frame.CopyScale,new Vector2(sx*.68f,-sy*.42f),frame.CopyAlpha*frame.EndAlpha,
                 Color.Lerp(Palette.Text,Color.white,frame.Flash*.45f),frame.Glow*.82f,.045f,2,true);
-            Style(Multiplier,frame.MultiplierScale,new Vector2(sx*5.5f,sy*3.5f),frame.MultiplierAlpha,
-                Color.Lerp(Palette.Gold,Color.white,frame.Flash*.66f),Mathf.Max(frame.Glow,frame.MultiplierAlpha),.13f,7,true);
-            Style(MultiplierCaption,.94f+frame.MultiplierAlpha*.06f,Vector2.zero,frame.MultiplierAlpha,
-                Palette.Gold,frame.Glow*.8f,.04f,3,false);
+            float revealAlpha=outcome.Visible?Mathf.Clamp01(outcome.Age/.16f)*frame.EndAlpha:0;
+            float revealScale=VisualPreferences.ReducedMotion?1:1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
+            Color resultColor=outcome.Negative?Palette.Coral:Palette.Gold;
+            Color radiance=resultColor; radiance.a=revealAlpha;
+            outcomeLight?.Sample(outcome.Visible?outcome.Age:-1,radiance,VisualPreferences.ReducedMotion,outcome.Negative);
+            Style(Multiplier,revealScale,Vector2.zero,revealAlpha,resultColor,.65f+frame.Glow*.35f,.16f,2,true);
+            Style(MultiplierCaption,1,Vector2.zero,revealAlpha,resultColor,.35f,.05f,3,false);
+            Style(OutcomeContext,1,Vector2.zero,revealAlpha,Palette.Text,.12f,.02f,0,false);
             Style(Explanation,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.16f,.025f,0,false);
             Style(Resources,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Mint,.22f,.03f,1,true);
             Style(Prediction,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.12f,.02f,0,false);
