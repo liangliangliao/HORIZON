@@ -24,32 +24,37 @@ namespace Horizon.UI
         private CinematicTextChoreography choreography;
         private RewardPlan plan;
         private Color accent;
-        private readonly Dictionary<CanvasGroup,Vector3> hiddenPage=new Dictionary<CanvasGroup,Vector3>();
-        private readonly Dictionary<Transform,CanvasGroup> isolationGroups=new Dictionary<Transform,CanvasGroup>();
+        private readonly List<Transform> parkedPage=new List<Transform>();
+        private RectTransform pageParking;
 
         private void IsolatePage()
         {
             if(!HideWhenIdle || transform.parent==null) return;
+            if(pageParking==null)
+            {
+                pageParking=View.Rect(transform.parent,"Cinematic page parking",0,0,1,1);
+                var group=pageParking.gameObject.AddComponent<CanvasGroup>();
+                group.alpha=0; group.interactable=false; group.blocksRaycasts=false;
+            }
             // The receipt can be built after Started fires. Re-scan in LateUpdate
             // so late-created cards, lists and their input never cover the film.
-            foreach(Transform sibling in transform.parent)
+            var siblings=new List<Transform>();
+            foreach(Transform sibling in transform.parent) siblings.Add(sibling);
+            foreach(Transform sibling in siblings)
             {
-                if(sibling==transform || !sibling.gameObject.activeSelf) continue;
-                // Own a separate group. Never capture/overwrite PanelEntrance's
-                // group while its alpha is still zero: its animation must finish
-                // behind the film and remain visible when the film is dismissed.
-                if(!isolationGroups.TryGetValue(sibling,out CanvasGroup group) || group==null)
-                { group=sibling.gameObject.AddComponent<CanvasGroup>(); isolationGroups[sibling]=group; }
-                if(!hiddenPage.ContainsKey(group)) hiddenPage.Add(group,new Vector3(group.alpha,group.interactable?1:0,group.blocksRaycasts?1:0));
-                group.alpha=0; group.interactable=false; group.blocksRaycasts=false;
+                if(sibling==transform || sibling==pageParking || !sibling.gameObject.activeSelf) continue;
+                // One group on a full-size wrapper, never a second CanvasGroup
+                // on the page item itself. Anchors stay in the same coordinate
+                // space and the item's own entrance can finish normally.
+                parkedPage.Add(sibling); sibling.SetParent(pageParking,false);
             }
             transform.SetAsLastSibling();
         }
         private void RestorePage()
         {
-            foreach(var entry in hiddenPage)
-                if(entry.Key!=null) { entry.Key.alpha=entry.Value.x; entry.Key.interactable=entry.Value.y>0; entry.Key.blocksRaycasts=entry.Value.z>0; }
-            hiddenPage.Clear();
+            for(int i=0;i<parkedPage.Count;i++)
+                if(parkedPage[i]!=null) { parkedPage[i].SetParent(transform.parent,false); parkedPage[i].SetSiblingIndex(i); }
+            parkedPage.Clear();
         }
         private void OnCancelled()
         { RestorePage(); plan=null; choreography=null; if(HideWhenIdle) gameObject.SetActive(false); }
@@ -197,7 +202,7 @@ namespace Horizon.UI
 
         private void OnDestroy()
         {
-            RestorePage(); foreach(var group in isolationGroups.Values) if(group!=null) Destroy(group);
+            RestorePage(); if(pageParking!=null) Destroy(pageParking.gameObject);
             if(director==null) return; director.Started-=OnStarted; director.Cue-=OnCue; director.Completed-=OnCompleted; director.Cancelled-=OnCancelled;
         }
     }

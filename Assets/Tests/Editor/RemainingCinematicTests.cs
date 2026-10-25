@@ -137,7 +137,8 @@ namespace Horizon.Tests
                 float hit=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
                 if(kind==DomainEventKind.PatternBroken)
                 {
-                    world.Cinematics.Advance(world.Cinematics.Current.Duration*.405f);
+                    float crack=CinematicStoryboard.Pattern(world.Cinematics.Current).Single(s=>s.Beat==PatternShot.PatternCrack).Time;
+                    world.Cinematics.Advance(crack+.01f);
                     Assert.IsTrue(world.GetComponentsInChildren<LineRenderer>().Any(l=>l.name.StartsWith("Pattern crack")));
                 }
                 world.Cinematics.Advance(Mathf.Max(0,hit+.15f-world.Cinematics.Elapsed));

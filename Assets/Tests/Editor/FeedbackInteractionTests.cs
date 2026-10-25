@@ -110,9 +110,9 @@ namespace Horizon.Tests
             var late=View.Panel(root,"Created after Started",Palette.Panel,.05f,.65f,.95f,.9f).gameObject;
             yield return null; yield return null;
             Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
-            Assert.IsTrue(card.GetComponents<CanvasGroup>().Any(g=>g.alpha==0));
-            Assert.AreEqual(0,late.GetComponent<CanvasGroup>().alpha);
-            Assert.IsTrue(card.GetComponents<CanvasGroup>().Any(g=>!g.blocksRaycasts));
+            Assert.IsTrue(card.GetComponentsInParent<CanvasGroup>().Any(g=>g.alpha==0));
+            Assert.AreEqual(0,late.GetComponentInParent<CanvasGroup>().alpha);
+            Assert.IsTrue(card.GetComponentsInParent<CanvasGroup>().Any(g=>!g.blocksRaycasts));
             Assert.IsFalse(button.IsInteractable());
             Canvas canvas=root.GetComponentInParent<Canvas>();
             var target=new RenderTexture(540,960,24); target.Create();
@@ -141,7 +141,7 @@ namespace Horizon.Tests
             Assert.IsTrue(card.GetComponents<CanvasGroup>().All(g=>g.alpha==1)); Assert.IsTrue(button.IsInteractable());
             e.id="cancel-isolation"; world.PresentMasterEvent(e); yield return null;
             world.Cinematics.CancelAll(); yield return null;
-            Assert.AreEqual(1,late.GetComponent<CanvasGroup>().alpha);
+            Assert.AreEqual(root,late.transform.parent);
             Assert.IsFalse(root.Find("Reward cinematic captions").gameObject.activeSelf);
             yield return new ExitPlayMode();
         }

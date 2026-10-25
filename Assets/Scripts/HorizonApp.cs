@@ -630,6 +630,7 @@ namespace Horizon
                 Palette.Text, TextAnchor.MiddleCenter, 0.08f, 0.516f, 0.92f, 0.54f);
             dragHint = View.Label(root, "Destination", "点牌查看 / 向上拖进场景行动", 22,
                 Palette.Mint, TextAnchor.MiddleCenter, 0.06f, 0.006f, 0.94f, 0.028f);
+            destinationBeacon.gameObject.AddComponent<GuidePulse>().Active=false;
         }
 
         private void ResourceRegion()
@@ -701,8 +702,7 @@ namespace Horizon
             dropRing.SetVerticesDirty();
             dropTitle.text = ready ? PlayExperience.LandingLabel(card) : visible ? "再向上 · 进入金色圈" : "把卡牌拖到这里";
             GuidePulse receiving = destinationBeacon.GetComponent<GuidePulse>();
-            receiving.Active = !visible;
-            receiving.BaseScale = ready ? 1.035f : 1;
+            if(receiving!=null) { receiving.Active = !visible; receiving.BaseScale = ready ? 1.035f : 1; }
             destinationBeacon.localScale = Vector3.one * (ready ? 1.035f : 1);
             // The receiving label stays in front of the carried card and never captures input.
             destinationBeacon.SetAsLastSibling();
