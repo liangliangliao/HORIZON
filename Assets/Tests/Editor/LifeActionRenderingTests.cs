@@ -51,6 +51,14 @@ namespace Horizon.Tests
                             Assert.That(v.y,Is.InRange(.22f,.795f),renderer.name+" must clear the copy areas.");
                         }
                     }
+                    Vector3 sight=actor.position+Vector3.up*1.3f;
+                    var ray=new Ray(world.WorldCamera.transform.position,(sight-world.WorldCamera.transform.position).normalized);
+                    foreach(Renderer wall in set.GetComponentsInChildren<Renderer>().Where(r=>r.name=="Home rear wall" || r.name=="Home left wall"))
+                    {
+                        bool intersects=wall.bounds.IntersectRay(ray,out float distance);
+                        Assert.IsFalse(intersects && distance<Vector3.Distance(sight,ray.origin)-.15f,
+                            "A geometrically fitted shot must not hide the actor behind "+wall.name);
+                    }
                 }
                 Assert.Greater(Vector3.Distance(start,actor.localPosition),4,"Walking must actually leave the home and reach the park.");
                 world.Cinematics.Skip(); Assert.IsFalse(set.gameObject.activeSelf);

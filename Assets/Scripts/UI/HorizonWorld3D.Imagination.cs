@@ -158,6 +158,7 @@ namespace Horizon.UI
             SampleImaginationLifeSet(ref position);
             imaginationPerformance.Play(action,beat);
             moviePlayer.localPosition=position;
+            if(imaginationWalkSet) { camera=position+new Vector3(3.4f,2.7f,4.6f); look=position+Vector3.up*1.2f; }
             float lens=39;
             if(!preferences.reducedMotion)
             {
@@ -185,7 +186,7 @@ namespace Horizon.UI
             FitPortraitSubject(imaginationSubjectRenderers,HorizonCinemaLayout.ImaginationAperture,lens,ref camera,ref look);
             if(imaginationOverview)
             {
-                camera=new Vector3(6,5,-7); look=new Vector3(0,1.2f,3);
+                camera=new Vector3(6,5,imaginationWalkSet?9:-7); look=new Vector3(0,1.2f,3);
                 FitPortraitSubject(imaginationOverviewRenderers,HorizonCinemaLayout.ImaginationAperture,lens,ref camera,ref look,false);
             }
             optics.Glow=SystemInfo.graphicsDeviceType==UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?.25f:0;

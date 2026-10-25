@@ -119,7 +119,7 @@ namespace Horizon.Tests
             }
             Assert.IsFalse(System.Array.Exists(root.GetComponentsInChildren<Button>(), b => b.name == "Meet thirty day self"));
             string text = string.Join(" ", System.Array.ConvertAll(root.GetComponentsInChildren<Text>(), t => t.text));
-            Assert.That(text, Does.Contain("→ D4 夜"));
+            Assert.That(text, Does.Contain("→ 第 4 天 夜"));
             ButtonNamed(app, "Close future range").onClick.Invoke(); yield return null;
             Assert.IsTrue(System.Array.Exists(root.GetComponentsInChildren<Button>(),
                 b => b.name == "Thirty day view" && !b.interactable));
@@ -673,7 +673,7 @@ namespace Horizon.Tests
             yield return Capture(app, "27-six-axis-result");
             ButtonNamed(app, "Why").onClick.Invoke(); yield return null;
             string explanation = string.Join("\n", Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Select(t => t.text));
-            Assert.That(explanation, Does.Contain("D4").And.Contain("D5"));
+            Assert.That(explanation, Does.Contain("第 4 天").And.Contain("第 5 天"));
             ButtonNamed(app, "Close prediction why").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Continue").onClick.Invoke(); yield return null;
             Assert.IsTrue(s.Predictions[0].reviewed);
@@ -770,7 +770,7 @@ namespace Horizon.Tests
             Assert.AreEqual(30, s.CompletedRun.actions.Count); Assert.AreEqual(1, a.runs.Count); Assert.IsNull(a.active);
             CollectionAssert.AreEqual(new[] { 4, 12, 14, 21, 28 }, s.StationDays);
             Text stateEvidence = Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Where(t => t.name == "Gate evidence").ElementAt(1);
-            Assert.That(stateEvidence.text, Does.Contain("后半程").And.Contain("D13"));
+            Assert.That(stateEvidence.text, Does.Contain("后半程").And.Contain("第 13 天"));
             yield return Capture(app, "30-long-life-deadline");
             Call(app, "ShowMap", false); yield return null;
             Assert.AreEqual(30, Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Count(b => b.name.StartsWith("Inspect day ")));

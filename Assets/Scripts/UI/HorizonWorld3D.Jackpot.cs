@@ -144,6 +144,10 @@ namespace Horizon.UI
         private void SampleJackpotStage(float time,ref Vector3 camera,ref Vector3 look)
         {
             if(spectacle==null) return;
+            // Seeking can jump from an establishing shot with this parent
+            // hidden straight into the resource reveal. Framing needs active
+            // renderer bounds now, not after this frame has been rendered.
+            jackpotStage.gameObject.SetActive(true);
             spectacleFrame=spectacle.Sample(time,preferences.reducedMotion);
             float outcomeSecond=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
             OutcomeFrame outcome=moviePlan.Outcome.Sample(time,spectacle.MultiplierTime,outcomeSecond,spectacle.SettlementTime,preferences.reducedMotion);

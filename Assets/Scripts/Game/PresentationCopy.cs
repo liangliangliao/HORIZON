@@ -37,6 +37,7 @@ namespace Horizon.Game
         };
         private static readonly Regex Dates = new Regex(@"(?<![A-Za-z0-9])(?:DAY|Day|D)\s*(\d+)(?!\d)");
         private static readonly Regex Runs = new Regex(@"\bRUN\s*(\d+)\b");
+        private static readonly Regex Delay = new Regex(@"\+(\d+)D\b");
         public static string Chinese(string value)
         {
             if(string.IsNullOrEmpty(value)) return value ?? "";
@@ -54,6 +55,7 @@ namespace Horizon.Game
             for(int i=0;i<Words.GetLength(0);i++) result=result.Replace(Words[i,0],Words[i,1]);
             result=Dates.Replace(result,m=>"第 "+m.Groups[1].Value.TrimStart('0').PadLeft(1,'0')+" 天");
             result=Runs.Replace(result,m=>"第 "+m.Groups[1].Value.TrimStart('0').PadLeft(1,'0')+" 段人生").Replace(" DAYS"," 天").Replace("ME ·","我 ·");
+            result=Delay.Replace(result,m=>m.Groups[1].Value+" 天后").Replace("NOW","当下");
             result=result.Replace("想象演练 · 想象演练","想象演练").Replace("内在议会 · 内在议会","内在议会")
                 .Replace("知识熔炉 · 知识熔炉","知识熔炉").Replace("未来轨道 · 未来轨道","未来轨道");
             result=result.Replace("远 见  M E","远见 · 我");

@@ -161,7 +161,7 @@ namespace Horizon.UI
             {
                 currentRelaySource=current;
                 RewardEvidence evidence=relayPlan.Nodes[current].Evidence;
-                string label=evidence.label??"";
+                string label=PresentationCopy.Chinese(evidence.label??"");
                 string wrapped="";
                 for(int start=0;start<label.Length;start+=14)
                     wrapped+=(start==0?"":"\n")+label.Substring(start,Mathf.Min(14,label.Length-start));

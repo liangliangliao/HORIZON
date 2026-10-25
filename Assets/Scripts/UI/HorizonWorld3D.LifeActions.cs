@@ -183,7 +183,9 @@ namespace Horizon.UI
             // Both use actual renderer bounds, including the screen corners.
             bool wide=overview || frame.Shot==LifeActionShot.Establish || frame.Shot==LifeActionShot.Arrive || preferences.reducedMotion;
             CurrentCinematicFraming=wide?CinematicFraming.ExtremeWide:CinematicFraming.Close;
-            camera=wide?new Vector3(6,5.4f,-7):actorPosition+new Vector3(2.2f,1.8f,-3.4f);
+            // The home's rear wall is at negative Z. Shoot through the open
+            // front, not through that wall or the walking character's back.
+            camera=wide?new Vector3(6,5.4f,9):actorPosition+new Vector3(2.2f,1.8f,3.4f);
             look=wide?new Vector3(0,1,2):actorPosition+Vector3.up;
             Rect aperture=wide?new Rect(.065f,.245f,.87f,.52f):HorizonCinemaLayout.SubjectAperture;
             FitPortraitSubject(wide?lifeOverviewRenderers:lifeActorRenderers,aperture,CinematicFieldOfView(time),ref camera,ref look,false);

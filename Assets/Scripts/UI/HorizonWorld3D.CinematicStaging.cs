@@ -227,7 +227,7 @@ namespace Horizon.UI
                     if(currentInsightSource!=current)
                     {
                         currentInsightSource=current; RewardEvidence source=receipt.causes[current];
-                        string detail=source.label??"";
+                        string detail=PresentationCopy.Chinese(source.label??"");
                         var lines=new List<string>();
                         for(int start=0;start<detail.Length;start+=14) lines.Add(detail.Substring(start,Mathf.Min(14,detail.Length-start)));
                         EvidenceLabel(2,"Day "+source.day+"\n"+string.Join("\n",lines),new Vector3(0,2.65f,4));
