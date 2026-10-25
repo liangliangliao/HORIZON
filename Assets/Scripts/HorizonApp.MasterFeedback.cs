@@ -31,9 +31,12 @@ namespace Horizon
             // every minor bookkeeping event into another confirmation movie.
             DomainEvent e = state.events.FirstOrDefault(x => !x.acknowledged && x.tier >= RewardTier.Epic);
             if (e == null) return false;
-            PlayMasterSpectacle(e, () => { if (!TryMasterSpectacle(resume)) resume(); }); return true;
+            DomainEvent action=RewardPlayback.Prerequisite(state.events,e);
+            PlayMasterSpectacleCore(action, () => { if (!TryMasterSpectacle(resume)) resume(); },action!=e); return true;
         }
         private void PlayMasterSpectacle(DomainEvent e, Action resume)
+        { PlayMasterSpectacleCore(e,resume,false); }
+        private void PlayMasterSpectacleCore(DomainEvent e,Action resume,bool actionPrelude)
         {
             bool finished = false;
             Action finish = () => { if (finished) return; finished = true; e.acknowledged = true; busy = false;
@@ -73,7 +76,8 @@ namespace Horizon
             framing=View.Button(overlay,"Cinematic framing","查看全景",()=> {
                 world.ToggleCinematicOverview(); framing.GetComponentInChildren<Text>().text=world.CinematicOverview?"自动镜头":"查看全景";
             },.735f,.958f,.935f,.994f,Palette.Deep,Palette.Mint,21);
-            world.PresentMasterEvent(e, () => { if (next == null) return; next.gameObject.SetActive(true); next.interactable=true;
+            world.PresentMasterEvent(e, () => { if (actionPrelude) { finish(); return; }
+                if (next == null) return; next.gameObject.SetActive(true); next.interactable=true;
                 if(skip!=null) skip.gameObject.SetActive(false); if(pause!=null) pause.gameObject.SetActive(false);
                 if(framing!=null) framing.gameObject.SetActive(false);
                 busy=false; e.acknowledged=true; PersistMasterAction(); }, true);

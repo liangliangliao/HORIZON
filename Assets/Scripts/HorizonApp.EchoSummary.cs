@@ -57,7 +57,7 @@ namespace Horizon
         {
             MasterRunState state = CurrentMaster;
             if (state == null) return;
-            var pending = state.events.Where(e => !e.acknowledged && e.tier < RewardTier.Mythic).ToList();
+            var pending = RewardPlayback.Pending(state.events).Where(e=>e.tier<RewardTier.Mythic).ToList();
             BindLocalCinematicCopy();
             foreach (DomainEvent e in pending)
             {

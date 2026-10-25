@@ -7,6 +7,8 @@ namespace Horizon.Game
     public static class PresentationCopy
     {
         private static readonly string[,] Words = {
+            {"KNOW · 我知道","知道这个方法"},{"RECOGNIZE · 识别情境","识别情境"},
+            {"SIMULATE · 游戏中用过","在游戏中演练"},{"EXECUTE · 现实中行动","在现实中行动"},{"EXPERIENCE · 形成经验","形成经验"},
             {"YOU HAVE SEEN\nTHIS BEFORE","这一步，你曾预演过"},{"PATTERN\nBROKEN","模式突破"},
             {"OPPORTUNITY WINDOW","机会窗口"},{"DECISION LOCK","决定已锁定"},{"EXECUTION MODE","执行模式"},{"EXECUTION","执行步骤"},
             {"BUILD THE PATH","准备这条路"},{"CHANGED STRATEGY","调整方法"},{"IMAGINED VICTORY","想象中的抵达"},
@@ -38,6 +40,7 @@ namespace Horizon.Game
         private static readonly Regex Dates = new Regex(@"(?<![A-Za-z0-9])(?:DAY|Day|D)\s*(\d+)(?!\d)");
         private static readonly Regex Runs = new Regex(@"\bRUN\s*(\d+)\b");
         private static readonly Regex Delay = new Regex(@"\+(\d+)D\b");
+        private static readonly Regex Now = new Regex(@"\bNOW\b");
         public static string Chinese(string value)
         {
             if(string.IsNullOrEmpty(value)) return value ?? "";
@@ -55,7 +58,7 @@ namespace Horizon.Game
             for(int i=0;i<Words.GetLength(0);i++) result=result.Replace(Words[i,0],Words[i,1]);
             result=Dates.Replace(result,m=>"第 "+m.Groups[1].Value.TrimStart('0').PadLeft(1,'0')+" 天");
             result=Runs.Replace(result,m=>"第 "+m.Groups[1].Value.TrimStart('0').PadLeft(1,'0')+" 段人生").Replace(" DAYS"," 天").Replace("ME ·","我 ·");
-            result=Delay.Replace(result,m=>m.Groups[1].Value+" 天后").Replace("NOW","当下");
+            result=Now.Replace(Delay.Replace(result,m=>m.Groups[1].Value+" 天后"),"当下");
             result=result.Replace("想象演练 · 想象演练","想象演练").Replace("内在议会 · 内在议会","内在议会")
                 .Replace("知识熔炉 · 知识熔炉","知识熔炉").Replace("未来轨道 · 未来轨道","未来轨道");
             result=result.Replace("远 见  M E","远见 · 我");

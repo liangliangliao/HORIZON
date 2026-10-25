@@ -140,6 +140,22 @@ namespace Horizon.Game
     }
 
     // Presentation only: no wallet, session, RNG, probability or ApplyEffect access.
+    public static class RewardPlayback
+    {
+        // Bookkeeping emit order is not the narrative order. Sort a new view:
+        // never rewrite saved events, causal edges, amounts or rarity.
+        public static IReadOnlyList<DomainEvent> Pending(IEnumerable<DomainEvent> events)
+        { return events.Where(e=>!e.acknowledged).OrderBy(e=>e.day)
+            .ThenBy(e=>e.kind==DomainEventKind.ActionTaken || e.kind==DomainEventKind.TimeEcho?0:1).ToList(); }
+        public static DomainEvent Prerequisite(IEnumerable<DomainEvent> events,DomainEvent reward)
+        {
+            return Pending(events).FirstOrDefault(e=>e.day==reward.day &&
+                (e.kind==DomainEventKind.ActionTaken || e.kind==DomainEventKind.TimeEcho) &&
+                (e.nodeId==reward.nodeId && !string.IsNullOrEmpty(e.nodeId) ||
+                 !string.IsNullOrEmpty(e.receipt?.action) && e.receipt.action==reward.receipt?.action)) ?? reward;
+        }
+    }
+
     public static class RewardDirector
     {
         public const string Version = "1.1";

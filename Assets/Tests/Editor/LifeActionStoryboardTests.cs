@@ -58,9 +58,28 @@ namespace Horizon.Tests
             e.receipt.sourceDay=2; Assert.IsTrue(new LifeActionStoryboard(RewardDirector.Direct(e)).Enabled);
         }
         [TestCase("TIME ECHO · Day 5","时间回声 · 第 5 天")]
+        [TestCase("NOW","当下")]
+        [TestCase("KNOW · 我知道","知道这个方法")]
         [TestCase("CAUSAL SINGULARITY","因果汇聚")]
         [TestCase("D7 · SURPRISE","第 7 天 · 发现预料之外的变化")]
         public void LegacyDisplayCopyIsChineseWithoutRewritingTheSave(string original,string expected)
         { Assert.AreEqual(expected,PresentationCopy.Chinese(original)); Assert.AreEqual(expected,PresentationCopy.Chinese(expected)); }
+        [Test]
+        public void RealActionPlaysBeforeItsOrbitAndEpicWithoutRewritingEmitOrderOrPayout()
+        {
+            var life=GameSession.StartMasterLife(2,0,RunMode.Quick);
+            foreach(var old in life.Master.events) old.acknowledged=true;
+            CardSpec walk=life.Hand.Single(c=>c.Id=="walk"); life.Choose(walk.Id);
+            DomainEvent action=life.Master.events.Last(e=>e.kind==DomainEventKind.ActionTaken);
+            DomainEvent orbit=life.Master.events.Last(e=>e.kind==DomainEventKind.OrbitActivated);
+            Assert.Less(life.Master.events.IndexOf(orbit),life.Master.events.IndexOf(action),"Reproduce the real bookkeeping order.");
+            string before=JsonUtility.ToJson(life.Snapshot());
+            Assert.AreSame(action,RewardPlayback.Pending(life.Master.events).First());
+            Assert.AreSame(action,RewardPlayback.Prerequisite(life.Master.events,orbit));
+            DomainEvent epic=orbit.Copy(); epic.kind=DomainEventKind.Breakthrough; epic.tier=RewardTier.Epic;
+            Assert.AreSame(action,RewardPlayback.Prerequisite(life.Master.events,epic));
+            Assert.AreEqual(before,JsonUtility.ToJson(life.Snapshot()));
+            action.acknowledged=true; Assert.AreSame(orbit,RewardPlayback.Prerequisite(life.Master.events,orbit));
+        }
     }
 }
