@@ -416,6 +416,7 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(0.35f);
             Assert.AreEqual(balance, archive.wallet.stardust);
             Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
+            yield return WaitForInput(app);
             ButtonNamed(app, "Continue result").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.4f);
             session = Get<GameSession>(app, "session");
@@ -435,6 +436,7 @@ namespace Horizon.Tests
             Assert.AreEqual(4, session.Day);
             Assert.AreEqual(FeedbackKind.Echoes, archive.pendingFeedback.kind);
             Assert.That(archive.pendingFeedback.description, Does.Contain("D1"));
+            yield return WaitForInput(app);
             if (archive.pendingFeedback.beats.Count > 1)
             {
                 ButtonNamed(app, "Review echo details").onClick.Invoke();
@@ -446,6 +448,7 @@ namespace Horizon.Tests
             while (archive.pendingFeedback != null)
             {
                 Assert.AreEqual(4,session.Day,"Reading a receipt must not choose or advance a day.");
+                yield return WaitForInput(app);
                 ButtonNamed(app, "Continue result").onClick.Invoke();
                 read++;
                 yield return new WaitForSecondsRealtime(0.4f);
@@ -459,6 +462,7 @@ namespace Horizon.Tests
             FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
             ButtonNamed(app, "Use card").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1);
+            yield return WaitForInput(app);
             ButtonNamed(app, "Continue result").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1.2f);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
@@ -477,6 +481,7 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(5);
             while (archive.pendingFeedback != null)
             {
+                yield return WaitForInput(app);
                 ButtonNamed(app, "Continue result").onClick.Invoke();
                 yield return new WaitForSecondsRealtime(0.4f);
             }

@@ -322,7 +322,15 @@ namespace Horizon.Tests
                     { sawBundle = true; yield return Capture(app, "60-grouped-time-echo"); }
                     var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.interactable &&
                         (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
-                    if (next != null) { next.onClick.Invoke(); receipts++; }
+                    if (next != null)
+                    {
+                        bool confirmation=next.name!="Skip cinematic";
+                        next.onClick.Invoke();
+                        // Skip is an optional playback accelerator used by the
+                        // harness, not a mandatory acknowledgement to advance
+                        // the day. Keep the original cap on real confirmations.
+                        if(confirmation) receipts++;
+                    }
                     yield return new WaitForSecondsRealtime(0.15f);
                 }
                 Assert.Less(Time.realtimeSinceStartup, until, "UI stopped on D" + day);
