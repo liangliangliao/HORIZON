@@ -18,7 +18,7 @@ namespace Horizon.Game
             plan=value ?? throw new ArgumentNullException(nameof(value));
             spectacle=new RewardSpectacle(plan);
             Celebrates=spectacle.Style!=RewardSpectacleStyle.Quiet && spectacle.Style!=RewardSpectacleStyle.Loss;
-            Strength=new[] {.10f,.18f,.32f,.56f,.78f,1f}[Math.Max(0,Math.Min(5,(int)plan.Event.tier-1))];
+            Strength=new[] {.16f,.30f,.48f,.72f,.90f,1f}[Math.Max(0,Math.Min(5,(int)plan.Event.tier-1))];
             accents=plan.Cues.Where(c=>c.NodeHit || c.Phase==CinematicPhase.Impact ||
                 c.Phase==CinematicPhase.SecondReveal || c.Phase==CinematicPhase.Jackpot).ToArray();
         }
@@ -38,16 +38,21 @@ namespace Horizon.Game
                 // A sub-second charge looked like another flash on a phone.
                 // Major releases now grow for long enough to be read, while
                 // individual causal nodes keep their quicker relay rhythm.
-                float window=cue.NodeHit?.18f:Math.Min(2.4f,Math.Max(1.15f,plan.Duration*.22f));
+                float window=cue.NodeHit?.95f:Math.Min(5.2f,Math.Max(2.8f,plan.Duration*.28f));
                 float from=Math.Max(i==0?0:accents[i-1].Time+.06f,cue.Time-window);
                 if(time>=from && time<cue.Time)
                     charge=Math.Max(charge,ImmersiveMotion.Smooth((time-from)/Math.Max(.001f,cue.Time-from))*weight);
                 float age=time-cue.Time;
                 if(age<0) continue;
                 last=cue.Time;
-                burst=Math.Max(burst,weight*(float)Math.Exp(-age/(cue.NodeHit?.16f:.42f)));
+                burst=Math.Max(burst,weight*(float)Math.Exp(-age/(cue.NodeHit?.32f:.62f)));
                 recoil+=ImmersiveMotion.Punch(age,cue.NodeHit?.22f:.46f)*weight;
             }
+            // Keep a visible accumulated charge BETWEEN actual causal hits.
+            // Each hit adds to the same field, then the final release opens it.
+            int nodes=accents.Count(c=>c.NodeHit),lit=accents.Count(c=>c.NodeHit && c.Time<=time);
+            if(nodes>0 && time<spectacle.ImpactTime)
+                charge=Math.Max(charge,.14f+.58f*lit/nodes);
             float afterglow=ImmersiveMotion.Smooth((time-spectacle.ImpactTime)/.4f)*(1-settle);
             float focus=charge*(1-settle);
             if(!Celebrates) return new CinematicEnergyFrame(time,0,0,.14f*afterglow,0,settle,last,0);

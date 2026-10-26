@@ -90,15 +90,21 @@ namespace Horizon.Tests
             Assert.AreEqual(1,plan.Cues.Count(x=>!x.NodeHit && x.Phase==CinematicPhase.Impact));
         }
         [Test]
-        public void CascadeAcceleratesAndHoldsLongEnoughToReadBeforeNetworkImpact()
+        public void CascadeGivesEveryRecordedNodeAReadableIncrementBeforeNetworkImpact()
         {
             var receipt=new RewardReceipt(); for(int i=0;i<16;i++) receipt.causes.Add(new RewardEvidence { id="node:"+i,label="D"+i,day=i });
             RewardPlan plan=RewardDirector.Direct(new DomainEvent { id="chain",kind=DomainEventKind.Cascade,tier=RewardTier.Epic,chainSize=16,receipt=receipt });
             float[] hits=plan.Cues.Where(x=>x.NodeHit).Select(x=>x.Time).ToArray();
-            Assert.AreEqual(.35f,hits[1]-hits[0],.001f); Assert.AreEqual(.28f,hits[2]-hits[1],.001f); Assert.AreEqual(.21f,hits[3]-hits[2],.001f); Assert.AreEqual(.15f,hits[4]-hits[3],.001f);
+            for(int i=0;i<hits.Length-1;i++) Assert.GreaterOrEqual(hits[i+1]-hits[i],2.6f-.001f);
             float freeze=plan.Cues.Single(x=>!x.NodeHit && x.Phase==CinematicPhase.HitStop).Time;
             Assert.AreEqual(.42f,plan.Cues.Single(x=>!x.NodeHit && x.Phase==CinematicPhase.Impact).Time-freeze,.001f);
-            Assert.Greater(freeze,hits.Last());
+            Assert.GreaterOrEqual(freeze-hits.Last(),2.6f-.001f);
+            var text=new CinematicTextChoreography(plan);
+            for(int i=0;i<hits.Length;i++)
+            {
+                Assert.That(text.Sample(hits[i]+.2f).Narration,Does.Contain("第 "+i+" 天"));
+                Assert.AreEqual(text.Sample(hits[i]+.2f).Narration,text.Sample(hits[i]+2.3f).Narration);
+            }
         }
         [Test]
         public void PauseSlowFramesAndSkipNeverRepeatAnImpact()

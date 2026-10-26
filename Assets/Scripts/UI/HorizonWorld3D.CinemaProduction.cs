@@ -113,17 +113,21 @@ namespace Horizon.UI
             for(int i=0;i<cinemaRibbons.Length;i++)
             {
                 LineRenderer line=cinemaRibbons[i]; bool visible=i<ribbonBudget && pulse>.025f;
+                float charge=Mathf.Max(energyFrame.Inward,lifePressure);
+                visible=i<ribbonBudget && (pulse>.025f || charge>.08f);
                 line.gameObject.SetActive(visible); if(!visible) continue;
                 float a=i*2.39996f,timeSince=time-burstTime;
                 for(int segment=0;segment<24;segment++)
                 {
-                    float p=segment/23f; float radius=.12f+p*(1.5f+timeSince*1.6f);
-                    float turn=a+p*1.9f+timeSince*.7f;
+                    float p=segment/23f;
+                    float radius=pulse>.025f?.12f+p*(1.5f+timeSince*1.6f):Mathf.Lerp(2.9f,.48f,p)*(1-charge*.23f);
+                    float turn=a+p*1.9f+(pulse>.025f?timeSince*.7f:-time*.28f);
                     Vector3 center=burstCenter;
                     line.SetPosition(segment,center+new Vector3(Mathf.Cos(turn)*radius,Mathf.Sin(turn)*radius*.78f,Mathf.Sin(a)*.45f+p*.6f));
                 }
-                line.widthMultiplier=Mathf.Max(.006f,.011f+Mathf.Sin(timeSince*Mathf.PI)*.018f)*pulse;
-                SetMovieColor(line.transform,Color.Lerp(tint,golden && i%3==0?Palette.Gold:Color.white,.4f)*pulse);
+                float light=Mathf.Max(pulse,charge*.42f);
+                line.widthMultiplier=Mathf.Max(.006f,.011f+Mathf.Abs(Mathf.Sin(time*.9f+i))*.014f)*light;
+                SetMovieColor(line.transform,Color.Lerp(tint,charge>.2f?Palette.Gold:Color.white,.5f)*light);
             }
             for(int i=0;i<cinemaWaves.Length;i++)
             {

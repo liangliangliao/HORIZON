@@ -35,13 +35,25 @@ Shader "HORIZON/Immersion"
                 float wave=exp(-pow((r-radius)*32,2));
                 float seam=exp(-pow((r-(.60-_Charge*.18))*65,2));
                 float halo=exp(-pow((r-.48)*4.8,2))*(_Charge*.055+_Afterglow*.035);
+                // Broad amber shafts establish volume first; narrow ivory
+                // cores and tiny moving glints arrive as the charge grows.
+                // Keep the aperture hollow so the event is never a white wall.
+                float growth=smoothstep(.04,.92,_Charge);
+                float fan=pow(saturate(.5+.5*sin(a*(19+_Layer*4)+sin(a*3)*.55+_Clock*.19)),12);
+                float reach=smoothstep(.28,.4,r)*(1-smoothstep(.42+growth*.53,.94+growth*.18,r));
+                float filaments=pow(saturate(.5+.5*sin(a*57-r*13+_Clock*.7)),52);
+                float sparkle=pow(saturate(sin(a*39+_Clock*1.7)*sin(r*47-_Clock*2.1)),18);
+                float corona=exp(-pow((r-(.39+sin(_Clock*.8)*.015))*25,2));
                 float light=mask*(spiral*inward*_Charge*.46+beams*_Burst*.58+
-                    wave*_Burst*.50+seam*(_Charge*.22+_Afterglow*.08)+halo);
+                    wave*_Burst*.50+seam*(_Charge*.22+_Afterglow*.08)+halo+
+                    fan*reach*growth*.42+filaments*reach*growth*growth*.22+
+                    sparkle*growth*.32+corona*growth*.16);
                 // Thin high-frequency rays sit over a broad low-energy halo.
                 // This keeps the subject silhouette and text readable instead
                 // of turning every late frame into the same white starburst.
-                float3 tint=lerp(_Color.rgb,float3(1,.86,.48),.12+_Burst*.25);
-                return half4(tint*1.38,saturate(light*.88)*_Color.a);
+                float3 tint=lerp(_Color.rgb,float3(1,.69,.19),growth*.72);
+                tint=lerp(tint,float3(1,.94,.68),saturate(_Burst*.7+sparkle*.25));
+                return half4(tint*1.45,min(.72,saturate(light))*_Color.a);
             }
             ENDCG
         }

@@ -205,12 +205,39 @@ namespace Horizon
                 0.035f, 0.35f, 0.965f, 0.766f, 28);
             var positions = new Dictionary<int, Vector2>();
             for (int day = 1; day <= GameSession.RunLength(run); day++) positions[day] = ConstellationPoint(day, GameSession.RunLength(run));
+            var graph=CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
+            var links=new List<TimeThreadGraphic>(); var pairs=new HashSet<string>();
+            foreach(CausalNode node in graph)
+                foreach(string parentId in CausalGraph.Parents(node))
+                {
+                    CausalNode parent=graph.Find(n=>n.id==parentId);
+                    if(parent==null || parent.day==node.day || !positions.ContainsKey(parent.day) || !positions.ContainsKey(node.day)) continue;
+                    string pair=parent.day+":"+node.day; if(!pairs.Add(pair)) continue;
+                    TimeThreadGraphic line=View.Rect(root,"Recorded day cause "+pair,0,0,1,1).gameObject.AddComponent<TimeThreadGraphic>();
+                    line.From=positions[parent.day]; line.To=positions[node.day];
+                    line.Thickness=2.2f; line.Arrow=true; line.raycastTarget=false;
+                    line.color=new Color(Palette.Mint.r,Palette.Mint.g,Palette.Mint.b,.22f); links.Add(line);
+                }
+            Text connectionGuide=View.Label(root,"Constellation connection guide","箭头连接真实因果 · 点一天，只看它的来去",22,Palette.Muted,
+                TextAnchor.MiddleCenter,.07f,.318f,.93f,.352f);
             foreach (ActionRecord action in run.actions)
             {
                 Vector2 p = positions[action.day]; Color c = action.kind == CardKind.Growth ? Palette.Mint : action.kind == CardKind.Recovery ? Palette.Gold : Palette.Coral;
                 View.Panel(root, "Boss day " + action.day, c, p.x - 0.012f, p.y - 0.007f, p.x + 0.012f, p.y + 0.007f, 14);
                 View.Label(root, "Boss action", "第" + action.day + "天\n" + action.cardName, GameSession.RunLength(run) == 30 ? 15 : 24, Palette.Text,
                     TextAnchor.MiddleCenter, p.x - 0.101f, p.y - 0.084f, p.x + 0.101f, p.y - 0.01f);
+                int selectedDay=action.day;
+                View.Button(root,"Trace day "+selectedDay,"",()=> {
+                    int count=0;
+                    foreach(TimeThreadGraphic link in links)
+                    {
+                        bool connected=link.From==positions[selectedDay] || link.To==positions[selectedDay];
+                        if(connected) count++;
+                        link.color=connected?new Color(1,.76f,.49f,.95f):new Color(.52f,.95f,.8f,.055f);
+                        link.Thickness=connected?4:1.5f; link.SetVerticesDirty();
+                    }
+                    connectionGuide.text="第 "+selectedDay+" 天 · "+action.cardName+" · "+count+" 条已记录连接";
+                },p.x-.105f,p.y-.09f,p.x+.105f,p.y+.02f,Color.clear,Palette.Text);
             }
         }
 

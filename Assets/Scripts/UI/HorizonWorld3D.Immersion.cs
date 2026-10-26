@@ -17,6 +17,9 @@ namespace Horizon.UI
         private Vector3 immersionFocus;
         private Renderer[] cinematicOverviewRenderers;
         private bool cinematicOverviewRequested;
+        private Renderer[] narrativeSubjects,cinematicSolids;
+        private readonly List<Renderer> shotOccluders=new List<Renderer>();
+        private readonly HashSet<Renderer> narrativeSubjectSet=new HashSet<Renderer>();
         public bool CinematicOverview => cinematicOverviewRequested;
         public void ToggleCinematicOverview()
         {
@@ -37,11 +40,59 @@ namespace Horizon.UI
             foreach(Transform item in movieObjects) renderers.AddRange(item.GetComponentsInChildren<Renderer>(true));
             if(relayStage!=null) renderers.AddRange(relayStage.GetComponentsInChildren<Renderer>(true));
             cinematicOverviewRenderers=renderers.ToArray();
+            var subjects=new List<Renderer>();
+            foreach(Transform item in new[] {moviePlayer,movieFuture,movieFriend}) subjects.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            foreach(Transform item in movieObjects) subjects.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            narrativeSubjects=subjects.ToArray(); narrativeSubjectSet.Clear();
+            foreach(Renderer subject in narrativeSubjects) narrativeSubjectSet.Add(subject);
+            cinematicSolids=cinematicStage.GetComponentsInChildren<Renderer>(true);
+        }
+        private void RestoreShotOccluders()
+        {
+            foreach(Renderer renderer in shotOccluders) if(renderer!=null) renderer.enabled=true;
+            shotOccluders.Clear();
+        }
+        private void FrameCinematicSafety(float time,ref Vector3 camera,ref Vector3 look)
+        {
+            bool life=LifeActionPlaying && lifeStage.gameObject.activeSelf;
+            bool wide=cinematicOverviewRequested || CurrentCinematicFraming==CinematicFraming.ExtremeWide;
+            // Fit complete bodies/objects instead of trusting an authored
+            // camera coordinate which can land inside a head or behind a desk.
+            if(!life && (relayPlan==null || relayPlan.Nodes.Count==0) && showcaseCameraWeight<.01f)
+            {
+                // Optical travel is suggested by the lens, not by pushing the
+                // physical camera through the actor's head/torso.
+                if(!wide && (moviePlan.Event.kind==DomainEventKind.HorizonChanged || moviePlan.Event.kind==DomainEventKind.Overdrive))
+                {
+                    camera=new Vector3(4.8f,3.4f,-6.5f); look=new Vector3(0,1.4f,2.5f);
+                    if(moviePlayer.gameObject.activeSelf) moviePlayer.localRotation=Quaternion.identity;
+                }
+                FitPortraitSubject(narrativeSubjects,HorizonCinemaLayout.SubjectAperture,
+                    CinematicFieldOfView(time),ref camera,ref look);
+            }
+            if(wide) return;
+            Vector3 eye=cinematicStage.TransformPoint(camera),target=cinematicStage.TransformPoint(look);
+            if(life) target=moviePlayer.position+Vector3.up;
+            Vector3 delta=target-eye; float distance=delta.magnitude;
+            if(distance<.01f || cinematicSolids==null) return;
+            Ray ray=new Ray(eye,delta/distance);
+            foreach(Renderer renderer in cinematicSolids)
+            {
+                if(renderer==null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
+                    renderer is LineRenderer || renderer is ParticleSystemRenderer || renderer.GetComponent<TextMesh>()!=null ||
+                    narrativeSubjectSet.Contains(renderer) || renderer.transform.IsChildOf(jackpotStage) ||
+                    renderer.transform.IsChildOf(immersionStage) || renderer.transform.IsChildOf(cinemaProduction)) continue;
+                Bounds bounds=renderer.bounds;
+                if(bounds.size.magnitude<.45f || !bounds.IntersectRay(ray,out float hit) || hit>=distance-.5f) continue;
+                shotOccluders.Add(renderer); renderer.enabled=false;
+            }
         }
         private void FrameCinematicOverview(float time,ref Vector3 camera,ref Vector3 look)
         {
             if(moviePlan==null || LifeActionPlaying) return;
-            float start=spectacle.SettlementTime, weight=cinematicOverviewRequested?1:Smooth(start,start+.85f,time);
+            float start=spectacle.SettlementTime;
+            float opening=cinemaTension!=null && cinemaTension.SourceCloseup?0:1-Smooth(1.05f,2.15f,time);
+            float weight=cinematicOverviewRequested?1:Mathf.Max(opening,Smooth(start,start+.85f,time));
             if(weight<=0) return;
             foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
             showcaseOccluders.Clear();
@@ -152,7 +203,9 @@ namespace Horizon.UI
                 if(i>=budget) continue;
                 layer.position=center+WorldCamera.transform.forward*(.7f+i*1.35f);
                 layer.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,0,i*31);
-                layer.localScale=Vector3.one*(4.9f+i*1.9f+energyFrame.Burst*.72f);
+                float layerDepth=Mathf.Max(1,WorldCamera.WorldToViewportPoint(layer.position).z);
+                float fullHeight=2*layerDepth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f);
+                layer.localScale=Vector3.one*Mathf.Max(4.9f+i*1.9f,fullHeight*(1.02f+i*.12f)+energyFrame.Burst*.72f);
                 Material material=immersionMaterials[i];
                 Color charged=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
                     Mathf.Clamp01(Mathf.Max(energyFrame.Inward,lifePressure)*.72f+Mathf.Max(energyFrame.Burst,lifeBurst)*.48f));
@@ -166,6 +219,7 @@ namespace Horizon.UI
 
         private void ResetImmersion()
         {
+            RestoreShotOccluders();
             cinematicEnergy=null; energyFrame=default(CinematicEnergyFrame);
             if(immersionStage!=null) immersionStage.gameObject.SetActive(false);
         }

@@ -952,7 +952,7 @@ namespace Horizon
             world.ShowBoard();
             world.SetTimeline(session.Actions, session.Deadline);
             world.BeginEcho(echo);
-            float total = archive.seenFirstEcho ? 1.4f : 2.9f;
+            float total = 5.8f;
             bool difficult = PlayExperience.IsDifficult(echo.actualDelta ?? echo.delta);
             Color echoColor = difficult ? Palette.Coral : echo.kind == CardKind.Growth ? Palette.Gold : Palette.Mint;
             View.Fill(root, "Echo shade", new Color(0.014f, 0.045f, 0.068f, 0.35f), 0, 0, 1, 1);
@@ -1004,6 +1004,9 @@ namespace Horizon
             yield return new WaitForSeconds(total * 0.34f);
             archive.seenFirstEcho = true;
             Save();
+            int checkpoint=viewGeneration;
+            yield return WaitForStoryCheckpoint("看清这次回声了 · 继续");
+            if(checkpoint!=viewGeneration) yield break;
         }
 
         private IEnumerator CascadeSequence(PendingEcho echo)
@@ -1066,7 +1069,8 @@ namespace Horizon
                     View.Label(root, "Causal event", node.label, 26, Palette.Text,
                         TextAnchor.MiddleCenter, x - 0.11f, 0.42f, x + 0.11f, 0.495f);
                 }
-                yield return new WaitForSeconds(i == 0 ? 0.25f : 0.25f / i);
+                reading.verticalNormalizedPosition=path.Count<=1?1:1-i/(float)(path.Count-1);
+                yield return new WaitForSeconds(RewardDirector.CausalNodeSeconds(node.label));
             }
             View.Fill(root, "Chain flash", new Color(1f, 0.69f, 0.4f, 0.1f), 0, 0, 1, 1).gameObject.AddComponent<ImpactFlash>();
             View.Label(root, "Cascade", "因果连锁 · " + chainSize + " 个真实节点", 32, Palette.Gold,

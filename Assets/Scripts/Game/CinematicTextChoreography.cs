@@ -69,11 +69,17 @@ namespace Horizon.Game
                 Smooth(0,.16f,multiplierAge)*multiplierLinger*ending:0;
             float multiplierPunch=multiplierAge<0?0:(float)Math.Exp(-multiplierAge/Math.Max(.12f,plan.Duration*.025f));
             string narration=!string.IsNullOrEmpty(reading.Copy)?reading.Copy:plan.Event.detail;
+            CinematicCue node=plan.Cues.LastOrDefault(c=>c.NodeHit && c.Time<=time);
+            if(node!=null && time<ImpactTime)
+            {
+                RewardEvidence cause=plan.Event.receipt?.causes.OrderBy(c=>c.day).ElementAtOrDefault(node.NodeIndex);
+                if(cause!=null) narration="第 "+cause.day+" 天 · "+PresentationCopy.Chinese(cause.label);
+            }
             if(action.Enabled && time<MultiplierTime) narration=action.Sample(time,reducedMotion).Copy;
             float receiptStart=Math.Max(0,SettlementTime-.08f);
             float receiptEnd=Math.Min(plan.Duration,SettlementTime+.14f);
             return new CinematicTextFrame(time,chapter?.Phase??CinematicPhase.Anticipation,
-                PhaseCopy(reading.Phase),narration,
+                node!=null && time<ImpactTime?"真实来路 · 第 "+(node.NodeIndex+1)+" 个节点":PhaseCopy(reading.Phase),narration,
                 readableEntrance*ending,Clamp(.12f+e.Inward*.72f+e.Afterglow*.24f+flash*.72f,0,1),
                 tremor,flash,1-Smooth(receiptStart,receiptEnd,time),
                 multiplierAlpha,.78f+.22f*Smooth(0,.24f,multiplierAge)+multiplierPunch*.24f,

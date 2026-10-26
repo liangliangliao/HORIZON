@@ -164,6 +164,7 @@ namespace Horizon.UI
         public System.Action<HorizonCardDrag> Began;
         private bool dragging;
         public bool IsDragging { get { return dragging; } }
+        public bool IsReturning { get { return returning!=null; } }
         private int pointerId;
         private RectTransform rect;
         private Vector3 origin;

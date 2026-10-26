@@ -25,7 +25,7 @@ namespace Horizon.Game
             if (cascade)
             {
                 List<RewardEvidence> evidence = (plan.Event.receipt?.causes ?? new List<RewardEvidence>())
-                    .Take(MaximumNodes).Select(x => x.Copy()).ToList();
+                    .OrderBy(x=>x.day).Take(MaximumNodes).Select(x => x.Copy()).ToList();
                 for (int i = 0; i < evidence.Count; i++)
                 {
                     RewardEvidence source = evidence[i];
@@ -58,7 +58,7 @@ namespace Horizon.Game
             float fade = 1 - Ease(Duration * .94f, Duration, time);
             float age = time - node.ActivationTime;
             bool lit = age >= 0;
-            float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 4);
+            float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 1.7f);
             float final = time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
             if(!reducedMotion && time>=secondRevealTime) final=Math.Max(final,(float)Math.Exp(-(time-secondRevealTime)*3.5f));
             if(!reducedMotion && time>=jackpotTime) final=Math.Max(final,(float)Math.Exp(-(time-jackpotTime)*3.5f));

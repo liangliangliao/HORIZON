@@ -17,7 +17,7 @@ namespace Horizon.UI
         private readonly Color[][] relaySolidColors = new Color[CausalRelayPlan.MaximumNodes][];
         private readonly LineRenderer[] relayEdges = new LineRenderer[CausalRelayPlan.MaximumEdges];
         private MaterialPropertyBlock relayProperties;
-        private int currentRelaySource = -1;
+        private Renderer[] relayOverviewSolids;
 
         private void PrepareCausalRelays()
         {
@@ -72,6 +72,7 @@ namespace Horizon.UI
                 causalRelays[node.Index].localPosition=at; causalRelays[node.Index].gameObject.SetActive(true);
                 causalRelays[node.Index].name="Causal relay · "+node.Evidence.id;
             }
+            relayOverviewSolids=relaySolids.Take(relayPlan.Nodes.Count).SelectMany(r=>r).ToArray();
             for(int i=0;i<relayPlan.Edges.Count;i++)
             {
                 CausalRelayEdge edge=relayPlan.Edges[i]; relayEdges[i].gameObject.SetActive(true);
@@ -85,6 +86,8 @@ namespace Horizon.UI
             if(relayPlan==null || relayStage==null || !relayStage.gameObject.activeSelf) return;
             bool final=time>=relayPlan.ImpactTime;
             camera=new Vector3(2.8f,7.2f,-7.5f); look=new Vector3(0,.15f,2);
+            if(time>=(cinemaTension?.FirstRelease??0)+1.10f)
+                FitPortraitSubject(relayOverviewSolids,new Rect(.07f,.25f,.86f,.52f),CinematicFieldOfView(time),ref camera,ref look);
             if(cinemaTension!=null && cinemaTension.SourceCloseup && time<cinemaTension.FirstRelease+1.10f && !preferences.reducedMotion)
             {
                 CausalRelayNode source=relayPlan.Nodes[0]; Vector3 center=new Vector3(source.X,source.Y,source.Z);
@@ -145,6 +148,10 @@ namespace Horizon.UI
                 CausalRelayEdge edge=relayPlan.Edges[i];
                 CausalRelayFrame from=relayPlan.Sample(edge.From,time,preferences.reducedMotion),to=relayPlan.Sample(edge.To,time,preferences.reducedMotion);
                 bool lit=from.Lit && to.Lit;
+                float travel=preferences.reducedMotion?1:Smooth(relayPlan.Nodes[edge.To].ActivationTime,
+                    relayPlan.Nodes[edge.To].ActivationTime+.65f,time);
+                Vector3 begin=movieNodes[edge.From].localPosition,end=movieNodes[edge.To].localPosition;
+                MovieLine(relayEdges[i],begin,Vector3.Lerp(begin,end,lit?travel:1));
                 relayEdges[i].widthMultiplier=lit?.022f+to.Pulse*.035f:.012f;
                 SetMovieColor(relayEdges[i].transform,(lit?final?Palette.Gold:Palette.Mint:Palette.Muted*.2f)*to.Fade*(1-tensionFrame.Focus*.9f));
             }
@@ -153,28 +160,13 @@ namespace Horizon.UI
                 else ResetMovieColor(tile);
             // One full source at a time keeps the actual action readable on a
             // narrow phone while all physical nodes remain present in the graph.
-            int current=-1;
-            for(int i=0;i<relayPlan.Nodes.Count;i++) if(time>=relayPlan.Nodes[i].ActivationTime) current=i;
-            if((spectacle!=null && time>=spectacle.HeroTime) || tensionFrame.Preview>.08f)
-            { movieLabels[25].gameObject.SetActive(false); return; }
-            if(current>=0 && currentRelaySource!=current)
-            {
-                currentRelaySource=current;
-                RewardEvidence evidence=relayPlan.Nodes[current].Evidence;
-                string label=PresentationCopy.Chinese(evidence.label??"");
-                string wrapped="";
-                for(int start=0;start<label.Length;start+=14)
-                    wrapped+=(start==0?"":"\n")+label.Substring(start,Mathf.Min(14,label.Length-start));
-                EvidenceLabel(25,"Day "+evidence.day+"\n"+wrapped,new Vector3(0,2.8f,2));
-                int lines=1+Mathf.Max(1,Mathf.CeilToInt(label.Length/14f));
-                movieLabels[25].characterSize=.05f*Mathf.Min(1,2.5f/lines);
-                movieLabels[25].color=Palette.Text;
-            }
+            // Source copy belongs to the synchronized caption band. A second
+            // giant world-space label crossed the graph and duplicated it.
+            movieLabels[25].gameObject.SetActive(false);
         }
         private void ResetCausalRelays()
         {
             relayPlan=null;
-            currentRelaySource=-1;
             if(relayStage!=null) relayStage.gameObject.SetActive(false);
         }
     }

@@ -286,6 +286,7 @@ namespace Horizon.UI
         public void SampleCinematic(float time)
         {
             if(moviePlan==null) return;
+            RestoreShotOccluders();
             if (moviePhase == CinematicPhase.HitStop) time = moviePhaseTime;
             SampleCinemaTension(time);
             if(tensionFrame.Silent) time=tensionFrame.PoseTime;
@@ -374,6 +375,7 @@ namespace Horizon.UI
             FrameShowcaseInReadingAperture(time,ref camera,ref look);
             FrameCinematicOverview(time,ref camera,ref look);
             SampleLifeAction(time,ref camera,ref look);
+            FrameCinematicSafety(time,ref camera,ref look);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
             {

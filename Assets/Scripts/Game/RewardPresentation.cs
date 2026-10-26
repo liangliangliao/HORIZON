@@ -178,6 +178,12 @@ namespace Horizon.Game
             if (r.predictionRecorded && (e.kind == DomainEventKind.Synchronized || e.kind == DomainEventKind.Surprise))
                 objects.Add(new MaterialReward(RewardObjectKind.PredictionPanel, RewardObjectClass.System, e.detail));
             float duration = Duration(e.tier);
+            bool causalMovie=e.kind==DomainEventKind.Cascade || e.kind==DomainEventKind.CausalSingularity;
+            // A node is a readable event, not a 150ms decorative flash. Reserve
+            // its full sentence before constructing the common sensory clock.
+            var orderedCauses=r.causes.OrderBy(c=>c.day).Take(CausalRelayPlan.MaximumNodes).ToArray();
+            if(causalMovie && orderedCauses.Length>0)
+                duration=Math.Max(duration,5f+orderedCauses.Sum(c=>CausalNodeSeconds(c.label))+12f);
             int multiplier = PresentationStrength(e);
             var cues = new List<CinematicCue>();
             if (e.tier >= RewardTier.Epic)
@@ -194,16 +200,18 @@ namespace Horizon.Game
                 // One cue fires all senses on the same frame. Hit-stop ends at Impact.
                 if (e.kind == DomainEventKind.Cascade || e.kind == DomainEventKind.CausalSingularity)
                 {
-                    int count = Math.Min(16, r.causes.Count);
-                    float time = duration * .20f;
+                    cues.RemoveAll(c=>c.Phase==CinematicPhase.Charge);
+                    cues.Add(new CinematicCue(1.2f,CinematicPhase.Charge,SafeCopy(copy[1],CinematicPhase.Charge)));
+                    int count = orderedCauses.Length;
+                    float time = 3.2f;
                     for (int i = 0; i < count; i++)
-                    { cues.Add(new CinematicCue(time, CinematicPhase.Escalation, r.causes[i].label, i)); time += i == 0 ? .35f : i == 1 ? .28f : i == 2 ? .21f : .15f; }
+                    { cues.Add(new CinematicCue(time, CinematicPhase.Escalation, orderedCauses[i].label, i)); time += CausalNodeSeconds(orderedCauses[i].label); }
                     // Final network impact follows the final node and a visible
                     // breath-hold. This used to be 150ms and read as a dropped
                     // frame on a phone rather than intentional suspense.
                     cues.RemoveAll(c => !c.NodeHit && c.Phase >= CinematicPhase.Escalation);
-                    float hit = count == 0 ? duration * .45f : cues.Where(c => c.NodeHit).Max(c => c.Time) + .001f;
-                    cues.Add(new CinematicCue(Math.Max(0,Math.Min(hit-.001f,duration*.19f)),CinematicPhase.Escalation,
+                    float hit = count == 0 ? duration * .45f : time;
+                    cues.Add(new CinematicCue(Math.Max(0,Math.Min(hit-.001f,3.1f)),CinematicPhase.Escalation,
                         SafeCopy(copy[2],CinematicPhase.Escalation)));
                     cues.Add(new CinematicCue(Math.Max(0, hit - .0005f), CinematicPhase.HeroMoment,SafeCopy(e.title,CinematicPhase.HeroMoment)));
                     cues.Add(new CinematicCue(hit, CinematicPhase.HitStop, "每一条光，都有真实的来路。"));
@@ -242,6 +250,8 @@ namespace Horizon.Game
             else { beats.Add(new PresentationBeat(0, 1)); beats.Add(new PresentationBeat(cues.First(c => c.Phase == CinematicPhase.Impact).Time, multiplier)); }
             return new RewardPlan(e, objects, cues, duration, multiplier, beats);
         }
+        public static float CausalNodeSeconds(string copy)
+        { return Math.Max(2.6f,CinematicReading.ReadSeconds(copy)+.5f); }
         // These values control sensory intensity only. Never reuse them as causal
         // depth, resilience, resource amounts, or an input to the rule engine.
         public static int PresentationStrength(DomainEvent e)

@@ -8,6 +8,7 @@ namespace Horizon.UI
         public Vector2 From, To;
         public float Thickness = 3;
         public bool RightLane;
+        public bool Arrow;
         protected override void OnPopulateMesh(VertexHelper helper)
         {
             helper.Clear();
@@ -32,6 +33,15 @@ namespace Horizon.UI
                 vertex.position = next - normal; helper.AddVert(vertex);
                 helper.AddTriangle(first, first + 1, first + 2); helper.AddTriangle(first, first + 2, first + 3);
                 previous = next;
+            }
+            if(Arrow)
+            {
+                Vector2 direction=(to-endControl).normalized,side=new Vector2(-direction.y,direction.x);
+                int first=helper.currentVertCount; float size=Mathf.Max(9,Thickness*3);
+                helper.AddVert(to,color,Vector2.zero);
+                helper.AddVert(to-direction*size+side*size*.46f,color,Vector2.zero);
+                helper.AddVert(to-direction*size-side*size*.46f,color,Vector2.zero);
+                helper.AddTriangle(first,first+1,first+2);
             }
         }
     }

@@ -50,6 +50,19 @@ namespace Horizon.Tests
             }
         }
         [Test]
+        public void CausalChargeAccumulatesBetweenHitsRatherThanReturningToDarkness()
+        {
+            RewardPlan plan=RewardDirector.Direct(CausalRelayTests.ActualCascade(DomainEventKind.Cascade));
+            var energy=new CinematicEnergy(plan); float[] hits=plan.Cues.Where(c=>c.NodeHit).Select(c=>c.Time).ToArray();
+            float previous=0;
+            for(int i=0;i<hits.Length-1;i++)
+            {
+                float value=energy.Sample(hits[i+1]-.98f).Inward;
+                Assert.Greater(value,previous); previous=value;
+            }
+            Assert.AreEqual(0,energy.Sample(hits[0],true).Inward);
+        }
+        [Test]
         public void SecondaryRevealsHaveFreshImpulsesAndSettleBackToQuiet()
         {
             var plan=Plan(DomainEventKind.Breakthrough,RewardTier.Mythic); var energy=new CinematicEnergy(plan);

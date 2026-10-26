@@ -127,6 +127,22 @@ namespace Horizon.Tests
                 "An individual recorded cause still receives its full close-up pulse.");
         }
         [Test]
+        public void UnsortedReceiptsRevealChronologicallyWithoutRewritingSavedEvidence()
+        {
+            RewardPlan initial=Merge(); DomainEvent source=initial.Event.Copy();
+            source.receipt.causes.Reverse(); string saved=JsonUtility.ToJson(source);
+            RewardPlan plan=RewardDirector.Direct(source); var relay=new CausalRelayPlan(plan);
+            CollectionAssert.IsOrdered(relay.Nodes.Select(n=>n.Evidence.day));
+            for(int i=0;i<relay.Nodes.Count;i++)
+            {
+                float end=i+1<relay.Nodes.Count?relay.Nodes[i+1].ActivationTime:
+                    plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+                Assert.GreaterOrEqual(end-relay.Nodes[i].ActivationTime,
+                    RewardDirector.CausalNodeSeconds(relay.Nodes[i].Evidence.label)-.001f);
+            }
+            Assert.AreEqual(saved,JsonUtility.ToJson(source));
+        }
+        [Test]
         public void DenseReceiptHasBoundedVisualObjectsAndOnlyRecordedEdges()
         {
             RewardPlan plan=Merge();

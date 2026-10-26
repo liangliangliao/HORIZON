@@ -192,22 +192,8 @@ namespace Horizon.Tests
         }
         private static void AssertSourceInsideCamera(HorizonWorld3D world)
         {
-            Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
-            var target=RenderTexture.GetTemporary(540,614,24);
-            try
-            {
-                camera.rect=new Rect(0,0,1,1); camera.targetTexture=target; world.FrameCinematicLabels();
-                TextMesh source=world.GetComponentsInChildren<TextMesh>().Single(t=>t.name=="Cinematic evidence label 25");
-                Bounds bounds=source.GetComponent<Renderer>().localBounds;
-                for(int i=0;i<8;i++)
-                {
-                    Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
-                    Vector3 projected=camera.WorldToViewportPoint(source.transform.TransformPoint(corner));
-                    Assert.That(projected.y,Is.InRange(.02f,.98f),"The full day and source must remain inside the rendered scene.");
-                    Assert.Less(projected.y,.795f,"Source labels must not overlap the event title or narration.");
-                }
-            }
-            finally { camera.rect=viewport; camera.targetTexture=prior; world.FrameCinematicLabels(); RenderTexture.ReleaseTemporary(target); }
+            Assert.IsFalse(world.GetComponentsInChildren<TextMesh>(true).Single(t=>t.name=="Cinematic evidence label 25").gameObject.activeSelf,
+                "One synchronized caption must replace the giant world-space duplicate.");
         }
     }
 }
