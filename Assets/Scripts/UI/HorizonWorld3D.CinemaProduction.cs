@@ -13,6 +13,7 @@ namespace Horizon.UI
         private readonly Transform[] cinemaGlints=new Transform[24];
         private Material cinemaBackdropMaterial;
         private Renderer[] cinemaArchitecture;
+        private Renderer[] cinemaHaloRenderers;
         private Color[] cinemaArchitectureColors;
         private float architectureFocus=-1;
         private CameraClearFlags priorCinemaClear;
@@ -45,6 +46,7 @@ namespace Horizon.UI
                     float a=i*Mathf.PI/12;
                     Soft(cinemaRotor,"Aperture coordinate "+i,new Vector3(Mathf.Cos(a)*3.15f,Mathf.Sin(a)*3.15f,-.03f),new Vector3(.045f,i%3==0?.22f:.12f,.035f),i%3==0?gold:ivory).localRotation=Quaternion.Euler(0,0,a*Mathf.Rad2Deg-90);
                 }
+                cinemaHaloRenderers=cinemaHalo.GetComponentsInChildren<Renderer>();
                 cinemaArchitecture=deck.GetComponentsInChildren<Renderer>().Concat(cinemaHalo.GetComponentsInChildren<Renderer>()).ToArray();
                 cinemaArchitectureColors=cinemaArchitecture.Select(r=>r.sharedMaterial.GetColor(r.sharedMaterial.HasProperty("_BaseColor")?"_BaseColor":"_Color")).ToArray();
                 for(int i=0;i<cinemaWaves.Length;i++)
@@ -80,6 +82,13 @@ namespace Horizon.UI
             bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
             float pose=cinemaTension!=null && cinemaTension.Enabled?tensionFrame.PoseTime:time;
             float attention=Mathf.Max(tensionFrame.Focus,energyFrame.Focus*.8f);
+            // The aperture is a stage frame, never the subject. On the action
+            // close-up it used to pass in front of the actor (especially at a
+            // desk), so remove only that foreground layer. It returns for the
+            // arrival wide shot, suspense, reveal, and final overview.
+            bool actionClose=LifeActionPlaying && lifeAction.Sample(time,preferences.reducedMotion).Shot==LifeActionShot.Action;
+            if(cinemaHaloRenderers!=null)
+                foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!actionClose;
             cinemaBackdropMaterial.SetColor("_Color",tint*(1-attention*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
             cinemaRotor.localRotation=Quaternion.Euler(0,0,preferences.reducedMotion?0:pose*7);
             if(!Mathf.Approximately(architectureFocus,attention))

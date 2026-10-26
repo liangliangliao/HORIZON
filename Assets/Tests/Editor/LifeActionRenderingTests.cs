@@ -32,10 +32,14 @@ namespace Horizon.Tests
                 var story=new LifeActionStoryboard(world.Cinematics.Current);
                 Transform set=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Everyday action scene");
                 Transform actor=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player");
+                Transform aperture=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Architectural horizon aperture");
                 Vector3 start=actor.localPosition;
                 foreach(float time in new[] {0,story.ActionEnd*.45f,story.ActionEnd*.85f,story.Impact-.1f,story.Settlement+1})
                 {
                     world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
+                    bool actionClose=world.CurrentLifeActionShot==LifeActionShot.Action;
+                    Assert.IsTrue(aperture.GetComponentsInChildren<Renderer>(true).All(r=>r.enabled!=actionClose),
+                        "The architectural aperture must clear the actor close-up and return for every wide/reveal shot.");
                     if(world.CurrentLifeActionShot==LifeActionShot.Arrive)
                     {
                         Assert.Less(Vector3.Distance(actor.localPosition,new Vector3(.65f,0,4.35f)),.001f,
