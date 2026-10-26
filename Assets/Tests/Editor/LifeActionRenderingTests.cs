@@ -111,14 +111,9 @@ namespace Horizon.Tests
             Invoke(app,"Clear",false);
             Invoke(app,"DrawDeadlineConstellation",run);
             yield return null;
-            var actualGraph=CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
             RectTransform readingRoot=Field<RectTransform>(app,"root"); Assert.IsNotNull(readingRoot,"The map reading root must survive Clear.");
             TimeThreadGraphic[] dayLinks=readingRoot.GetComponentsInChildren<TimeThreadGraphic>();
-            var expectedPairs=actualGraph.SelectMany(node=>CausalGraph.Parents(node).Select(parentId=>
-                new {Parent=actualGraph.Find(n=>n.id==parentId),Child=node})).Where(pair=>pair.Parent!=null && pair.Parent.day!=pair.Child.day &&
-                    pair.Parent.day>=1 && pair.Parent.day<=GameSession.RunLength(run) && pair.Child.day>=1 && pair.Child.day<=GameSession.RunLength(run))
-                .Select(pair=>"Recorded day cause "+pair.Parent.day+":"+pair.Child.day).Distinct().ToArray();
-            CollectionAssert.AreEquivalent(expectedPairs,dayLinks.Select(l=>l.name));
+            CollectionAssert.AreEquivalent(ExpectedDayPairs(run),dayLinks.Select(l=>l.name));
             Assert.IsTrue(dayLinks.All(l=>l.Arrow && !l.raycastTarget));
             // The button closure uses only persisted ids/day values, not a
             // transient graph or coroutine-local session.
@@ -229,6 +224,19 @@ namespace Horizon.Tests
                 life.Choose(life.Hand[2].Id); if(life.NeedsStation) life.VisitStation(); if(life.CompletedRun==null) life.Advance();
             }
             return life.CompletedRun;
+        }
+        private static string[] ExpectedDayPairs(RunRecord run)
+        {
+            // Captures inside a UnityTest iterator are allocated BEFORE its
+            // first EnterPlayMode yield, then lost during the domain reload.
+            // Build this query in an ordinary call after entering PlayMode.
+            var graph=CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
+            int length=GameSession.RunLength(run);
+            return graph.SelectMany(node=>CausalGraph.Parents(node).Select(parentId=>
+                new {Parent=graph.Find(n=>n.id==parentId),Child=node}))
+                .Where(pair=>pair.Parent!=null && pair.Parent.day!=pair.Child.day && pair.Parent.day>=1 &&
+                    pair.Parent.day<=length && pair.Child.day>=1 && pair.Child.day<=length)
+                .Select(pair=>"Recorded day cause "+pair.Parent.day+":"+pair.Child.day).Distinct().ToArray();
         }
         private static void Invoke(HorizonApp app,string method,params object[] arguments)
         {
