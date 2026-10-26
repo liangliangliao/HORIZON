@@ -224,6 +224,9 @@ namespace Horizon
             {
                 Vector2 p = positions[action.day]; Color c = action.kind == CardKind.Growth ? Palette.Mint : action.kind == CardKind.Recovery ? Palette.Gold : Palette.Coral;
                 View.Panel(root, "Boss day " + action.day, c, p.x - 0.012f, p.y - 0.007f, p.x + 0.012f, p.y + 0.007f, 14);
+                // Routes stay behind the day text, never cross through glyphs.
+                View.Panel(root,"Day caption backing "+action.day,new Color(.012f,.035f,.055f,.98f),
+                    p.x-.105f,p.y-.084f,p.x+.105f,p.y-.01f,12);
                 View.Label(root, "Boss action", "第" + action.day + "天\n" + action.cardName, GameSession.RunLength(run) == 30 ? 15 : 24, Palette.Text,
                     TextAnchor.MiddleCenter, p.x - 0.101f, p.y - 0.084f, p.x + 0.101f, p.y - 0.01f);
                 int selectedDay=action.day;

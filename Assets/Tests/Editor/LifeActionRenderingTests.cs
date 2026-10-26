@@ -187,21 +187,23 @@ namespace Horizon.Tests
         public IEnumerator CardHasADeepMetalEdgeAndIdleMotionRespectsPauseAndReduction()
         {
             yield return new EnterPlayMode();
+            var canvas=new GameObject("Card acceptance canvas",typeof(Canvas)); canvas.GetComponent<Canvas>().renderMode=RenderMode.ScreenSpaceOverlay;
             var go=new GameObject("Sculpted card acceptance",typeof(RectTransform),typeof(CanvasRenderer),typeof(HorizonCardSurface));
+            go.transform.SetParent(canvas.transform,false);
             var rect=go.GetComponent<RectTransform>(); rect.sizeDelta=new Vector2(290,500);
             HorizonCardSurface surface=go.GetComponent<HorizonCardSurface>();
             VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=false;
             yield return null;
             Quaternion before=rect.localRotation; yield return new WaitForSecondsRealtime(.6f);
             Assert.Greater(Quaternion.Angle(before,rect.localRotation),.05f);
-            surface.Rebuild(CanvasUpdate.PreRender); var mesh=new Mesh(); surface.canvasRenderer.GetMesh(mesh);
+            surface.Rebuild(CanvasUpdate.PreRender); Mesh mesh=surface.canvasRenderer.GetMesh(); Assert.IsNotNull(mesh);
             Assert.GreaterOrEqual(mesh.bounds.size.z,24,"A real extruded edge must remain in card geometry.");
             VisualPreferences.Paused=true; Quaternion held=rect.localRotation;
             yield return new WaitForSecondsRealtime(.3f); Assert.AreEqual(held,rect.localRotation);
             VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=true;
             yield return null; held=rect.localRotation; yield return new WaitForSecondsRealtime(.3f);
             Assert.AreEqual(held,rect.localRotation);
-            VisualPreferences.ReducedMotion=false; Object.Destroy(mesh); Object.Destroy(go);
+            VisualPreferences.ReducedMotion=false; Object.Destroy(canvas);
             yield return new ExitPlayMode();
         }
         private sealed class Completion { public bool Done; }
