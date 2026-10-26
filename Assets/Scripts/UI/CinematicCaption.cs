@@ -172,11 +172,14 @@ namespace Horizon.UI
             if(plan==null) return;
             float second=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
             OutcomeFrame outcome=plan.Outcome.Sample(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion);
+            LifeActionFrame lifeAction=default(LifeActionFrame);
+            bool actionBeforeReveal=actionStory!=null && actionStory.Enabled && frame.Time<actionStory.Reveal;
+            if(actionBeforeReveal) lifeAction=actionStory.Sample(frame.Time,VisualPreferences.ReducedMotion);
             if(Phase!=null) Phase.text=outcome.Visible?(outcome.Future?
                 plan.Event.receipt?.destinationDay>plan.Event.day?"接下来，回声会抵达":"变化留下的含义":"把这次变化，看清楚"):frame.PhaseCopy;
-            if(Phase!=null && actionStory!=null && actionStory.Enabled && frame.Time<actionStory.Reveal)
+            if(Phase!=null && actionBeforeReveal)
             {
-                LifeActionShot shot=actionStory.Sample(frame.Time,VisualPreferences.ReducedMotion).Shot;
+                LifeActionShot shot=lifeAction.Shot;
                 Phase.text=shot==LifeActionShot.Suspense?"等一等 · 变化即将显现":shot==LifeActionShot.Establish?"看见这次行动":
                     shot==LifeActionShot.Arrive?"这一步，已经发生":"正在行动";
             }
@@ -199,7 +202,11 @@ namespace Horizon.UI
             // leaves isolated glyphs in screenshots and reads like corruption.
             bool wholeSentence=outcome.Visible || VisualPreferences.ReducedMotion ||
                 frame.Phase==CinematicPhase.Impact || frame.Phase==CinematicPhase.SecondReveal ||
-                frame.Phase==CinematicPhase.Jackpot;
+                frame.Phase==CinematicPhase.Jackpot || actionBeforeReveal && lifeAction.Shot==LifeActionShot.Suspense;
+            // The event heading is the viewer's fixed orientation landmark.
+            // It must never inherit a partial TMP reveal from a prior frame,
+            // especially while a slow device crosses the hit-stop boundary.
+            CinematicTypography.Reveal(Title,int.MaxValue);
             CinematicTypography.Reveal(Story,wholeSentence?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
             CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;

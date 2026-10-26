@@ -73,6 +73,22 @@ namespace Horizon.Tests
             world.Cinematics.enabled=false;
             RewardPlan plan=world.Cinematics.Current;
             Assert.IsNotNull(plan,"The actual action must be scheduled, not replaced by a startup page.");
+            var actionStory=new LifeActionStoryboard(plan);
+            Assert.IsTrue(actionStory.Enabled,"The recorded action needs its authored action scene before the result.");
+            world.Cinematics.Advance(actionStory.Impact-.25f); yield return null; yield return null;
+            Assert.AreEqual(LifeActionShot.Suspense,actionStory.Sample(world.Cinematics.Elapsed).Shot);
+            foreach(string labelName in new[] {"Reward event title","Reward story"})
+            {
+                Text label=root.GetComponentsInChildren<Text>(true).Single(t=>t.name==labelName);
+                Assert.IsNotEmpty(label.text,labelName);
+                var face=label.GetComponentsInChildren<TextMeshProUGUI>(true).Single(t=>t.name=="Cinematic TMP text");
+                Assert.AreEqual(label.text,face.text,labelName);
+                Assert.GreaterOrEqual(face.maxVisibleCharacters,label.text.Length,
+                    labelName+" must remain completely readable throughout the breath-hold before reveal.");
+                var depth=label.transform.Find("Embossed text depth")?.GetComponent<TextMeshProUGUI>();
+                if(depth!=null) Assert.GreaterOrEqual(depth.maxVisibleCharacters,label.text.Length,
+                    labelName+" embossed depth must follow the complete face, not a stale partial reveal.");
+            }
             float reveal=plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Multiplication).Time;
             float future=plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
             var target=new RenderTexture(540,960,24); target.Create(); var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
