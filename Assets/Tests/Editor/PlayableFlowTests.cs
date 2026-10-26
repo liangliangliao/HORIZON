@@ -628,7 +628,9 @@ namespace Horizon.Tests
             third = Get<GameSession>(app, "session");
             Assert.IsNotNull(combined);
             app.StartCoroutine((IEnumerator)typeof(HorizonApp).GetMethod("CascadeSequence", Private).Invoke(app, new object[] { combined }));
-            yield return new WaitForSecondsRealtime(1.1f);
+            float chainReading=CausalGraph.Ancestors(CausalGraph.ObservedGraph(third.CausalNodes),combined.nodeId)
+                .Sum(n=>RewardDirector.CausalNodeSeconds(n.label));
+            yield return new WaitForSecondsRealtime(chainReading+.5f);
             yield return Capture(app, "13-cascade-merge");
             int renderedConnections = 0;
             foreach (TimeThreadGraphic line in Get<RectTransform>(app, "root").GetComponentsInChildren<TimeThreadGraphic>())

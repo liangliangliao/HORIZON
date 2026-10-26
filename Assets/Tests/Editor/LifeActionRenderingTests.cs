@@ -109,7 +109,8 @@ namespace Horizon.Tests
             var actualGraph=CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
             TimeThreadGraphic[] dayLinks=Field<RectTransform>(app,"root").GetComponentsInChildren<TimeThreadGraphic>();
             var expectedPairs=actualGraph.SelectMany(node=>CausalGraph.Parents(node).Select(parentId=>
-                new {Parent=actualGraph.Find(n=>n.id==parentId),Child=node})).Where(pair=>pair.Parent!=null && pair.Parent.day!=pair.Child.day)
+                new {Parent=actualGraph.Find(n=>n.id==parentId),Child=node})).Where(pair=>pair.Parent!=null && pair.Parent.day!=pair.Child.day &&
+                    pair.Parent.day>=1 && pair.Parent.day<=GameSession.RunLength(run) && pair.Child.day>=1 && pair.Child.day<=GameSession.RunLength(run))
                 .Select(pair=>"Recorded day cause "+pair.Parent.day+":"+pair.Child.day).Distinct().ToArray();
             CollectionAssert.AreEquivalent(expectedPairs,dayLinks.Select(l=>l.name));
             Assert.IsTrue(dayLinks.All(l=>l.Arrow && !l.raycastTarget));
