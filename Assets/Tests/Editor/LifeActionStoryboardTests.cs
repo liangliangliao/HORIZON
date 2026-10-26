@@ -65,6 +65,10 @@ namespace Horizon.Tests
         [TestCase("v0.4.2 · SEE FARTHER. IMAGINE DEEPER.","v0.4.2 · 看得更远，想得更深。")]
         [TestCase("HORIZON VIII · Day +3","远见 · 第 8 层 · 3 天后")]
         [TestCase("IF · 先停一下\nTHEN · 再决定","如果 · 先停一下\n那么 · 再决定")]
+        [TestCase("ALL LINKED\nFuture Memory","未来方向已连接\n未来记忆")]
+        [TestCase("IMAGINATION → SIMULATION → REALITY","想象 → 游戏预演 → 现实")]
+        [TestCase("RUN 003 / D7","第 3 段人生 / 第 7 天")]
+        [TestCase("Future Message · 留一段经验","未来来信 · 留一段经验")]
         public void LegacyDisplayCopyIsChineseWithoutRewritingTheSave(string original,string expected)
         { Assert.AreEqual(expected,PresentationCopy.Chinese(original)); Assert.AreEqual(expected,PresentationCopy.Chinese(expected)); }
         [Test]

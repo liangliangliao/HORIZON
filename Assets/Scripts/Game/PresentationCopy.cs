@@ -32,7 +32,7 @@ namespace Horizon.Game
             {"REALITY NODE","现实节点"},{"REALITY","现实"},{"CASCADE","因果连锁"},
             {"COMEBACK","再次行动"},{"OVERDRIVE","视野展开"},{"EXECUTE","执行"},
             {"VICTORY ANCHOR","目标画面"},{"Victory Anchor","目标画面"},
-            {"Reality Node","现实节点"},{"Future Memory","未来记忆"},
+            {"Reality Node","现实节点"},{"Future Memory","未来记忆"},{"Future Message","未来来信"},
             {"COUNCIL","内在议会"},{"IMAGINE","想象演练"},{"FORGE","知识熔炉"},
             {"ORBIT","未来轨道"},{"Tal Ben-Shahar","塔尔·本-沙哈尔"},
             {"KNOW","知道"},{"RECOGNIZE","识别"},{"SIMULATE","游戏预演"},{"EXPERIENCE","形成经验"},
