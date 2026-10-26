@@ -96,27 +96,35 @@ namespace Horizon.Tests
                 "The waiting hint belongs below the continue button, not on the third gate result.");
             Assert.IsTrue(next.interactable); next.onClick.Invoke(); yield return null; yield return null;
             Assert.IsTrue(completion.Done);
-            var life=new GameSession(1,15);
-            while(life.CompletedRun==null)
-            {
-                while(life.HasPredictionReview) life.MarkPredictionReviewed(); if(life.CanPredict) life.SkipPrediction();
-                life.Choose(life.Hand[2].Id); if(life.NeedsStation) life.VisitStation(); if(life.CompletedRun==null) life.Advance();
-            }
-            RunRecord run=life.CompletedRun; string evidence=JsonUtility.ToJson(run);
-            typeof(HorizonApp).GetMethod("Clear",Private).Invoke(app,new object[] {false});
-            typeof(HorizonApp).GetMethod("DrawDeadlineConstellation",Private).Invoke(app,new object[] {run});
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator DeadlineMapProjectsOnlyRecordedDayEdgesAndLeavesEvidenceUnchanged()
+        {
+            yield return new EnterPlayMode();
+            HorizonApp app=Object.FindObjectOfType<HorizonApp>(); if(app==null) app=new GameObject("Map projection acceptance").AddComponent<HorizonApp>();
+            yield return null;
+            RunRecord run=CompleteReadingLife();
+            Assert.IsNotNull(run,"The map fixture must have a completed run before entering UI code.");
+            string evidence=JsonUtility.ToJson(run);
+            Invoke(app,"Clear",false);
+            Invoke(app,"DrawDeadlineConstellation",run);
             yield return null;
             var actualGraph=CausalGraph.ObservedGraph(GameSession.GraphForRun(run));
-            TimeThreadGraphic[] dayLinks=Field<RectTransform>(app,"root").GetComponentsInChildren<TimeThreadGraphic>();
+            RectTransform readingRoot=Field<RectTransform>(app,"root"); Assert.IsNotNull(readingRoot,"The map reading root must survive Clear.");
+            TimeThreadGraphic[] dayLinks=readingRoot.GetComponentsInChildren<TimeThreadGraphic>();
             var expectedPairs=actualGraph.SelectMany(node=>CausalGraph.Parents(node).Select(parentId=>
                 new {Parent=actualGraph.Find(n=>n.id==parentId),Child=node})).Where(pair=>pair.Parent!=null && pair.Parent.day!=pair.Child.day &&
                     pair.Parent.day>=1 && pair.Parent.day<=GameSession.RunLength(run) && pair.Child.day>=1 && pair.Child.day<=GameSession.RunLength(run))
                 .Select(pair=>"Recorded day cause "+pair.Parent.day+":"+pair.Child.day).Distinct().ToArray();
             CollectionAssert.AreEquivalent(expectedPairs,dayLinks.Select(l=>l.name));
             Assert.IsTrue(dayLinks.All(l=>l.Arrow && !l.raycastTarget));
-            Field<RectTransform>(app,"root").GetComponentsInChildren<Button>().Single(b=>b.name=="Trace day 1").onClick.Invoke();
+            // The button closure uses only persisted ids/day values, not a
+            // transient graph or coroutine-local session.
+            readingRoot.GetComponentsInChildren<Button>().Single(b=>b.name=="Trace day 1").onClick.Invoke();
             Assert.IsTrue(Field<RectTransform>(app,"root").GetComponentsInChildren<Text>().Single(t=>t.name=="Constellation connection guide").text.Contains("第 1 天"));
-            typeof(HorizonApp).GetMethod("ShowCausalNetworkOverview",Private).Invoke(app,new object[] {run,false});
+            Invoke(app,"ShowCausalNetworkOverview",run,false);
             yield return null;
             RectTransform page=Field<RectTransform>(app,"overlay");
             Assert.AreEqual(0,page.GetComponentsInChildren<TimeThreadGraphic>().Length);
@@ -192,19 +200,42 @@ namespace Horizon.Tests
             go.transform.SetParent(canvas.transform,false);
             var rect=go.GetComponent<RectTransform>(); rect.sizeDelta=new Vector2(290,500);
             HorizonCardSurface surface=go.GetComponent<HorizonCardSurface>();
-            VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=false;
-            yield return null;
-            Quaternion before=rect.localRotation; yield return new WaitForSecondsRealtime(.6f);
-            Assert.Greater(Quaternion.Angle(before,rect.localRotation),.05f);
-            surface.Rebuild(CanvasUpdate.PreRender); Mesh mesh=surface.canvasRenderer.GetMesh(); Assert.IsNotNull(mesh);
-            Assert.GreaterOrEqual(mesh.bounds.size.z,24,"A real extruded edge must remain in card geometry.");
-            VisualPreferences.Paused=true; Quaternion held=rect.localRotation;
-            yield return new WaitForSecondsRealtime(.3f); Assert.AreEqual(held,rect.localRotation);
-            VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=true;
-            yield return null; held=rect.localRotation; yield return new WaitForSecondsRealtime(.3f);
-            Assert.AreEqual(held,rect.localRotation);
-            VisualPreferences.ReducedMotion=false; Object.Destroy(canvas);
+            try
+            {
+                VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=false;
+                yield return null;
+                Quaternion before=rect.localRotation; yield return new WaitForSecondsRealtime(.6f);
+                Assert.Greater(Quaternion.Angle(before,rect.localRotation),.05f);
+                surface.Rebuild(CanvasUpdate.PreRender); Mesh mesh=surface.canvasRenderer.GetMesh(); Assert.IsNotNull(mesh);
+                Assert.GreaterOrEqual(mesh.bounds.size.z,24,"A real extruded edge must remain in card geometry.");
+                VisualPreferences.Paused=true; Quaternion held=rect.localRotation;
+                yield return new WaitForSecondsRealtime(.3f); Assert.AreEqual(held,rect.localRotation);
+                VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=true;
+                // UnityTest resumes before Update on a null yield. Wait for
+                // the preference transition to actually reach the component.
+                yield return new WaitForSecondsRealtime(.06f); held=rect.localRotation;
+                Assert.That(Quaternion.Angle(Quaternion.identity,held),Is.LessThan(.001f));
+                yield return new WaitForSecondsRealtime(.3f); Assert.AreEqual(held,rect.localRotation);
+            }
+            finally { VisualPreferences.Paused=false; VisualPreferences.ReducedMotion=false; Object.Destroy(canvas); }
             yield return new ExitPlayMode();
+        }
+        private static RunRecord CompleteReadingLife()
+        {
+            var life=new GameSession(1,15);
+            while(life.CompletedRun==null)
+            {
+                while(life.HasPredictionReview) life.MarkPredictionReviewed(); if(life.CanPredict) life.SkipPrediction();
+                life.Choose(life.Hand[2].Id); if(life.NeedsStation) life.VisitStation(); if(life.CompletedRun==null) life.Advance();
+            }
+            return life.CompletedRun;
+        }
+        private static void Invoke(HorizonApp app,string method,params object[] arguments)
+        {
+            Assert.IsNotNull(app,"The live application must exist before "+method);
+            MethodInfo target=typeof(HorizonApp).GetMethod(method,Private);
+            Assert.IsNotNull(target,"Missing UI entry point: "+method);
+            target.Invoke(app,arguments);
         }
         private sealed class Completion { public bool Done; }
         private static IEnumerator Observe(IEnumerator routine,Completion completion) { yield return routine; completion.Done=true; }

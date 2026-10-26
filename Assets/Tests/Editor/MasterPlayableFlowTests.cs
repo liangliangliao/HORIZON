@@ -32,16 +32,26 @@ namespace Horizon.Tests
 
         private static IEnumerator FinishDailyFeedback(HorizonApp app, int fromDay)
         {
-            float until = Time.realtimeSinceStartup + 15;
-            while (Time.realtimeSinceStartup < until)
+            float noProgressUntil=Time.realtimeSinceStartup+15;
+            float absoluteUntil=Time.realtimeSinceStartup+15+CausalRelayPlan.MaximumNodes*RewardDirector.CausalNodeSeconds(new string('字',60));
+            string previousProgress="";
+            while (Time.realtimeSinceStartup < noProgressUntil && Time.realtimeSinceStartup<absoluteUntil)
             {
                 if (!Get<bool>(app, "busy") && Get<ArchiveData>(app, "archive").pendingFeedback == null && Get<GameSession>(app, "session").Day > fromDay) yield break;
+                RectTransform root=Get<RectTransform>(app,"root");
+                FeedbackRecord receipt=Get<ArchiveData>(app,"archive").pendingFeedback;
+                string progress=Get<int>(app,"viewGeneration")+"|"+Get<GameSession>(app,"session").Day+"|"+
+                    root.GetComponentsInChildren<Text>().Count(t=>t.name=="Causal event")+"|"+(receipt?.page??-1)+"|"+
+                    Get<HorizonWorld3D>(app,"world").Cinematics.Current?.Event.id;
+                // A longer readable chain is progress, not a deadlock. Keep
+                // the original 15s stall limit for each actual node/page.
+                if(progress!=previousProgress) {previousProgress=progress; noProgressUntil=Time.realtimeSinceStartup+15;}
                 var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b =>
                     b.interactable && (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat" || b.name=="Continue story checkpoint"));
                 if (next != null) next.onClick.Invoke();
                 yield return new WaitForSecondsRealtime(0.15f);
             }
-            Assert.Fail("Daily feedback did not return to the next choice.");
+            Assert.Fail("Daily feedback stalled after day "+fromDay+". Last progress: "+previousProgress);
         }
 
         [UnityTest]
@@ -443,7 +453,7 @@ namespace Horizon.Tests
                     {
                         if (!Get<bool>(app, "busy") && Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Try another timeline")) break;
                         var next = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.interactable &&
-                            (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat"));
+                            (b.name == "Continue result" || b.name == "Continue master event" || b.name == "Skip cinematic" || b.name == "Next station beat" || b.name=="Continue story checkpoint"));
                         if (next != null) next.onClick.Invoke(); yield return new WaitForSecondsRealtime(0.15f);
                     }
                     Assert.Less(Time.realtimeSinceStartup, until);
