@@ -268,8 +268,9 @@ namespace Horizon
             WalletButton(root);
             View.Label(root, "Logo", "H O R I Z O N", 57, Palette.Text,
                 TextAnchor.MiddleCenter, 0.08f, 0.82f, 0.92f, 0.91f);
-            View.Label(root, "Home line", "你走过的路，还在发光。", 35, Palette.Muted,
-                TextAnchor.MiddleCenter, 0.12f, 0.595f, 0.88f, 0.648f);
+            // Let the home diorama remain a clean visual landmark. The old
+            // decorative sentence sat directly across the character and desk,
+            // repeating meaning that is already stated by the navigation.
             View.Button(root, "Continue", "继续一生", ContinueRun, 0.12f, 0.245f, 0.88f, 0.317f,
                 Palette.Mint, Palette.Ink, 37);
             View.Button(root, "Map", "时间地图", () => ShowMap(false), 0.12f, 0.154f, 0.49f, 0.23f,

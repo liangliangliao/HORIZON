@@ -56,6 +56,8 @@ namespace Horizon.Tests
             yield return null;
             var root=(RectTransform)typeof(HorizonApp).GetField("root",flags).GetValue(app);
             var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
+            Assert.IsFalse(root.GetComponentsInChildren<Text>(true).Any(t=>t.name=="Home line"),
+                "Ordinary home copy must not be layered across the 3D diorama.");
             GameObject[] home=root.Cast<Transform>().Where(t=>t.gameObject.activeSelf).Select(t=>t.gameObject).ToArray();
             Rect viewport=world.WorldCamera.rect; var probe=new CueProbe(); DomainEvent reward=Pattern();
             typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { reward,new Action(probe.Completed) });
