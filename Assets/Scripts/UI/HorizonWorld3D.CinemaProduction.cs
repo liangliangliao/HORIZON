@@ -82,13 +82,14 @@ namespace Horizon.UI
             bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
             float pose=cinemaTension!=null && cinemaTension.Enabled?tensionFrame.PoseTime:time;
             float attention=Mathf.Max(tensionFrame.Focus,energyFrame.Focus*.8f);
-            // The aperture is a stage frame, never the subject. On the action
-            // close-up it used to pass in front of the actor (especially at a
-            // desk), so remove only that foreground layer. It returns for the
-            // arrival wide shot, suspense, reveal, and final overview.
-            bool actionClose=LifeActionPlaying && lifeAction.Sample(time,preferences.reducedMotion).Shot==LifeActionShot.Action;
+            // The aperture is a stage frame, never the subject. On action and
+            // breath-hold close-ups it used to pass in front of the actor
+            // (especially at a desk), so remove only that foreground layer.
+            // It returns for wide arrivals, the result reveal, and overview.
+            LifeActionShot actionShot=LifeActionPlaying?lifeAction.Sample(time,preferences.reducedMotion).Shot:LifeActionShot.Overview;
+            bool subjectClose=LifeActionPlaying && (actionShot==LifeActionShot.Action || actionShot==LifeActionShot.Suspense);
             if(cinemaHaloRenderers!=null)
-                foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!actionClose;
+                foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!subjectClose;
             cinemaBackdropMaterial.SetColor("_Color",tint*(1-attention*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
             cinemaRotor.localRotation=Quaternion.Euler(0,0,preferences.reducedMotion?0:pose*7);
             if(!Mathf.Approximately(architectureFocus,attention))

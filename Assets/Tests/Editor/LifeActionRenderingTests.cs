@@ -37,9 +37,9 @@ namespace Horizon.Tests
                 foreach(float time in new[] {0,story.ActionEnd*.45f,story.ActionEnd*.85f,story.Impact-.1f,story.Settlement+1})
                 {
                     world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
-                    bool actionClose=world.CurrentLifeActionShot==LifeActionShot.Action;
-                    Assert.IsTrue(aperture.GetComponentsInChildren<Renderer>(true).All(r=>r.enabled!=actionClose),
-                        "The architectural aperture must clear the actor close-up and return for every wide/reveal shot.");
+                    bool subjectClose=world.CurrentLifeActionShot==LifeActionShot.Action || world.CurrentLifeActionShot==LifeActionShot.Suspense;
+                    Assert.IsTrue(aperture.GetComponentsInChildren<Renderer>(true).All(r=>r.enabled!=subjectClose),
+                        "The architectural aperture must clear action/tension close-ups and return for every wide/reveal shot.");
                     if(world.CurrentLifeActionShot==LifeActionShot.Arrive)
                     {
                         Assert.Less(Vector3.Distance(actor.localPosition,new Vector3(.65f,0,4.35f)),.001f,
