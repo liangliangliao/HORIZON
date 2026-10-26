@@ -17,7 +17,7 @@ namespace Horizon.UI
         private readonly Color[][] relaySolidColors = new Color[CausalRelayPlan.MaximumNodes][];
         private readonly LineRenderer[] relayEdges = new LineRenderer[CausalRelayPlan.MaximumEdges];
         private MaterialPropertyBlock relayProperties;
-        private Renderer[] relayOverviewSolids;
+        private Renderer[] relayOverviewSolids,relaySourceSubjects;
 
         private void PrepareCausalRelays()
         {
@@ -73,6 +73,7 @@ namespace Horizon.UI
                 causalRelays[node.Index].name="Causal relay · "+node.Evidence.id;
             }
             relayOverviewSolids=relaySolids.Take(relayPlan.Nodes.Count).SelectMany(r=>r).ToArray();
+            relaySourceSubjects=relaySolids[0].Concat(movieNodes[0].GetComponentsInChildren<Renderer>(true)).ToArray();
             for(int i=0;i<relayPlan.Edges.Count;i++)
             {
                 CausalRelayEdge edge=relayPlan.Edges[i]; relayEdges[i].gameObject.SetActive(true);

@@ -56,6 +56,13 @@ namespace Horizon.UI
         {
             bool life=LifeActionPlaying && lifeStage.gameObject.activeSelf;
             bool wide=cinematicOverviewRequested || CurrentCinematicFraming==CinematicFraming.ExtremeWide;
+            // A causal source is a complete machined relay, not just the
+            // emissive point at its centre. Bound the authored push after all
+            // staging layers and after the cue has moved its physical crown.
+            if(!life && !wide && cinemaTension!=null && cinemaTension.SourceCloseup &&
+                time<cinemaTension.FirstRelease+1.10f && !preferences.reducedMotion)
+                FitPortraitSubject(relaySourceSubjects,new Rect(.12f,.25f,.76f,.51f),
+                    CinematicFieldOfView(time),ref camera,ref look);
             // Fit complete bodies/objects instead of trusting an authored
             // camera coordinate which can land inside a head or behind a desk.
             if(!life && (relayPlan==null || relayPlan.Nodes.Count==0) && showcaseCameraWeight<.01f)
@@ -81,6 +88,7 @@ namespace Horizon.UI
                 if(renderer==null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
                     renderer is LineRenderer || renderer is ParticleSystemRenderer || renderer.GetComponent<TextMesh>()!=null ||
                     narrativeSubjectSet.Contains(renderer) || renderer.transform.IsChildOf(jackpotStage) ||
+                    (relayStage!=null && renderer.transform.IsChildOf(relayStage)) ||
                     renderer.transform.IsChildOf(immersionStage) || renderer.transform.IsChildOf(cinemaProduction)) continue;
                 Bounds bounds=renderer.bounds;
                 if(bounds.size.magnitude<.45f || !bounds.IntersectRay(ray,out float hit) || hit>=distance-.5f) continue;

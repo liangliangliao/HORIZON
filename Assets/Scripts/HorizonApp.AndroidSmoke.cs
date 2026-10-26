@@ -200,10 +200,11 @@ namespace Horizon
                         "The actual native source has no visible renderer.");
                     Shader iris=Resources.Load<Shader>("HorizonCinemaIris");
                     AndroidSmoke.Require(iris!=null && iris.isSupported,"The native attention iris shader is unavailable.");
-                    CaptureAndroidFrame("08-causal-"+kind+"-first",source,Vector3.up*.1f);
+                    Renderer evidence=source.Find("Evidence metal base").GetComponent<Renderer>();
+                    CaptureAndroidFrame("08-causal-"+kind+"-first",source,Vector3.up*.1f,evidence);
                     world.Cinematics.Advance(relay.ImpactTime-first+.03f);
                     yield return null; yield return new WaitForEndOfFrame();
-                    CaptureAndroidFrame("08-causal-"+kind+"-impact",source,Vector3.up*.1f);
+                    CaptureAndroidFrame("08-causal-"+kind+"-impact",source,Vector3.up*.1f,evidence);
                     SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event"); yield return null;
                     AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
                         "The native causal movie did not restore the phone controls.");
@@ -314,7 +315,7 @@ namespace Horizon
             }
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
         }
-        private void CaptureAndroidFrame(string name,Transform actor,Vector3? focusOffset=null)
+        private void CaptureAndroidFrame(string name,Transform actor,Vector3? focusOffset=null,Renderer evidence=null)
         {
             AndroidSmoke.Require(world.WorldCamera.enabled && actor.gameObject.activeInHierarchy,"The scene actor/camera is hidden.");
             Texture2D frame=ScreenCapture.CaptureScreenshotAsTexture();
@@ -334,9 +335,34 @@ namespace Horizon
                 AndroidSmoke.Require(point.z>0 && point.x>0 && point.x<frame.width && point.y>0 && point.y<frame.height,"The scene actor is outside the phone viewport.");
                 float minimum=1,maximum=0;
                 int radius=Mathf.Max(12,frame.width/24);
-                for(int y=Mathf.Max(0,(int)point.y-radius);y<Mathf.Min(frame.height,(int)point.y+radius);y+=3)
-                    for(int x=Mathf.Max(0,(int)point.x-radius);x<Mathf.Min(frame.width,(int)point.x+radius);x+=3)
+                int left=Mathf.Max(0,(int)point.x-radius),right=Mathf.Min(frame.width,(int)point.x+radius);
+                int bottom=Mathf.Max(0,(int)point.y-radius),top=Mathf.Min(frame.height,(int)point.y+radius);
+                if(evidence!=null)
+                {
+                    AndroidSmoke.Require(evidence.enabled && evidence.gameObject.activeInHierarchy,"The native evidence base is hidden: "+name);
+                    // The source centre intentionally flares with uniform
+                    // light. Inspect the actual solid base, not an arbitrary
+                    // central patch or the whole frame (which includes HUD).
+                    Bounds bounds=evidence.bounds; Vector2 min=new Vector2(frame.width,frame.height),max=Vector2.zero;
+                    for(int corner=0;corner<8;corner++)
+                    {
+                        Vector3 at=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
+                            (corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                        Vector3 projected=world.WorldCamera.WorldToScreenPoint(at);
+                        AndroidSmoke.Require(projected.z>0 && projected.x>=frame.width*.04f && projected.x<=frame.width*.96f &&
+                            projected.y>=frame.height*.22f && projected.y<=frame.height*.80f,
+                            "The native evidence base is cropped or behind a caption band: "+name);
+                        min=Vector2.Min(min,new Vector2(projected.x,projected.y)); max=Vector2.Max(max,new Vector2(projected.x,projected.y));
+                    }
+                    AndroidSmoke.Require(max.x-min.x>12 && max.y-min.y>12,"The native evidence base is too small to inspect: "+name);
+                    left=Mathf.FloorToInt(min.x); right=Mathf.CeilToInt(max.x);
+                    bottom=Mathf.FloorToInt(min.y); top=Mathf.CeilToInt(max.y);
+                }
+                for(int y=bottom;y<top;y+=3)
+                    for(int x=left;x<right;x+=3)
                     { Color c=frame.GetPixel(x,y); float light=Mathf.Max(c.r,c.g,c.b); minimum=Mathf.Min(minimum,light); maximum=Mathf.Max(maximum,light); }
+                Debug.Log("HORIZON native visibility: "+name+"; region="+left+","+bottom+"–"+right+","+top+
+                    "; min="+minimum.ToString("F4")+"; max="+maximum.ToString("F4"));
                 AndroidSmoke.Require(maximum-minimum>.045f && maximum>.12f,"The Android 3D viewport is blank or uniformly gray: "+name);
                 AndroidSmoke.Frames.Add(name); AndroidSmoke.Write("running");
             }

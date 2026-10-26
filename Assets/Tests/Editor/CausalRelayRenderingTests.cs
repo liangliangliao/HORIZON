@@ -38,6 +38,38 @@ namespace Horizon.Tests
         [UnityTest, Timeout(600000)]
         public IEnumerator ActualSingularityRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
         { return ExportActualRelay(DomainEventKind.CausalSingularity); }
+
+        [UnityTest]
+        public IEnumerator ActualSourceCloseupsKeepTheWholeRelayInsideThreePortraitScreens()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Complete causal source camera acceptance").AddComponent<HorizonWorld3D>(); world.Initialize();
+            world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false}); world.Cinematics.enabled=false;
+            try
+            {
+                foreach(float aspect in new[] {9f/20,9f/16,5f/12})
+                    foreach(DomainEventKind kind in new[] {DomainEventKind.Cascade,DomainEventKind.CausalSingularity})
+                    {
+                        world.WorldCamera.aspect=aspect;
+                        world.Cinematics.Enqueue(CausalRelayTests.ActualCascade(kind),true);
+                        var tension=new CinematicTension(world.Cinematics.Current);
+                        foreach(float time in new[] {0,tension.FirstHold-.01f,tension.FirstHold+.1f,
+                            tension.FirstRelease+.03f,tension.FirstRelease+.75f})
+                        {
+                            world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
+                            AssertSourceInsideCamera(world);
+                        }
+                        world.ToggleCinematicOverview();
+                        Assert.IsTrue(world.CinematicOverview,"The close-up must still allow a complete network view.");
+                        foreach(Renderer solid in (Renderer[])typeof(HorizonWorld3D).GetField("relayOverviewSolids",
+                            BindingFlags.Instance|BindingFlags.NonPublic).GetValue(world))
+                            AssertInsidePhone(world,solid);
+                        world.Cinematics.Skip();
+                    }
+            }
+            finally { Object.Destroy(world.gameObject); }
+            yield return new ExitPlayMode();
+        }
         private IEnumerator ExportActualRelay(DomainEventKind relayKind)
         {
             yield return new EnterPlayMode(); yield return null;
@@ -185,7 +217,9 @@ namespace Horizon.Tests
         private static void AssertOpeningCloseup(HorizonWorld3D world,Transform stage)
         {
             Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
-            RenderTexture target=RenderTexture.GetTemporary(540,614,24);
+            // Full-screen films use the same 20:9 phone shape as the native
+            // backbuffer, not the old cropped 540x614 scene strip.
+            RenderTexture target=RenderTexture.GetTemporary(540,1200,24);
             try
             {
                 camera.rect=new Rect(0,0,1,1); camera.targetTexture=target;
@@ -197,6 +231,8 @@ namespace Horizon.Tests
                     float x=camera.WorldToViewportPoint(corner).x; left=Mathf.Min(left,x); right=Mathf.Max(right,x);
                 }
                 Assert.Greater(right-left,.4f,"The first source must dominate the initial shot, including same-frame replay.");
+                Assert.That(left,Is.GreaterThanOrEqualTo(.04f),"The close-up must not crop the left of the real source.");
+                Assert.That(right,Is.LessThanOrEqualTo(.96f),"The close-up must not crop the right of the real source.");
             }
             finally { camera.rect=viewport; camera.targetTexture=prior; RenderTexture.ReleaseTemporary(target); world.FrameCinematicLabels(); }
         }
@@ -204,6 +240,22 @@ namespace Horizon.Tests
         {
             Assert.IsFalse(world.GetComponentsInChildren<TextMesh>(true).Single(t=>t.name=="Cinematic evidence label 25").gameObject.activeSelf,
                 "One synchronized caption must replace the giant world-space duplicate.");
+            foreach(Renderer part in (Renderer[])typeof(HorizonWorld3D).GetField("relaySourceSubjects",
+                BindingFlags.Instance|BindingFlags.NonPublic).GetValue(world)) AssertInsidePhone(world,part);
+        }
+        private static void AssertInsidePhone(HorizonWorld3D world,Renderer part)
+        {
+            Assert.IsTrue(part.enabled && part.gameObject.activeInHierarchy,"Physical evidence must not be hidden: "+part.name);
+            Bounds bounds=part.bounds;
+            for(int corner=0;corner<8;corner++)
+            {
+                Vector3 point=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
+                    (corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                Vector3 projected=world.WorldCamera.WorldToViewportPoint(point);
+                Assert.Greater(projected.z,0,part.name+" must remain in front of the camera.");
+                Assert.That(projected.x,Is.InRange(.04f,.96f),part.name+" must fit the phone width.");
+                Assert.That(projected.y,Is.InRange(.22f,.80f),part.name+" must clear the caption and control bands.");
+            }
         }
     }
 }
