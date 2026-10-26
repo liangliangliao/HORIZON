@@ -28,10 +28,14 @@ namespace Horizon.Tests
         public void AttentionIrisImportsWithoutErrors()
         { Shader shader=Resources.Load<Shader>("HorizonCinemaIris"); Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader)); }
 
-        [UnityTest]
+        // These are full-length 20 fps RGB + GIF exports, not real-time
+        // playback benchmarks. Readable node intervals increased the frame
+        // count; retain every frame and give the software renderer a bounded
+        // export budget instead of shortening the user's animation.
+        [UnityTest, Timeout(600000)]
         public IEnumerator ActualCascadeRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
         { return ExportActualRelay(DomainEventKind.Cascade); }
-        [UnityTest]
+        [UnityTest, Timeout(600000)]
         public IEnumerator ActualSingularityRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
         { return ExportActualRelay(DomainEventKind.CausalSingularity); }
         private IEnumerator ExportActualRelay(DomainEventKind relayKind)
@@ -109,6 +113,9 @@ namespace Horizon.Tests
                     foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                     canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                     float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
+                    Assert.That(frames,Is.InRange(1,6000),"The complete export must remain finite and bounded.");
+                    float exportStarted=Time.realtimeSinceStartup;
+                    Debug.Log("Causal capture started: "+kind+", "+duration+" seconds, "+frames+" frames at 20 fps.");
                     string lossless="artifacts/cinematics/frames-"+kind; Directory.CreateDirectory(lossless);
                     using(var stream=File.Create("artifacts/cinematics/causal-relays-"+kind+".gif"))
                     using(var gif=new TimelineGifWriter(stream,540,960))
@@ -133,6 +140,9 @@ namespace Horizon.Tests
                             }
                             if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2 || frame==Mathf.CeilToInt(heroTime*20)+8)
                                 File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+"-"+frame+".png",pixels.EncodeToPNG());
+                            if((frame+1)%200==0 || frame+1==frames)
+                                Debug.Log("Causal capture progress: "+kind+", "+(frame+1)+"/"+frames+" frames, "+
+                                    (Time.realtimeSinceStartup-exportStarted).ToString("F1")+" export seconds.");
                             yield return null;
                         }
                     }

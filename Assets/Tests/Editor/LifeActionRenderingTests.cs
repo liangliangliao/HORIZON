@@ -94,8 +94,8 @@ namespace Horizon.Tests
             Text hint=Field<RectTransform>(app,"root").GetComponentsInChildren<Text>().Single(t=>t.name=="Story checkpoint hint");
             Assert.Less(hint.rectTransform.anchorMax.y,((RectTransform)next.transform).anchorMin.y,
                 "The waiting hint belongs below the continue button, not on the third gate result.");
-            Assert.IsTrue(next.interactable); next.onClick.Invoke(); yield return null; yield return null;
-            Assert.IsTrue(completion.Done);
+            Assert.IsTrue(next.interactable); next.onClick.Invoke();
+            yield return WaitForCompletion(completion);
             yield return new ExitPlayMode();
         }
 
@@ -181,8 +181,15 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(8.5f);
             Assert.IsFalse(completion.Done,"An echo result must not auto-dismiss even after its animation has ended.");
             Button next=Field<RectTransform>(app,"root").GetComponentsInChildren<Button>().Single(b=>b.name=="Continue story checkpoint");
-            Assert.IsTrue(next.interactable); next.onClick.Invoke(); yield return null; yield return null;
-            Assert.IsTrue(completion.Done);
+            Assert.IsTrue(next.interactable);
+            yield return new WaitForSecondsRealtime(3.2f);
+            Assert.IsFalse(completion.Done,"The readable result must still wait when no click has occurred.");
+            next.onClick.Invoke();
+            // Observe -> EchoSequence -> WaitForStoryCheckpoint are nested
+            // coroutines. A click must finish them promptly, but not in an
+            // assumed number of player-loop frames.
+            yield return WaitForCompletion(completion);
+            Assert.IsTrue(next==null,"The accepted continue control must be removed.");
             yield return new ExitPlayMode();
         }
 
@@ -246,6 +253,12 @@ namespace Horizon.Tests
             target.Invoke(app,arguments);
         }
         private sealed class Completion { public bool Done; }
+        private static IEnumerator WaitForCompletion(Completion completion)
+        {
+            float deadline=Time.realtimeSinceStartup+1f;
+            while(!completion.Done && Time.realtimeSinceStartup<deadline) yield return null;
+            Assert.IsTrue(completion.Done,"The explicit continue click must finish the nested reading flow within one second.");
+        }
         private static IEnumerator Observe(IEnumerator routine,Completion completion) { yield return routine; completion.Done=true; }
     }
 }
