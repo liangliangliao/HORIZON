@@ -13,13 +13,16 @@ namespace Horizon
             FeedbackRecord receipt = archive.pendingFeedback;
             if (receipt?.kind != FeedbackKind.Echoes || receipt.detailed || receipt.page > 0 || receipt.beats.Count < 2) return false;
             Clear(); world.ShowBoard(); world.SetTimeline(session.Actions, session.Deadline);
+            // A summary is an information page. Do not put opaque rows over
+            // the 3D stage; reserve that full-screen surface for the movie.
+            View.Fill(root,"Echo summary reading background",Palette.Ink,0,0,1,1,true);
             View.Label(root, "Result day", "DAY " + receipt.day.ToString("00") + " / " + session.Deadline, 37, Palette.Text,
                 TextAnchor.MiddleLeft, 0.06f, 0.95f, 0.94f, 0.985f);
             View.Label(root, "Echo bundle title", receipt.beats.Count + " 条回声 · 一起抵达", 48, Palette.Mint,
-                TextAnchor.MiddleLeft, 0.075f, 0.78f, 0.925f, 0.88f);
+                TextAnchor.MiddleLeft, 0.075f, 0.835f, 0.925f, 0.915f);
             View.Label(root, "Echo bundle context", "下面每一条，都来自已经发生的行动。", 32, Palette.Text,
-                TextAnchor.MiddleLeft, 0.075f, 0.713f, 0.925f, 0.78f);
-            RectTransform viewport = View.Rect(root, "Echo summary scroll", 0.075f, 0.275f, 0.925f, 0.705f);
+                TextAnchor.MiddleLeft, 0.075f, 0.77f, 0.925f, 0.83f);
+            RectTransform viewport = View.Rect(root, "Echo summary scroll", 0.075f, 0.275f, 0.925f, 0.75f);
             viewport.gameObject.AddComponent<RectMask2D>();
             Image hit = viewport.gameObject.AddComponent<Image>(); hit.color = Color.clear;
             ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>(); scroll.viewport = viewport; scroll.horizontal = false;
@@ -31,7 +34,7 @@ namespace Horizon
                 FeedbackBeat beat = receipt.beats[i];
                 RectTransform row = View.Panel(content, "Resolved echo " + i, Palette.Panel, 0, 1, 1, 1, 23).rectTransform;
                 row.pivot = new Vector2(0.5f, 1); row.sizeDelta = new Vector2(0, 166); row.anchoredPosition = new Vector2(0, -i * 184);
-                View.Label(row, "Echo source", "D" + beat.sourceDay + "「" + beat.source + "」 → 今天", 32, Palette.Gold,
+                View.Label(row, "Echo source", "第 " + beat.sourceDay + " 天 · 「" + beat.source + "」 → 今天", 29, Palette.Gold,
                     TextAnchor.MiddleLeft, 0.035f, 0.51f, 0.965f, 0.96f);
                 View.Label(row, "Echo actual changes", PlayExperience.NowLabel(beat.delta), 34, Palette.Text,
                     TextAnchor.MiddleLeft, 0.035f, 0.07f, 0.965f, 0.52f);
@@ -54,7 +57,7 @@ namespace Horizon
         {
             MasterRunState state = CurrentMaster;
             if (state == null) return;
-            var pending = state.events.Where(e => !e.acknowledged && e.tier < RewardTier.Mythic).ToList();
+            var pending = RewardPlayback.Pending(state.events).Where(e=>e.tier<RewardTier.Mythic).ToList();
             BindLocalCinematicCopy();
             foreach (DomainEvent e in pending)
             {

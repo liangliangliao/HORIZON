@@ -1,5 +1,7 @@
 # 电影式动画与实体奖励 v1.0
 
+2026-10-25 用户更正：下文“演出倍率”仅可作为内部感官强度参数，不再生成玩家可见的倍率或倍率牌。实际实现以 [结果文案电影化重制](CINEMATIC_OUTCOME_REWORK.md) 为准。
+
 当前修复与功能补齐请见 [两份 v1.0 方案独立核对](REWARD_CINEMATIC_ACCEPTANCE_V1.md)。下文的历史 CI 数字不能作为当前功能提交的验收。
 
 基于 main `9527132`，产品规则基线仍为 Master v0.4.2。本次实现依据用户提供的《Master Product Specification v0.4.2》《Reward System Specification v1.0》《Cinematic & Animation Specification v1.0》三份 DOCX。

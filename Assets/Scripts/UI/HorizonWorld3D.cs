@@ -145,9 +145,9 @@ namespace Horizon.UI
             if (rareGroup != null) rareGroup.gameObject.SetActive(false);
             station = false;
             Aim(false, false, CardKind.Growth);
-            WorldCamera.rect = new Rect(0, 0.43f, 1, 0.49f);
-            cameraPosition = new Vector3(3.8f, 3.3f, -7.4f);
-            cameraLook = new Vector3(0, 2.1f, 1.35f);
+            WorldCamera.rect = new Rect(0, 0.54f, 1, 0.22f);
+            cameraPosition = new Vector3(3.1f, 2.5f, -5.2f);
+            cameraLook = new Vector3(0, 1.15f, 1.35f);
             Avatar.gameObject.SetActive(true);
             Avatar.localPosition = avatarHome;
             Avatar.GetComponent<HorizonActor>().Walking = false;
@@ -189,6 +189,16 @@ namespace Horizon.UI
             bench.gameObject.SetActive(true);
             gates.gameObject.SetActive(false);
             foreach (Transform prop in props) prop.gameObject.SetActive(false);
+        }
+
+        public void FrameStationConversation()
+        {
+            // Non-cinematic station conversation: keep the complete actor in a
+            // dedicated scene above the reading dock, not behind dialogue cards.
+            WorldCamera.rect=new Rect(0,.50f,1,.35f);
+            cameraPosition=futureSelf.position+new Vector3(1.2f,1.8f,-5.7f);
+            cameraLook=futureSelf.position+Vector3.up*1.12f;
+            stationCameraOffset=cameraPosition-futureSelf.position;
         }
 
         public void ShowDeadline()
@@ -276,9 +286,12 @@ namespace Horizon.UI
                 dueDay > 0 && dueDay <= timelineLength ? DayPoint(dueDay) + Vector3.up * 0.25f : new Vector3(0, 2.3f, 6);
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.65f)
             {
-                symbol.position = Vector3.Lerp(from, to, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.2f;
-                symbol.Rotate(60 * Time.unscaledDeltaTime, 180 * Time.unscaledDeltaTime, 0);
-                symbol.localScale = Vector3.one * Mathf.Lerp(0.25f, 0.07f, t);
+                while(paused) yield return null;
+                if(symbol==null) yield break;
+                float flight=preferences.reducedMotion?1:ImmersiveMotion.Flight(t);
+                symbol.position = Vector3.Lerp(from, to, flight) + Vector3.up * Mathf.Sin(flight * Mathf.PI) * 1.2f;
+                symbol.localRotation=preferences.reducedMotion?Quaternion.identity:Quaternion.Euler(t*60,t*180,0);
+                symbol.localScale = Vector3.one * Mathf.Lerp(0.25f, 0.07f, flight);
                 yield return null;
             }
             if (kind == CardKind.Growth) WorldRipple(to, portalLight, 0.22f);

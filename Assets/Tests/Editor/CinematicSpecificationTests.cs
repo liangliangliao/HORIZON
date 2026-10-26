@@ -17,7 +17,7 @@ namespace Horizon.Tests
             Assert.AreEqual(value,item.Amount); Assert.AreEqual(form,item.Form); Assert.LessOrEqual(item.VisualCount,5);
         }
         [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(16)]
-        public void SparseAndFullCascadeReceiptsKeepOrderedPhasesAnd150msSilence(int count)
+        public void SparseAndFullCascadeReceiptsKeepOrderedPhasesAndReadableSilence(int count)
         {
             var receipt=new RewardReceipt();
             for(int i=0;i<count;i++) receipt.causes.Add(new RewardEvidence { id="cause"+i,day=i+1,label="D"+(i+1) });
@@ -25,7 +25,7 @@ namespace Horizon.Tests
             RewardPlan plan=RewardDirector.Direct(e);
             CollectionAssert.AreEqual(Enum.GetValues(typeof(CinematicPhase)),plan.Cues.Where(c=>!c.NodeHit).Select(c=>c.Phase));
             float stop=plan.Cues.Single(c=>c.Phase==CinematicPhase.HitStop).Time;
-            Assert.AreEqual(.15f,plan.Cues.Single(c=>c.Phase==CinematicPhase.Impact).Time-stop,.0001f);
+            Assert.AreEqual(.42f,plan.Cues.Single(c=>c.Phase==CinematicPhase.Impact).Time-stop,.0001f);
             Assert.IsTrue(plan.Cues.All(c=>c.Time>=0 && c.Time<=plan.Duration));
         }
         [Test]
@@ -39,13 +39,13 @@ namespace Horizon.Tests
             Assert.IsTrue(plan.Cues.Any(c=>c.Phase==CinematicPhase.HitStop));
         }
         [Test]
-        public void DowngradedConvergenceRetainsThe200msSilence()
+        public void DowngradedConvergenceUsesAReadableBreathHold()
         {
             var state=new MasterRunState(); DomainEvent e=null;
             for(int i=0;i<3;i++) e=RewardEngine.Emit(state,1,1,DomainEventKind.RealityConvergence,null,"REALITY CONVERGENCE");
             Assert.AreEqual(RewardTier.Major,e.tier);
             RewardPlan plan=RewardDirector.Direct(e);
-            Assert.AreEqual(.2f,plan.Cues.Single(c=>c.Phase==CinematicPhase.Impact).Time-
+            Assert.AreEqual(.32f,plan.Cues.Single(c=>c.Phase==CinematicPhase.Impact).Time-
                 plan.Cues.Single(c=>c.Phase==CinematicPhase.HitStop).Time,.0001f);
         }
         [Test]

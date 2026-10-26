@@ -59,12 +59,17 @@ namespace Horizon.Game
             Master.engine.socialPressure = Master.triggers.Contains("promise") || Master.triggers.Contains("friend") ? 2 : 0;
             RefreshExpeditionEngine();
         }
-        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null, PredictionRecord prediction = null, IEnumerable<MemoryFrame> frames = null)
+        private DomainEvent Emit(DomainEventKind kind, CausalNode node, string title, string detail = "", int chain = 0, int sourceDay = 0, string actionText = null, PredictionRecord prediction = null, IEnumerable<MemoryFrame> frames = null, CardSpec actedCard = null)
         {
             RewardReceipt receipt = RewardReceipt.Capture(kind, node, CausalNodes, Master.orbitBits, MasterHorizon, Master.triggers.LastOrDefault());
             receipt.frames = MemoryFrame.CopyFrames(frames);
             if (sourceDay > 0 && node?.originHidden != true) receipt.sourceDay = sourceDay;
             if (actionText != null && node?.originHidden != true) receipt.action = actionText;
+            if(actedCard!=null)
+            {
+                receipt.destinationDay=actedCard.Delay>0?Day+actedCard.Delay:0;
+                receipt.futureMeaning=PlayExperience.FutureMeaning(actedCard);
+            }
             if (kind == DomainEventKind.TimeEcho && node?.originHidden == true) detail = "一条回声已经抵达，来路暂未清晰。";
             if (kind == DomainEventKind.HorizonChanged) receipt.horizonLevel = BaseMasterHorizon;
             if (kind == DomainEventKind.OrbitActivated) receipt.orbitIndex = Array.FindIndex(MasterSpecification.OrbitNames, name => title.EndsWith(name, StringComparison.Ordinal));
@@ -300,7 +305,7 @@ namespace Horizon.Game
             ChapterAfterChoice(action, card);
             ExpeditionAfterChoice(action, card, n, before);
             action.parentNodeId = n.parentId; action.parentNodeIds = CausalGraph.Parents(n);
-            Master.insightPoints++; RefreshEngine(); RecordResourceSample(); Emit(DomainEventKind.ActionTaken, n, card.Name);
+            Master.insightPoints++; RefreshEngine(); RecordResourceSample(); Emit(DomainEventKind.ActionTaken, n, card.Name, actedCard:card);
         }
         private void MasterAfterEcho(PendingEcho echo)
         {

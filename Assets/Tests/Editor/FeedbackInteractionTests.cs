@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
 using NUnit.Framework;
@@ -87,6 +88,67 @@ namespace Horizon.Tests
                     Assert.AreNotEqual(UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error, message.severity,
                         name + ": " + message.message);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator LocalMovieHidesLateCreatedReceiptAndRestoresItOnSkipAndCancel()
+        {
+            yield return new EnterPlayMode();
+            var app=Object.FindObjectOfType<HorizonApp>();
+            if(app==null) app=new GameObject("Local movie isolation test").AddComponent<HorizonApp>();
+            yield return null;
+            typeof(HorizonApp).GetMethod("Clear",Private).Invoke(app,new object[] {false});
+            var root=(RectTransform)typeof(HorizonApp).GetField("root",Private).GetValue(app);
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",Private).GetValue(app);
+            world.ShowBoard();
+            Call(app,"BindLocalCinematicCopy");
+            var card=View.Panel(root,"Late receipt card",Palette.Panel,.05f,.1f,.95f,.6f).gameObject;
+            card.AddComponent<PanelEntrance>();
+            var button=View.Button(card.transform,"Must not accept input","继续",()=>{},0,0,1,.2f,Palette.Mint,Palette.Ink);
+            var e=new DomainEvent {id="isolation",kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,title="TIME ECHO",detail="来自过去的行动。",receipt=new RewardReceipt {sourceDay=2}};
+            world.PresentMasterEvent(e);
+            var late=View.Panel(root,"Created after Started",Palette.Panel,.05f,.65f,.95f,.9f).gameObject;
+            yield return null; yield return null;
+            Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
+            Assert.IsTrue(card.GetComponentsInParent<CanvasGroup>().Any(g=>g.alpha==0));
+            Assert.AreEqual(0,late.GetComponentInParent<CanvasGroup>().alpha);
+            Assert.IsTrue(card.GetComponentsInParent<CanvasGroup>().Any(g=>!g.blocksRaycasts));
+            Assert.IsFalse(button.IsInteractable());
+            Canvas canvas=root.GetComponentInParent<Canvas>();
+            var target=new RenderTexture(540,960,24); target.Create();
+            var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
+            var ui=new GameObject("Local isolation evidence camera",typeof(Camera)).GetComponent<Camera>();
+            ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20; ui.targetTexture=target;
+            RenderMode mode=canvas.renderMode; Camera old=canvas.worldCamera; float distance=canvas.planeDistance;
+            try
+            {
+                foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
+                RenderTexture previous=RenderTexture.active; RenderTexture.active=target;
+                pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=previous;
+                string directory=System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(),"artifacts","cinematics");
+                System.IO.Directory.CreateDirectory(directory);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory,"fixture-local-receipt-isolation.png"),pixels.EncodeToPNG());
+            }
+            finally
+            {
+                canvas.renderMode=mode; canvas.worldCamera=old; canvas.planeDistance=distance;
+                target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
+            }
+            yield return new WaitForSecondsRealtime(.35f);
+            world.Cinematics.SkipPending(); yield return null;
+            Assert.IsTrue(card.GetComponents<CanvasGroup>().All(g=>g.alpha==1)); Assert.IsTrue(button.IsInteractable());
+            e.id="cancel-isolation"; world.PresentMasterEvent(e); yield return null;
+            world.Cinematics.CancelAll(); yield return null;
+            Assert.AreEqual(root,late.transform.parent);
+            Assert.IsFalse(root.Find("Reward cinematic captions").gameObject.activeSelf);
+            Call(app,"BindLocalCinematicCopy"); e.id="new-page-before-old-destroy"; world.PresentMasterEvent(e);
+            yield return null;
+            Assert.AreEqual(1,root.GetComponentsInChildren<CinematicCaption>(true).Count(c=>c.gameObject.activeInHierarchy),
+                "A cancelled caption must not resurrect when the replacement page starts in the same frame.");
+            world.Cinematics.SkipPending();
+            yield return new ExitPlayMode();
         }
 
         [UnityTest]

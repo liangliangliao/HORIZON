@@ -56,9 +56,12 @@ Shader "HORIZON/LitColor"
                 half3 reflected=reflect(-view,normal);
                 half3 sky=lerp(half3(.045,.07,.12),half3(.68,.79,1),saturate(reflected.y*.5+.5));
                 half studio=pow(saturate(dot(reflected,normalize(half3(-.5,.8,-.3)))),lerp(4,32,_Smoothness));
+                // Broad studio strips describe curved metal between glints.
+                half strip=saturate(1-abs((reflected.x+.24)*4)); strip=strip*strip*strip*strip*smoothstep(-.12,.65,reflected.y);
+                half fill=saturate(1-abs((reflected.x-.68)*6)); fill=fill*fill*fill*fill*smoothstep(-.6,.2,reflected.y)*.45;
                 half rim=pow(1-saturate(dot(normal,view)),3);
                 half3 color=_Color.rgb*SampleSH(normal)*(1-_Metallic*.75)+SurfaceLight(normal,view,light);
-                color+=_Color.rgb*(sky*.32+studio*.8)*_Metallic+_RimColor.rgb*rim+_Emission.rgb;
+                color+=(_Color.rgb*(sky*.22+studio*.65+strip*.65)+half3(1,.91,.7)*(strip+fill)*.3)*_Metallic+_RimColor.rgb*rim+_Emission.rgb;
                 #ifdef _ADDITIONAL_LIGHTS
                 uint count=GetAdditionalLightsCount();
                 for(uint n=0;n<count;n++) { color+=SurfaceLight(normal,view,GetAdditionalLight(n,i.positionWS)); }

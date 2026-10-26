@@ -110,19 +110,8 @@ namespace Horizon.Tests
             {
                 camera.rect=new Rect(0,0,1,1); camera.targetTexture=target; world.FrameCinematicLabels();
                 Transform plaque=stage.Find("3D presentation multiplier plaque");
-                float bottom=1,top=0;
-                foreach(Renderer renderer in plaque.GetComponentsInChildren<Renderer>())
-                {
-                    Bounds bounds=renderer.localBounds;
-                    for(int i=0;i<8;i++)
-                    {
-                        Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
-                        float y=viewport.y+camera.WorldToViewportPoint(renderer.transform.TransformPoint(corner)).y*viewport.height;
-                        bottom=Mathf.Min(bottom,y); top=Mathf.Max(top,y);
-                    }
-                }
-                Assert.Greater(bottom,HorizonCinemaLayout.PredictionTop,"The 3D multiplier must clear the real prediction receipt panel.");
-                Assert.Less(top,HorizonCinemaLayout.TitleBottom,"The 3D multiplier must clear the actual title panel.");
+                Assert.IsFalse(plaque.gameObject.activeSelf,"A decorative multiplier must not replace the actual outcome.");
+                Assert.IsEmpty(plaque.GetComponentsInChildren<Renderer>(true),"Do not merely hide old digits under new text.");
                 Bounds hero=asset.GetComponentsInChildren<Renderer>().First().bounds;
                 foreach(Renderer renderer in asset.GetComponentsInChildren<Renderer>()) hero.Encapsulate(renderer.bounds);
                 float center=viewport.y+camera.WorldToViewportPoint(hero.center).y*viewport.height;
@@ -149,7 +138,9 @@ namespace Horizon.Tests
                     var source=new DomainEvent { id="resource-render-"+i,kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,day=7,
                         receipt=new RewardReceipt { resourcesRecorded=true,resources=changes[i],sourceDay=3,action="实际行动" } };
                     string before=JsonUtility.ToJson(source);
-                    Assert.IsTrue(world.Cinematics.Enqueue(source,true)); world.Cinematics.Advance(2.85f);
+                    Assert.IsTrue(world.Cinematics.Enqueue(source,true));
+                    float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                    world.Cinematics.Advance(impact+.25f);
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
                     Assert.IsNotNull(stage.Find("Reward showcase "+kinds[i]));
                     Assert.IsTrue(stage.Find("Reward showcase "+kinds[i]).gameObject.activeInHierarchy);

@@ -175,7 +175,7 @@ namespace Horizon.Tests
                 if (button != null) yield break;
                 // A completed life now presents each earned epic before its
                 // causal timeline. Follow the real skip/continue controls.
-                Button next = buttons.FirstOrDefault(b => b.name == "Continue master event" && b.interactable);
+                Button next = buttons.FirstOrDefault(b => (b.name == "Continue master event" || b.name=="Continue story checkpoint") && b.interactable);
                 if (next != null) next.onClick.Invoke();
                 else {
                     Button skip = buttons.FirstOrDefault(b => b.name == "Skip cinematic" && b.interactable);

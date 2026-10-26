@@ -15,7 +15,7 @@ namespace Horizon.UI
             if (ambience != null) ambience.pitch = 1 + insightAmount * 0.16f;
             if (bloom != null && !preferences.reducedMotion && !preferences.batterySaver) bloom.Echo = Mathf.Max(bloom.Echo, insightAmount * 0.22f);
         }
-        public void PresentMasterEvent(DomainEvent e, System.Action completed = null, bool fullscreen = false)
+        public void PresentMasterEvent(DomainEvent e, System.Action completed = null, bool fullscreen = true)
         {
             if (e == null) return;
             Cinematics.Enqueue(e, fullscreen, completed);

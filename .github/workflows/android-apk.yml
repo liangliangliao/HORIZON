@@ -11,6 +11,7 @@ on:
       - codex/playable-feedback-3d
       - fix/apk-rewards-animation
       - feat/3d-jackpot-animation
+      - feature/reward-cinematic-upgrade
   workflow_dispatch:
     inputs:
       native_check_run:
@@ -263,7 +264,12 @@ jobs:
           test -s artifacts/visuals/71-story-home.png
           test -s artifacts/visuals/72-tall-phone-board.png
           test -s artifacts/visuals/73-tall-phone-home.png
-          test -s artifacts/visuals/90-pattern-3d.png
+          test -s artifacts/visuals/92-pattern-fullscreen-01-charge.png
+          test -s artifacts/visuals/92-pattern-fullscreen-02-breath-hold.png
+          test -s artifacts/visuals/92-pattern-fullscreen-03-impact.png
+          test -s artifacts/visuals/92-pattern-fullscreen-04-multiplier.png
+          test -s artifacts/visuals/92-pattern-fullscreen-05-second-reveal.png
+          test -s artifacts/visuals/92-pattern-fullscreen-06-settlement.png
           test -s artifacts/visuals/91-reality-convergence-3d.png
 
       - name: Decode and verify actual Unity GIF exports
@@ -307,8 +313,23 @@ jobs:
         with:
           name: HORIZON-Cinematic-Reward-Previews
           path: |
-            artifacts/visuals/9[01]-*.png
+            artifacts/visuals/9[0-2]-*.png
             artifacts/cinematics/
+            !artifacts/cinematics/frames-actual-outcome/**
+            !artifacts/cinematics/frames-walk-outcome/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload full-colour action frames separately for video review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Action-RGB-Frames
+          path: |
+            artifacts/cinematics/frames-actual-outcome/
+            artifacts/cinematics/frames-walk-outcome/
+            artifacts/cinematics/actual-outcome-motion.pcm
+            artifacts/cinematics/walk-outcome-motion.pcm
           if-no-files-found: ignore
           retention-days: 14
 

@@ -28,8 +28,49 @@ namespace Horizon.Tests
         public void AttentionIrisImportsWithoutErrors()
         { Shader shader=Resources.Load<Shader>("HorizonCinemaIris"); Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader)); }
 
-        [UnityTest]
+        // These are full-length 20 fps RGB + GIF exports, not real-time
+        // playback benchmarks. Readable node intervals increased the frame
+        // count; retain every frame and give the software renderer a bounded
+        // export budget instead of shortening the user's animation.
+        [UnityTest, Timeout(600000)]
         public IEnumerator ActualCascadeRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
+        { return ExportActualRelay(DomainEventKind.Cascade); }
+        [UnityTest, Timeout(600000)]
+        public IEnumerator ActualSingularityRelaysPauseReduceAndExportWithTheirOriginalPhoneCopy()
+        { return ExportActualRelay(DomainEventKind.CausalSingularity); }
+
+        [UnityTest]
+        public IEnumerator ActualSourceCloseupsKeepTheWholeRelayInsideThreePortraitScreens()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Complete causal source camera acceptance").AddComponent<HorizonWorld3D>(); world.Initialize();
+            world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false}); world.Cinematics.enabled=false;
+            try
+            {
+                foreach(float aspect in new[] {9f/20,9f/16,5f/12})
+                    foreach(DomainEventKind kind in new[] {DomainEventKind.Cascade,DomainEventKind.CausalSingularity})
+                    {
+                        world.WorldCamera.aspect=aspect;
+                        world.Cinematics.Enqueue(CausalRelayTests.ActualCascade(kind),true);
+                        var tension=new CinematicTension(world.Cinematics.Current);
+                        foreach(float time in new[] {0,tension.FirstHold-.01f,tension.FirstHold+.1f,
+                            tension.FirstRelease+.03f,tension.FirstRelease+.75f})
+                        {
+                            world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
+                            AssertSourceInsideCamera(world);
+                        }
+                        world.ToggleCinematicOverview();
+                        Assert.IsTrue(world.CinematicOverview,"The close-up must still allow a complete network view.");
+                        foreach(Renderer solid in (Renderer[])typeof(HorizonWorld3D).GetField("relayOverviewSolids",
+                            BindingFlags.Instance|BindingFlags.NonPublic).GetValue(world))
+                            AssertInsidePhone(world,solid);
+                        world.Cinematics.Skip();
+                    }
+            }
+            finally { Object.Destroy(world.gameObject); }
+            yield return new ExitPlayMode();
+        }
+        private IEnumerator ExportActualRelay(DomainEventKind relayKind)
         {
             yield return new EnterPlayMode(); yield return null;
             var app=Object.FindObjectOfType<HorizonApp>();
@@ -52,7 +93,7 @@ namespace Horizon.Tests
             Directory.CreateDirectory("artifacts/cinematics");
             try
             {
-                foreach(DomainEventKind kind in new[] {DomainEventKind.Cascade,DomainEventKind.CausalSingularity})
+                foreach(DomainEventKind kind in new[] {relayKind})
                 {
                     DomainEvent source=CausalRelayTests.ActualCascade(kind); string before=JsonUtility.ToJson(source);
                     CameraClearFlags clear=world.WorldCamera.clearFlags; Color background=world.WorldCamera.backgroundColor;
@@ -68,6 +109,8 @@ namespace Horizon.Tests
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     world.Cinematics.Advance(.04f); yield return null;
                     AssertSourceInsideCamera(world);
+                    Assert.That(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text,
+                        Does.Not.Contain("CASCADE").And.Not.Contain("CAUSAL SINGULARITY").And.Not.Contain("×"));
                     var beam=stage.GetComponentsInChildren<Renderer>().First(r=>r.name.StartsWith("Director driven causal light shaft"));
                     Vector3 scale=beam.transform.localScale; var properties=new MaterialPropertyBlock(); beam.GetPropertyBlock(properties);
                     float clock=properties.GetFloat("_Clock");
@@ -85,9 +128,11 @@ namespace Horizon.Tests
                     Assert.IsFalse(world.GetComponentsInChildren<TextMesh>(true).Single(t=>t.name=="Cinematic evidence label 25").gameObject.activeSelf);
                     Vector3 heldPosition=subject.localPosition; Quaternion heldAngle=subject.localRotation;
                     Vector3 heldCamera=world.WorldCamera.transform.position; float heldFov=world.WorldCamera.fieldOfView;
+                    Quaternion heldCameraAngle=world.WorldCamera.transform.rotation;
                     world.Cinematics.Advance(.15f); yield return null;
                     Assert.AreEqual(heldPosition,subject.localPosition); Assert.AreEqual(heldAngle,subject.localRotation);
                     Assert.AreEqual(heldCamera,world.WorldCamera.transform.position); Assert.AreEqual(heldFov,world.WorldCamera.fieldOfView);
+                    Assert.AreEqual(heldCameraAngle,world.WorldCamera.transform.rotation);
                     world.ApplyPreferences(new PlayerPreferences {sound=false,haptics=false,reducedMotion=true}); world.Cinematics.Advance(.001f);
                     Assert.IsFalse(stage.GetComponentsInChildren<Renderer>().Any(r=>r.name.StartsWith("Director driven causal light shaft")));
                     Assert.AreEqual(relay.Nodes.Count,stage.Cast<Transform>().Count(t=>t.gameObject.activeSelf && t.name.StartsWith("Causal relay ·")));
@@ -100,6 +145,9 @@ namespace Horizon.Tests
                     foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                     canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                     float duration=world.Cinematics.Current.Duration; int frames=Mathf.CeilToInt(duration*20);
+                    Assert.That(frames,Is.InRange(1,6000),"The complete export must remain finite and bounded.");
+                    float exportStarted=Time.realtimeSinceStartup;
+                    Debug.Log("Causal capture started: "+kind+", "+duration+" seconds, "+frames+" frames at 20 fps.");
                     string lossless="artifacts/cinematics/frames-"+kind; Directory.CreateDirectory(lossless);
                     using(var stream=File.Create("artifacts/cinematics/causal-relays-"+kind+".gif"))
                     using(var gif=new TimelineGifWriter(stream,540,960))
@@ -115,12 +163,18 @@ namespace Horizon.Tests
                             float heroTime=new RewardSpectacle(world.Cinematics.Current).HeroTime;
                             if(frame==Mathf.CeilToInt(heroTime*20)+8)
                             {
-                                Transform plaque=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="3D presentation multiplier plaque");
-                                foreach(Renderer carrier in stage.GetComponentsInChildren<Renderer>().Where(r=>r.name=="Evidence metal base"))
-                                    Assert.Greater(world.WorldCamera.WorldToViewportPoint(carrier.bounds.center).z,world.WorldCamera.WorldToViewportPoint(plaque.position).z+.3f,"Evidence carriers must not hide the physical multiplier.");
+                                Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf);
+                                Assert.That(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience").text,Does.Not.Contain("×"),
+                                    "The foreground reveal must describe this causal event rather than invent a payout.");
+                                Assert.AreNotEqual(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience").text,
+                                    root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text,
+                                    "The context must add provenance instead of repeating the large revealed sentence.");
                             }
                             if(frame==Mathf.CeilToInt(first*20)+2 || frame==Mathf.CeilToInt(relay.ImpactTime*20)+2 || frame==Mathf.CeilToInt(heroTime*20)+8)
                                 File.WriteAllBytes("artifacts/cinematics/causal-relays-"+kind+"-"+frame+".png",pixels.EncodeToPNG());
+                            if((frame+1)%200==0 || frame+1==frames)
+                                Debug.Log("Causal capture progress: "+kind+", "+(frame+1)+"/"+frames+" frames, "+
+                                    (Time.realtimeSinceStartup-exportStarted).ToString("F1")+" export seconds.");
                             yield return null;
                         }
                     }
@@ -133,8 +187,8 @@ namespace Horizon.Tests
                     Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
                     float jackpot=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot).Time;
                     Assert.Greater(PcmPeak(pcm,jackpot,jackpot+.15f),50,"The final network burst must have its synchronized impact sound.");
-                    Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
-                    Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
+                    Assert.AreEqual(CinematicOutcome.EventHeading(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
+                    Assert.AreEqual(CinematicOutcome.Readable(source.detail),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
                     foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})
                     {
                         Text text=root.GetComponentsInChildren<Text>(true).Single(t=>t.name==name);
@@ -163,7 +217,9 @@ namespace Horizon.Tests
         private static void AssertOpeningCloseup(HorizonWorld3D world,Transform stage)
         {
             Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
-            RenderTexture target=RenderTexture.GetTemporary(540,614,24);
+            // Full-screen films use the same 20:9 phone shape as the native
+            // backbuffer, not the old cropped 540x614 scene strip.
+            RenderTexture target=RenderTexture.GetTemporary(540,1200,24);
             try
             {
                 camera.rect=new Rect(0,0,1,1); camera.targetTexture=target;
@@ -175,26 +231,31 @@ namespace Horizon.Tests
                     float x=camera.WorldToViewportPoint(corner).x; left=Mathf.Min(left,x); right=Mathf.Max(right,x);
                 }
                 Assert.Greater(right-left,.4f,"The first source must dominate the initial shot, including same-frame replay.");
+                Assert.That(left,Is.GreaterThanOrEqualTo(.04f),"The close-up must not crop the left of the real source.");
+                Assert.That(right,Is.LessThanOrEqualTo(.96f),"The close-up must not crop the right of the real source.");
             }
             finally { camera.rect=viewport; camera.targetTexture=prior; RenderTexture.ReleaseTemporary(target); world.FrameCinematicLabels(); }
         }
         private static void AssertSourceInsideCamera(HorizonWorld3D world)
         {
-            Camera camera=world.WorldCamera; Rect viewport=camera.rect; RenderTexture prior=camera.targetTexture;
-            var target=RenderTexture.GetTemporary(540,614,24);
-            try
+            Assert.IsFalse(world.GetComponentsInChildren<TextMesh>(true).Single(t=>t.name=="Cinematic evidence label 25").gameObject.activeSelf,
+                "One synchronized caption must replace the giant world-space duplicate.");
+            foreach(Renderer part in (Renderer[])typeof(HorizonWorld3D).GetField("relaySourceSubjects",
+                BindingFlags.Instance|BindingFlags.NonPublic).GetValue(world)) AssertInsidePhone(world,part);
+        }
+        private static void AssertInsidePhone(HorizonWorld3D world,Renderer part)
+        {
+            Assert.IsTrue(part.enabled && part.gameObject.activeInHierarchy,"Physical evidence must not be hidden: "+part.name);
+            Bounds bounds=part.bounds;
+            for(int corner=0;corner<8;corner++)
             {
-                camera.rect=new Rect(0,0,1,1); camera.targetTexture=target; world.FrameCinematicLabels();
-                TextMesh source=world.GetComponentsInChildren<TextMesh>().Single(t=>t.name=="Cinematic evidence label 25");
-                Bounds bounds=source.GetComponent<Renderer>().localBounds;
-                for(int i=0;i<8;i++)
-                {
-                    Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
-                    Vector3 projected=camera.WorldToViewportPoint(source.transform.TransformPoint(corner));
-                    Assert.That(projected.y,Is.InRange(.02f,.98f),"The full day and source must remain inside the rendered scene.");
-                }
+                Vector3 point=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
+                    (corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                Vector3 projected=world.WorldCamera.WorldToViewportPoint(point);
+                Assert.Greater(projected.z,0,part.name+" must remain in front of the camera.");
+                Assert.That(projected.x,Is.InRange(.04f,.96f),part.name+" must fit the phone width.");
+                Assert.That(projected.y,Is.InRange(.22f,.80f),part.name+" must clear the caption and control bands.");
             }
-            finally { camera.rect=viewport; camera.targetTexture=prior; world.FrameCinematicLabels(); RenderTexture.ReleaseTemporary(target); }
         }
     }
 }

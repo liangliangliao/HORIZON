@@ -29,11 +29,11 @@ namespace Horizon.Tests
             {
                 float time=Mathf.Lerp(impact+.005f,duration*.88f,sample/12f);
                 world.Cinematics.Advance(time-world.Cinematics.Elapsed); yield return null;
-                var captions=world.GetComponentsInChildren<TextMesh>().Where(t=>t.name.StartsWith("Cinematic evidence label ") && t.text.StartsWith("Day ")).ToArray();
+                var captions=world.GetComponentsInChildren<TextMesh>().Where(t=>t.name.StartsWith("Cinematic evidence label ") && t.text.StartsWith("第 ")).ToArray();
                 Assert.AreEqual(1,captions.Length,"Only the current source should occupy the caption area.");
                 string copy=captions[0].text.Replace("\n",""); if(!seen.Contains(copy)) seen.Add(copy);
             }
-            CollectionAssert.AreEqual(source.receipt.causes.Take(6).Select(c=>"Day "+c.day+c.label).Distinct(),seen);
+            CollectionAssert.AreEqual(source.receipt.causes.Take(6).Select(c=>"第 "+c.day+" 天"+PresentationCopy.Chinese(c.label)).Distinct(),seen);
             Camera camera=world.WorldCamera; float originalAspect=camera.aspect;
             foreach(float aspect in new[] { .45f/.64f,.5625f/.64f })
             {
@@ -62,7 +62,15 @@ namespace Horizon.Tests
             world.Cinematics.Enqueue(CinematicEventCoverageTests.RealEvents().Single(e=>e.kind==DomainEventKind.PatternBroken),true);
             var body=world.GetComponentsInChildren<HorizonActorPerformance>().Single(x=>x.name=="Cinematic player");
             var actor=body.GetComponent<HorizonActor>();
-            world.Cinematics.Advance(world.Cinematics.Current.Duration*.54f);
+            IReadOnlyList<CinematicShot> shots=CinematicStoryboard.Pattern(world.Cinematics.Current);
+            float stop=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+            world.Cinematics.Advance(stop+.01f);
+            Assert.AreEqual(PatternShot.Silence.ToString(),world.CurrentCinematicShot,
+                "Holding the actor pose must not rewind the authored camera cut.");
+            Assert.Greater(Vector3.Distance(world.WorldCamera.transform.position,body.transform.position),5.5f,
+                "The breath-hold must frame the actor and interruption together instead of filling the phone with the avatar's back.");
+            float crossedAt=shots[(int)PatternShot.ShatterHistory].Time+.01f;
+            world.Cinematics.Advance(crossedAt-world.Cinematics.Elapsed);
             Assert.IsTrue(body.GraphReady);
             Assert.Greater(body.transform.localPosition.z,3.5f,"The character must cross the old break at z=2 before the memento shot.");
             Vector3 crossed=body.transform.localPosition; yield return null;
@@ -122,7 +130,9 @@ namespace Horizon.Tests
             {
                 var e=new DomainEvent { id="resource"+value,kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,
                     receipt=new RewardReceipt { resourcesRecorded=true,resources=new ResourceDelta(value,5,3,9,value,value),sourceDay=1 },day=4 };
-                world.Cinematics.Enqueue(e,true); world.Cinematics.Advance(2.7f);
+                world.Cinematics.Enqueue(e,true);
+                float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                world.Cinematics.Advance(impact+.25f);
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="EnergyCell"));
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Assembled tool 0"));
                 Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Relationship other person"));
@@ -131,7 +141,8 @@ namespace Horizon.Tests
             }
             world.Cinematics.Enqueue(new DomainEvent { id="major-energy",kind=DomainEventKind.PatternBroken,tier=RewardTier.Mythic,
                 receipt=new RewardReceipt { resourcesRecorded=true,resources=new ResourceDelta(1) } },true);
-            world.Cinematics.Advance(7);
+            float mythicImpact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            world.Cinematics.Advance(mythicImpact+.2f);
             Assert.AreEqual(1,world.Cinematics.Current.Objects.Single(o=>o.Kind==RewardObjectKind.EnergyCell).Amount);
             Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Energy presentation amplifier 2"));
             Assert.IsTrue(world.GetComponentsInChildren<Transform>().Any(t=>t.name=="Scene power distribution 0"));

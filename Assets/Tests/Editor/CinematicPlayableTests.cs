@@ -56,12 +56,19 @@ namespace Horizon.Tests
             yield return null;
             var root=(RectTransform)typeof(HorizonApp).GetField("root",flags).GetValue(app);
             var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",flags).GetValue(app);
+            Assert.IsFalse(root.GetComponentsInChildren<Text>(true).Any(t=>t.name=="Home line"),
+                "Ordinary home copy must not be layered across the 3D diorama.");
             GameObject[] home=root.Cast<Transform>().Where(t=>t.gameObject.activeSelf).Select(t=>t.gameObject).ToArray();
             Rect viewport=world.WorldCamera.rect; var probe=new CueProbe(); DomainEvent reward=Pattern();
             typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { reward,new Action(probe.Completed) });
             Assert.IsTrue(home.All(g=>!g.activeInHierarchy));
+            Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect,"Reward movies must use the complete phone viewport.");
+            Assert.IsFalse(root.GetComponentsInChildren<Button>(true).Single(b=>b.name=="Continue master event").gameObject.activeSelf);
+            Assert.IsNotNull(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Cinematic phase copy"));
+            Assert.IsNotNull(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Presentation multiplier meaning"));
             world.Cinematics.enabled=false; world.Cinematics.Advance(30); yield return null;
             Assert.IsTrue(root.GetComponentsInChildren<Button>().Single(b=>b.name=="Continue master event").interactable);
+            Assert.IsFalse(root.GetComponentsInChildren<Button>(true).Single(b=>b.name=="Skip cinematic").gameObject.activeSelf);
             typeof(HorizonApp).GetMethod("HandleBack",flags).Invoke(app,null); yield return null;
             Assert.AreEqual(1,probe.Completions,"System back must run the reward continuation, rather than just destroy its page.");
             Assert.IsTrue(reward.acknowledged); Assert.IsNull(typeof(HorizonApp).GetField("overlay",flags).GetValue(app));
@@ -141,7 +148,8 @@ namespace Horizon.Tests
             DomainEvent e=Pattern(); string before=JsonUtility.ToJson(e); var probe=new CueProbe();
             var director=world.Cinematics; director.enabled=false;
             director.Cue+=probe.Cue;
-            Assert.IsTrue(director.Enqueue(e,true,probe.Completed)); Assert.IsFalse(director.Enqueue(e,true,probe.Completed));
+            Assert.IsTrue(director.Enqueue(e,false,probe.Completed)); Assert.IsFalse(director.Enqueue(e,true,probe.Completed));
+            Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect,"Even legacy embedded requests must play full screen.");
             float stop=director.Current.Cues.Single(c=>c.Phase==CinematicPhase.HitStop).Time;
             director.Advance(stop); Vector3 position=world.WorldCamera.transform.position;
             director.SetPaused(true);
@@ -149,7 +157,8 @@ namespace Horizon.Tests
             Quaternion head=actor.Head.localRotation; yield return null; Assert.AreEqual(head,actor.Head.localRotation);
             director.Advance(10); Assert.AreEqual(stop,director.Elapsed);
             Assert.AreEqual(position,world.WorldCamera.transform.position); Assert.AreEqual(0,probe.Impacts);
-            director.SetPaused(false); director.Advance(.5f); Assert.AreEqual(1,probe.Impacts);
+            float release=director.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+            director.SetPaused(false); director.Advance(release-director.Elapsed+.01f); Assert.AreEqual(1,probe.Impacts);
             director.Skip(); director.Skip(); Assert.AreEqual(1,probe.Completions); Assert.AreEqual(rect,world.WorldCamera.rect); Assert.AreEqual(fov,world.WorldCamera.fieldOfView);
             Assert.AreEqual(before,JsonUtility.ToJson(e));
             Assert.IsTrue(director.Enqueue(e,true,probe.Completed)); director.CancelAll(); Assert.AreEqual(1,probe.Completions); Assert.AreEqual(rect,world.WorldCamera.rect);
@@ -202,16 +211,44 @@ namespace Horizon.Tests
                 for(int i=0;i<events.Length;i++)
                 {
                     typeof(HorizonApp).GetMethod("PlayMasterSpectacle",flags).Invoke(app,new object[] { events[i],(Action)(()=>{}) });
-                    world.Cinematics.enabled=false; float reveal=world.Cinematics.Current.Cues.Single(c=>c.Phase==CinematicPhase.SecondReveal).Time;
-                    world.Cinematics.Advance(reveal+.1f); yield return null;
-                    foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
-                    canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
-                    Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,image);
-                    RenderTexture previous=RenderTexture.active; RenderTexture.active=image; pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=previous;
-                    File.WriteAllBytes(Path.Combine(directory,names[i]+".png"),pixels.EncodeToPNG());
-                    Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text);
+                    world.Cinematics.enabled=false;
+                    RewardPlan playing=world.Cinematics.Current;
+                    float reveal=playing.Cues.Single(c=>c.Phase==CinematicPhase.SecondReveal).Time;
+                    float[] samples=i==0?new[] {
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge).Time+.12f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time+.05f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time+.08f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Multiplication).Time+.18f,
+                        reveal+.12f,
+                        playing.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Settlement).Time+.95f
+                    }:new[] {reveal+.1f};
+                    string[] beats=i==0?new[] {"charge","breath-hold","impact","multiplier","second-reveal","settlement"}:new[] {"second-reveal"};
+                    for(int sample=0;sample<samples.Length;sample++)
+                    {
+                        world.Cinematics.Advance(Mathf.Max(0,samples[sample]-world.Cinematics.Elapsed)); yield return null;
+                        foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                        canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                        Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,image);
+                        RenderTexture previous=RenderTexture.active; RenderTexture.active=image; pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=previous;
+                        string filename=i==0?"92-pattern-fullscreen-"+(sample+1).ToString("00")+"-"+beats[sample]:names[i];
+                        File.WriteAllBytes(Path.Combine(directory,filename+".png"),pixels.EncodeToPNG());
+                        Text phase=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Cinematic phase copy");
+                        Assert.IsNotEmpty(phase.text); Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text);
+                        Text multiplier=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience");
+                        if(i==0 && beats[sample]=="impact") Assert.IsEmpty(multiplier.text,"Impact must remain readable before the multiplier reveal.");
+                        if(i==0 && beats[sample]=="multiplier")
+                        {
+                            Assert.IsNotEmpty(multiplier.text); Assert.That(multiplier.text,Does.Not.Contain("×"));
+                            Assert.IsFalse(world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="3D presentation multiplier plaque").gameObject.activeSelf,
+                                "No decorative multiplier plaque may return during an actual outcome reveal.");
+                        }
+                    }
                     Assert.IsTrue(saved.rewardCollection.Capture(events[i],i==0?3:0)); Assert.IsFalse(saved.rewardCollection.Capture(events[i],i==0?3:0));
                     world.Cinematics.Skip(); Assert.IsTrue(events[i].acknowledged);
+                    Text finalStory=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story");
+                    var finalTypography=finalStory.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                    Assert.GreaterOrEqual(finalTypography.maxVisibleCharacters,finalStory.text.Length,
+                        "The completed result must retain the whole sentence, not a partially typed entrance frame.");
                 }
                 var restored=JsonUtility.FromJson<ArchiveData>(JsonUtility.ToJson(saved)); restored.RepairMasterArchive();
                 Assert.AreEqual(2,restored.rewardCollection.items.Count);

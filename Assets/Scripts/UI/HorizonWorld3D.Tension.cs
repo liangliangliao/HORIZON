@@ -12,13 +12,14 @@ namespace Horizon.UI
         private Material attentionMaterial;
         private bool tensionStopped;
         private bool tensionPreviewCharged;
+        private bool tensionOpeningCharged;
         private readonly Dictionary<int,AudioClip> chargeSounds=new Dictionary<int,AudioClip>();
         private void PrepareCinemaTension()
         {
 #if UNITY_EDITOR
             recordedCinemaSounds.Clear(); recordedSoundTime=0;
 #endif
-            cinemaTension=new CinematicTension(moviePlan); tensionStopped=false; tensionPreviewCharged=false;
+            cinemaTension=new CinematicTension(moviePlan); tensionStopped=false; tensionPreviewCharged=false; tensionOpeningCharged=false;
             if(!cinemaTension.Enabled) return;
             if(cinemaTension.SourceCloseup)
             {
@@ -66,6 +67,19 @@ namespace Horizon.UI
             tensionFrame=cinemaTension?.Sample(time,preferences.reducedMotion) ?? default(CinematicTensionFrame);
             bool hold=tensionFrame.Silent || moviePhase==CinematicPhase.HitStop;
             if(cinemaTension==null || !cinemaTension.Enabled) return;
+            // Some Major events have no Charge cue. Start their short ramp from
+            // the same clock, once, without adding time to the authored movie.
+            if(!tensionOpeningCharged && cinemaTension.OpeningHold && time>=cinemaTension.ChargeAt)
+            {
+                tensionOpeningCharged=true;
+                if(!preferences.reducedMotion && !paused && time<cinemaTension.FirstHold)
+                {
+#if UNITY_EDITOR
+                    recordedSoundTime=time;
+#endif
+                    PlayTensionCharge(cinemaTension.FirstHold-time);
+                }
+            }
             if(!tensionPreviewCharged && time>=cinemaTension.PreviewStart && cinemaTension.PreviewStart<cinemaTension.Reveal)
             {
                 tensionPreviewCharged=true;
@@ -102,12 +116,14 @@ namespace Horizon.UI
         }
         private void ResetCinemaTension()
         {
-            cinemaTension=null; tensionFrame=default(CinematicTensionFrame); tensionStopped=false; tensionPreviewCharged=false;
+            cinemaTension=null; tensionFrame=default(CinematicTensionFrame); tensionStopped=false; tensionPreviewCharged=false; tensionOpeningCharged=false;
             if(attentionIris!=null) attentionIris.gameObject.SetActive(false);
         }
         private void PlayTensionCharge()
         {
             if(cinemaTension==null || !cinemaTension.Enabled || preferences.reducedMotion) return;
+            if(tensionOpeningCharged) return;
+            tensionOpeningCharged=true;
             PlayTensionCharge(cinemaTension.FirstHold-cinemaTension.ChargeAt);
         }
         private void PlayTensionCharge(float seconds)

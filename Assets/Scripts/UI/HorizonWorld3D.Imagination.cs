@@ -9,10 +9,18 @@ namespace Horizon.UI
         public bool ImaginationPlaying { get { return imaginationSceneActive && imaginedScene!=null; } }
         public ImaginationFrame CurrentImaginationFrame { get; private set; }
         private HorizonActorPerformance imaginationPerformance;
+        private Renderer[] imaginationSubjectRenderers;
+        private Renderer[] imaginationOverviewRenderers;
+        private Renderer[] imaginationScenicRenderers;
+        private bool imaginationOverview;
+        public bool ImaginationOverview => imaginationOverview;
+        public void ToggleImaginationOverview()
+        { if(!imaginationSceneActive) return; imaginationOverview=!imaginationOverview; SampleImaginationScene(); }
         public void SampleImaginationAt(float seconds)
         { if(!imaginationSceneActive || imaginedScene==null || paused) return; imaginationTime=Mathf.Max(0,seconds); SampleImaginationScene(); }
         private ImagineRun imaginedScene;
         private float imaginationTime;
+        public float ImaginationElapsed => imaginationTime;
         private Vector3 imaginationSavedCamera, imaginationSavedLook;
         private Rect imaginationSavedRect;
         private float imaginationSavedFov;
@@ -22,13 +30,20 @@ namespace Horizon.UI
             Cinematics.CancelAll(); EndImaginationScene();
             imaginationSavedCamera=cameraPosition; imaginationSavedLook=cameraLook; imaginationSavedRect=WorldCamera.rect; imaginationSavedFov=WorldCamera.fieldOfView;
             imaginedScene=run.Copy(); imaginationTime=0; imaginationSceneActive=true;
+            imaginationOverview=false;
             inspectedSystem=null; if(systemScenery!=null) systemScenery.gameObject.SetActive(false);
             movieAnchor.localScale=Vector3.one; movieAnchor.localPosition=Vector3.zero;
             movieMuted=run.phase==ImaginePhase.Failure; if(movieMuted) audioSource.Stop(); UpdateAudio();
-            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,.44f,1,.38f);
+            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,0,1,1);
             PrepareProjectionWorld();
+            imaginationScenicRenderers=projectionLayers[2].GetComponentsInChildren<Renderer>(true);
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
+            imaginationSubjectRenderers=moviePlayer.GetComponentsInChildren<Renderer>(true);
+            var people=new System.Collections.Generic.List<Renderer>(imaginationSubjectRenderers);
+            people.AddRange(movieFuture.GetComponentsInChildren<Renderer>(true));
+            people.AddRange(movieFriend.GetComponentsInChildren<Renderer>(true));
+            imaginationSubjectRenderers=people.ToArray();
             moviePlayer.gameObject.SetActive(true); movieFuture.gameObject.SetActive(true); moviePlayer.localRotation=Quaternion.Euler(0,180,0);
             movieFuture.localScale=Vector3.one; movieFuture.localPosition=new Vector3(0,0,6); movieFuture.GetComponent<HorizonActor>().Pointing=false;
             movieAnchor.gameObject.SetActive(true); movieBarrier.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false);
@@ -45,6 +60,11 @@ namespace Horizon.UI
             if(task!=null) task.gameObject.SetActive(run.goalFamily=="career" || run.goalFamily=="learning");
             movieLight.intensity=.7f; movieLight.color=Palette.Mint;
             moviePlayer.GetComponent<HorizonActor>().SetNeutral();
+            PrepareImaginationLifeSet(run);
+            var overview=new System.Collections.Generic.List<Renderer>(projectionWorld.GetComponentsInChildren<Renderer>(true));
+            overview.AddRange(movieAnchor.GetComponentsInChildren<Renderer>(true));
+            overview.AddRange(imaginationSubjectRenderers);
+            if(imaginationWalkSet) overview.AddRange(lifeStage.GetComponentsInChildren<Renderer>(true));
             moviePlayer.GetComponent<HorizonActor>().TiredUntil=0;
             if(run.phase==ImaginePhase.Effort || run.phase==ImaginePhase.Adjust) moviePlayer.GetComponent<HorizonActor>().SetIntent(CardKind.Growth);
             if(run.phase==ImaginePhase.Recover || run.phase==ImaginePhase.Retry)
@@ -58,6 +78,10 @@ namespace Horizon.UI
             if(run.phase==ImaginePhase.VictoryAnchor || run.phase==ImaginePhase.Preparation)
             { Transform projector=RewardObject(RewardObjectKind.Projector,0); projector.localPosition=new Vector3(-1.6f,.65f,1); projector.localScale=Vector3.one*.7f; movieObjects.Add(projector); }
             if(run.phase==ImaginePhase.Complete) { Transform film=RewardObject(RewardObjectKind.MemoryFilm,0); BindMemoryFilm(film,run.frames); film.localPosition=new Vector3(0,1.4f,4.7f); film.localScale=Vector3.one*1.4f; movieObjects.Add(film); }
+            overview.AddRange(movieFuture.GetComponentsInChildren<Renderer>(true));
+            overview.AddRange(movieFriend.GetComponentsInChildren<Renderer>(true));
+            foreach(Transform item in movieObjects) overview.AddRange(item.GetComponentsInChildren<Renderer>(true));
+            imaginationOverviewRenderers=overview.ToArray();
             SampleImaginationScene();
         }
         private void SampleImaginationScene()
@@ -136,11 +160,49 @@ namespace Horizon.UI
                 case ImaginationShot.ImaginedVictory: action=HorizonBodyAction.Celebrate; position=new Vector3(0,0,5); camera=new Vector3(3.4f,2.7f,1.2f); look=new Vector3(0,1.2f,5.6f); break;
             }
             SampleProjectionWorld(preferences.reducedMotion?1:beat,CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor || CurrentImaginationFrame.Shot==ImaginationShot.BuildThePath);
+            // Scenic neighbours are not the action. Keep them out of the
+            // title band in detail shots; the optional overview fits them too.
+            // Preserve all five materializing layers and their original
+            // progress. Only hide background bodies in a subject close-up.
+            foreach(Renderer renderer in imaginationScenicRenderers)
+                renderer.enabled=!imaginationWalkSet && imaginationOverview;
             if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor) position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
+            SampleImaginationLifeSet(ref position);
             imaginationPerformance.Play(action,beat);
             moviePlayer.localPosition=position;
+            if(imaginationWalkSet) { camera=position+new Vector3(3.4f,2.7f,4.6f); look=position+Vector3.up*1.2f; }
+            float lens=39;
+            if(!preferences.reducedMotion)
+            {
+                // Shot-specific contrast: effort closes in, recovery opens out,
+                // victory releases. A simulated victory remains a simulation.
+                ImaginationShot shot=CurrentImaginationFrame.Shot;
+                float pressure=shot==ImaginationShot.Difficulty?Smooth(0,.8f,beat)*.65f:
+                    shot==ImaginationShot.FinalPush?Smooth(0,.8f,beat):
+                    shot==ImaginationShot.Failure?(1-Smooth(.65f,1,beat))*.4f:0;
+                float release=shot==ImaginationShot.ImaginedVictory?Smooth(0,.8f,beat):0;
+                Vector3 toward=(look-camera).normalized;
+                camera+=toward*(pressure*.65f-release*.32f);
+                lens-=pressure*2.2f; lens+=release*1.2f;
+                if(shot==ImaginationShot.Recovery)
+                {
+                    movieLight.intensity=Mathf.Lerp(.2f,.75f,Smooth(.18f,1,beat));
+                    movieLight.color=Color.Lerp(new Color(.25f,.4f,.65f),new Color(1,.68f,.38f),beat);
+                }
+                if(shot==ImaginationShot.ImaginedVictory)
+                    movieLight.intensity=1.1f+Mathf.Sin(beat*Mathf.PI)*.6f;
+            }
             if(preferences.reducedMotion) camera=new Vector3(5,4,-6);
-            WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=39;
+            // Follow the actual moving actor, rather than looking past them at
+            // a fixed victory coordinate that clips on a tall full-screen phone.
+            FitPortraitSubject(imaginationSubjectRenderers,HorizonCinemaLayout.ImaginationAperture,lens,ref camera,ref look);
+            if(imaginationOverview)
+            {
+                camera=new Vector3(6,5,imaginationWalkSet?9:-7); look=new Vector3(0,1.2f,3);
+                FitPortraitSubject(imaginationOverviewRenderers,HorizonCinemaLayout.ImaginationAperture,lens,ref camera,ref look,false);
+            }
+            optics.Glow=SystemInfo.graphicsDeviceType==UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?.25f:0;
+            WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=lens;
         }
         public void EndImaginationScene()
         {
@@ -148,6 +210,7 @@ namespace Horizon.UI
             imaginationPerformance?.Release(); movieMuted=false; UpdateAudio();
             foreach(HorizonActorPerformance performance in cinematicStage.GetComponentsInChildren<HorizonActorPerformance>(true)) performance.Release();
             imaginationSceneActive=false; imaginedScene=null; cinematicStage.gameObject.SetActive(false);
+            imaginationWalkSet=false; imaginationOverview=false; if(lifeStage!=null) lifeStage.gameObject.SetActive(false);
             if(projectionWorld!=null) projectionWorld.gameObject.SetActive(false);
             ResetAdditionalVfx();
             movieAnchor.localScale=Vector3.one; optics?.Clear();

@@ -1,4 +1,5 @@
 using System;
+using Horizon.Game;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -106,7 +107,7 @@ namespace Horizon.UI
         {
             Text label = Rect(parent, name, x0, y0, x1, y1).gameObject.AddComponent<Text>();
             label.font = Font;
-            label.text = value;
+            label.text = Horizon.Game.PresentationCopy.Chinese(value);
             label.fontSize = size;
             label.color = color;
             label.alignment = alignment;
@@ -142,6 +143,7 @@ namespace Horizon.UI
         {
             Canvas.ForceUpdateCanvases();
             Text[] labels = parent.GetComponentsInChildren<Text>();
+            foreach(Text label in labels) if(label.GetComponentInParent<InputField>()==null) label.text=Horizon.Game.PresentationCopy.Chinese(label.text);
             foreach (Text label in labels)
                 if (label.font != null) label.font.RequestCharactersInTexture(label.text, label.fontSize, label.fontStyle);
             foreach (Text label in labels) label.SetAllDirty();
@@ -162,6 +164,7 @@ namespace Horizon.UI
         public System.Action<HorizonCardDrag> Began;
         private bool dragging;
         public bool IsDragging { get { return dragging; } }
+        public bool IsReturning { get { return returning!=null; } }
         private int pointerId;
         private RectTransform rect;
         private Vector3 origin;
@@ -208,8 +211,8 @@ namespace Horizon.UI
             Vector2 point = eventData.position;
             if (parent != null) RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, eventData.position, eventCamera, out point);
             rect.position = origin + (parent != null ? parent.TransformVector(point - down) : (Vector3)(point - down));
-            rect.localScale = homeScale * 1.06f;
-            rect.localRotation = Quaternion.Euler(-8, Mathf.Clamp((point.x - down.x) * 0.05f, -18, 18), -3);
+            rect.localScale = homeScale * (VisualPreferences.ReducedMotion?1:1.06f);
+            rect.localRotation = VisualPreferences.ReducedMotion?homeRotation:Quaternion.Euler(-8, Mathf.Clamp((point.x - down.x) * 0.05f, -18, 18), -3);
             Dragged?.Invoke(this, eventData.position);
         }
 
@@ -250,9 +253,10 @@ namespace Horizon.UI
         private System.Collections.IEnumerator ReturnCard()
         {
             Vector3 from = rect.position;
-            for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.2f)
+            for (float t = 0; t < 1; t += Time.unscaledDeltaTime / 0.26f)
             {
-                rect.position = Vector3.Lerp(from, origin, Mathf.SmoothStep(0, 1, t));
+                while(VisualPreferences.Paused) yield return null;
+                rect.position = VisualPreferences.ReducedMotion?origin:Vector3.LerpUnclamped(from, origin, ImmersiveMotion.Land(t));
                 yield return null;
             }
             rect.position = origin;
@@ -267,16 +271,19 @@ namespace Horizon.UI
         private float age;
         private void Update()
         {
+            if(VisualPreferences.Paused) return;
             age += Time.unscaledDeltaTime;
             float delay = Index * 0.025f;
             float t = Mathf.Clamp01((age - delay) / 0.9f);
             float angle = Index * 2.399f;
             Vector2 scatter = new Vector2(Mathf.Cos(angle) * 0.08f, Mathf.Sin(angle) * 0.045f + 0.07f);
-            Vector2 point = Vector2.Lerp(StartPoint, new Vector2(0.82f, 0.967f), t * t) + scatter * Mathf.Sin(t * Mathf.PI);
+            float flight=ImmersiveMotion.Flight(t);
+            Vector2 destination=new Vector2(0.82f,0.967f);
+            Vector2 point = VisualPreferences.ReducedMotion?destination:Vector2.Lerp(StartPoint,destination,flight)+scatter*Mathf.Sin(flight*Mathf.PI);
             RectTransform rect = (RectTransform)transform;
             rect.anchorMin = point - new Vector2(0.009f, 0.005f);
             rect.anchorMax = point + new Vector2(0.009f, 0.005f);
-            rect.localScale = Vector3.one * (1 + Mathf.Sin(t * Mathf.PI) * 0.65f);
+            rect.localScale = Vector3.one * (VisualPreferences.ReducedMotion?1:(1+Mathf.Sin(t*Mathf.PI)*.65f)*(1-ImmersiveMotion.Smooth((t-.8f)/.2f)*.85f));
             if (t >= 1) Destroy(gameObject);
         }
     }
@@ -332,7 +339,7 @@ namespace Horizon.UI
             age += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(age / 0.28f);
             group.alpha = t;
-            transform.localScale = Vector3.one * Mathf.Lerp(0.91f, 1, Mathf.SmoothStep(0, 1, t));
+            transform.localScale = Vector3.one * Mathf.LerpUnclamped(0.91f, 1, ImmersiveMotion.Land(t));
             if (t >= 1) enabled = false;
         }
     }

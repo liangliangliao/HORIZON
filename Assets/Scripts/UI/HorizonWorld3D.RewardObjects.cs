@@ -110,7 +110,11 @@ namespace Horizon.UI
                     Shape(item,"Accumulated cause energy",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.4f,portalLight); break;
                 case RewardObjectKind.OrbitNode:
                     Sculpt(item,"Orbit carrier",rewardRing,Vector3.zero,Vector3.one,gold);
-                    Shape(item,"Future node",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.18f,portalLight); break;
+                    Shape(item,"Future node",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.18f,rewardCrystal);
+                    for(int meridian=0;meridian<3;meridian++)
+                        Sculpt(item,"Future direction meridian "+meridian,Own(HorizonSculpt.Torus(.11f,.008f)),Vector3.zero,Vector3.one,gold)
+                            .localRotation=Quaternion.Euler(0,meridian*60,25);
+                    break;
                 case RewardObjectKind.CausalChain:
                     for(int i=0;i<3;i++) { Sculpt(item,"Causal link "+i,rewardRing,new Vector3((i-1)*.33f,(i-1)*.32f,0),Vector3.one*.84f,i==1?gold:teal).localRotation=Quaternion.Euler(0,i%2*75,-25); } break;
                 case RewardObjectKind.PredictionPanel:

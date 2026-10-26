@@ -46,8 +46,8 @@ namespace Horizon
         private void BuildReadableHand()
         {
             choiceVisibleSince = Time.unscaledTime;
-            boardHint = View.Label(root, "Drag hint", IsPractice ? "练习采用正式规则，退出后原人生保持原样" : "点牌查看 · 向上拖进金色圈行动", 28,
-                Palette.Muted, TextAnchor.MiddleCenter, 0.045f, 0.014f, 0.955f, 0.057f);
+            boardHint=dragHint;
+            if(IsPractice && boardHint!=null) boardHint.text="练习采用正式规则，退出后原人生保持原样";
             trail = View.Fill(root, "Causal light", Palette.Mint, 0.5f, 0.5f, 0.5f, 0.5f).rectTransform;
             trail.gameObject.SetActive(false);
             for (int i = 0; i < session.Hand.Length; i++)

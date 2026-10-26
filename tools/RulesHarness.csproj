@@ -30,5 +30,9 @@
     <Compile Include="../Assets/Tests/Editor/RewardSpectacleTests.cs" />
     <Compile Include="../Assets/Tests/Editor/CausalRelayTests.cs" />
     <Compile Include="../Assets/Tests/Editor/CinematicTensionTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CinematicEnergyTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/CinematicOutcomeTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/LifeActionStoryboardTests.cs" />
+    <Compile Include="../Assets/Tests/Editor/UiProgressWatchdogTests.cs" />
   </ItemGroup>
 </Project>

@@ -25,7 +25,7 @@ namespace Horizon.Game
             if (cascade)
             {
                 List<RewardEvidence> evidence = (plan.Event.receipt?.causes ?? new List<RewardEvidence>())
-                    .Take(MaximumNodes).Select(x => x.Copy()).ToList();
+                    .OrderBy(x=>x.day).Take(MaximumNodes).Select(x => x.Copy()).ToList();
                 for (int i = 0; i < evidence.Count; i++)
                 {
                     RewardEvidence source = evidence[i];
@@ -58,10 +58,16 @@ namespace Horizon.Game
             float fade = 1 - Ease(Duration * .94f, Duration, time);
             float age = time - node.ActivationTime;
             bool lit = age >= 0;
-            float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 4);
+            float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 1.7f);
             float final = time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
             if(!reducedMotion && time>=secondRevealTime) final=Math.Max(final,(float)Math.Exp(-(time-secondRevealTime)*3.5f));
             if(!reducedMotion && time>=jackpotTime) final=Math.Max(final,(float)Math.Exp(-(time-jackpotTime)*3.5f));
+            // A single relay may flare at full strength. At the shared release,
+            // however, every recorded source lights at once. Capping only that
+            // simultaneous component preserves the climbing node rhythm while
+            // avoiding a featureless white wall on Android additive blending.
+            float networkPeak=Math.Max(.42f,.75f-Math.Max(0,Nodes.Count-3)*.03f);
+            final*=networkPeak;
             float emphasis=Math.Max(pulse,final);
             float beam = lit && !reducedMotion ? Math.Max(emphasis, .1f) * fade : 0;
             return new CausalRelayFrame(lit, fade, emphasis * fade, beam,

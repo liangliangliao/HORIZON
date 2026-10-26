@@ -107,21 +107,26 @@ namespace Horizon.UI
             PrepareCinematicEffects();
         }
         private void EvidenceLabel(int index,string text,Vector3 position)
-        { TextMesh label=movieLabels[index]; label.gameObject.SetActive(true); label.text=text; label.transform.localPosition=position; }
+        { TextMesh label=movieLabels[index]; label.gameObject.SetActive(true); label.text=PresentationCopy.Chinese(text); label.transform.localPosition=position; }
         public void FrameCinematicLabels()
         {
             if(WorldCamera==null) return;
+            // A travelling day label on every 3D node becomes an unreadable
+            // stack in perspective. Time-echo provenance lives in the caption.
+            if(moviePlan?.Event.kind==DomainEventKind.TimeEcho)
+                for(int i=0;i<25;i++) movieLabels[i].gameObject.SetActive(false);
             foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
             FrameJackpotStage();
+            FrameImmersion();
             FrameCinemaTension();
             if(relayPlan!=null && relayPlan.Nodes.Count>0 && movieLabels[25].gameObject.activeSelf)
-                movieLabels[25].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,.88f,6));
+                movieLabels[25].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,.71f,6));
             if(moviePlan==null || (moviePlan.Event.kind!=DomainEventKind.Synchronized && moviePlan.Event.kind!=DomainEventKind.Surprise)) return;
             // These are readable annotations, so frame them against the actual
             // portrait camera rather than the depth of the world-space rays.
             // Keep them between the event heading and the prediction panel.
             for(int i=0;i<3;i++) if(movieLabels[i].gameObject.activeSelf)
-                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.70f:.78f,6));
+                movieLabels[i].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(i==0?.28f:i==1?.72f:.5f,i<2?.77f:.69f,6));
         }
         private void SampleCinematicStaging(float time,float impact,ref Vector3 camera,ref Vector3 look)
         {
@@ -131,22 +136,28 @@ namespace Horizon.UI
             if(e.kind==DomainEventKind.PatternBroken) SamplePatternStoryboard(time,ref camera,ref look);
             else if(e.kind==DomainEventKind.TimeEcho)
             {
-                CurrentCinematicShot=time<.12f?"Slow present":time<.35f?"Desaturate":time<.8f?"Rewind actual days":time<1.05f?"Original action stop":time<2.15f?"Cause returns":"Attribution";
+                float chargeAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge).Time;
+                float rewindAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Escalation).Time;
+                float sourceAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.HeroMoment).Time;
+                float returnAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                float attributionAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
+                CurrentCinematicShot=time<chargeAt?"Slow present":time<rewindAt?"Desaturate":time<sourceAt?"Rewind actual days":
+                    time<returnAt?"Original action stop":time<attributionAt?"Cause returns":"Attribution";
                 int count=Mathf.Min(24,receipt?.causes.Count??0); Vector3 source=count>0?movieNodes[0].localPosition:new Vector3(0,.65f,-3);
-                float rewind=(receipt?.sourceDay??0)>0?Smooth(.35f,.8f,time):0, forward=Smooth(1.05f,2.15f,time);
+                float rewind=(receipt?.sourceDay??0)>0?Smooth(rewindAt,sourceAt,time):0, forward=Smooth(returnAt,attributionAt,time);
                 look=Vector3.Lerp(new Vector3(0,1,2),source,rewind*(1-forward));
                 camera=Vector3.Lerp(new Vector3(3.7f,2.8f,-4.8f),source+new Vector3(1.8f,1.5f,-2.5f),rewind);
                 bool connection=receipt?.resourcesRecorded==true && receipt.resources.relation!=0;
                 camera=Vector3.Lerp(camera,connection?new Vector3(3.8f,3.5f,-7):new Vector3(3.7f,2.8f,-4.8f),forward);
                 if(connection) look=Vector3.Lerp(look,new Vector3(.8f,1.2f,1.5f),forward);
-                movieLabels[24].text=(receipt?.sourceDay??0)>0?"Day "+CinematicStoryboard.DayDuringRewind(e,time):"来路暂未显现";
+                movieLabels[24].text=(receipt?.sourceDay??0)>0?"第 "+CinematicStoryboard.DayDuringRewind(e,time,rewindAt,sourceAt)+" 天":"来路暂未显现";
                 movieLabels[24].transform.localPosition=look+Vector3.up*1.1f;
-                float saturation=time<1.05f?1-Smooth(.12f,.35f,time)*.85f:Smooth(1.05f,2.15f,time);
+                float saturation=time<returnAt?1-Smooth(chargeAt,rewindAt,time)*.85f:Smooth(returnAt,attributionAt,time);
                 foreach(Transform tile in movieTiles) SetMovieColor(tile,Color.Lerp(Palette.Muted*.3f,Palette.Mint*.4f,saturation));
                 if(saturation>=.995f) ResetMovieColor(moviePlayer);
                 else SetMovieColor(moviePlayer,Color.Lerp(Palette.Muted*.5f,Color.white,saturation));
-                moviePlayer.GetComponent<HorizonActor>().MotionRate=time<.12f?Mathf.Lerp(1,.18f,time/.12f):time<1.05f?0:1;
-                causalPulse.gameObject.SetActive(time>=1.05f && time<2.15f);
+                moviePlayer.GetComponent<HorizonActor>().MotionRate=time<chargeAt?Mathf.Lerp(1,.18f,time/Mathf.Max(.001f,chargeAt)):time<returnAt?0:1;
+                causalPulse.gameObject.SetActive(time>=returnAt && time<attributionAt);
                 float nodeProgress=forward*Mathf.Max(1,count-1); int node=Mathf.Min(Mathf.FloorToInt(nodeProgress),Mathf.Max(0,count-2));
                 causalPulse.localPosition=count>1?Vector3.Lerp(movieNodes[node].localPosition,movieNodes[node+1].localPosition,nodeProgress-node):Vector3.Lerp(source,new Vector3(0,1,2),forward);
                 for(int i=0;i<count;i++) if(i<=nodeProgress) { SetMovieColor(movieNodes[i],Palette.Mint); if(i>0) SetMovieColor(movieLines[i].transform,Palette.Mint); }
@@ -216,7 +227,7 @@ namespace Horizon.UI
                     if(currentInsightSource!=current)
                     {
                         currentInsightSource=current; RewardEvidence source=receipt.causes[current];
-                        string detail=source.label??"";
+                        string detail=PresentationCopy.Chinese(source.label??"");
                         var lines=new List<string>();
                         for(int start=0;start<detail.Length;start+=14) lines.Add(detail.Substring(start,Mathf.Min(14,detail.Length-start)));
                         EvidenceLabel(2,"Day "+source.day+"\n"+string.Join("\n",lines),new Vector3(0,2.65f,4));
@@ -252,9 +263,14 @@ namespace Horizon.UI
         }
         private void SamplePatternStoryboard(float time,ref Vector3 camera,ref Vector3 look)
         {
-            CinematicShot shot=patternStoryboard.Last(s=>s.Time<=time); int index=(int)shot.Beat;
+            // Slow motion may hold the actor on an earlier pose, but editorial
+            // time must still cut to the authored Silence shot.  Using pose
+            // time for both left the phone trapped in the preceding crack
+            // close-up, with the avatar's back filling the frame.
+            float shotTime=moviePhase==CinematicPhase.HitStop?moviePhaseTime:time;
+            CinematicShot shot=patternStoryboard.Last(s=>s.Time<=shotTime); int index=(int)shot.Beat;
             float next=index+1<patternStoryboard.Count?patternStoryboard[index+1].Time:moviePlan.Duration;
-            float p=Smooth(shot.Time,next,time); CurrentCinematicShot=shot.Beat.ToString(); CurrentCinematicFraming=shot.Framing;
+            float p=Smooth(shot.Time,next,shotTime); CurrentCinematicShot=shot.Beat.ToString(); CurrentCinematicFraming=shot.Framing;
             moviePlayer.gameObject.SetActive(index!=11);
             float crossing=Smooth(patternStoryboard[7].Time,patternStoryboard[8].Time,time);
             float shatter=Smooth(patternStoryboard[8].Time,patternStoryboard[9].Time,time);
@@ -291,10 +307,33 @@ namespace Horizon.UI
             look=moviePlayer.localPosition+Vector3.up*1.2f;
             switch(shot.Framing)
             {
-                case CinematicFraming.Close: camera=look+new Vector3(1.4f,.35f,-2.2f); break;
+                case CinematicFraming.Close:
+                    if(index==6)
+                    {
+                        // The silent beat is about the choice meeting the old
+                        // interruption.  A conventional character close-up put
+                        // the avatar's back and legs across the entire phone and
+                        // hid that relationship.  Keep both body and barrier in
+                        // the portrait frame while the sound and motion stop.
+                        look=new Vector3(0,.96f,1.84f);
+                        camera=look+new Vector3(3.05f,1.42f,-5.85f);
+                    }
+                    else camera=look+new Vector3(1.4f,.35f,-2.2f);
+                    break;
                 case CinematicFraming.ObjectDetail:
-                    look=index==5?new Vector3(0,.2f,2):new Vector3(0,1.2f,1.1f);
-                    camera=look+new Vector3(index==11?-1.8f:1,.6f,-3.4f); break;
+                    if(index==5)
+                    {
+                        // See the crack, the approaching choice and enough
+                        // negative space for the synchronized story copy.
+                        look=new Vector3(0,.66f,1.94f);
+                        camera=look+new Vector3(2.72f,1.5f,-5.25f);
+                    }
+                    else
+                    {
+                        look=new Vector3(0,1.2f,1.1f);
+                        camera=look+new Vector3(index==11?-1.8f:1,.6f,-3.4f);
+                    }
+                    break;
                 case CinematicFraming.Medium: camera=look+new Vector3(index==3?0:2.4f,1,index==3?4.4f:-4.4f); break;
                 case CinematicFraming.ExtremeWide: look=new Vector3(0,1.3f,3); camera=new Vector3(7,6,-12); break;
                 default: look=new Vector3(0,1,2); camera=new Vector3(4.7f,3.8f,-6.8f); break;

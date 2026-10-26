@@ -13,6 +13,7 @@ namespace Horizon.UI
         private readonly Transform[] cinemaGlints=new Transform[24];
         private Material cinemaBackdropMaterial;
         private Renderer[] cinemaArchitecture;
+        private Renderer[] cinemaHaloRenderers;
         private Color[] cinemaArchitectureColors;
         private float architectureFocus=-1;
         private CameraClearFlags priorCinemaClear;
@@ -21,7 +22,6 @@ namespace Horizon.UI
 
         private void PrepareCinemaProduction()
         {
-            if(moviePlan.Event.tier<RewardTier.Major) return;
             if(cinemaProduction==null)
             {
                 cinemaProduction=Group("HORIZON optical cinema production",cinematicStage);
@@ -46,6 +46,7 @@ namespace Horizon.UI
                     float a=i*Mathf.PI/12;
                     Soft(cinemaRotor,"Aperture coordinate "+i,new Vector3(Mathf.Cos(a)*3.15f,Mathf.Sin(a)*3.15f,-.03f),new Vector3(.045f,i%3==0?.22f:.12f,.035f),i%3==0?gold:ivory).localRotation=Quaternion.Euler(0,0,a*Mathf.Rad2Deg-90);
                 }
+                cinemaHaloRenderers=cinemaHalo.GetComponentsInChildren<Renderer>();
                 cinemaArchitecture=deck.GetComponentsInChildren<Renderer>().Concat(cinemaHalo.GetComponentsInChildren<Renderer>()).ToArray();
                 cinemaArchitectureColors=cinemaArchitecture.Select(r=>r.sharedMaterial.GetColor(r.sharedMaterial.HasProperty("_BaseColor")?"_BaseColor":"_Color")).ToArray();
                 for(int i=0;i<cinemaWaves.Length;i++)
@@ -74,16 +75,26 @@ namespace Horizon.UI
         private void SampleCinemaProduction(float time)
         {
             if(cinemaProduction==null || !cinemaProduction.gameObject.activeSelf || spectacle==null) return;
-            Color tint=RewardEffectTint();
+            Color tint=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
+                Mathf.Clamp01(energyFrame.Inward*.66f+energyFrame.Burst*.45f));
             bool golden=spectacle.Style==RewardSpectacleStyle.Golden || spectacle.Style==RewardSpectacleStyle.Legendary;
             Vector3 burstCenter=relayPlan!=null && relayPlan.Nodes.Count>0 && time<spectacle.HeroTime?new Vector3(0,1.3f,2):showcaseCenter;
             bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
             float pose=cinemaTension!=null && cinemaTension.Enabled?tensionFrame.PoseTime:time;
-            cinemaBackdropMaterial.SetColor("_Color",tint*(1-tensionFrame.Focus*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
+            float attention=Mathf.Max(tensionFrame.Focus,energyFrame.Focus*.8f);
+            // The aperture is a stage frame, never the subject. On action and
+            // breath-hold close-ups it used to pass in front of the actor
+            // (especially at a desk), so remove only that foreground layer.
+            // It returns for wide arrivals, the result reveal, and overview.
+            LifeActionShot actionShot=LifeActionPlaying?lifeAction.Sample(time,preferences.reducedMotion).Shot:LifeActionShot.Overview;
+            bool subjectClose=LifeActionPlaying && (actionShot==LifeActionShot.Action || actionShot==LifeActionShot.Suspense);
+            if(cinemaHaloRenderers!=null)
+                foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!subjectClose;
+            cinemaBackdropMaterial.SetColor("_Color",tint*(1-attention*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
             cinemaRotor.localRotation=Quaternion.Euler(0,0,preferences.reducedMotion?0:pose*7);
-            if(!Mathf.Approximately(architectureFocus,tensionFrame.Focus))
+            if(!Mathf.Approximately(architectureFocus,attention))
             {
-                architectureFocus=tensionFrame.Focus;
+                architectureFocus=attention;
                 for(int i=0;i<cinemaArchitecture.Length;i++)
                     if(architectureFocus>.001f) SetMovieColor(cinemaArchitecture[i].transform,cinemaArchitectureColors[i]*(1-architectureFocus*.78f));
                     else ResetMovieColor(cinemaArchitecture[i].transform);
@@ -97,21 +108,26 @@ namespace Horizon.UI
                 pulse=Mathf.Max(pulse,Mathf.Exp(-age*3.2f)); burstTime=Mathf.Max(burstTime,cue.Time);
             }
             if(tensionFrame.Silent) pulse=0;
-            int ribbonBudget=preferences.reducedMotion?0:LowCostEffects?5:cinemaRibbons.Length;
+            int authoredRibbonBudget=moviePlan.Event.tier<=RewardTier.Local?4:moviePlan.Event.tier==RewardTier.Combo?8:cinemaRibbons.Length;
+            int ribbonBudget=preferences.reducedMotion?0:LowCostEffects?Mathf.Min(5,authoredRibbonBudget):authoredRibbonBudget;
             for(int i=0;i<cinemaRibbons.Length;i++)
             {
                 LineRenderer line=cinemaRibbons[i]; bool visible=i<ribbonBudget && pulse>.025f;
+                float charge=Mathf.Max(energyFrame.Inward,lifePressure);
+                visible=i<ribbonBudget && (pulse>.025f || charge>.08f);
                 line.gameObject.SetActive(visible); if(!visible) continue;
                 float a=i*2.39996f,timeSince=time-burstTime;
                 for(int segment=0;segment<24;segment++)
                 {
-                    float p=segment/23f; float radius=.12f+p*(1.5f+timeSince*1.6f);
-                    float turn=a+p*1.9f+timeSince*.7f;
+                    float p=segment/23f;
+                    float radius=pulse>.025f?.12f+p*(1.5f+timeSince*1.6f):Mathf.Lerp(2.9f,.48f,p)*(1-charge*.23f);
+                    float turn=a+p*1.9f+(pulse>.025f?timeSince*.7f:-time*.28f);
                     Vector3 center=burstCenter;
                     line.SetPosition(segment,center+new Vector3(Mathf.Cos(turn)*radius,Mathf.Sin(turn)*radius*.78f,Mathf.Sin(a)*.45f+p*.6f));
                 }
-                line.widthMultiplier=Mathf.Max(.008f,.015f+Mathf.Sin(timeSince*Mathf.PI)*.025f)*pulse;
-                SetMovieColor(line.transform,Color.Lerp(tint,golden && i%3==0?Palette.Gold:Color.white,.4f)*pulse);
+                float light=Mathf.Max(pulse,charge*.42f);
+                line.widthMultiplier=Mathf.Max(.006f,.011f+Mathf.Abs(Mathf.Sin(time*.9f+i))*.014f)*light;
+                SetMovieColor(line.transform,Color.Lerp(tint,charge>.2f?Palette.Gold:Color.white,.5f)*light);
             }
             for(int i=0;i<cinemaWaves.Length;i++)
             {
@@ -121,7 +137,8 @@ namespace Horizon.UI
                 wave.localRotation=Quaternion.Euler(10+i*12,0,0); wave.localScale=Vector3.one*(.12f+age*(3.5f+i*.4f));
                 SetMovieColor(wave,Color.Lerp(tint,Color.white,.45f)*(1-age/.85f));
             }
-            int starBudget=!celebrates || preferences.reducedMotion?0:LowCostEffects?8:cinemaGlints.Length;
+            int authoredStars=moviePlan.Event.tier<=RewardTier.Local?6:moviePlan.Event.tier==RewardTier.Combo?12:cinemaGlints.Length;
+            int starBudget=!celebrates || preferences.reducedMotion?0:LowCostEffects?Mathf.Min(8,authoredStars):authoredStars;
             for(int i=0;i<cinemaGlints.Length;i++)
             {
                 Transform star=cinemaGlints[i]; bool show=i<starBudget && time>=movieImpactTime && tensionFrame.Focus<.1f && time<moviePlan.Duration*.94f;

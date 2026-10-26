@@ -44,15 +44,17 @@ namespace Horizon
             bool reveal = (Vision.Compare || session.RunNumber == 3) && stage >= 2;
             bool question = (session.RunNumber == 3 || session.Deadline >= 30 && session.Day >= 14) && stage == 3;
             world.ShowStation(stage, reveal);
+            world.FrameStationConversation();
             List<ActionRecord> memories = ExperienceContent.StationMemories(session);
             world.ShowCausalMemories(CausalPresentation.Station(session));
-            View.Fill(root, "Station atmosphere", new Color(0.005f, 0.02f, 0.035f, 0.18f), 0, 0, 1, 1);
+            View.Fill(root,"Station header dock",Palette.Ink,0,.85f,1,1);
+            View.Fill(root,"Station reading dock",Palette.Ink,0,0,1,.5f);
             View.Label(root, "Station title", "F U T U R E   S T A T I O N", 33, Palette.Mint,
                 TextAnchor.MiddleCenter, 0.05f, 0.91f, 0.95f, 0.965f);
             View.Label(root, "Station day", "DAY " + session.Day.ToString("00") + " / 在地平线的另一边", 25, Palette.Muted,
                 TextAnchor.MiddleCenter, 0.06f, 0.852f, 0.94f, 0.9f);
-            View.Panel(root, "Station dialogue plate", new Color(0.013f, 0.034f, 0.055f, 0.9f),
-                0.045f, 0.365f, 0.955f, 0.51f, 35);
+            View.Panel(root, "Station dialogue plate", new Color(0.013f, 0.034f, 0.055f, 1),
+                0.045f, 0.365f, 0.955f, 0.498f, 35);
             string voice = CampaignContent.StationVoice(session, stage, question);
             Text dialogue = View.Label(root, "Future voice", voice, 39, Palette.Text,
                 TextAnchor.MiddleCenter, 0.075f, 0.405f, 0.925f, 0.495f);

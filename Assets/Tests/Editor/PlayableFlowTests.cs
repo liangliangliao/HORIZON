@@ -119,7 +119,7 @@ namespace Horizon.Tests
             }
             Assert.IsFalse(System.Array.Exists(root.GetComponentsInChildren<Button>(), b => b.name == "Meet thirty day self"));
             string text = string.Join(" ", System.Array.ConvertAll(root.GetComponentsInChildren<Text>(), t => t.text));
-            Assert.That(text, Does.Contain("→ D4 夜"));
+            Assert.That(text, Does.Contain("→ 第 4 天 夜"));
             ButtonNamed(app, "Close future range").onClick.Invoke(); yield return null;
             Assert.IsTrue(System.Array.Exists(root.GetComponentsInChildren<Button>(),
                 b => b.name == "Thirty day view" && !b.interactable));
@@ -416,6 +416,7 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(0.35f);
             Assert.AreEqual(balance, archive.wallet.stardust);
             Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
+            yield return WaitForInput(app);
             ButtonNamed(app, "Continue result").onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.4f);
             session = Get<GameSession>(app, "session");
@@ -435,6 +436,7 @@ namespace Horizon.Tests
             Assert.AreEqual(4, session.Day);
             Assert.AreEqual(FeedbackKind.Echoes, archive.pendingFeedback.kind);
             Assert.That(archive.pendingFeedback.description, Does.Contain("D1"));
+            yield return WaitForInput(app);
             if (archive.pendingFeedback.beats.Count > 1)
             {
                 ButtonNamed(app, "Review echo details").onClick.Invoke();
@@ -446,6 +448,7 @@ namespace Horizon.Tests
             while (archive.pendingFeedback != null)
             {
                 Assert.AreEqual(4,session.Day,"Reading a receipt must not choose or advance a day.");
+                yield return WaitForInput(app);
                 ButtonNamed(app, "Continue result").onClick.Invoke();
                 read++;
                 yield return new WaitForSecondsRealtime(0.4f);
@@ -459,6 +462,7 @@ namespace Horizon.Tests
             FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
             ButtonNamed(app, "Use card").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1);
+            yield return WaitForInput(app);
             ButtonNamed(app, "Continue result").onClick.Invoke();
             yield return new WaitForSecondsRealtime(1.2f);
             ButtonNamed(app, "Next station beat").onClick.Invoke();
@@ -477,6 +481,7 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(5);
             while (archive.pendingFeedback != null)
             {
+                yield return WaitForInput(app);
                 ButtonNamed(app, "Continue result").onClick.Invoke();
                 yield return new WaitForSecondsRealtime(0.4f);
             }
@@ -623,7 +628,9 @@ namespace Horizon.Tests
             third = Get<GameSession>(app, "session");
             Assert.IsNotNull(combined);
             app.StartCoroutine((IEnumerator)typeof(HorizonApp).GetMethod("CascadeSequence", Private).Invoke(app, new object[] { combined }));
-            yield return new WaitForSecondsRealtime(1.1f);
+            float chainReading=CausalGraph.Ancestors(CausalGraph.ObservedGraph(third.CausalNodes),combined.nodeId)
+                .Sum(n=>RewardDirector.CausalNodeSeconds(n.label));
+            yield return new WaitForSecondsRealtime(chainReading+.5f);
             yield return Capture(app, "13-cascade-merge");
             int renderedConnections = 0;
             foreach (TimeThreadGraphic line in Get<RectTransform>(app, "root").GetComponentsInChildren<TimeThreadGraphic>())
@@ -668,7 +675,7 @@ namespace Horizon.Tests
             yield return Capture(app, "27-six-axis-result");
             ButtonNamed(app, "Why").onClick.Invoke(); yield return null;
             string explanation = string.Join("\n", Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Select(t => t.text));
-            Assert.That(explanation, Does.Contain("D4").And.Contain("D5"));
+            Assert.That(explanation, Does.Contain("第 4 天").And.Contain("第 5 天"));
             ButtonNamed(app, "Close prediction why").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Continue").onClick.Invoke(); yield return null;
             Assert.IsTrue(s.Predictions[0].reviewed);
@@ -700,7 +707,7 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(600000)]
         public IEnumerator SeventhStoryResumesAndRealLongLifeFinishesThroughTheUI()
         {
             yield return new EnterPlayMode();
@@ -736,9 +743,30 @@ namespace Horizon.Tests
             Assert.AreEqual(13, s.Day); Assert.IsNull(s.CompletedRun);
             yield return Capture(app, "29-long-life-board");
             int guard = 0; float began = Time.realtimeSinceStartup;
+            float totalBudget=15+(s.Deadline-s.Day+1)*15+
+                CausalRelayPlan.MaximumNodes*RewardDirector.CausalNodeSeconds(new string('字',60));
+            var watchdog=new UiProgressWatchdog(began,15,totalBudget);
+            string previousMilestone=null;
+            Debug.Log("Long UI replay seeds: world="+s.WorldSeed+", deck="+s.DeckSeed+"; total budget="+totalBudget+"s.");
             while (s.CompletedRun == null || Get<bool>(app, "busy") || Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Continue master event")) {
-                Assert.Less(Time.realtimeSinceStartup - began, 150, "Long UI flow stalled.");
-                if (Get<bool>(app, "busy")) { yield return null; continue; }
+                string milestone=LongFlowMilestone(app);
+                if(milestone!=previousMilestone)
+                {
+                    Debug.Log("Long UI progress at "+(Time.realtimeSinceStartup-began).ToString("F2")+"s: "+milestone);
+                    previousMilestone=milestone;
+                }
+                string failure=watchdog.Observe(Time.realtimeSinceStartup,milestone);
+                if(failure!=null)
+                {
+                    Debug.Log(failure+"; world seed="+s.WorldSeed+"; deck seed="+s.DeckSeed);
+                    yield return Capture(app,"30-long-life-stalled");
+                    Assert.Fail(failure);
+                }
+                if (Get<bool>(app, "busy")) {
+                    Button skipMovie=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>(b.name=="Skip cinematic" || b.name=="Continue story checkpoint") && b.IsInteractable());
+                    if(skipMovie!=null) skipMovie.onClick.Invoke();
+                    yield return null; continue;
+                }
                 Button masterEvent = Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().FirstOrDefault(b => b.name == "Continue master event");
                 if (masterEvent != null) { if (masterEvent.interactable) masterEvent.onClick.Invoke(); yield return null; continue; }
                 if (a.pendingFeedback != null) {
@@ -761,7 +789,7 @@ namespace Horizon.Tests
             Assert.AreEqual(30, s.CompletedRun.actions.Count); Assert.AreEqual(1, a.runs.Count); Assert.IsNull(a.active);
             CollectionAssert.AreEqual(new[] { 4, 12, 14, 21, 28 }, s.StationDays);
             Text stateEvidence = Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().Where(t => t.name == "Gate evidence").ElementAt(1);
-            Assert.That(stateEvidence.text, Does.Contain("后半程").And.Contain("D13"));
+            Assert.That(stateEvidence.text, Does.Contain("后半程").And.Contain("第 13 天"));
             yield return Capture(app, "30-long-life-deadline");
             Call(app, "ShowMap", false); yield return null;
             Assert.AreEqual(30, Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Count(b => b.name.StartsWith("Inspect day ")));
@@ -770,9 +798,24 @@ namespace Horizon.Tests
             yield return Capture(app, "32-long-life-network");
             ButtonNamed(app, "Close causal network").onClick.Invoke(); yield return null;
             ButtonNamed(app, "Share life").onClick.Invoke(); yield return null;
-            Assert.That(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().First(t => t.name == "Share run").text, Does.Contain("30 DAYS"));
+            Assert.That(Get<RectTransform>(app, "root").GetComponentsInChildren<Text>().First(t => t.name == "Share run").text,
+                Does.Contain("第 1 段人生").And.Contain("30 天").And.Not.Contain("DAYS"));
             yield return Capture(app, "33-long-life-share");
             yield return new ExitPlayMode();
+        }
+
+        private static string LongFlowMilestone(HorizonApp app)
+        {
+            GameSession life=Get<GameSession>(app,"session");
+            RectTransform page=Get<RectTransform>(app,"root");
+            FeedbackRecord receipt=Get<ArchiveData>(app,"archive").pendingFeedback;
+            HorizonWorld3D world=Get<HorizonWorld3D>(app,"world");
+            return "day="+life.Day+"; actions="+life.Actions.Count+"; completed="+(life.CompletedRun!=null)+
+                "; generation="+Get<int>(app,"viewGeneration")+"; busy="+Get<bool>(app,"busy")+
+                "; station="+Get<int>(app,"stationStage")+"; receipt="+receipt?.kind+":"+(receipt?.page??-1)+
+                "; nodes="+page.GetComponentsInChildren<Text>().Count(t=>t.name=="Causal event")+
+                "; movie="+world.Cinematics.Current?.Event.id+"; shot="+world.CurrentCinematicShot+
+                "; controls="+string.Join(",",page.GetComponentsInChildren<Button>().Select(b=>b.name+":"+b.IsInteractable()));
         }
 
         private static IEnumerator Capture(HorizonApp app, string name)
@@ -843,6 +886,11 @@ namespace Horizon.Tests
         {
             float began = Time.realtimeSinceStartup;
             while (Get<bool>(app, "busy")) {
+                // Readability now intentionally exceeds the harness's input
+                // timeout. Exercise the real, visible skip control; never invoke
+                // a covered receipt button or shorten the production movie.
+                Button skip=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>(b.name=="Skip cinematic" || b.name=="Continue story checkpoint") && b.IsInteractable());
+                if(skip!=null) skip.onClick.Invoke();
                 Assert.Less(Time.realtimeSinceStartup - began, 8, "The result did not become readable and actionable.");
                 yield return null;
             }

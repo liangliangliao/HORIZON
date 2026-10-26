@@ -121,7 +121,7 @@ namespace Horizon.UI
             {
                 while (paused) yield return null;
                 if (orb == null) yield break;
-                float t = age / 0.42f;
+                float t = preferences.reducedMotion?1:ImmersiveMotion.Flight(age / 0.42f);
                 orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI);
                 yield return null;
             }
@@ -175,7 +175,7 @@ namespace Horizon.UI
             {
                 while (paused) yield return null;
                 if (orb == null) yield break;
-                float t = age / 0.46f;
+                float t = preferences.reducedMotion?1:ImmersiveMotion.Flight(age / 0.46f);
                 orb.position = Vector3.Lerp(start, end, t) + Vector3.up * Mathf.Sin(t * Mathf.PI) * 1.4f;
                 orb.localScale = Vector3.one * (0.2f + Mathf.Sin(t * Mathf.PI) * 0.22f);
                 yield return null;

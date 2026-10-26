@@ -25,7 +25,7 @@ namespace Horizon.Tests
             Assert.AreEqual(cues,string.Join("|",plan.Cues.Select(c=>c.Time+":"+c.Phase+":"+c.NodeIndex)));
             float stopped=plan.Cues.Single(c=>c.Phase==CinematicPhase.HitStop && !c.NodeHit).Time;
             float released=plan.Cues.Single(c=>c.Phase==CinematicPhase.Impact && !c.NodeHit).Time;
-            Assert.AreEqual(.15f,released-stopped,.001f);
+            Assert.AreEqual(plan.Event.tier==RewardTier.Mythic?.55f:.42f,released-stopped,.001f);
             Assert.AreEqual(saved,JsonUtility.ToJson(source));
         }
         [Test]
