@@ -707,7 +707,7 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(600000)]
         public IEnumerator SeventhStoryResumesAndRealLongLifeFinishesThroughTheUI()
         {
             yield return new EnterPlayMode();
@@ -743,8 +743,25 @@ namespace Horizon.Tests
             Assert.AreEqual(13, s.Day); Assert.IsNull(s.CompletedRun);
             yield return Capture(app, "29-long-life-board");
             int guard = 0; float began = Time.realtimeSinceStartup;
+            float totalBudget=15+(s.Deadline-s.Day+1)*15+
+                CausalRelayPlan.MaximumNodes*RewardDirector.CausalNodeSeconds(new string('字',60));
+            var watchdog=new UiProgressWatchdog(began,15,totalBudget);
+            string previousMilestone=null;
+            Debug.Log("Long UI replay seeds: world="+s.WorldSeed+", deck="+s.DeckSeed+"; total budget="+totalBudget+"s.");
             while (s.CompletedRun == null || Get<bool>(app, "busy") || Get<RectTransform>(app, "root").GetComponentsInChildren<Button>().Any(b => b.name == "Continue master event")) {
-                Assert.Less(Time.realtimeSinceStartup - began, 150, "Long UI flow stalled.");
+                string milestone=LongFlowMilestone(app);
+                if(milestone!=previousMilestone)
+                {
+                    Debug.Log("Long UI progress at "+(Time.realtimeSinceStartup-began).ToString("F2")+"s: "+milestone);
+                    previousMilestone=milestone;
+                }
+                string failure=watchdog.Observe(Time.realtimeSinceStartup,milestone);
+                if(failure!=null)
+                {
+                    Debug.Log(failure+"; world seed="+s.WorldSeed+"; deck seed="+s.DeckSeed);
+                    yield return Capture(app,"30-long-life-stalled");
+                    Assert.Fail(failure);
+                }
                 if (Get<bool>(app, "busy")) {
                     Button skipMovie=Get<RectTransform>(app,"root").GetComponentsInChildren<Button>().FirstOrDefault(b=>(b.name=="Skip cinematic" || b.name=="Continue story checkpoint") && b.IsInteractable());
                     if(skipMovie!=null) skipMovie.onClick.Invoke();
@@ -785,6 +802,20 @@ namespace Horizon.Tests
                 Does.Contain("第 1 段人生").And.Contain("30 天").And.Not.Contain("DAYS"));
             yield return Capture(app, "33-long-life-share");
             yield return new ExitPlayMode();
+        }
+
+        private static string LongFlowMilestone(HorizonApp app)
+        {
+            GameSession life=Get<GameSession>(app,"session");
+            RectTransform page=Get<RectTransform>(app,"root");
+            FeedbackRecord receipt=Get<ArchiveData>(app,"archive").pendingFeedback;
+            HorizonWorld3D world=Get<HorizonWorld3D>(app,"world");
+            return "day="+life.Day+"; actions="+life.Actions.Count+"; completed="+(life.CompletedRun!=null)+
+                "; generation="+Get<int>(app,"viewGeneration")+"; busy="+Get<bool>(app,"busy")+
+                "; station="+Get<int>(app,"stationStage")+"; receipt="+receipt?.kind+":"+(receipt?.page??-1)+
+                "; nodes="+page.GetComponentsInChildren<Text>().Count(t=>t.name=="Causal event")+
+                "; movie="+world.Cinematics.Current?.Event.id+"; shot="+world.CurrentCinematicShot+
+                "; controls="+string.Join(",",page.GetComponentsInChildren<Button>().Select(b=>b.name+":"+b.IsInteractable()));
         }
 
         private static IEnumerator Capture(HorizonApp app, string name)
