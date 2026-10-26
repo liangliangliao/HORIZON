@@ -62,6 +62,9 @@ namespace Horizon.Tests
         [TestCase("KNOW · 我知道","知道这个方法")]
         [TestCase("CAUSAL SINGULARITY","因果汇聚")]
         [TestCase("D7 · SURPRISE","第 7 天 · 发现预料之外的变化")]
+        [TestCase("v0.4.2 · SEE FARTHER. IMAGINE DEEPER.","v0.4.2 · 看得更远，想得更深。")]
+        [TestCase("HORIZON VIII · Day +3","远见 · 第 8 层 · 3 天后")]
+        [TestCase("IF · 先停一下\nTHEN · 再决定","如果 · 先停一下\n那么 · 再决定")]
         public void LegacyDisplayCopyIsChineseWithoutRewritingTheSave(string original,string expected)
         { Assert.AreEqual(expected,PresentationCopy.Chinese(original)); Assert.AreEqual(expected,PresentationCopy.Chinese(expected)); }
         [Test]

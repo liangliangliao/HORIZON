@@ -119,6 +119,14 @@ namespace Horizon.Tests
             Assert.AreEqual(before,JsonUtility.ToJson(source));
         }
         [Test]
+        public void SharedNetworkReleaseKeepsDetailInsteadOfStackingEveryBeamAtFullWhite()
+        {
+            RewardPlan plan=Merge(); var relay=new CausalRelayPlan(plan);
+            Assert.That(relay.Sample(0,relay.ImpactTime,false).Beam,Is.InRange(.1f,.75f));
+            Assert.AreEqual(1,relay.Sample(0,relay.Nodes[0].ActivationTime,false).Beam,
+                "An individual recorded cause still receives its full close-up pulse.");
+        }
+        [Test]
         public void DenseReceiptHasBoundedVisualObjectsAndOnlyRecordedEdges()
         {
             RewardPlan plan=Merge();

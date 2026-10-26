@@ -194,7 +194,13 @@ namespace Horizon.UI
                     context=plan.Event.day>0?"第 "+plan.Event.day+" 天 · 原始记录":"原始记录已保留";
             }
             if(Story!=null) Story.text=context;
-            CinematicTypography.Reveal(Story,outcome.Visible || VisualPreferences.ReducedMotion?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
+            // At a release beat, reveal the new thought as one sentence and
+            // let opacity/scale carry the entrance. A type-on during the flash
+            // leaves isolated glyphs in screenshots and reads like corruption.
+            bool wholeSentence=outcome.Visible || VisualPreferences.ReducedMotion ||
+                frame.Phase==CinematicPhase.Impact || frame.Phase==CinematicPhase.SecondReveal ||
+                frame.Phase==CinematicPhase.Jackpot;
+            CinematicTypography.Reveal(Story,wholeSentence?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
             CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;
             if(Explanation!=null) Explanation.text=receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
@@ -255,8 +261,12 @@ namespace Horizon.UI
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear(); Rect r=rectTransform.rect;
-            Color clear=new Color(.002f,.007f,.018f,0), deep=new Color(.002f,.007f,.018f,.88f), side=new Color(.002f,.007f,.018f,.23f);
-            Quad(mesh,new Vector2(r.xMin,r.yMin+r.height*.62f),new Vector2(r.xMax,r.yMax),clear,deep);
+            Color clear=new Color(.002f,.007f,.018f,0), mid=new Color(.002f,.007f,.018f,.62f),
+                deep=new Color(.002f,.007f,.018f,.94f), side=new Color(.002f,.007f,.018f,.23f);
+            // Two-stage falloff gives the three top text bands stable contrast
+            // without becoming an opaque card over the cinematic subject.
+            Quad(mesh,new Vector2(r.xMin,r.yMin+r.height*.62f),new Vector2(r.xMax,r.yMin+r.height*.78f),clear,mid);
+            Quad(mesh,new Vector2(r.xMin,r.yMin+r.height*.78f),new Vector2(r.xMax,r.yMax),mid,deep);
             Quad(mesh,new Vector2(r.xMin,r.yMin),new Vector2(r.xMax,r.yMin+r.height*.34f),deep,clear);
             SideQuad(mesh,new Vector2(r.xMin,r.yMin),new Vector2(r.xMin+r.width*.12f,r.yMax),side,clear);
             SideQuad(mesh,new Vector2(r.xMax-r.width*.12f,r.yMin),new Vector2(r.xMax,r.yMax),clear,side);
