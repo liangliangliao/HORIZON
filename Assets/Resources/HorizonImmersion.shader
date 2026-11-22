@@ -23,6 +23,10 @@ Shader "HORIZON/Immersion"
             float _Clock, _Charge, _Burst, _Afterglow, _Layer;
             struct v2f { float4 vertex:SV_POSITION; float2 uv:TEXCOORD0; };
             v2f vert(appdata_base v) { v2f o; o.vertex=UnityObjectToClipPos(v.vertex); o.uv=v.texcoord; return o; }
+            float bell(float distanceToBand,float sharpness) {
+                float x=distanceToBand*sharpness;
+                return exp(-x*x);
+            }
             half4 frag(v2f i):SV_Target {
                 float2 p=(i.uv-.5)*2;
                 float r=length(p), a=atan2(p.y,p.x);
@@ -32,9 +36,9 @@ Shader "HORIZON/Immersion"
                 float inward=pow(saturate(.5+.5*sin(r*27+_Clock*9+_Layer*2)),16);
                 float beams=pow(saturate(.5+.5*sin(a*(15+_Layer*3)-_Clock*.32)),34);
                 float radius=.28+(1-_Burst)*.58;
-                float wave=exp(-pow((r-radius)*32,2));
-                float seam=exp(-pow((r-(.60-_Charge*.18))*65,2));
-                float halo=exp(-pow((r-.48)*4.8,2))*(_Charge*.055+_Afterglow*.035);
+                float wave=bell(r-radius,32);
+                float seam=bell(r-(.60-_Charge*.18),65);
+                float halo=bell(r-.48,4.8)*(_Charge*.055+_Afterglow*.035);
                 // Broad amber shafts establish volume first; narrow ivory
                 // cores and tiny moving glints arrive as the charge grows.
                 // Keep the aperture hollow so the event is never a white wall.
@@ -43,11 +47,20 @@ Shader "HORIZON/Immersion"
                 float reach=smoothstep(.28,.4,r)*(1-smoothstep(.42+growth*.53,.94+growth*.18,r));
                 float filaments=pow(saturate(.5+.5*sin(a*57-r*13+_Clock*.7)),52);
                 float sparkle=pow(saturate(sin(a*39+_Clock*1.7)*sin(r*47-_Clock*2.1)),18);
-                float corona=exp(-pow((r-(.39+sin(_Clock*.8)*.015))*25,2));
+                float corona=bell(r-(.39+sin(_Clock*.8)*.015),25);
+                // Streak heads travel in from different distances. Their
+                // longer trailing edges point back toward the periphery.
+                float lane=floor((a+3.141593)*4.45634);
+                float phase=frac(_Clock*.78+lane*.38197+_Layer*.29);
+                float head=.85-phase*.58;
+                float trail=r-head;
+                float streak=bell(trail,trail<0?76:13)*filaments;
+                float arrival=sin(phase*3.141593)*growth;
+                float inwardStreak=streak*arrival*(.28+.65*growth);
                 float light=mask*(spiral*inward*_Charge*.46+beams*_Burst*.58+
                     wave*_Burst*.50+seam*(_Charge*.22+_Afterglow*.08)+halo+
                     fan*reach*growth*.42+filaments*reach*growth*growth*.22+
-                    sparkle*growth*.32+corona*growth*.16);
+                    sparkle*growth*.32+corona*growth*.16+inwardStreak);
                 // Thin high-frequency rays sit over a broad low-energy halo.
                 // This keeps the subject silhouette and text readable instead
                 // of turning every late frame into the same white starburst.

@@ -41,8 +41,12 @@ namespace Horizon.Game
             if(float.IsNaN(seconds) || float.IsInfinity(seconds)) throw new ArgumentOutOfRangeException(nameof(seconds));
             bool visible=seconds>=reveal && seconds<settlement;
             bool future=seconds>=secondReveal;
-            int index=Changes.Count==0?-1:Math.Min(Changes.Count-1,Math.Max(0,(int)((seconds-reveal)/ChangeSeconds)));
-            float age=future?seconds-secondReveal:seconds-reveal-(index<0?0:index*ChangeSeconds);
+            int index=Changes.Count==0?-1:0;
+            // Compare against the actual cue timestamp: subtract/divide can
+            // round the first frame of a new row back onto the previous row.
+            while(index+1<Changes.Count && seconds>=reveal+(index+1)*ChangeSeconds) index++;
+            float rowStart=reveal+Math.Max(0,index)*ChangeSeconds;
+            float age=future?seconds-secondReveal:seconds-rowStart;
             float p=reducedMotion?1:Ease(age/.78f);
             string copy=future?FutureMeaning:index>=0?Changes[index].Copy(p):Recorded?"状态保持不变":Title;
             return new OutcomeFrame(visible,future,index,future?FutureHeading:Heading,copy,
@@ -113,6 +117,12 @@ namespace Horizon.Game
         public readonly int Index;
         public readonly string Heading,Copy,Context;
         public readonly float Age,Progress;
+        public bool HasResource => Visible && !Future && Index>=0;
+
+        // All three tracks restart on the receipt row's own timestamp. Leave
+        // most of its 2.8 seconds for reading after the mechanism has landed.
+        public float DeviceTravel(bool reduced) => reduced ? 1 : ImmersiveMotion.Smooth((Age-.09f)/.69f);
+        public float Entrance(bool reduced) => reduced ? 1 : ImmersiveMotion.Land(Age/.52f);
         public OutcomeFrame(bool visible,bool future,int index,string heading,string copy,string context,float age,float progress,bool negative)
         { Visible=visible; Future=future; Index=index; Heading=heading; Copy=copy; Context=context; Age=age; Progress=progress; Negative=negative; }
     }

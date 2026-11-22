@@ -63,12 +63,14 @@ namespace Horizon.UI
             // sampled request and clock together so a reentrant observer cannot
             // deliver old effects into the next movie or dereference its clock.
             Request playing=active; CinematicClock advancing=clock;
+            float previous=advancing.Elapsed;
             advancing.Advance(delta, cue => {
                 if (active!=playing) return;
                 world.ApplyCinematicCue(cue); Cue?.Invoke(cue);
             });
             if (active!=playing) return;
             if (graph.IsValid()) { track.SetTime(advancing.Elapsed); graph.Evaluate(0); }
+            world.PlayResourceContact(previous,advancing.Elapsed);
             if (advancing.Finished) Finish();
         }
         public void Skip()

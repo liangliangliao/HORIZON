@@ -21,6 +21,11 @@ namespace Horizon.Game
             float q=p-1;
             return 1+2.15f*q*q*q+1.15f*q*q;
         }
+        public const float RevealContactSeconds=.24f;
+        public static float RevealPulse(float age)
+        {
+            return Smooth((age-.13f)/.11f)*(1-Smooth((age-RevealContactSeconds)/.66f));
+        }
         public static float Punch(float age,float duration)
         {
             if(age<0 || age>=duration || duration<=0) return 0;

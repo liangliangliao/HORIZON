@@ -21,7 +21,7 @@ namespace Horizon.Tests
         [Test]
         public void EmbossAndMobileLightShadersCompile()
         {
-            foreach(string name in new[] {"HorizonCaption","HorizonBloom","HorizonImmersion"})
+            foreach(string name in new[] {"HorizonCaption","HorizonBloom","HorizonImmersion","HorizonResultLight"})
             {
                 Shader shader=Resources.Load<Shader>(name); Assert.IsNotNull(shader,name);
                 Assert.IsFalse(ShaderUtil.ShaderHasError(shader),name);
@@ -161,6 +161,81 @@ namespace Horizon.Tests
             }
             yield return new ExitPlayMode();
         }
+        [UnityTest]
+        public IEnumerator EachReceiptLightsItsOwnObjectAndMixedLossWithdrawsMoney()
+        {
+            yield return new EnterPlayMode(); yield return null;
+            var world=new GameObject("Result contact regression").AddComponent<HorizonWorld3D>();
+            world.Initialize(); world.WorldCamera.aspect=9f/20;
+            var prefs=new PlayerPreferences { sound=false,haptics=false };
+            world.ApplyPreferences(prefs); world.Cinematics.enabled=false;
+            var source=new DomainEvent { id="mixed-resource",kind=DomainEventKind.ActionTaken,tier=RewardTier.Local,
+                receipt=new RewardReceipt { action="去公园散步",resourcesRecorded=true,resources=new ResourceDelta(energy:2,money:-1) } };
+            try
+            {
+                world.Cinematics.Enqueue(source,true);
+                var plan=world.Cinematics.Current; float start=new RewardSpectacle(plan).MultiplierTime;
+                world.Cinematics.Advance(start+ImmersiveMotion.RevealContactSeconds);
+                Transform field=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Resource reveal horizon");
+                Material mat=field.GetComponent<Renderer>().sharedMaterial;
+                Assert.IsTrue(field.gameObject.activeInHierarchy);
+                Assert.Greater(mat.GetFloat("_Pulse"),.98f);
+                AssertResultLightAffectsRenderedPixels(world,field);
+                float second=start+CinematicOutcome.ChangeSeconds;
+                world.Cinematics.Advance(second+.02f-world.Cinematics.Elapsed);
+                Transform wallet=field.parent.Find("Reward showcase MoneyWallet");
+                Transform coin=wallet.Find("Money arriving");
+                Vector3 pocket=coin.localPosition;
+                Assert.IsTrue(wallet.gameObject.activeInHierarchy);
+                world.Cinematics.Advance(.25f);
+                Assert.AreEqual(0,mat.GetFloat("_Pulse")); Assert.AreEqual(0,mat.GetFloat("_Gain"));
+                Assert.Greater(coin.localPosition.y,pocket.y);
+                float age=mat.GetFloat("_Age"); world.Cinematics.SetPaused(true);
+                world.Cinematics.Advance(.8f); world.FrameCinematicLabels();
+                Assert.AreEqual(age,mat.GetFloat("_Age")); world.Cinematics.SetPaused(false);
+                prefs.reducedMotion=true; world.ApplyPreferences(prefs);
+                Vector3 withdrawn=coin.localPosition; world.Cinematics.Advance(.36f);
+                Assert.AreEqual(withdrawn,coin.localPosition); Assert.Greater(withdrawn.y,pocket.y+.8f);
+                world.ToggleCinematicOverview(); Assert.IsFalse(field.gameObject.activeInHierarchy);
+                world.Cinematics.Skip(); Assert.IsFalse(field.gameObject.activeInHierarchy);
+            }
+            finally { world.Cinematics.CancelAll(); Object.Destroy(world.gameObject); }
+            yield return new ExitPlayMode();
+        }
+
+        private static void AssertResultLightAffectsRenderedPixels(HorizonWorld3D world,Transform field)
+        {
+            Camera camera=world.WorldCamera;
+            RenderTexture prior=camera.targetTexture,active=RenderTexture.active;
+            var target=RenderTexture.GetTemporary(180,400,24);
+            var image=new Texture2D(180,400,TextureFormat.RGB24,false);
+            try
+            {
+                camera.targetTexture=target;
+                world.FrameCinematicLabels();
+                camera.Render(); RenderTexture.active=target;
+                image.ReadPixels(new Rect(0,0,180,400),0,0); image.Apply();
+                Color32[] lit=image.GetPixels32();
+                field.gameObject.SetActive(false);
+                camera.Render(); RenderTexture.active=target;
+                image.ReadPixels(new Rect(0,0,180,400),0,0); image.Apply();
+                Color32[] bare=image.GetPixels32();
+                int brighter=0;
+                for(int y=155;y<320;y++)
+                    for(int x=5;x<175;x++)
+                    {
+                        int i=y*180+x;
+                        if(lit[i].r>bare[i].r+12 || lit[i].g>bare[i].g+12 || lit[i].b>bare[i].b+12) brighter++;
+                    }
+                Assert.Greater(brighter,80,"The contact must actually light pixels around the subject.");
+            }
+            finally
+            {
+                camera.targetTexture=prior; RenderTexture.active=active; world.FrameCinematicLabels();
+                RenderTexture.ReleaseTemporary(target); Object.Destroy(image);
+            }
+        }
+
         private static GameSession CreateActualLife()
         {
             // Keep the captured predicate OUT of the EnterPlayMode coroutine.

@@ -39,6 +39,32 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void EveryResourceStartsItsOwnMotionOnItsExactCueAndSettlesBeforeReading()
+        {
+            var e=new DomainEvent { receipt=new RewardReceipt {
+                resourcesRecorded=true,resources=new ResourceDelta(2,3,-2,1,4,1) } };
+            var outcome=new CinematicOutcome(e);
+            const float reveal=15.73f, future=37, settlement=40;
+            for(int i=0;i<outcome.Changes.Count;i++)
+            {
+                float t=reveal+i*CinematicOutcome.ChangeSeconds;
+                var start=outcome.Sample(t,reveal,future,settlement);
+                var landing=outcome.Sample(t+.24f,reveal,future,settlement);
+                var read=outcome.Sample(t+1,reveal,future,settlement);
+                Assert.IsTrue(start.HasResource); Assert.AreEqual(i,start.Index);
+                Assert.AreEqual(0,start.Age); Assert.AreEqual(0,start.DeviceTravel(false));
+                Assert.AreEqual(0,start.Entrance(false)); Assert.Greater(landing.DeviceTravel(false),0);
+                Assert.AreEqual(1,start.DeviceTravel(true)); Assert.AreEqual(1,start.Entrance(true));
+                Assert.Greater(ImmersiveMotion.RevealPulse(landing.Age),.99f);
+                Assert.AreEqual(1,read.DeviceTravel(false)); Assert.AreEqual(1,read.Entrance(false));
+                Assert.AreEqual(0,ImmersiveMotion.RevealPulse(read.Age));
+                if(i>0) Assert.AreEqual(i-1,outcome.Sample(t-.001f,reveal,future,settlement).Index);
+            }
+            Assert.IsFalse(outcome.Sample(reveal-.01f,reveal,future,settlement).HasResource);
+            Assert.IsFalse(outcome.Sample(future,reveal,future,settlement).HasResource);
+        }
+
+        [Test]
         public void RealActionsCaptureActualClampedChangesAndFutureMeaningBeforeObserversRun()
         {
             var life=GameSession.StartMasterLife(1,15,RunMode.Quick);

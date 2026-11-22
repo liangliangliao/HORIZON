@@ -191,7 +191,7 @@ namespace Horizon.UI
             if(immersionStage==null || cinematicEnergy==null) return;
             float lifeBurst=LifeActionPlaying && energyFrame.Time>=lifeAction.Impact && energyFrame.Time<lifeAction.Reveal?
                 Mathf.Exp(-(energyFrame.Time-lifeAction.Impact)/.48f)*.78f:0;
-            bool visible=(cinematicEnergy.Celebrates || lifePressure>0 || lifeBurst>.003f) && !preferences.reducedMotion;
+            bool visible=(cinematicEnergy.Celebrates || lifePressure>0 || lifeBurst>.003f) && !preferences.reducedMotion && !InResultShot;
             immersionStage.gameObject.SetActive(visible);
             if(!visible) return;
             int tierBudget=moviePlan.Event.tier<=RewardTier.Local?1:moviePlan.Event.tier==RewardTier.Combo?2:3;
@@ -213,7 +213,11 @@ namespace Horizon.UI
                 layer.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,0,i*31);
                 float layerDepth=Mathf.Max(1,WorldCamera.WorldToViewportPoint(layer.position).z);
                 float fullHeight=2*layerDepth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f);
-                layer.localScale=Vector3.one*Mathf.Max(4.9f+i*1.9f,fullHeight*(1.02f+i*.12f)+energyFrame.Burst*.72f);
+                // On a tall phone, basing every radius on screen height pushed
+                // the incoming streaks outside the left and right edges. Place
+                // the first corona around the subject; deeper layers spill out.
+                float span=i==0?Mathf.Clamp(WorldCamera.aspect*1.54f,.52f,.96f):1.02f+i*.12f;
+                layer.localScale=Vector3.one*(fullHeight*span+energyFrame.Burst*.34f);
                 Material material=immersionMaterials[i];
                 Color charged=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
                     Mathf.Clamp01(Mathf.Max(energyFrame.Inward,lifePressure)*.72f+Mathf.Max(energyFrame.Burst,lifeBurst)*.48f));
