@@ -175,7 +175,14 @@ namespace Horizon.Tests
             {
                 world.Cinematics.Enqueue(source,true);
                 var plan=world.Cinematics.Current; float start=new RewardSpectacle(plan).MultiplierTime;
-                world.Cinematics.Advance(start+ImmersiveMotion.RevealContactSeconds);
+                world.Cinematics.Advance(start-.25f);
+                var stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
+                Assert.IsFalse(stage.Find("Reward showcase EnergyCell").gameObject.activeInHierarchy,
+                    "The upcoming product must not intrude into the park before the receipt cut.");
+                var membrane=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Optical depth membrane 0");
+                Assert.Greater(membrane.GetComponent<Renderer>().sharedMaterial.GetFloat("_Charge"),.4f,
+                    "Carry the charge through the interval between the actor's impact and the first result.");
+                world.Cinematics.Advance(start+ImmersiveMotion.RevealContactSeconds-world.Cinematics.Elapsed);
                 Transform field=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Resource reveal horizon");
                 Material mat=field.GetComponent<Renderer>().sharedMaterial;
                 Assert.IsTrue(field.gameObject.activeInHierarchy);

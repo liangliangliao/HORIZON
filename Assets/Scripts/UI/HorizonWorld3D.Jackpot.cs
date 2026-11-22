@@ -177,7 +177,8 @@ namespace Horizon.UI
             // Ordinary actions and losses deserve a readable product shot too.
             // This is attention, not a promotion to a reward tier: their sound,
             // particles and celebration budgets remain unchanged.
-            outcomeSubjectFocus=!spectacle.HasHero && outcomeResources.Length>0?
+            bool actionInFrame=LifeActionPlaying && time<lifeAction.Reveal;
+            outcomeSubjectFocus=!actionInFrame && !spectacle.HasHero && outcomeResources.Length>0?
                 Smooth(spectacle.MultiplierTime-.8f,spectacle.MultiplierTime,time)*
                 (1-Smooth(moviePlan.Duration*.94f,moviePlan.Duration,time)):0;
             float heroFocus=ShowingResource?1:Mathf.Max(frame.Hero,outcomeSubjectFocus);

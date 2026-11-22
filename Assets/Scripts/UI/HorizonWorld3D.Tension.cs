@@ -20,7 +20,7 @@ namespace Horizon.UI
             recordedCinemaSounds.Clear(); recordedSoundTime=0;
 #endif
             cinemaTension=new CinematicTension(moviePlan); tensionStopped=false; tensionPreviewCharged=false; tensionOpeningCharged=false;
-            if(!cinemaTension.Enabled) return;
+            if(!cinemaTension.Enabled && LifeActionStoryboard.ThemeFor(moviePlan.Event)==LifeActionTheme.None) return;
             if(cinemaTension.SourceCloseup)
             {
                 HideShowcaseOccluder(moviePlayer); HideShowcaseOccluder(movieFuture); HideShowcaseOccluder(movieFriend);
@@ -105,6 +105,8 @@ namespace Horizon.UI
         {
             if(attentionIris==null) return;
             float strength=tensionFrame.Focus*.72f;
+            if(LifeActionPlaying && !cinematicOverviewRequested && !preferences.reducedMotion)
+                strength=Mathf.Max(strength,lifePressure*.54f);
             attentionIris.gameObject.SetActive(strength>.001f);
             if(strength<=.001f) return;
             const float depth=.6f;

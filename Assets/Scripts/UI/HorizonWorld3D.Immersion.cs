@@ -87,7 +87,7 @@ namespace Horizon.UI
             {
                 if(renderer==null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
                     renderer is LineRenderer || renderer is ParticleSystemRenderer || renderer.GetComponent<TextMesh>()!=null ||
-                    narrativeSubjectSet.Contains(renderer) || renderer.transform.IsChildOf(jackpotStage) ||
+                    narrativeSubjectSet.Contains(renderer) || renderer.transform==attentionIris || renderer.transform.IsChildOf(jackpotStage) ||
                     (relayStage!=null && renderer.transform.IsChildOf(relayStage)) ||
                     renderer.transform.IsChildOf(immersionStage) || renderer.transform.IsChildOf(cinemaProduction)) continue;
                 Bounds bounds=renderer.bounds;
@@ -191,7 +191,14 @@ namespace Horizon.UI
             if(immersionStage==null || cinematicEnergy==null) return;
             float lifeBurst=LifeActionPlaying && energyFrame.Time>=lifeAction.Impact && energyFrame.Time<lifeAction.Reveal?
                 Mathf.Exp(-(energyFrame.Time-lifeAction.Impact)/.48f)*.78f:0;
-            bool visible=(cinematicEnergy.Celebrates || lifePressure>0 || lifeBurst>.003f) && !preferences.reducedMotion && !InResultShot;
+            bool actionClose=LifeActionPlaying && !cinematicOverviewRequested && energyFrame.Time<lifeAction.Reveal;
+            // Carry the first impact into the separately timed receipt. The
+            // character stays on screen during this interval, so the charge
+            // must stay with the character as well.
+            float gather=actionClose && energyFrame.Time>=lifeAction.Impact?
+                .26f+.52f*Smooth(lifeAction.Impact+.25f,lifeAction.Reveal-.18f,energyFrame.Time):0;
+            float charge=Mathf.Max(energyFrame.Inward,Mathf.Max(lifePressure*.92f,gather));
+            bool visible=(cinematicEnergy.Celebrates || charge>0 || lifeBurst>.003f) && !preferences.reducedMotion && !InResultShot;
             immersionStage.gameObject.SetActive(visible);
             if(!visible) return;
             int tierBudget=moviePlan.Event.tier<=RewardTier.Local?1:moviePlan.Event.tier==RewardTier.Combo?2:3;
@@ -209,7 +216,8 @@ namespace Horizon.UI
             {
                 Transform layer=immersionLayers[i]; layer.gameObject.SetActive(i<budget);
                 if(i>=budget) continue;
-                layer.position=center+WorldCamera.transform.forward*(.7f+i*1.35f);
+                float offset=i==0 && actionClose?.08f:.7f+i*1.35f;
+                layer.position=center+WorldCamera.transform.forward*offset;
                 layer.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,0,i*31);
                 float layerDepth=Mathf.Max(1,WorldCamera.WorldToViewportPoint(layer.position).z);
                 float fullHeight=2*layerDepth*Mathf.Tan(WorldCamera.fieldOfView*Mathf.Deg2Rad*.5f);
@@ -220,10 +228,10 @@ namespace Horizon.UI
                 layer.localScale=Vector3.one*(fullHeight*span+energyFrame.Burst*.34f);
                 Material material=immersionMaterials[i];
                 Color charged=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
-                    Mathf.Clamp01(Mathf.Max(energyFrame.Inward,lifePressure)*.72f+Mathf.Max(energyFrame.Burst,lifeBurst)*.48f));
+                    Mathf.Clamp01(charge*.72f+Mathf.Max(energyFrame.Burst,lifeBurst)*.48f));
                 material.SetColor("_Color",charged);
                 material.SetFloat("_Clock",energyFrame.Time);
-                material.SetFloat("_Charge",Mathf.Max(energyFrame.Inward,lifePressure*.92f)*(1-energyFrame.Settlement));
+                material.SetFloat("_Charge",charge*(1-energyFrame.Settlement));
                 material.SetFloat("_Burst",tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(energyFrame.Burst,lifeBurst));
                 material.SetFloat("_Afterglow",energyFrame.Afterglow);
             }
