@@ -17,7 +17,7 @@ namespace Horizon.Game
         public static float Land(float value)
         {
             float p=Unit(value);
-            if(p>=1) return 1;
+            if(p==0 || p==1) return p;
             float q=p-1;
             return 1+2.15f*q*q*q+1.15f*q*q;
         }
