@@ -42,11 +42,14 @@ namespace Horizon.Game
             bool visible=seconds>=reveal && seconds<settlement;
             bool future=seconds>=secondReveal;
             int index=Changes.Count==0?-1:0;
-            // Compare against the actual cue timestamp: subtract/divide can
-            // round the first frame of a new row back onto the previous row.
-            while(index+1<Changes.Count && seconds>=reveal+(index+1)*ChangeSeconds) index++;
+            // Unity Mono may keep the intermediate cue sum at higher
+            // precision than the stored director timestamp. Coalesce only
+            // roundoff at the boundary (20 microseconds, below one audio sample).
+            const float cueRoundoff=.00002f;
+            while(index+1<Changes.Count && seconds+cueRoundoff>=reveal+(index+1)*ChangeSeconds) index++;
             float rowStart=reveal+Math.Max(0,index)*ChangeSeconds;
             float age=future?seconds-secondReveal:seconds-rowStart;
+            if(!future && index>=0 && Math.Abs(age)<=cueRoundoff) age=0;
             float p=reducedMotion?1:Ease(age/.78f);
             string copy=future?FutureMeaning:index>=0?Changes[index].Copy(p):Recorded?"状态保持不变":Title;
             return new OutcomeFrame(visible,future,index,future?FutureHeading:Heading,copy,
