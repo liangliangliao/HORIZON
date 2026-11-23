@@ -51,6 +51,26 @@ namespace Horizon.Tests
             Assert.AreEqual(evidence,JsonUtility.ToJson(source));
         }
         [Test]
+        public void WalkRecoveryCountsOnlyLandedPulsesFromTheReceipt()
+        {
+            DomainEvent walk=Walk(); walk.receipt.resources=new ResourceDelta(3,1);
+            var outcome=new CinematicOutcome(walk);
+            Assert.IsTrue(outcome.WalkRecovery);
+            Assert.AreEqual("精力",outcome.Sample(10.1f,10,16,20).Copy);
+            Assert.AreEqual("精力 +1",outcome.Sample(10.25f,10,16,20).Copy);
+            Assert.AreEqual("精力 +2",outcome.Sample(10.59f,10,16,20).Copy);
+            Assert.AreEqual("精力 +3",outcome.Sample(10.93f,10,16,20).Copy);
+            Assert.AreEqual("心情",outcome.Sample(13.2f,10,16,20).Copy);
+            Assert.AreEqual("心情 +1",outcome.Sample(13.62f,10,16,20).Copy);
+            Assert.AreEqual("精力 +3",outcome.Sample(10,10,16,20,true).Copy);
+            Assert.AreEqual("精力 +3　·　心情 +1",outcome.RecoverySummary);
+            walk.receipt.resources=new ResourceDelta(2,-1);
+            Assert.IsFalse(new CinematicOutcome(walk).WalkRecovery);
+            walk.receipt.resourcesRecorded=false;
+            Assert.IsFalse(new CinematicOutcome(walk).WalkRecovery);
+        }
+
+        [Test]
         public void HiddenEchoesNeverInventAnEverydaySourceScene()
         {
             DomainEvent e=Walk(); e.kind=DomainEventKind.TimeEcho; e.receipt.sourceDay=0;

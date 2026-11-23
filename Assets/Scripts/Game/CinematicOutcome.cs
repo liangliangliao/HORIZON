@@ -12,7 +12,17 @@ namespace Horizon.Game
         public const float ChangeSeconds = 2.8f;
         public readonly IReadOnlyList<OutcomeChange> Changes;
         public readonly string Title, Origin, Heading, Meaning, FutureHeading, FutureMeaning;
-        public readonly bool Recorded;
+        public readonly bool Recorded, WalkRecovery;
+        public readonly string RecoverySummary;
+        public const float FootfallLead = .54f;
+        public static float RecoveryContact(int axis,int pulse) => axis==0?.25f+pulse*.34f:.82f;
+        public static int RecoverySteps(OutcomeChange change) => change.Axis==0?Math.Min(3,change.Amount):1;
+        public static int LandedSteps(OutcomeChange change,float age)
+        {
+            int count=RecoverySteps(change),landed=0;
+            while(landed<count && age+.00002f>=RecoveryContact(change.Axis,landed)) landed++;
+            return landed;
+        }
         public float RevealSeconds => Math.Max(3.2f, Changes.Count * ChangeSeconds);
 
         public CinematicOutcome(DomainEvent e)
@@ -34,6 +44,9 @@ namespace Horizon.Game
                 for(int i=0;i<values.Length;i++) if(values[i]!=0) changes.Add(new OutcomeChange(i,names[i],values[i]));
             }
             Changes=changes.AsReadOnly();
+            WalkRecovery=e.kind==DomainEventKind.ActionTaken && LifeActionStoryboard.ThemeFor(e)==LifeActionTheme.Walk &&
+                changes.Count>0 && changes.All(change=>change.Axis<=1 && change.Amount>0);
+            RecoverySummary=WalkRecovery?string.Join("　·　",changes.Select(change=>change.Copy())):"";
         }
 
         public OutcomeFrame Sample(float seconds,float reveal,float secondReveal,float settlement,bool reducedMotion=false)
@@ -52,6 +65,13 @@ namespace Horizon.Game
             if(!future && index>=0 && Math.Abs(age)<=cueRoundoff) age=0;
             float p=reducedMotion?1:Ease(age/.78f);
             string copy=future?FutureMeaning:index>=0?Changes[index].Copy(p):Recorded?"状态保持不变":Title;
+            if(WalkRecovery && visible && !future && !reducedMotion)
+            {
+                OutcomeChange change=Changes[index];
+                int landed=LandedSteps(change,age), count=RecoverySteps(change);
+                p=landed/(float)count;
+                copy=landed==0?change.Name:change.Name+" +"+((long)change.Amount*landed/count);
+            }
             return new OutcomeFrame(visible,future,index,future?FutureHeading:Heading,copy,
                 future?Meaning:Origin,age,p,index>=0 && !future && Changes[index].Amount<0);
         }

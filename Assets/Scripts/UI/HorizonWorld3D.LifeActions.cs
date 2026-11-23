@@ -60,6 +60,7 @@ namespace Horizon.UI
             lifeActorRenderers=moviePlayer.GetComponentsInChildren<Renderer>(true);
             lifeOverviewRenderers=lifeStage.GetComponentsInChildren<Renderer>(true);
             lifePerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
+            if(moviePlan.Outcome.WalkRecovery) PrepareWalkRecovery();
         }
 
         private void BuildLifeActionStage()
@@ -134,9 +135,10 @@ namespace Horizon.UI
             LifeActionFrame frame=lifeAction.Sample(time,preferences.reducedMotion);
             CurrentLifeActionShot=frame.Shot; lifePressure=frame.Pressure;
             bool overview=frame.Shot==LifeActionShot.Overview || cinematicOverviewRequested;
-            bool narrative=time<lifeAction.Reveal || overview;
-            lifeStage.gameObject.SetActive(time<lifeAction.Reveal || overview);
-            if(jackpotStage!=null && (time<lifeAction.ActionEnd || overview)) jackpotStage.gameObject.SetActive(false);
+            bool recovery=moviePlan.Outcome.WalkRecovery;
+            bool narrative=time<lifeAction.Reveal || overview || recovery;
+            lifeStage.gameObject.SetActive(narrative);
+            if(jackpotStage!=null && (time<lifeAction.ActionEnd || overview || recovery)) jackpotStage.gameObject.SetActive(false);
             else if(jackpotStage!=null) jackpotStage.gameObject.SetActive(true);
             if(!narrative) return;
             movieFuture.gameObject.SetActive(false); movieFriend.gameObject.SetActive(false); movieAnchor.gameObject.SetActive(false);
@@ -144,7 +146,7 @@ namespace Horizon.UI
             foreach(Transform node in movieNodes) node.gameObject.SetActive(false);
             foreach(LineRenderer line in movieLines) line.gameObject.SetActive(false);
             foreach(Transform item in movieObjects) item.gameObject.SetActive(false);
-            if(overview)
+            if(overview || recovery && time>=lifeAction.Reveal)
             {
                 foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
                 showcaseOccluders.Clear();
@@ -191,9 +193,11 @@ namespace Horizon.UI
             look=wide?new Vector3(0,1,2):actorPosition+Vector3.up;
             Rect aperture=wide?new Rect(.065f,.245f,.87f,.52f):HorizonCinemaLayout.SubjectAperture;
             FitPortraitSubject(wide?lifeOverviewRenderers:lifeActorRenderers,aperture,CinematicFieldOfView(time),ref camera,ref look,false);
+            if(recovery) SampleWalkRecovery(time,overview,ref camera,ref look);
         }
         private void EndLifeAction()
         {
+            if(walkEffects!=null) { walkEffects.gameObject.SetActive(false); ClearWalkBench(); }
             lifePerformance?.Release(); lifeAction=null; lifePressure=0;
             if(lifeStage!=null) lifeStage.gameObject.SetActive(false);
         }

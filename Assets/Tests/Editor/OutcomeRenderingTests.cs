@@ -105,7 +105,20 @@ namespace Horizon.Tests
                     Text main=root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward resilience");
                     Assert.AreEqual(next?plan.Outcome.FutureMeaning:plan.Outcome.Changes[i].Copy(),main.text);
                     Assert.That(main.text,Does.Not.Contain("×"));
-                    if(!next)
+                    if(walk && !next)
+                    {
+                        Assert.IsTrue(plan.Outcome.WalkRecovery);
+                        Transform park=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Park destination");
+                        Transform actor=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Cinematic player");
+                        Transform badge=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Recovery marks on coat");
+                        Assert.IsTrue(park.gameObject.activeInHierarchy);
+                        Assert.IsTrue(actor.GetComponentsInChildren<Renderer>().Any(r=>r.enabled));
+                        Assert.IsTrue(badge.gameObject.activeInHierarchy);
+                        Vector3 visible=world.WorldCamera.WorldToViewportPoint(badge.position);
+                        Assert.Greater(visible.z,0);
+                        Assert.That(visible.x,Is.InRange(.05f,.95f)); Assert.That(visible.y,Is.InRange(.25f,.82f));
+                    }
+                    else if(!next)
                     {
                         var resources=plan.Objects.Where(o=>o.Class==RewardObjectClass.Resource).ToArray();
                         var subject=(MaterialReward)typeof(HorizonWorld3D).GetField("activeHeroReward",Private).GetValue(world);

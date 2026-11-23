@@ -196,6 +196,8 @@ namespace Horizon.UI
                 if(string.IsNullOrWhiteSpace(context) || context==outcome.Copy)
                     context=plan.Event.day>0?"第 "+plan.Event.day+" 天 · 原始记录":"原始记录已保留";
             }
+            if(plan.Outcome.WalkRecovery && outcome.HasResource)
+                context=plan.Outcome.Changes[outcome.Index].Axis==0?"脚步落稳，感受身体恢复。":"慢慢呼气，让肩膀放松。";
             if(Story!=null) Story.text=context;
             // At a release beat, reveal the new thought as one sentence and
             // let opacity/scale carry the entrance. A type-on during the flash
@@ -217,6 +219,12 @@ namespace Horizon.UI
             if(OutcomeContext!=null) OutcomeContext.text=outcome.Visible && !outcome.Future && outcome.Index>=0?
                 (outcome.Index+1)+" / "+plan.Outcome.Changes.Count+" · 实际记录":"";
 
+            if(OutcomeContext!=null && plan.Outcome.WalkRecovery && outcome.Visible)
+            {
+                if(outcome.Future) OutcomeContext.text=plan.Outcome.RecoverySummary;
+                else if(outcome.Index>0) OutcomeContext.text=plan.Outcome.Changes[0].Copy()+"　·　已恢复";
+            }
+
             float sx=VisualPreferences.ReducedMotion?0:
                 (Mathf.Sin(frame.Time*71)+Mathf.Sin(frame.Time*113)*.45f)*frame.Tremor;
             float sy=VisualPreferences.ReducedMotion?0:
@@ -230,6 +238,8 @@ namespace Horizon.UI
             float revealAlpha=outcome.Visible?Mathf.Clamp01(outcome.Age/.16f)*frame.EndAlpha:0;
             float revealScale=VisualPreferences.ReducedMotion?1:1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
             Color resultColor=outcome.Negative?Palette.Coral:Palette.Gold;
+            if(plan.Outcome.WalkRecovery && outcome.HasResource && plan.Outcome.Changes[outcome.Index].Axis==0)
+                resultColor=Palette.Mint;
             Color radiance=resultColor; radiance.a=revealAlpha;
             outcomeLight?.Sample(outcome.Visible?outcome.Age:-1,radiance,VisualPreferences.ReducedMotion,outcome.Negative);
             Style(Multiplier,revealScale,Vector2.zero,revealAlpha,resultColor,.65f+frame.Glow*.35f,.16f,2,true);

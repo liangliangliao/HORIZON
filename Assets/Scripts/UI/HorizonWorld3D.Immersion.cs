@@ -89,6 +89,7 @@ namespace Horizon.UI
                     renderer is LineRenderer || renderer is ParticleSystemRenderer || renderer.GetComponent<TextMesh>()!=null ||
                     narrativeSubjectSet.Contains(renderer) || renderer.transform==attentionIris || renderer.transform.IsChildOf(jackpotStage) ||
                     (relayStage!=null && renderer.transform.IsChildOf(relayStage)) ||
+                    (walkEffects!=null && renderer.transform.IsChildOf(walkEffects)) ||
                     renderer.transform.IsChildOf(immersionStage) || renderer.transform.IsChildOf(cinemaProduction)) continue;
                 Bounds bounds=renderer.bounds;
                 if(bounds.size.magnitude<.45f || !bounds.IntersectRay(ray,out float hit) || hit>=distance-.5f) continue;

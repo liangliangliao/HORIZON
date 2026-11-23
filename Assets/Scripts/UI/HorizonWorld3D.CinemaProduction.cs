@@ -94,7 +94,8 @@ namespace Horizon.UI
             // (especially at a desk), so remove only that foreground layer.
             // It returns for wide arrivals, the result reveal, and overview.
             LifeActionShot actionShot=LifeActionPlaying?lifeAction.Sample(time,preferences.reducedMotion).Shot:LifeActionShot.Overview;
-            bool subjectClose=LifeActionPlaying && (actionShot==LifeActionShot.Action || actionShot==LifeActionShot.Suspense);
+            bool subjectClose=LifeActionPlaying && (actionShot==LifeActionShot.Action || actionShot==LifeActionShot.Suspense ||
+                moviePlan.Outcome.WalkRecovery && actionShot==LifeActionShot.Reveal && !cinematicOverviewRequested);
             if(cinemaHaloRenderers!=null)
                 foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!subjectClose;
             cinemaBackdropMaterial.SetColor("_Color",tint*(1-attention*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);

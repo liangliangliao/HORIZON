@@ -177,6 +177,12 @@ namespace Horizon.UI
             // Ordinary actions and losses deserve a readable product shot too.
             // This is attention, not a promotion to a reward tier: their sound,
             // particles and celebration budgets remain unchanged.
+            if(moviePlan.Outcome.WalkRecovery)
+            {
+                showcaseCameraWeight=0; outcomeSubjectFocus=0;
+                jackpotStage.gameObject.SetActive(false);
+                return;
+            }
             bool actionInFrame=LifeActionPlaying && time<lifeAction.Reveal;
             outcomeSubjectFocus=!actionInFrame && !spectacle.HasHero && outcomeResources.Length>0?
                 Smooth(spectacle.MultiplierTime-.8f,spectacle.MultiplierTime,time)*
@@ -350,6 +356,11 @@ namespace Horizon.UI
 
         internal void PlayResourceContact(float previous,float now)
         {
+            if(moviePlan!=null && moviePlan.Outcome.WalkRecovery)
+            {
+                PlayWalkRecoverySounds(previous,now);
+                return;
+            }
             if(!ShowingResource || preferences.reducedMotion || tensionFrame.Silent || paused) return;
             float contact=spectacle.MultiplierTime+resourceBeat.Index*CinematicOutcome.ChangeSeconds+ImmersiveMotion.RevealContactSeconds;
             // A skipped section never queues a backlog of late sounds. Pose
