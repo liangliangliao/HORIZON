@@ -22,6 +22,9 @@ namespace Horizon.UI
         private Material rayMaterial;
         private MaterialPropertyBlock practiceLight;
         private Renderer rayRenderer;
+        private readonly Transform[] prizePieces=new Transform[6], prizeSockets=new Transform[6], prizeBeams=new Transform[6];
+        private readonly Vector3[] prizeLandings=new Vector3[6];
+        private readonly bool[] prizeLanded=new bool[6];
         private int prizeAxis;
         private bool prizeNegative;
 
@@ -231,12 +234,44 @@ namespace Horizon.UI
             chamber.gameObject.SetActive(false);
         }
 
+        public void PreparePracticePayout(int[] ticks)
+        {
+            int count=System.Array.FindAll(ticks,v=>v!=0).Length;
+            int slot=0;
+            for (int axis=0;axis<6;axis++)
+            {
+                if(ticks[axis]==0) continue;
+                float angle=count==1 ? 0 : Mathf.Lerp(-1.10f,1.10f,slot++/(float)(count-1));
+                prizeLandings[axis]=new Vector3(Mathf.Sin(angle)*.61f,.16f,-.50f*Mathf.Cos(angle)-.16f);
+                var socket=Group(PracticeReward.Names[axis]+" landing",chamber);
+                socket.localPosition=prizeLandings[axis]-Vector3.up*.055f;
+                Disc(socket,"Foot",Vector3.zero,.32f,dark);
+                Disc(socket,"Gold lip",Vector3.up*.024f,.28f,gold);
+                var beam=Shape(socket,"Column of light",PrimitiveType.Quad,new Vector3(0,.35f,.08f),new Vector3(.31f,.68f,1),rayMaterial);
+                Color[] colors={new Color(.21f,1,.76f),new Color(1,.42f,.26f),new Color(.43f,.66f,1),new Color(1,.70f,.13f),new Color(.98f,.52f,.70f),new Color(.74f,.52f,1)};
+                practiceLight.Clear();
+                practiceLight.SetColor("_Column",colors[axis]);
+                beam.GetComponent<Renderer>().SetPropertyBlock(practiceLight);
+                practiceLight.Clear();
+                prizeBeams[axis]=beam; prizeSockets[axis]=socket;
+                socket.gameObject.SetActive(false);
+            }
+        }
         public void SetPracticePrize(int axis,bool negative)
         {
-            if (prize!=null) { prize.gameObject.SetActive(false); Dispose(prize.gameObject); }
+            if(prize!=null && axis!=prizeAxis && prizeLanded[prizeAxis])
+            {
+                prize.localPosition=prizeLandings[prizeAxis]; prize.localScale=Vector3.one*.50f;
+                prize.localRotation=Quaternion.Euler(0,24,0);
+            }
             prizeAxis=axis; prizeNegative=negative;
-            PracticeProp[] symbols={PracticeProp.Shoe,PracticeProp.Flower,PracticeProp.Book,PracticeProp.Coin,PracticeProp.Cup,PracticeProp.Model};
-            prize=PracticeObject(chamber,symbols[axis]); prize.gameObject.SetActive(false);
+            if(prizePieces[axis]==null)
+            {
+                PracticeProp[] symbols={PracticeProp.Shoe,PracticeProp.Flower,PracticeProp.Book,PracticeProp.Coin,PracticeProp.Cup,PracticeProp.Model};
+                prizePieces[axis]=PracticeObject(chamber,symbols[axis]);
+                prizePieces[axis].gameObject.SetActive(false);
+            }
+            prize=prizePieces[axis];
         }
 
         public void SamplePractice(PracticeShot shot,float progress,PracticeMove move,int beat)
@@ -325,13 +360,24 @@ namespace Horizon.UI
                     float light=shot==PracticeShot.Charge ? .08f+.67f*t : shot==PracticeShot.Open ? 1f-.5f*t : .29f;
                     practiceLight.SetVector("_Beat",new Vector4(reduced?0:p,light*(reduced?.48f:1),shot==PracticeShot.Open?1:0,charge));
                     rayRenderer.SetPropertyBlock(practiceLight);
+                    for(int index=0;index<6;index++)
+                    {
+                        if(prizeSockets[index]==null) continue;
+                        prizeSockets[index].gameObject.SetActive(shot!=PracticeShot.Charge);
+                        bool arriving=shot==PracticeShot.Receive && index==prizeAxis;
+                        float column=arriving?.35f+.65f*Mathf.Sin(p*Mathf.PI*.5f):prizeLanded[index]?.55f:0;
+                        prizeBeams[index].gameObject.SetActive(column>0);
+                        prizeBeams[index].localScale=new Vector3(.28f,column*.78f,1);
+                        prizeBeams[index].localPosition=new Vector3(0,column*.39f,.085f);
+                    }
                     if(prize!=null)
                     {
                         prize.gameObject.SetActive(shot!=PracticeShot.Charge);
                         Vector3 lifted=new Vector3(0,.76f,-.03f);
                         prize.localPosition=shot==PracticeShot.Receive ?
-                            Vector3.Lerp(lifted,new Vector3(prizeNegative?.51f:-.42f,prizeNegative?.12f:.52f,.10f),t) : Vector3.Lerp(Vector3.up*.13f,lifted,open);
-                        prize.localScale=Vector3.one*(.09f+open*.97f);
+                            Vector3.Lerp(lifted,prizeLandings[prizeAxis],t)+Vector3.up*(reduced?0:.19f*Mathf.Sin(t*Mathf.PI)) : Vector3.Lerp(Vector3.up*.13f,lifted,open);
+                        prize.localScale=Vector3.one*(shot==PracticeShot.Receive?Mathf.Lerp(1.06f,.50f,t):.09f+open*.97f);
+                        if(shot==PracticeShot.Receive && p>=1) prizeLanded[prizeAxis]=true;
                         prize.localEulerAngles=new Vector3(0,open*29+(reduced?0:p*24),prizeNegative?-12*t:0);
                     }
                     look=chamber.localPosition+new Vector3(-.12f,.43f,.14f);
@@ -363,6 +409,8 @@ namespace Horizon.UI
         {
             if(practiceStage==null) return;
             practiceStage.gameObject.SetActive(false); Dispose(practiceStage.gameObject); practiceStage=null; prize=null;
+            for(int i=0;i<6;i++)
+            { prizePieces[i]=null; prizeSockets[i]=null; prizeBeams[i]=null; prizeLanded[i]=false; }
             WorldCamera.rect=originalRect; WorldCamera.fieldOfView=originalFov; WorldCamera.backgroundColor=originalSky;
             WorldCamera.transform.SetPositionAndRotation(originalCamera,originalRotation);
         }

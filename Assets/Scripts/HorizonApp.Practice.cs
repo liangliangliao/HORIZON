@@ -132,6 +132,7 @@ namespace Horizon
             int budget=session.PracticeBudget, ceiling=PracticeReward.Ceiling(take.difficulty);
             var actual=session.PreviewPractice(card);
             int[] ticks=PracticeReward.Ticks(actual);
+            world.PreparePracticePayout(ticks);
             int first=System.Array.FindIndex(ticks,v=>v>0);
             if(first<0) first=System.Array.FindIndex(ticks,v=>v<0);
             if(first>=0) world.SetPracticePrize(first,ticks[first]<0);

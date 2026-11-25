@@ -69,11 +69,13 @@ namespace Horizon.Tests
             ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20; ui.targetTexture=target;
             int rate=Time.captureFramerate; Time.captureFramerate=16;
             bool selected=false, achieved=false, sawCharge=false, finished=false;
-            int frame=0, waiting=0, balance=life.AxisTicks(0);
+            int frame=0, waiting=0, balance=life.AxisTicks(0), lastFrame=-1;
             try
             {
                 while(frame<560)
                 {
+                    if(Time.frameCount==lastFrame) { yield return null; continue; }
+                    lastFrame=Time.frameCount;
                     var buttons=film.GetComponentsInChildren<Button>();
                     var difficulty=buttons.FirstOrDefault(b=>b.name=="Practice difficulty 1");
                     var fork=buttons.FirstOrDefault(b=>b.name=="Practice route B");
@@ -95,7 +97,12 @@ namespace Horizon.Tests
                     yield return null;
                 }
                 Assert.That(achieved && selected && sawCharge && finished);
-                Assert.AreEqual("B",life.Actions.Last().practice.routes);
+                var last=life.Actions.Last();
+                Assert.AreEqual("B",last.practice.routes);
+                var landings=world.GetComponentsInChildren<Transform>().Where(x=>x.name.EndsWith(" landing") && x.parent.name=="Reward case at finished work").ToArray();
+                Assert.AreEqual(last.actualNow.ticks.Count(v=>v!=0),landings.Length);
+                Assert.That(landings.All(x=>x.Find("Column of light").gameObject.activeInHierarchy));
+                Assert.AreEqual(landings.Length,landings.Select(x=>x.localPosition).Distinct().Count());
                 Assert.AreEqual(life.AxisTicks(0),GameSession.Restore(archive.active).AxisTicks(0));
                 Assert.Greater(life.AxisTicks(0),balance);
             }
