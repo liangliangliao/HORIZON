@@ -62,6 +62,7 @@ namespace Horizon
 #if UNITY_ANDROID && DEVELOPMENT_BUILD
             AndroidSmoke.NotePause(paused);
 #endif
+            practiceBackground=paused;
             if (paused) { CancelAIRequest(); PersistLiveLife(); }
             if (world != null) world.SetPaused(paused || userPaused);
         }
@@ -71,6 +72,7 @@ namespace Horizon
 
         private void HandleBack()
         {
+            if(practicePage!=null) { if(!session.HasChosen) LeavePractice(); return; }
             if (busy) { backRequested = true; return; }
             if (overlay != null)
             {

@@ -32,6 +32,7 @@ namespace Horizon.Tests
 
         private static IEnumerator FinishDailyFeedback(HorizonApp app, int fromDay)
         {
+            yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
             float noProgressUntil=Time.realtimeSinceStartup+15;
             float absoluteUntil=Time.realtimeSinceStartup+15+CausalRelayPlan.MaximumNodes*RewardDirector.CausalNodeSeconds(new string('字',60));
             string previousProgress="";
@@ -85,6 +86,8 @@ namespace Horizon.Tests
             Assert.Greater(rect.localScale.x, 1, "Lift gives visible feedback.");
             ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.endDragHandler);
             ExecuteEvents.Execute(pointer.pointerDrag, pointer, ExecuteEvents.endDragHandler);
+            Assert.AreEqual(0,life.Actions.Count);
+            yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
             Assert.AreEqual(1, life.Actions.Count); Assert.AreEqual(card.name, life.Actions[0].cardId);
             yield return new ExitPlayMode();
         }
@@ -323,6 +326,7 @@ namespace Horizon.Tests
                     Button(app, "Execute next step").onClick.Invoke();
                 }
                 else Button(app, "Use card").onClick.Invoke();
+                yield return PracticeTouch.Finish(root);
                 float until = Time.realtimeSinceStartup + 20;
                 while (Time.realtimeSinceStartup < until)
                 {
@@ -445,6 +449,7 @@ namespace Horizon.Tests
                 CardSpec chosen = life.Hand[2];
                 if (day != 5 && life.Energy >= 4 && life.Hand[1].Id != "imagine" && life.CanPlay(life.Hand[1])) chosen = life.Hand[1];
                 Call(app, "CardTapped", Card(app, chosen.Id)); yield return null; Button(app, "Use card").onClick.Invoke();
+                yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
                 if (day < 12) yield return FinishDailyFeedback(app, day);
                 else
                 {

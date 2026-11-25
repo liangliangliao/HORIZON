@@ -212,7 +212,7 @@ namespace Horizon.Game
 
     public static class ResourceMath
     {
-        public static ResourceDelta Copy(ResourceDelta d) { return d == null ? new ResourceDelta() : new ResourceDelta(d.energy, d.mood, d.insight, d.relation, d.money, d.ability); }
+        public static ResourceDelta Copy(ResourceDelta d) { return d == null ? new ResourceDelta() : new ResourceDelta(d.energy, d.mood, d.insight, d.relation, d.money, d.ability) { ticks = (int[])d.ticks?.Clone() }; }
         public static int[] Axes(ResourceDelta d) { return new[] { d.energy, d.mood, d.insight, d.money, d.relation, d.ability }; }
         public static ResourceTrend Trend(List<ResourceSample> samples, int axis)
         {

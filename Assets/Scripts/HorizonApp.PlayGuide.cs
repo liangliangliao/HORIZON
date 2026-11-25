@@ -41,7 +41,7 @@ namespace Horizon
                 CardSpec sample = session.Hand.FirstOrDefault(c => c.Kind == CardKind.Growth) ?? session.Hand[0];
                 View.Label(overlay, "Guide sample card", "例如「" + sample.Name + "」", 39, Palette.Text,
                     TextAnchor.MiddleLeft, 0.075f, 0.68f, 0.925f, 0.78f);
-                View.Label(overlay, "Guide now", "今天 · 付出与得到\n" + PlayExperience.NowLabel(session.ImmediateEffect(sample)), 33, Palette.Mint,
+                View.Label(overlay, "Guide now", "今天 · 付出与得到\n" + PracticeReward.Label(session.ImmediateEffect(sample),true), 33, Palette.Mint,
                     TextAnchor.MiddleLeft, 0.075f, 0.54f, 0.925f, 0.675f);
                 View.Label(overlay, "Guide future", "第 " + (session.Day + sample.Delay) + " 天 · 行动回来\n" + PlayExperience.FutureMeaning(sample), 33, Palette.Gold,
                     TextAnchor.MiddleLeft, 0.075f, 0.39f, 0.925f, 0.53f);

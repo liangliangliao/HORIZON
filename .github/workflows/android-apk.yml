@@ -281,6 +281,18 @@ jobs:
           /tmp/horizon-gif-verification/bin/python tools/verify_v03_previews.py
           python3 tools/verify_video_exports.py --ffprobe tools/media/ffprobe
 
+      - name: Encode the interactive card practice filmed in Unity
+        run: |
+          tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 16 -i artifacts/practice-frames/frame-%05d.jpg -c:v libx264 -crf 19 -pix_fmt yuv420p -movflags +faststart artifacts/HORIZON-card-practice.mp4
+          tools/media/ffprobe -v error -show_entries stream=width,height,duration artifacts/HORIZON-card-practice.mp4
+      - name: Upload interactive practice preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Card-Practice-Preview
+          path: artifacts/HORIZON-card-practice.mp4
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Unity portrait previews
         if: always()
         uses: actions/upload-artifact@v4

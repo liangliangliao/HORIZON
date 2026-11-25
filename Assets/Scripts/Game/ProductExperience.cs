@@ -36,7 +36,7 @@ namespace Horizon.Game
 
         public static int EvidenceNeeded(GameSession life) { return life.Deadline >= 30 ? 3 : 2; }
         public static int GrowthEvidence(GameSession life)
-        { return life.Actions.Count(a => (life.Deadline < 30 || a.day > 12) && a.echoed && a.later?.ability > 0); }
+        { return life.Actions.Count(a => (life.Deadline < 30 || a.day > 12) && a.echoed && (a.practice==null ? a.later?.ability>0 : PracticeReward.Ticks(a.actualLaterRecorded ? a.actualLater : a.later)[5] > 0)); }
         public static int RecoveryEvidence(GameSession life)
         { return life.Actions.Count(a => (life.Deadline < 30 || a.day > 12) && a.kind == CardKind.Recovery); }
         public static int SupportEvidence(GameSession life)
@@ -44,10 +44,15 @@ namespace Horizon.Game
         public static bool GateReady(GameSession life, int gate)
         {
             int need = EvidenceNeeded(life);
-            if (gate == 0) return life.Ability >= 6 && (life.CatalogVersion < 2 || GrowthEvidence(life) >= need);
+            if (gate == 0) return life.AxisTicks(5) >= GrowthThreshold(life) && (life.CatalogVersion < 2 || GrowthEvidence(life) >= need);
             if (gate == 1) return life.Energy >= 4 && life.Mood >= 4 && (life.CatalogVersion < 2 || RecoveryEvidence(life) >= need);
-            return SupportEvidence(life) >= need && life.Relation >= 6 && life.Money >= 2;
+            return SupportEvidence(life) >= need && life.AxisTicks(4) >= SupportThreshold(life) && life.Money >= 2;
         }
+
+        // Fractional runs start with ability 2 and relationship 4. Require a real net improvement
+        // alongside the original independent evidence from different days.
+        public static int GrowthThreshold(GameSession life) => life.HasPracticeBalances ? 20001 : 60000;
+        public static int SupportThreshold(GameSession life) => life.HasPracticeBalances ? 40001 : 60000;
 
         public static int ReadyGates(GameSession life)
         { return Enumerable.Range(0, 3).Count(g => GateReady(life, g)); }

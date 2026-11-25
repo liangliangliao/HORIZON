@@ -144,6 +144,8 @@ namespace Horizon
 
         private void Clear(bool immersive = false)
         {
+            practicePage=null; practiceOptions=null;
+            if(world!=null) world.EndPracticeSet();
             RestoreMasterBackground();
             if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); }
             CancelAIRequest();
@@ -304,6 +306,13 @@ namespace Horizon
             HandRegion();
             BuildMasterBoard();
             world.SetTimeline(session.Actions, session.Deadline);
+            if(session.Practice!=null)
+            {
+                foreach(var entry in cards)
+                    if(entry.Value.Id==session.Practice.cardId && session.CanPlay(entry.Value))
+                    { OpenPractice(entry.Key,entry.Value); return; }
+                session.AbandonPractice(); PersistMasterAction();
+            }
             if (ShowChapterMoment()) return;
             if (session.UsesExpedition && ShowMirrorEncounter()) return;
             if (TryRareMoment()) return;
@@ -376,8 +385,8 @@ namespace Horizon
                 View.Label(overlay, "Gate progress", PlayExperience.GateReason(session, i), 26, Palette.Text,
                     TextAnchor.MiddleLeft, 0.115f, y + 0.01f, 0.885f, y + 0.075f);
             }
-            View.Label(overlay, "All states", "精力 " + session.Energy + "   心情 " + session.Mood + "   专注 " + session.Insight +
-                "\n关系 " + session.Relation + "   金钱 " + session.Money + "   能力 " + session.Ability + "    / 上限 10", 28,
+            View.Label(overlay, "All states", "精力 " + session.Balance(0) + "   心情 " + session.Balance(1) + "   专注 " + session.Balance(2) +
+                "\n关系 " + session.Balance(4) + "   金钱 " + session.Balance(3) + "   能力 " + session.Balance(5) + "    / 上限 10", 28,
                 Palette.Gold, TextAnchor.MiddleCenter, 0.07f, 0.145f, 0.93f, 0.235f);
             View.Button(overlay, "Got it", "明白了，回到今天", () => {
                 archive.journey.Remember(LifeLesson.Preparation); Save();
@@ -725,7 +734,7 @@ namespace Horizon
             trail.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(vector.y, vector.x) * Mathf.Rad2Deg);
             dragHint.text = PlayExperience.DestinationLabel(card, session.Day, session.Deadline);
             if (boardHint != null) boardHint.text = ready ? "已接住「" + card.Name + "」 · 松手即可" :
-                "今天：" + PlayExperience.NowLabel(card.Now);
+                "今天：" + PracticeReward.Label(card.Now,true);
         }
 
         private bool IsInsideDropZone(Vector2 pointer)
@@ -744,7 +753,7 @@ namespace Horizon
             panel.gameObject.AddComponent<PanelEntrance>();
             View.Label(panel, "Name", card.Name, 48, Palette.Text, TextAnchor.MiddleLeft,
                 0.075f, 0.865f, 0.925f, 0.97f);
-            View.Label(panel, "Today", "今天\n" + PlayExperience.NowLabel(session.ImmediateEffect(card)), 32, Palette.Mint,
+            View.Label(panel, "Today", "今天\n" + PracticeReward.Label(session.ImmediateEffect(card),true), 32, Palette.Mint,
                 TextAnchor.MiddleLeft, 0.075f, 0.73f, 0.925f, 0.87f);
             View.Label(panel, "Later", card.Delay == 0 ? "现在就能得到恢复。" :
                 "第 " + (session.Day + card.Delay) + " 天\n" + PlayExperience.FutureMeaning(card) +
@@ -777,15 +786,20 @@ namespace Horizon
             if (busy || !cards.TryGetValue(drag, out CardSpec card)) return;
             if (session.CanPrepareImagination(card)) { PrepareCardImagination(card); return; }
             if (!session.CanPlay(card)) return;
+            OpenPractice(drag,card);
+        }
+
+        private ActionRecord CommitPracticeCard(CardSpec card)
+        {
             busy = true;
             foreach (HorizonCardDrag item in cards.Keys) item.Available = false;
             RunSnapshot before = session.Snapshot();
-            ActionRecord action = session.Choose(card.Id);
+            ActionRecord action = session.FinishPractice();
             session.RecordChoiceDuration((int)Mathf.Clamp((Time.unscaledTime - choiceVisibleSince) * 1000, 0, 300000));
             int stars = archive.wallet.Claim("run:" + session.RunNumber + ":action:" + session.Day, 1);
-            ResourceDelta change = new ResourceDelta(session.Energy - before.energy, session.Mood - before.mood,
-                session.Insight - before.insight, session.Relation - before.relation,
-                session.Money - before.money, session.Ability - before.ability);
+            ResourceDelta change=action.actualNow;
+            var witnessed=session.Master?.events?.FindLast(e=>e.day==session.Day && e.kind==DomainEventKind.ActionTaken);
+            if(witnessed!=null) witnessed.acknowledged=true;
             archive.pendingFeedback = new FeedbackRecord
             {
                 kind = FeedbackKind.Choice, runNumber = session.RunNumber, day = session.Day,
@@ -806,7 +820,7 @@ namespace Horizon
                 PrepareDeadlineFeedback(session.CompletedRun, stars);
             }
             Save();
-            StartCoroutine(ResolveChoice(drag, card, action));
+            return action;
         }
 
         private IEnumerator ResolveChoice(HorizonCardDrag drag, CardSpec card, ActionRecord action)

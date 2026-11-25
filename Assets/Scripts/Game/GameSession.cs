@@ -6,6 +6,8 @@ namespace Horizon.Game
     [Serializable]
     public sealed class ActionRecord
     {
+        public PracticeTake practice;
+        public int practiceBudget;
         public int day;
         public string cardId;
         public string cardName;
@@ -137,6 +139,7 @@ namespace Horizon.Game
     [Serializable]
     public sealed class RunRecord
     {
+        public int[] finalFractions;
         public MasterRunState master;
         public int catalogVersion;
         public int deadline;
@@ -164,6 +167,8 @@ namespace Horizon.Game
     [Serializable]
     public sealed class RunSnapshot
     {
+        public int[] fractions;
+        public PracticeTake practice;
         public MasterRunState master;
         public int rulesVersion;
         public int catalogVersion;
@@ -461,6 +466,8 @@ namespace Horizon.Game
                 DeckSeed = saved.deckSeedRecorded ? saved.deckSeed : saved.worldSeed,
                 Deadline = deadline,
                 Day = saved.day, Energy = saved.energy, Mood = saved.mood,
+                fractions = saved.fractions?.Length == 6 && Array.TrueForAll(saved.fractions, v => v >= 0 && v < PracticeReward.Unit) ? (int[])saved.fractions.Clone() : null,
+                Practice = !saved.hasChosen && saved.practice?.Valid == true && saved.practice.day == saved.day ? saved.practice.Copy() : null,
                 Insight = saved.insight, Relation = saved.relation,
                 Money = saved.money, Ability = saved.ability,
                 SupportActions = saved.supportActions,
@@ -559,6 +566,7 @@ namespace Horizon.Game
                 deckSeed = DeckSeed, deckSeedRecorded = true, deadline = Deadline,
                 day = Day, runNumber = RunNumber,
                 energy = Energy, mood = Mood, insight = Insight,
+                fractions = (int[])fractions?.Clone(), practice = Practice?.Copy(),
                 relation = Relation, money = Money, ability = Ability,
                 supportActions = SupportActions, focusUses = FocusUses,
                 hasChosen = HasChosen, stationVisited = StationVisited,
@@ -754,7 +762,9 @@ namespace Horizon.Game
                 energy, mood, insight, relation, money, ability);
         }
 
-        public ActionRecord Choose(string cardId)
+        public ActionRecord Choose(string cardId) => ChooseCore(cardId, null);
+
+        private ActionRecord ChooseCore(string cardId, PracticeTake take)
         {
             if (HasChosen || CompletedRun != null) throw new InvalidOperationException("Day already played.");
             if (HasPredictionReview) throw new InvalidOperationException("Review the prediction first.");
@@ -764,7 +774,9 @@ namespace Horizon.Game
             if (!CanPlay(card)) throw new InvalidOperationException("Insufficient resources.");
 
             ResourceDelta before = Values();
-            ResourceDelta immediate = ImmediateEffect(card);
+            ResourceDelta immediate = ImmediateEffect(card), later = card.Later;
+            int budget = take == null ? 0 : PracticeReward.Draw(WorldSeed,RunNumber,take);
+            if (take != null) PracticeReward.Allocate(budget, immediate, card.Delay > 0 && Day + card.Delay <= Deadline ? later : null, out immediate, out later);
             Apply(immediate);
             if (card.GivesSupport) SupportActions++;
             CausalNode changedChoice = CausalNodes.FindLast(n => (n.type == CausalNodeKind.Choice ||
@@ -778,7 +790,7 @@ namespace Horizon.Game
                 day = Day, cardId = card.Id, cardName = card.Name, kind = card.Kind,
                 echoDay = card.Delay > 0 ? Day + card.Delay : 0,
                 echoName = card.EchoName, givesSupport = card.GivesSupport,
-                now = immediate, later = card.Later,
+                now = immediate, later = later, practice = take?.Copy(), practiceBudget = budget,
                 actualNow = origin.effect, actualNowRecorded = true,
                 nodeId = origin.id, parentNodeId = origin.parentId,
                 parentNodeIds = new List<string>(CausalGraph.Parents(origin))
@@ -792,10 +804,11 @@ namespace Horizon.Game
                 {
                     sourceDay = Day, dueDay = action.echoDay, cardId = card.Id,
                     cardName = card.Name, echoName = card.EchoName,
-                    delta = card.Later, kind = card.Kind, depth = 1,
+                    delta = later, kind = card.Kind, depth = 1,
                     nodeId = result.id, parentNodeId = origin.id
                 });
             }
+            Practice = null;
             HasChosen = true;
             MasterAfterChoice(action, card, before);
             if (Day == Deadline) Complete();
@@ -940,6 +953,19 @@ namespace Horizon.Game
 
         private void Apply(ResourceDelta delta)
         {
+            if (fractions != null || delta.ticks?.Length == 6)
+            {
+                int[] sum = PracticeReward.Ticks(Values()), changes = PracticeReward.Ticks(delta);
+                fractions = new int[6];
+                for (int i=0;i<6;i++)
+                {
+                    sum[i] = Math.Max(0, Math.Min(ResourceCap * PracticeReward.Unit, sum[i] + changes[i]));
+                    fractions[i] = sum[i] % PracticeReward.Unit;
+                    sum[i] /= PracticeReward.Unit;
+                }
+                Energy=sum[0]; Mood=sum[1]; Insight=sum[2]; Money=sum[3]; Relation=sum[4]; Ability=sum[5];
+                return;
+            }
             Energy = Clamp(Energy + delta.energy);
             Mood = Clamp(Mood + delta.mood);
             Insight = Clamp(Insight + delta.insight);
@@ -949,10 +975,25 @@ namespace Horizon.Game
         }
 
         private ResourceDelta Values()
-        { return new ResourceDelta(Energy, Mood, Insight, Relation, Money, Ability); }
+        {
+            var value = new ResourceDelta(Energy, Mood, Insight, Relation, Money, Ability);
+            if (fractions != null)
+            {
+                value.ticks = PracticeReward.Ticks(value);
+                for (int i=0;i<6;i++) value.ticks[i] += fractions[i];
+            }
+            return value;
+        }
 
         private ResourceDelta Difference(ResourceDelta before)
-        { return new ResourceDelta(Energy - before.energy, Mood - before.mood, Insight - before.insight,
+        {
+            if (fractions != null || before.ticks != null)
+            {
+                int[] after = PracticeReward.Ticks(Values()), start = PracticeReward.Ticks(before);
+                for (int i=0;i<6;i++) after[i] -= start[i];
+                return PracticeReward.FromTicks(after);
+            }
+            return new ResourceDelta(Energy - before.energy, Mood - before.mood, Insight - before.insight,
             Relation - before.relation, Money - before.money, Ability - before.ability); }
 
         private static int Clamp(int value) { return Math.Max(0, Math.Min(ResourceCap, value)); }
@@ -1030,7 +1071,13 @@ namespace Horizon.Game
                     choice = replay.Hand[2];
                     if (!replay.CanPlay(choice)) return null;
                 }
-                replay.Choose(choice.Id);
+                if (recorded.practice?.Complete == true)
+                {
+                    replay.BeginPractice(choice,recorded.practice.difficulty);
+                    foreach (char route in recorded.practice.routes) replay.PickPracticeRoute(route == 'B');
+                    replay.FinishPractice();
+                }
+                else replay.Choose(choice.Id);
                 if (replay.NeedsStation) replay.VisitStation();
                 if (day < stopDay) replay.Advance();
             }
@@ -1131,14 +1178,13 @@ namespace Horizon.Game
             {
                 ResourceDelta now = action.now;
                 ResourceDelta later = action.echoed ? action.later : null;
-                if ((now != null && now.ability > 0) || (later != null && later.ability > 0))
+                int[] earned = PracticeReward.Ticks(now), echoed = PracticeReward.Ticks(later);
+                if (earned[5] > 0 || echoed[5] > 0)
                     boss.abilityDays.Add(action.day);
-                if ((now != null && (now.energy != 0 || now.mood != 0)) ||
-                    (later != null && (later.energy != 0 || later.mood != 0)) || action.secondaryResolved)
+                if (earned[0]!=0 || earned[1]!=0 || echoed[0]!=0 || echoed[1]!=0 || action.secondaryResolved)
                     boss.stateDays.Add(action.day);
                 if (action.givesSupport ||
-                    (now != null && (now.relation > 0 || now.money > 0)) ||
-                    (later != null && (later.relation > 0 || later.money > 0)))
+                    earned[4]>0 || earned[3]>0 || echoed[4]>0 || echoed[3]>0)
                     boss.supportDays.Add(action.day);
             }
             if (CatalogVersion >= 2)
@@ -1173,7 +1219,7 @@ namespace Horizon.Game
                 number = RunNumber,
                 boss = boss,
                 actions = new List<ActionRecord>(Actions),
-                finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
+                finalFractions = (int[])fractions?.Clone(), finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
                 finalRelation = Relation, finalMoney = Money, finalAbility = Ability,
                 prediction = Prediction, predictions = new List<PredictionRecord>(Predictions),
                 skippedPredictionDays = new List<int>(SkippedPredictionDays), stationDays = new List<int>(StationDays),

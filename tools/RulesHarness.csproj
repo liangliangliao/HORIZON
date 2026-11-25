@@ -10,6 +10,7 @@
     <PackageReference Include="NUnitLite" Version="3.14.0" />
     <Compile Include="../Assets/Scripts/Game/*.cs" />
     <Compile Include="RulesHarness/*.cs" />
+    <Compile Include="../Assets/Tests/Editor/PracticeFilmTests.cs" />
     <Compile Include="../Assets/Tests/Editor/GameSessionTests.cs" />
     <Compile Include="../Assets/Tests/Editor/BusinessRuleTests.cs" />
     <Compile Include="../Assets/Tests/Editor/CampaignCompletionTests.cs" />

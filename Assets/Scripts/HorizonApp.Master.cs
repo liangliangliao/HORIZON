@@ -54,7 +54,7 @@ namespace Horizon
             }
         }
         private void CloseMasterPage()
-        { CancelAIRequest(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } RestoreMasterBackground(); }
+        { CancelAIRequest(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); world.EndPracticeSet(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } RestoreMasterBackground(); }
         private RectTransform MasterPage(string name, string title, Action back = null)
         {
             CloseMasterPage(); overlay = View.Rect(root, name, 0, 0, 1, 1);
@@ -115,7 +115,7 @@ namespace Horizon
             else View.Label(overlay, "Engine invitation", "已经想做，仍然没有开始？\n先选一张行动牌，再把决定锁定。\n之后只处理执行步骤。", 33, Palette.Text,
                 TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.84f);
             CardSpec locked = session.InExecutionMode ? CardCatalog.FindById(session.Master.decision.cardId) : null;
-            string cost = locked == null ? "查看行动条件与来源" : "执行成本 · " + PlayExperience.NowLabel(session.ImmediateEffect(locked)) +
+            string cost = locked == null ? "查看行动条件与来源" : "执行成本 · " + PracticeReward.Label(session.ImmediateEffect(locked),true) +
                 (session.PreparationSaving(locked) > 0 ? " · 准备已省1精力" : session.PreparationWillSave(locked) ? " · 准备可省1精力" : " · 查看准备条件");
             View.Button(overlay, "Action factors", cost, ShowActionFactors,
                 0.075f, 0.455f, 0.925f, 0.515f, Palette.Deep, Palette.Muted, 24);

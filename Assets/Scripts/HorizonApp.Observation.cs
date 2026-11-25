@@ -12,7 +12,7 @@ namespace Horizon
     public sealed partial class HorizonApp
     {
         private readonly List<Text> resourceNumbers = new List<Text>();
-        private readonly List<int> resourceValues = new List<int>();
+        private readonly List<string> resourceValues = new List<string>();
         private int focusPage;
 
         private float FutureX(int day)
@@ -97,17 +97,18 @@ namespace Horizon
                 orbit.Value = values[i]; orbit.color = values[i] <= 2 ? Palette.Coral : Palette.Mint; orbit.raycastTarget = false;
                 View.Label(root, "Resource name", names[i], values.Length == 3 ? 31 : 25,
                     Palette.Text, TextAnchor.MiddleCenter, x + 0.064f, 0.382f, x + width - 0.018f, 0.407f);
-                resourceNumbers.Add(View.Label(root, "Resource number", values[i] + "/10", 29,
+                string exact=session.Balance(System.Array.IndexOf(PracticeReward.Names,names[i]))+"/10";
+                resourceNumbers.Add(View.Label(root, "Resource number", exact, 25,
                     values[i] <= 2 ? Palette.Coral : Palette.Muted, TextAnchor.MiddleCenter,
                     x + 0.064f, 0.356f, x + width - 0.018f, 0.383f));
-                resourceValues.Add(values[i]);
+                resourceValues.Add(exact);
             }
         }
 
         private void RevealResourceNumbers(bool reveal)
         {
             for (int i = 0; i < resourceNumbers.Count; i++)
-                if (resourceNumbers[i] != null) resourceNumbers[i].text = resourceValues[i] + "/10";
+                if (resourceNumbers[i] != null) resourceNumbers[i].text = resourceValues[i];
         }
 
         private void ShowPredictionWhy()

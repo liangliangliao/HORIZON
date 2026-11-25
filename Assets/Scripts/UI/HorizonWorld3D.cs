@@ -253,7 +253,7 @@ namespace Horizon.UI
 
         public void SnapCamera()
         {
-            if (moviePlan != null || imaginationSceneActive) return;
+            if (moviePlan != null || imaginationSceneActive || practiceStage != null) return;
             WorldCamera.transform.position = cameraPosition;
             WorldCamera.transform.LookAt(cameraLook);
         }
@@ -261,7 +261,7 @@ namespace Horizon.UI
         private void Update()
         {
             if (WorldCamera == null || paused) return;
-            if (Cinematics != null && Cinematics.IsPlaying || imaginationSceneActive) return;
+            if (Cinematics != null && Cinematics.IsPlaying || imaginationSceneActive || practiceStage != null) return;
             UpdateInsight();
             float dt = Time.unscaledDeltaTime;
             shake = Mathf.MoveTowards(shake, 0, dt * 0.32f);

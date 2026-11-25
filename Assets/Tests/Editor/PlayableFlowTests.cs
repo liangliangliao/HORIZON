@@ -397,6 +397,7 @@ namespace Horizon.Tests
             pointer.position = target.TransformPoint(target.rect.center);
             growth.OnDrag(pointer);
             growth.OnEndDrag(pointer);
+            yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
             yield return new WaitForSecondsRealtime(1);
             ArchiveData archive = Get<ArchiveData>(app, "archive");
             Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
@@ -426,7 +427,7 @@ namespace Horizon.Tests
             {
                 FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
                 Assert.IsNotNull(Get<RectTransform>(app, "overlay"));
-                ButtonNamed(app, "Use card").onClick.Invoke();
+                ButtonNamed(app, "Use card").onClick.Invoke(); yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
                 yield return new WaitForSecondsRealtime(1);
                 yield return WaitForInput(app);
                 Assert.AreEqual(FeedbackKind.Choice, archive.pendingFeedback.kind);
@@ -460,7 +461,7 @@ namespace Horizon.Tests
             yield return new WaitForSecondsRealtime(0.4f);
             Assert.IsFalse(session.CanPredict);
             FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
-            ButtonNamed(app, "Use card").onClick.Invoke();
+            ButtonNamed(app, "Use card").onClick.Invoke(); yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
             yield return new WaitForSecondsRealtime(1);
             yield return WaitForInput(app);
             ButtonNamed(app, "Continue result").onClick.Invoke();
@@ -500,7 +501,7 @@ namespace Horizon.Tests
             Call(app, "BuildBoard");
             yield return new WaitForSecondsRealtime(0.5f);
             FindCard(app, session.Hand[2].Id).OnPointerClick(new PointerEventData(EventSystem.current));
-            ButtonNamed(app, "Use card").onClick.Invoke();
+            ButtonNamed(app, "Use card").onClick.Invoke(); yield return PracticeTouch.Finish(Get<RectTransform>(app,"root"));
             yield return new WaitForSecondsRealtime(3);
             Assert.AreEqual(1, archive.runs.Count);
             Assert.IsNull(archive.active);
@@ -784,7 +785,7 @@ namespace Horizon.Tests
                 if (s.CanPredict) { ButtonNamed(app, "Skip prediction").onClick.Invoke(); yield return null; continue; }
                 Assert.IsFalse(s.HasChosen); Assert.Less(guard++, 19);
                 Call(app, "CardTapped", FindCard(app, s.Hand[2].Id)); yield return null;
-                ButtonNamed(app, "Use card").onClick.Invoke(); yield return null;
+                ButtonNamed(app, "Use card").onClick.Invoke(); yield return PracticeTouch.Finish(Get<RectTransform>(app,"root")); yield return null;
             }
             Assert.AreEqual(30, s.CompletedRun.actions.Count); Assert.AreEqual(1, a.runs.Count); Assert.IsNull(a.active);
             CollectionAssert.AreEqual(new[] { 4, 12, 14, 21, 28 }, s.StationDays);

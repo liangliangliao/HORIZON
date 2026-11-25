@@ -105,6 +105,7 @@ namespace Horizon.Game
         public static string NowLabel(ResourceDelta delta)
         {
             if (delta == null) return "状态没有变化";
+            if (delta.ticks?.Length == 6) return PracticeReward.Label(delta);
             string label = "";
             Add(ref label, "精力", delta.energy);
             Add(ref label, "心情", delta.mood);
@@ -152,14 +153,14 @@ namespace Horizon.Game
 
         public static string GateReason(GameSession session, int gate)
         {
-            if (gate == 0) return "能力 " + session.Ability + "/6 · " +
+            if (gate == 0) return "能力 " + session.Balance(5) + "/" + PracticeReward.Format(ProductExperience.GrowthThreshold(session)) + " · " +
                 (session.CatalogVersion >= 2 ? "成长回声 " + ProductExperience.GrowthEvidence(session) +
                     "/" + ProductExperience.EvidenceNeeded(session) + "，练习和作品会帮你。" : "成长牌的回声会提高能力。");
             if (gate == 1) return "精力 " + session.Energy + "、心情 " + session.Mood +
                 " · 截止日各需至少 4" + (session.CatalogVersion >= 2 ? "；恢复 " +
                     ProductExperience.RecoveryEvidence(session) + "/" + ProductExperience.EvidenceNeeded(session) + "。" : "，恢复牌可以帮助你。");
-            return "支援行动 " + ProductExperience.SupportEvidence(session) + "/" + ProductExperience.EvidenceNeeded(session) + " · 关系 " + session.Relation +
-                "/6 · 金钱 " + session.Money + "/2，朋友与合作会留下支援。";
+            return "支援行动 " + ProductExperience.SupportEvidence(session) + "/" + ProductExperience.EvidenceNeeded(session) + " · 关系 " + session.Balance(4) + "/" + PracticeReward.Format(ProductExperience.SupportThreshold(session)) +
+                " · 金钱 " + session.Money + "/2，朋友与合作会留下支援。";
         }
     }
 }

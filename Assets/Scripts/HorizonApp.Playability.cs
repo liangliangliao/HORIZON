@@ -65,7 +65,7 @@ namespace Horizon
                 var emblem = View.Rect(rect, "Card causal emblem", 0.31f, 0.44f, 0.69f, 0.60f).gameObject.AddComponent<DropRingGraphic>();
                 emblem.color = accent; emblem.raycastTarget = false; emblem.Thickness = 3;
                 View.Label(rect, "Time marker", card.Delay == 0 ? "NOW" : "+" + card.Delay + "D", 26, accent, TextAnchor.MiddleCenter, 0.20f, 0.43f, 0.80f, 0.60f);
-                View.Label(rect, "Now", canImagine ? "先预演失败与恢复" : available ? PlayExperience.NowLabel(session.ImmediateEffect(card)) : "暂不可用 · 点开查看",
+                View.Label(rect, "Now", canImagine ? "先预演失败与恢复" : available ? PracticeReward.Label(session.ImmediateEffect(card),true) : "暂不可用 · 点开查看",
                     28, available || canImagine ? Palette.Text : Palette.Coral, TextAnchor.MiddleCenter, 0.06f, 0.23f, 0.94f, 0.41f);
                 string date = card.Delay == 0 ? "现在恢复" : "D" + (session.Day + card.Delay) + (session.Day + card.Delay > session.Deadline ? " · 局后" : " 回来");
                 View.Label(rect, "Future", date + (card.Delay > 0 ? "\n" + PlayExperience.FutureMeaning(card) : ""), 26, accent, TextAnchor.MiddleCenter, 0.07f, 0.03f, 0.93f, 0.21f);

@@ -39,12 +39,13 @@ namespace Horizon.Game
             var changes=new List<OutcomeChange>();
             if(Recorded)
             {
-                int[] values=ResourceMath.Axes(r.resources);
+                bool precise = r.resources.ticks?.Length == 6;
+                int[] values=precise ? r.resources.ticks : ResourceMath.Axes(r.resources);
                 string[] names={"精力","心情","专注","金钱","关系","能力"};
-                for(int i=0;i<values.Length;i++) if(values[i]!=0) changes.Add(new OutcomeChange(i,names[i],values[i]));
+                for(int i=0;i<values.Length;i++) if(values[i]!=0) changes.Add(new OutcomeChange(i,names[i],values[i],precise));
             }
             Changes=changes.AsReadOnly();
-            WalkRecovery=e.kind==DomainEventKind.ActionTaken && LifeActionStoryboard.ThemeFor(e)==LifeActionTheme.Walk &&
+            WalkRecovery=r?.resources?.ticks == null && e.kind==DomainEventKind.ActionTaken && LifeActionStoryboard.ThemeFor(e)==LifeActionTheme.Walk &&
                 changes.Count>0 && changes.All(change=>change.Axis<=1 && change.Amount>0);
             RecoverySummary=WalkRecovery?string.Join("　·　",changes.Select(change=>change.Copy())):"";
         }
@@ -126,9 +127,11 @@ namespace Horizon.Game
     {
         public readonly int Axis, Amount;
         public readonly string Name;
-        public OutcomeChange(int axis,string name,int amount) { Axis=axis; Name=name; Amount=amount; }
+        private readonly int? ticks;
+        public OutcomeChange(int axis,string name,int amount,bool precise=false) { Axis=axis; Name=name; Amount=precise ? Math.Sign(amount) : amount; if (precise) ticks=amount; }
         public string Copy(float progress=1)
         {
+            if (ticks.HasValue) return Name+" "+(ticks.Value < 0 ? "−" : "+")+PracticeReward.Format((int)(Math.Abs(ticks.Value)*Math.Min(1,Math.Max(0,progress))));
             long magnitude=Math.Abs((long)Amount);
             long value=progress>=1?magnitude:(long)Math.Floor(magnitude*Math.Max(0,progress));
             return Name+" "+(Amount<0?"−":"+")+value;
