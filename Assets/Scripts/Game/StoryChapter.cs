@@ -11,7 +11,8 @@ namespace Horizon.Game
     {
         public string id, originNode, preparationNode, failureNode, recoveryNode, returnNode, outcomeNode, response, route;
         public int startDay, encounterDay, failureDay, windowDay, targetAbility = 6;
-        public bool setbackOccurred;
+        public bool setbackOccurred, startingResourcesRecorded;
+        public int startingAbilityTicks, startingRelationTicks;
         public ChapterOutcome outcome;
         public string Title { get { return BossCatalog.Find(id)?.title ?? "穿过不确定"; } }
         public string BossName { get { return BossCatalog.Find(id)?.name ?? "不确定"; } }
@@ -41,7 +42,7 @@ namespace Horizon.Game
             if (Master.chapter != null || CatalogVersion < 9 || InExecutionMode || Deadline - Day < 7 ||
                 BossCatalog.Find(id) == null || CatalogVersion < 10 && !new[] { "uncertainty", "tomorrow", "perfection" }.Contains(id)) throw new InvalidOperationException("Start a chapter before its opportunity window.");
             CausalNode origin = MasterNode(CausalNodeKind.Opportunity, "未来目标 · " + id);
-            Master.chapter = new StoryChapter { id = id, originNode = origin.id, startDay = Day, encounterDay = Day + 2,
+            Master.chapter = new StoryChapter { startingResourcesRecorded=true, startingAbilityTicks=AxisTicks(5), startingRelationTicks=AxisTicks(4), id = id, originNode = origin.id, startDay = Day, encounterDay = Day + 2,
                 failureDay = Math.Min(Day + 4, (id == "tomorrow" ? Deadline - 2 : Deadline) - 2), windowDay = id == "tomorrow" ? Deadline - 2 : Deadline, targetAbility = Math.Min(8, Math.Max(6, Ability + 2)) };
             origin.label = "确立目标 · " + Master.chapter.Goal; Command("chapter", id);
         }
@@ -101,8 +102,9 @@ namespace Horizon.Game
         {
             StoryChapter c = Master?.chapter; if (c == null) return "先选择一个目标";
             if (route == "leave") return "允许放下这次机会，时间线会保留真实结果";
-            string condition = route == "help" ? "能力≥4 · 关系≥5 · 金钱≥1 · 精力≥2" :
-                route == "draft" ? "能力≥4 · 精力≥2" : route == "polish" ? "能力≥8 · 精力≥3" : "能力≥" + c.targetAbility + " · 精力≥3";
+            string ability=PracticeReward.Format(ChapterAbilityThreshold(route));
+            string condition = "能力≥"+ability + (route=="help" ? " · 关系≥"+PracticeReward.Format(ChapterRelationThreshold())+" · 金钱≥1 · 精力≥2" :
+                route=="draft" ? " · 精力≥2" : " · 精力≥3");
             return condition + " · 受挫后恢复并重新行动" + (UsesExpedition ? "\n" + AdditionalBossCondition(c.id) : "");
         }
         public string AdditionalBossCondition(string id)
@@ -130,16 +132,37 @@ namespace Horizon.Game
             if (id == "preparation") return executed;
             return true;
         }
+        private int ChapterAbilityThreshold(string route)
+        {
+            var c=Master.chapter;
+            if(!HasPracticeBalances)
+                return (route=="draft" || route=="help" ? 4 : route=="polish" ? 8 : c.targetAbility)*PracticeReward.Unit;
+            // Chapters can begin midway through a life. Measure earned growth from the
+            // player's own starting point, alongside the required recovery and return.
+            int baseline=c.startingResourcesRecorded?c.startingAbilityTicks:2*PracticeReward.Unit;
+            int gain=route=="help" || route=="draft" ? 150 : route=="polish" ? 1050 : 500;
+            return Math.Min(ResourceCap*PracticeReward.Unit,baseline+gain);
+        }
+
+        private int ChapterRelationThreshold()
+        {
+            var c=Master.chapter;
+            if(!HasPracticeBalances) return 5*PracticeReward.Unit;
+            int baseline=c.startingResourcesRecorded?c.startingRelationTicks:4*PracticeReward.Unit;
+            return Math.Min(ResourceCap*PracticeReward.Unit,baseline+100);
+        }
+
         public bool CanResolveChapter(string route)
         {
             StoryChapter c = Master?.chapter; if (!ChapterNeedsBoss || c == null) return false;
             if (route == "leave") return true;
             if (string.IsNullOrEmpty(c.returnNode)) return false;
             if (UsesExpedition && !BossEvidenceReady(c.id)) return false;
-            if (route == "help") return c.id != "perfection" && Ability >= 4 && Relation >= 5 && Money >= 1 && Energy >= 2;
-            if (route == "draft") return c.id == "perfection" && Ability >= 4 && Energy >= 2;
-            if (route == "polish") return c.id == "perfection" && Ability >= 8 && Energy >= 3;
-            return route == "act" && c.id != "perfection" && Ability >= c.targetAbility && Energy >= 3;
+            if(AxisTicks(5)<ChapterAbilityThreshold(route)) return false;
+            if (route == "help") return c.id != "perfection" && AxisTicks(4)>=ChapterRelationThreshold() && Money >= 1 && Energy >= 2;
+            if (route == "draft") return c.id == "perfection" && Energy >= 2;
+            if (route == "polish") return c.id == "perfection" && Energy >= 3;
+            return route == "act" && c.id != "perfection" && Energy >= 3;
         }
         public bool ResolveChapter(string route)
         {

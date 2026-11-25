@@ -32,6 +32,33 @@ namespace Horizon.Tests
         private static RunRecord Finish(GameSession s)
         { while (s.CompletedRun == null) Day(s, true); return s.CompletedRun; }
 
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void PracticedRecoveryAndReturnCanResolveTheHelpRouteAfterReload(int difficulty)
+        {
+            var life=GameSession.StartMasterLife(1,17,RunMode.Quick);
+            life.BeginChapter("uncertainty");
+            while(!life.ChapterNeedsBoss)
+            {
+                Ready(life);
+                if(life.ChapterNeedsPreparation) Assert.IsTrue(life.PrepareChapter("help"));
+                var card=life.Hand[2];
+                if(life.Day!=5 && life.Energy>=4 && life.Hand[1].Id!="imagine" && life.CanPlay(life.Hand[1])) card=life.Hand[1];
+                life.BeginPractice(card,difficulty);
+                for(int i=0;i<difficulty;i++) life.PickPracticeRoute(true);
+                life.FinishPractice();
+                if(life.NeedsStation) life.VisitStation();
+                life.Advance();
+            }
+            life=GameSession.Restore(JsonUtility.FromJson<RunSnapshot>(JsonUtility.ToJson(life.Snapshot())));
+            Ready(life);
+            Assert.IsNotEmpty(life.Master.chapter.returnNode);
+            Assert.That(life.ChapterRouteCondition("help"),Does.Contain("2.0150"));
+            Assert.IsTrue(life.CanResolveChapter("help"), life.Balance(5)+" / "+life.Balance(4));
+            Assert.IsTrue(life.ResolveChapter("help"));
+        }
+
         [TestCase("uncertainty", "help", 12)]
         [TestCase("tomorrow", "help", 10)]
         [TestCase("perfection", "draft", 12)]

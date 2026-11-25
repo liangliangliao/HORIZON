@@ -27,7 +27,10 @@ namespace Horizon
             View.Fill(practicePage,"Subtitle background",new Color(.014f,.03f,.05f,.95f),0,0,1,.33f);
             practiceHeading=View.Label(practicePage,"Scene heading","选择挑战",24,Palette.Mint,TextAnchor.MiddleLeft,.07f,.272f,.94f,.318f);
             practiceCaption=View.Label(practicePage,"Action caption",film.Goal,37,Palette.Text,TextAnchor.MiddleLeft,.07f,.184f,.94f,.27f);
-            practiceMeter=View.Label(practicePage,"Reward counter","",54,Palette.Gold,TextAnchor.MiddleCenter,.09f,.69f,.91f,.79f);
+            practiceMeter=View.Label(practicePage,"Reward counter","",76,Palette.Gold,TextAnchor.MiddleCenter,.07f,.75f,.93f,.854f);
+            CinematicTypography.Upgrade(practiceMeter,true);
+            CinematicTypography.Emboss(practiceMeter);
+            CinematicTypography.Present(practiceMeter,Palette.Gold,.60f,.13f,.8f,true);
             practiceNext=View.Button(practicePage,"Next shot","下一镜",()=>practiceCut=true,.71f,.032f,.94f,.099f,Palette.Panel,Palette.Text,24);
             practiceNext.gameObject.SetActive(false);
             var draft=session.Practice;
@@ -79,6 +82,8 @@ namespace Horizon
                     elapsed+=Mathf.Min(.1f,Time.captureFramerate>0?Time.deltaTime:Time.unscaledDeltaTime);
                     float p=practiceCut?1:Mathf.Clamp01(elapsed/duration);
                     world.SamplePractice(shot,p,move,beat);
+                    if(shot>=PracticeShot.Charge && !archive.preferences.reducedMotion)
+                        CinematicTypography.Sweep(practiceMeter,p*2.3f);
                     if(shot==PracticeShot.Charge)
                     {
                         // Slow down from a rapid scroll to a short held near-final value.

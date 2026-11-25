@@ -20,6 +20,9 @@ namespace Horizon.UI
         private float originalFov;
         private Color originalSky;
         private Material rayMaterial;
+        private Renderer[] practiceScenery;
+        private Color practiceDaylight;
+        private int dimmingStep;
         private MaterialPropertyBlock practiceLight;
         private Renderer rayRenderer;
         private readonly Transform[] prizePieces=new Transform[6], prizeSockets=new Transform[6], prizeBeams=new Transform[6];
@@ -36,7 +39,7 @@ namespace Horizon.UI
             originalRect=WorldCamera.rect; originalFov=WorldCamera.fieldOfView; originalSky=WorldCamera.backgroundColor;
             practiceStage=Group("Practice location · "+film.Set);
             practiceStage.localPosition=new Vector3(180,0,0);
-            WorldCamera.rect=new Rect(0,0,1,1);
+            WorldCamera.rect=new Rect(0,.31f,1,.69f);
             bool exterior=film.Set==PracticeSet.Street || film.Set==PracticeSet.Track;
             WorldCamera.backgroundColor=exterior ? new Color(.31f,.47f,.56f) : new Color(.09f,.14f,.19f);
             Box(practiceStage,"Floor",new Vector3(0,-.12f,1),new Vector3(15,.22f,13),exterior ? floor : wood);
@@ -75,6 +78,8 @@ namespace Horizon.UI
             practicePartner=HorizonActorPerformance.Attach(partner.GetComponent<HorizonActor>());
             partner.gameObject.SetActive(film.Set==PracticeSet.Cafe || film.Set==PracticeSet.Kitchen ||
                 film.MoveA==PracticeMove.Talk || film.MoveB==PracticeMove.Talk || film.MoveB==PracticeMove.Listen && film.Set!=PracticeSet.Stage);
+            practiceDaylight=WorldCamera.backgroundColor; dimmingStep=-1;
+            practiceScenery=practiceStage.GetComponentsInChildren<Renderer>(true);
             BuildPracticeChamber();
             routeEnd=performer.localPosition; firstPracticeShot=true;
             SamplePractice(PracticeShot.Establish,0,film.MoveA,0);
@@ -274,6 +279,30 @@ namespace Horizon.UI
             prize=prizePieces[axis];
         }
 
+        private void DimPracticeScenery(float progress)
+        {
+            // Keep the case, seals and landing beams in the spotlight. Only the
+            // already-built location and cast yield to the prize during the draw.
+            int step=Mathf.RoundToInt(8*Mathf.SmoothStep(0,1,Mathf.Clamp01(progress*2)));
+            if(step==dimmingStep) return;
+            dimmingStep=step;
+            float p=step/8f;
+            WorldCamera.backgroundColor=Color.Lerp(practiceDaylight,new Color(.045f,.026f,.086f),p);
+            foreach(Renderer surface in practiceScenery)
+            {
+                Material paint=surface.sharedMaterial;
+                if(paint==null || paint.shader.name!="HORIZON/LitColor") continue;
+                surface.GetPropertyBlock(practiceLight);
+                Color baseColor=paint.GetColor("_Color");
+                Color night=new Color(baseColor.r*.32f,baseColor.g*.23f,baseColor.b*.4f,baseColor.a);
+                practiceLight.SetColor("_Color",Color.Lerp(baseColor,night,p));
+                practiceLight.SetColor("_Emission",paint.GetColor("_Emission")*Mathf.Lerp(1,.18f,p));
+                practiceLight.SetFloat("_Metallic",paint.GetFloat("_Metallic")*Mathf.Lerp(1,.26f,p));
+                surface.SetPropertyBlock(practiceLight);
+            }
+            practiceLight.Clear();
+        }
+
         public void SamplePractice(PracticeShot shot,float progress,PracticeMove move,int beat)
         {
             if(practiceStage==null) return;
@@ -342,6 +371,7 @@ namespace Horizon.UI
                     look=Vector3.Lerp(propOrigin,new Vector3(-.32f,1.56f,.43f),t*.75f); offset=new Vector3(-.47f,.4f,-2.91f);
                     break;
                 default:
+                    DimPracticeScenery(shot==PracticeShot.Charge?t:1);
                     float open=shot==PracticeShot.Charge?0:shot==PracticeShot.Open?t:1;
                     lidLeft.localRotation=Quaternion.Euler(0,0,open*108); lidRight.localRotation=Quaternion.Euler(0,0,-open*108);
                     float charge=shot==PracticeShot.Charge?t:1;
@@ -380,9 +410,9 @@ namespace Horizon.UI
                         if(shot==PracticeShot.Receive && p>=1) prizeLanded[prizeAxis]=true;
                         prize.localEulerAngles=new Vector3(0,open*29+(reduced?0:p*24),prizeNegative?-12*t:0);
                     }
-                    look=chamber.localPosition+new Vector3(-.12f,.43f,.14f);
+                    look=actionTable.localPosition+chamber.localPosition+new Vector3(0,.36f,-.07f);
                     actorPos=chamber.localPosition+new Vector3(-.59f,-chamber.localPosition.y,.67f);
-                    offset=shot==PracticeShot.Receive ? new Vector3(.28f,.43f,-3.15f) : new Vector3(.12f,.38f,-2.84f+(reduced?0:charge*.43f));
+                    offset=shot==PracticeShot.Receive ? new Vector3(.24f,.64f,-3.05f) : new Vector3(.14f,.66f,-3.0f+(reduced?0:charge*.32f));
                     pose=shot==PracticeShot.Receive ? prizeNegative?HorizonBodyAction.Rest:
                         prizeAxis==5?HorizonBodyAction.Operate:prizeAxis==0?HorizonBodyAction.Stand:prizeAxis==1?HorizonBodyAction.Rest:HorizonBodyAction.Reach : HorizonBodyAction.Wait;
                     break;
@@ -408,7 +438,7 @@ namespace Horizon.UI
         public void EndPracticeSet()
         {
             if(practiceStage==null) return;
-            practiceStage.gameObject.SetActive(false); Dispose(practiceStage.gameObject); practiceStage=null; prize=null;
+            practiceStage.gameObject.SetActive(false); Dispose(practiceStage.gameObject); practiceStage=null; practiceScenery=null; prize=null;
             for(int i=0;i<6;i++)
             { prizePieces[i]=null; prizeSockets[i]=null; prizeBeams[i]=null; prizeLanded[i]=false; }
             WorldCamera.rect=originalRect; WorldCamera.fieldOfView=originalFov; WorldCamera.backgroundColor=originalSky;
