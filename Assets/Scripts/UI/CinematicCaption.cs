@@ -266,7 +266,10 @@ namespace Horizon.UI
 
         private void OnDestroy()
         {
-            RestorePage(); if(pageParking!=null) Destroy(pageParking.gameObject);
+            // Normal completion and cancellation restore the live page. During
+            // scene teardown the page and parking group are already being destroyed.
+            parkedPage.Clear();
+            if(pageParking!=null && pageParking.childCount==0) Destroy(pageParking.gameObject);
             Unbind();
         }
     }

@@ -17,17 +17,35 @@ namespace Horizon.Tests
     {
         public static IEnumerator Finish(RectTransform root)
         {
-            if(root.Find("Practice film")==null) yield break;
-            for(int frame=0;frame<180;frame++)
+            Transform film=root.Find("Practice film");
+            if(film==null || !film.gameObject.activeInHierarchy) yield break;
+            // The EditMode runner may poll nested enumerators many times between
+            // two player frames. Give touch events and the app's film coroutine
+            // the same player loop that they have on a phone.
+            var app=Object.FindObjectOfType<HorizonApp>();
+            string lastInput="none";
+            var driver=app.StartCoroutine(Drive(film, name=>lastInput=name));
+            float deadline=Time.realtimeSinceStartup+20;
+            while(film!=null && film.gameObject.activeInHierarchy && Time.realtimeSinceStartup<deadline)
+                yield return new WaitForSecondsRealtime(.08f);
+            if(driver!=null && app!=null) app.StopCoroutine(driver);
+            if(film!=null && film.gameObject.activeInHierarchy)
             {
-                Transform film=root.Find("Practice film");
-                if(film==null || !film.gameObject.activeInHierarchy) yield break;
+                string controls=string.Join(", ",film.GetComponentsInChildren<Button>().Select(b=>b.name+"="+b.IsInteractable()));
+                Assert.Fail("Practice stalled at "+film.Find("Scene heading").GetComponent<Text>().text+
+                    "; last touch="+lastInput+"; visible controls="+controls);
+            }
+        }
+
+        private static IEnumerator Drive(Transform film,System.Action<string> touched)
+        {
+            while(film!=null && film.gameObject.activeInHierarchy)
+            {
                 Button next=film.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.IsInteractable() &&
                     (b.name=="Practice difficulty 2" || b.name=="Practice route B" || b.name=="Next shot" || b.name=="Finish practice"));
-                if(next!=null) next.onClick.Invoke();
+                if(next!=null) { touched(next.name); next.onClick.Invoke(); }
                 yield return null;
             }
-            Assert.Fail("The practice did not reach its receipt after the player made each required choice.");
         }
     }
 
@@ -105,6 +123,7 @@ namespace Horizon.Tests
                 Assert.AreEqual(landings.Length,landings.Select(x=>x.localPosition).Distinct().Count());
                 Assert.AreEqual(life.AxisTicks(0),GameSession.Restore(archive.active).AxisTicks(0));
                 Assert.Greater(life.AxisTicks(0),balance);
+                File.WriteAllText(Path.Combine(path,"complete.txt"),frame.ToString());
             }
             finally
             {
