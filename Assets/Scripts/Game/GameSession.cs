@@ -140,6 +140,11 @@ namespace Horizon.Game
     public sealed class RunRecord
     {
         public int[] finalFractions;
+        public string Balance(int axis)
+        {
+            int[] whole = { finalEnergy, finalMood, finalInsight, finalMoney, finalRelation, finalAbility };
+            return PracticeReward.Format(whole[axis]*PracticeReward.Unit + (finalFractions?.Length==6 ? finalFractions[axis] : 0));
+        }
         public MasterRunState master;
         public int catalogVersion;
         public int deadline;
@@ -566,7 +571,7 @@ namespace Horizon.Game
                 deckSeed = DeckSeed, deckSeedRecorded = true, deadline = Deadline,
                 day = Day, runNumber = RunNumber,
                 energy = Energy, mood = Mood, insight = Insight,
-                fractions = (int[])fractions?.Clone(), practice = Practice?.Copy(),
+                fractions = CopyFractions(), practice = Practice?.Copy(),
                 relation = Relation, money = Money, ability = Ability,
                 supportActions = SupportActions, focusUses = FocusUses,
                 hasChosen = HasChosen, stationVisited = StationVisited,
@@ -776,7 +781,7 @@ namespace Horizon.Game
             ResourceDelta before = Values();
             ResourceDelta immediate = ImmediateEffect(card), later = card.Later;
             int budget = take == null ? 0 : PracticeReward.Draw(WorldSeed,RunNumber,take);
-            if (take != null) PracticeReward.Allocate(budget, immediate, card.Delay > 0 && Day + card.Delay <= Deadline ? later : null, out immediate, out later);
+            if (take != null) PracticeReward.Allocate(take, budget, immediate, card.Delay > 0 && Day + card.Delay <= Deadline ? later : null, out immediate, out later);
             Apply(immediate);
             if (card.GivesSupport) SupportActions++;
             CausalNode changedChoice = CausalNodes.FindLast(n => (n.type == CausalNodeKind.Choice ||
@@ -1219,7 +1224,7 @@ namespace Horizon.Game
                 number = RunNumber,
                 boss = boss,
                 actions = new List<ActionRecord>(Actions),
-                finalFractions = (int[])fractions?.Clone(), finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
+                finalFractions = CopyFractions(), finalEnergy = Energy, finalMood = Mood, finalInsight = Insight,
                 finalRelation = Relation, finalMoney = Money, finalAbility = Ability,
                 prediction = Prediction, predictions = new List<PredictionRecord>(Predictions),
                 skippedPredictionDays = new List<int>(SkippedPredictionDays), stationDays = new List<int>(StationDays),

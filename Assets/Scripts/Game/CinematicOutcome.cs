@@ -45,7 +45,7 @@ namespace Horizon.Game
                 for(int i=0;i<values.Length;i++) if(values[i]!=0) changes.Add(new OutcomeChange(i,names[i],values[i],precise));
             }
             Changes=changes.AsReadOnly();
-            WalkRecovery=r?.resources?.ticks == null && e.kind==DomainEventKind.ActionTaken && LifeActionStoryboard.ThemeFor(e)==LifeActionTheme.Walk &&
+            WalkRecovery=r?.resources?.ticks?.Length != 6 && e.kind==DomainEventKind.ActionTaken && LifeActionStoryboard.ThemeFor(e)==LifeActionTheme.Walk &&
                 changes.Count>0 && changes.All(change=>change.Axis<=1 && change.Amount>0);
             RecoverySummary=WalkRecovery?string.Join("　·　",changes.Select(change=>change.Copy())):"";
         }

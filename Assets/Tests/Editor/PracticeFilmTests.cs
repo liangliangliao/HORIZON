@@ -70,6 +70,48 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void MapAndDetourUseTheSameDrawButTrainDifferentResources()
+        {
+            var card=CardCatalog.FindById("walk");
+            var a=new PracticeTake { cardId=card.Id, day=3, difficulty=1, routes="A" };
+            var b=a.Copy(); b.routes="B";
+            int budget=PracticeReward.Draw(17,1,a);
+            Assert.AreEqual(budget,PracticeReward.Draw(17,1,b));
+            PracticeReward.Allocate(a,budget,card.Now,null,out var inspect,out _);
+            PracticeReward.Allocate(b,budget,card.Now,null,out var detour,out _);
+            Assert.Greater(inspect.ticks[2],detour.ticks[2]);
+            Assert.Greater(detour.ticks[0],inspect.ticks[0]);
+            Assert.AreEqual(budget,inspect.ticks.Sum()); Assert.AreEqual(budget,detour.ticks.Sum());
+        }
+
+        [Test]
+        public void ADelayedPracticeEchoSettlesExactlyOnceAfterRestore()
+        {
+            var life=new GameSession(1,17);
+            var card=life.Hand.First(c=>c.Delay>0 && c.Kind==CardKind.Growth);
+            life.BeginPractice(card,2); life.PickPracticeRoute(false); life.PickPracticeRoute(true);
+            var chosen=life.FinishPractice(); int due=chosen.echoDay;
+            life=GameSession.Restore(life.Snapshot());
+            while(life.Day<due)
+            {
+                if(!life.HasChosen)
+                {
+                    if(life.HasPredictionReview) life.MarkPredictionReviewed();
+                    if(life.CanPredict) life.SkipPrediction();
+                    life.Choose(life.Hand[2].Id);
+                }
+                if(life.NeedsStation) life.VisitStation();
+                life.Advance();
+            }
+            var settled=life.Actions.First();
+            Assert.That(settled.echoed);
+            Assert.IsTrue(settled.actualLaterRecorded);
+            Assert.IsTrue(settled.actualLater.ticks.Any(v=>v!=0));
+            Assert.IsFalse(life.Pending.Any(e=>e.sourceDay==chosen.day && e.depth==1));
+            Assert.AreEqual(settled.actualLater.ticks,GameSession.Restore(life.Snapshot()).Actions.First().actualLater.ticks);
+        }
+
+        [Test]
         public void CapacityAndEchoesUseActualTicksIncludingAtBounds()
         {
             var legacy=new GameSession(1,123).Snapshot(); legacy.energy=10; legacy.mood=10;

@@ -1248,10 +1248,10 @@ namespace Horizon
             panel.gameObject.AddComponent<PanelEntrance>();
             string[] names = { "能力", "状态", "支援" };
             string[] notes = {
-                "能力 " + run.finalAbility + "/6" + (run.catalogVersion >= 2 ? " · 成长回声 " + run.boss.growthEchoes + "/" + (GameSession.RunLength(run) == 30 ? 3 : 2) : ""),
-                "精力 " + run.finalEnergy + "、心情 " + run.finalMood + " · 各需 4" +
+                "能力 " + run.Balance(5) + "/" + PracticeReward.Format(ProductExperience.GrowthThreshold(run.finalFractions?.Length==6)) + (run.catalogVersion >= 2 ? " · 成长回声 " + run.boss.growthEchoes + "/" + (GameSession.RunLength(run) == 30 ? 3 : 2) : ""),
+                "精力 " + run.Balance(0) + "、心情 " + run.Balance(1) + " · 各需 4" +
                     (run.catalogVersion >= 2 ? " · 恢复 " + run.boss.recoveries + "/" + (GameSession.RunLength(run) == 30 ? 3 : 2) : ""),
-                "关系 " + run.finalRelation + "/6 · 金钱 " + run.finalMoney + "/2 · 支援 " + run.boss.supports + "/" + (GameSession.RunLength(run) == 30 ? 3 : 2)
+                "关系 " + run.Balance(4) + "/" + PracticeReward.Format(ProductExperience.SupportThreshold(run.finalFractions?.Length==6)) + " · 金钱 " + run.Balance(3) + "/2 · 支援 " + run.boss.supports + "/" + (GameSession.RunLength(run) == 30 ? 3 : 2)
             };
             List<int>[] evidence = { run.boss.abilityDays, run.boss.stateDays, run.boss.supportDays };
             for (int i = 0; i < 3; i++)

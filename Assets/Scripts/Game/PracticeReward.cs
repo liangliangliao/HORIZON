@@ -64,7 +64,7 @@ namespace Horizon.Game
                 5500 + (roll - 7000) * 3000 / 2500 : 8500 + (roll - 9500) * 1500 / 499;
             return Math.Max(1, ceiling * percentile / Unit);
         }
-        public static void Allocate(int budget, ResourceDelta immediate, ResourceDelta delayed, out ResourceDelta now, out ResourceDelta later)
+        public static void Allocate(PracticeTake take, int budget, ResourceDelta immediate, ResourceDelta delayed, out ResourceDelta now, out ResourceDelta later)
         {
             int[] a = ResourceMath.Axes(immediate), b = ResourceMath.Axes(delayed ?? new ResourceDelta());
             int total = 0;
@@ -88,6 +88,21 @@ namespace Horizon.Game
                     if (axis >= 0) { x[axis] += y[axis] / 4; y[axis] -= y[axis] / 4; }
                 }
             }
+            // A small part of the immediate gain follows the skill actually used.
+            // Reading a map trains focus, while walking the detour keeps that effort in energy.
+            int donor=0;
+            for(int i=1;i<6;i++) if(x[i]>x[donor]) donor=i;
+            int share=x[donor]>0 ? x[donor]/(5*take.difficulty) : 0;
+            var film=PracticeFilms.For(take.cardId);
+            for(int i=0;i<take.routes.Length && share>0;i++)
+            {
+                var move=film.Move(i,take.routes[i]=='B');
+                int axis=move==PracticeMove.Talk || move==PracticeMove.Listen ? 4 :
+                    move==PracticeMove.Walk || move==PracticeMove.Carry ? 0 :
+                    move==PracticeMove.Rest ? 1 : move==PracticeMove.Assemble ? 5 : 2;
+                if(axis==donor || x[axis]<0) continue;
+                x[donor]-=share; x[axis]+=share;
+            }
             now = FromTicks(x); later = FromTicks(y);
         }
     }
@@ -109,13 +124,14 @@ namespace Horizon.Game
         public void AbandonPractice() { Practice = null; }
         public int PracticeBudget => PracticeReward.Draw(WorldSeed, RunNumber, Practice);
         public bool HasPracticeBalances => fractions != null;
+        public int[] CopyFractions() => (int[])fractions?.Clone();
         public int AxisTicks(int axis) => PracticeReward.Ticks(Values())[axis];
         public string Balance(int axis) => PracticeReward.Format(AxisTicks(axis));
 
         public ResourceDelta PreviewPractice(CardSpec card)
         {
             if (Practice == null || Practice.cardId != card.Id || Practice.day != Day) throw new InvalidOperationException("Wrong practice.");
-            PracticeReward.Allocate(PracticeBudget, ImmediateEffect(card), card.Delay > 0 && Day+card.Delay <= Deadline ? card.Later : null, out var now, out _);
+            PracticeReward.Allocate(Practice, PracticeBudget, ImmediateEffect(card), card.Delay > 0 && Day+card.Delay <= Deadline ? card.Later : null, out var now, out _);
             int[] current = PracticeReward.Ticks(Values()), delta = PracticeReward.Ticks(now);
             for (int i=0;i<6;i++) delta[i] = Math.Min(ResourceCap*PracticeReward.Unit,Math.Max(0,current[i]+delta[i])) - current[i];
             return PracticeReward.FromTicks(delta);

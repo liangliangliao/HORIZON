@@ -48,9 +48,9 @@ namespace Horizon
                 "原来 → 这条可能未来\n" + GateComparison("能力", original.boss.ability, alternate.boss.ability) + "    " +
                 GateComparison("状态", original.boss.state, alternate.boss.state) + "\n" +
                 GateComparison("支援", original.boss.support, alternate.boss.support) + "\n" +
-                "能力 " + original.finalAbility + " → " + alternate.finalAbility +
-                " · 精力 " + original.finalEnergy + " → " + alternate.finalEnergy +
-                " · 心情 " + original.finalMood + " → " + alternate.finalMood;
+                "能力 " + original.Balance(5) + " → " + alternate.Balance(5) +
+                " · 精力 " + original.Balance(0) + " → " + alternate.Balance(0) +
+                " · 心情 " + original.Balance(1) + " → " + alternate.Balance(1);
             View.Label(overlay, "Branch result", outcome, 27, Palette.Text,
                 TextAnchor.MiddleCenter, 0.075f, 0.254f, 0.925f, 0.433f);
             int automaticChanges = alternate == null ? 0 : alternate.actions.Count(a =>
@@ -85,6 +85,7 @@ namespace Horizon
                 number = session.RunNumber, deadline = session.Deadline, title = "正在发生", actions = session.Actions,
                 causalNodes = session.CausalNodes, catalogVersion = session.CatalogVersion,
                 worldSeed = session.WorldSeed, deckSeed = session.DeckSeed, deckSeedRecorded = true,
+                finalFractions = session.CopyFractions(), finalInsight = session.Insight, finalMoney = session.Money, finalRelation = session.Relation,
                 finalEnergy = session.Energy, finalMood = session.Mood, finalAbility = session.Ability,
                 prediction = session.Prediction, predictions = new List<PredictionRecord>(session.Predictions)
             };
