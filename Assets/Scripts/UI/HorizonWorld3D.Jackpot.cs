@@ -200,7 +200,7 @@ namespace Horizon.UI
                 float breath=preferences.reducedMotion || tensionFrame.Silent?0:Mathf.Sin(pose*2)*.016f;
                 float age=time-spectacle.HeroTime;
                 float bounce=preferences.reducedMotion?0:age>=0?Mathf.Sin(Mathf.Min(1,age/.45f)*Mathf.PI)*.18f:0;
-                float detailTremor=preferences.reducedMotion || tensionFrame.Silent || ShowingResource?0:Mathf.Pow(energyFrame.Inward,4)*.035f;
+                float detailTremor=preferences.reducedMotion || tensionFrame.Silent || ShowingResource?0:Mathf.Pow(energyFrame.Inward,1.8f)*.035f*(.76f+.24f*Mathf.Sin(time*19));
                 float scale=showcaseScale*(.72f+heroFocus*.28f+breath+bounce);
                 if(preview>0) scale=showcaseScale*(.80f-preview*.055f);
                 float arrival=ShowingResource?resourceBeat.Entrance(preferences.reducedMotion):1;
@@ -401,6 +401,14 @@ namespace Horizon.UI
             resultLightMaterial.SetFloat("_Age",still?1:Mathf.Min(resultLightAge,CinematicOutcome.ChangeSeconds));
             resultLightMaterial.SetFloat("_Pulse",quiet || still?0:ImmersiveMotion.RevealPulse(resultLightAge));
             resultLightMaterial.SetFloat("_Gain",quiet?0:1);
+            // The receipt row owns its own time; its energy front and actual
+            // counter unfold together. No second full-white flash per row.
+            EnergyRelease rowRelease=!still && !quiet && resourceBeat.HasResource &&
+                moviePlan.Event.tier>=RewardTier.Combo
+                ? EnergyRelease.Sample(resultLightAge,.65f*(cinematicEnergy?.Strength??0))
+                : default(EnergyRelease);
+            resultLightMaterial.SetFloat("_Fire",rowRelease.Fire);
+            resultLightMaterial.SetFloat("_Wave",rowRelease.Wave);
             resultLightMaterial.SetFloat("_Opacity",still?1:Mathf.Lerp(.15f,1,Smooth(0,.18f,resultLightAge)));
         }
 

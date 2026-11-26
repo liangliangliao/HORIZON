@@ -88,6 +88,29 @@ namespace Horizon.Tests
             Assert.IsFalse(tension.Sample(release-.05f,true).Silent);
         }
         [Test]
+        public void ReleaseV2HasDistinctOverlappingTracksAndNeverFlashesDuringReceiptRows()
+        {
+            var first=EnergyRelease.Sample(0,1);
+            Assert.AreEqual(1,first.Flash); Assert.AreEqual(0,first.Fire+first.Wave);
+            var overlap=EnergyRelease.Sample(.09f,1);
+            Assert.Greater(overlap.Flash,0); Assert.Greater(overlap.Fire,0);
+            var fire=EnergyRelease.Sample(.2f,1);
+            Assert.AreEqual(0,fire.Flash); Assert.Greater(fire.Fire,.8f); Assert.Greater(fire.Wave,0);
+            Assert.AreEqual(0,EnergyRelease.Sample(1.4f,1).Fire+EnergyRelease.Sample(1.4f,1).Wave);
+            var plan=Plan(DomainEventKind.TimeEcho,RewardTier.Major);
+            var energy=new CinematicEnergy(plan);
+            float at=new RewardSpectacle(plan).ImpactTime;
+            string saved=JsonUtility.ToJson(plan.Event);
+            Assert.Greater(energy.Sample(at).Release.Flash,0);
+            Assert.Greater(energy.Sample(at+.2f).Release.Fire,0);
+            Assert.AreEqual(0,energy.Sample(at+.2f,true).Release.Fire);
+            Assert.AreEqual(energy.Sample(at+.2f).Release.Fire,energy.Sample(at+.2f).Release.Fire);
+            Assert.AreEqual(saved,JsonUtility.ToJson(plan.Event));
+            var loss=Plan(DomainEventKind.FailAndAgain,RewardTier.Major);
+            Assert.AreEqual(0,new CinematicEnergy(loss).Sample(new RewardSpectacle(loss).ImpactTime).Release.Flash);
+        }
+
+        [Test]
         public void MotionArrivesExactlyAndCountersNeverOvershoot()
         {
             float previous=0;

@@ -6,6 +6,8 @@ Shader "HORIZON/Resource Reveal Horizon"
         _Pulse ("Release",Range(0,1))=0
         _Gain ("Positive accent",Range(0,1))=1
         _Opacity ("Entrance",Range(0,1))=1
+        _Fire ("Irregular receipt energy",Range(0,1))=0
+        _Wave ("Receipt propagation",Range(0,1))=0
     }
     SubShader {
         Tags { "Queue"="Transparent-4" "RenderType"="Transparent" }
@@ -19,7 +21,7 @@ Shader "HORIZON/Resource Reveal Horizon"
             #pragma target 3.0
             #include "UnityCG.cginc"
             half4 _Tint;
-            float _Age, _Pulse, _Gain, _Opacity;
+            float _Age, _Pulse, _Gain, _Opacity, _Fire, _Wave;
             struct v2f { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; };
             v2f vert(appdata_base v) {
                 v2f o; o.pos=UnityObjectToClipPos(v.vertex); o.uv=v.texcoord; return o;
@@ -29,6 +31,45 @@ Shader "HORIZON/Resource Reveal Horizon"
             // Android adaptive renderer lowers its render scale.
             float stroke(float distanceToLine,float width,float pixel) {
                 return 1-smoothstep(width,width+pixel,abs(distanceToLine));
+            }
+            // Bounded three-octave value noise, sampled only during a release.
+            // Distorted shell: not a smooth radial sprite scaled over time.
+            float releaseHash(float2 p) {
+                p=frac(p*float2(.1031,.11369));
+                p+=dot(p,p.yx+19.19);
+                return frac((p.x+p.y)*p.x);
+            }
+            float releaseNoise(float2 p) {
+                float2 cell=floor(p), f=frac(p); f=f*f*(3-2*f);
+                return lerp(lerp(releaseHash(cell),releaseHash(cell+float2(1,0)),f.x),
+                            lerp(releaseHash(cell+float2(0,1)),releaseHash(cell+1),f.x),f.y);
+            }
+            float3 releaseLight(float2 p,float age,float flash,float fire,float wave,float3 tint) {
+                float r=length(p);
+                float3 outLight=float3(0,0,0);
+                if(flash>.001) {
+                    float glow=exp(-r*r*9.5)*flash*.65;
+                    outLight+=float3(1,.97,.89)*glow;
+                }
+                if(fire>.001) {
+                    float spread=smoothstep(0,.8,age);
+                    float2 q=p*(5.0-spread*2.5)-float2(age*.45,age*.28);
+                    float n=releaseNoise(q)*.57+releaseNoise(q*2.08+7)*.28+releaseNoise(q*4.15-3)*.15;
+                    float edge=.23+spread*.56+(n-.5)*.32;
+                    float body=(1-smoothstep(edge-.065,edge+.085,r))*smoothstep(.12,.27,r);
+                    float detail=smoothstep(.23,.78,n);
+                    float hot=body*(.12+detail*.95)*fire;
+                    float rim=exp(-abs(r-edge)*18)*fire*(.2+.8*detail);
+                    float3 ember=lerp(tint,float3(1,.25,.035),.64);
+                    outLight+=ember*rim*.85+lerp(ember,float3(1,.87,.43),detail)*hot;
+                }
+                if(wave>.001) {
+                    float radius=.22+.69*smoothstep(.08,1.15,age);
+                    float ring=exp(-abs(r-radius)*43);
+                    float tail=exp(-abs(r-radius+.07)*19)*.23;
+                    outLight+=lerp(tint,float3(1,.85,.46),.72)*(ring+tail)*wave*.68;
+                }
+                return outLight*(1-smoothstep(.84,1,r));
             }
             half4 frag(v2f i):SV_Target {
                 float2 p=i.uv*2-1;
@@ -67,6 +108,7 @@ Shader "HORIZON/Resource Reveal Horizon"
                 half3 ink=half3(.008,.012,.026)+accent*.033;
                 half3 light=accent*(.16*crest+rays)+foil*(.50*engraving+wave*.72)
                            +ivory*(sweep*engraving*.84+horizon*(.16+.68*_Pulse));
+                if(_Fire+_Wave>.001) light+=releaseLight(p,_Age,0,_Fire,_Wave,accent);
                 return half4(ink*alpha+light*mask,alpha);
             }
             ENDCG

@@ -235,6 +235,12 @@ namespace Horizon.UI
                 material.SetFloat("_Charge",charge*(1-energyFrame.Settlement));
                 material.SetFloat("_Burst",tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(energyFrame.Burst,lifeBurst));
                 material.SetFloat("_Afterglow",energyFrame.Afterglow);
+                EnergyRelease release=energyFrame.Release;
+                bool primary=i==0 && !tensionFrame.Silent && moviePhase!=CinematicPhase.HitStop;
+                material.SetFloat("_ReleaseAge",release.Age);
+                material.SetFloat("_Flash",primary?release.Flash:0);
+                material.SetFloat("_Fire",primary?release.Fire:0);
+                material.SetFloat("_Wave",primary?release.Wave:0);
             }
         }
 

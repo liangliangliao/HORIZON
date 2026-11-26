@@ -10,6 +10,7 @@ namespace Horizon.Game
         private readonly RewardPlan plan;
         private readonly RewardSpectacle spectacle;
         private readonly CinematicCue[] accents;
+        private readonly bool realPositive;
         public readonly float Strength;
         public readonly bool Celebrates;
 
@@ -18,6 +19,7 @@ namespace Horizon.Game
             plan=value ?? throw new ArgumentNullException(nameof(value));
             spectacle=new RewardSpectacle(plan);
             Celebrates=spectacle.Style!=RewardSpectacleStyle.Quiet && spectacle.Style!=RewardSpectacleStyle.Loss;
+            realPositive=plan.Outcome.Changes.Any(change=>change.Amount>0);
             Strength=new[] {.16f,.30f,.48f,.72f,.90f,1f}[Math.Max(0,Math.Min(5,(int)plan.Event.tier-1))];
             accents=plan.Cues.Where(c=>c.NodeHit || c.Phase==CinematicPhase.Impact ||
                 c.Phase==CinematicPhase.SecondReveal || c.Phase==CinematicPhase.Jackpot).ToArray();
@@ -41,7 +43,14 @@ namespace Horizon.Game
                 float window=cue.NodeHit?.95f:Math.Min(5.2f,Math.Max(2.8f,plan.Duration*.28f));
                 float from=Math.Max(i==0?0:accents[i-1].Time+.06f,cue.Time-window);
                 if(time>=from && time<cue.Time)
-                    charge=Math.Max(charge,ImmersiveMotion.Smooth((time-from)/Math.Max(.001f,cue.Time-from))*weight);
+                    {
+                    float p=Math.Max(0,Math.Min(1,(time-from)/Math.Max(.001f,cue.Time-from)));
+                    float rise=ImmersiveMotion.Smooth(p);
+                    // Endpoints stay stable; two incommensurate frequencies make
+                    // local peaks fall and rise without changing actual cue time.
+                    float pulse=cue.NodeHit?0:(float)(Math.Sin(p*32)*.11+Math.Sin(p*61)*.045)*4*p*(1-p);
+                    charge=Math.Max(charge,Math.Max(0,Math.Min(1,rise*(1+pulse)))*weight);
+                }
                 float age=time-cue.Time;
                 if(age<0) continue;
                 last=cue.Time;
@@ -57,15 +66,41 @@ namespace Horizon.Game
             float focus=charge*(1-settle);
             if(!Celebrates) return new CinematicEnergyFrame(time,0,0,.14f*afterglow,0,settle,last,0);
             if(reducedMotion) return new CinematicEnergyFrame(time,0,0,.18f*afterglow,0,settle,last,0);
+            // Only actual positive results receive the new celebration layers.
+            // Node hits keep their original relay accents; only the main impact flashes.
+            var release=realPositive && plan.Event.tier>=RewardTier.Combo
+                ? EnergyRelease.Sample(time-spectacle.ImpactTime,Strength*(1-settle))
+                : default(EnergyRelease);
             return new CinematicEnergyFrame(time,charge*Strength,burst*Strength*(1-settle),
-                afterglow*Strength,focus*Strength,settle,last,Math.Max(-1,Math.Min(1,recoil))*Strength);
+                afterglow*Strength,focus*Strength,settle,last,Math.Max(-1,Math.Min(1,recoil))*Strength,release);
+        }
+    }
+
+    // Separate white flash, fire volume and expanding wave, sampled by age.
+    // No RNG, wall clock, or business-state access.
+    public readonly struct EnergyRelease
+    {
+        public readonly float Age, Flash, Fire, Wave;
+        private EnergyRelease(float age,float flash,float fire,float wave)
+        { Age=age; Flash=flash; Fire=fire; Wave=wave; }
+        public static EnergyRelease Sample(float age,float strength)
+        {
+            if(age<0 || age>=1.35f || strength<=0) return default(EnergyRelease);
+            strength=Math.Max(0,Math.Min(1,strength));
+            float flash=age<.12f?strength*(1-age/.12f)*(1-age/.12f):0;
+            float fire=strength*ImmersiveMotion.Smooth((age-.025f)/.14f)*
+                (1-ImmersiveMotion.Smooth((age-.28f)/.62f));
+            float wave=strength*ImmersiveMotion.Smooth((age-.08f)/.12f)*
+                (1-ImmersiveMotion.Smooth((age-.36f)/.99f));
+            return new EnergyRelease(age,flash,fire,wave);
         }
     }
 
     public readonly struct CinematicEnergyFrame
     {
         public readonly float Time,Inward,Burst,Afterglow,Focus,Settlement,AccentTime,Recoil;
-        public CinematicEnergyFrame(float time,float inward,float burst,float afterglow,float focus,float settlement,float accentTime,float recoil)
-        { Time=time; Inward=inward; Burst=burst; Afterglow=afterglow; Focus=focus; Settlement=settlement; AccentTime=accentTime; Recoil=recoil; }
+        public readonly EnergyRelease Release;
+        public CinematicEnergyFrame(float time,float inward,float burst,float afterglow,float focus,float settlement,float accentTime,float recoil,EnergyRelease release=default(EnergyRelease))
+        { Time=time; Inward=inward; Burst=burst; Afterglow=afterglow; Focus=focus; Settlement=settlement; AccentTime=accentTime; Recoil=recoil; Release=release; }
     }
 }

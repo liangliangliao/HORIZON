@@ -19,6 +19,8 @@ namespace Horizon.Tests
         {
             Shader shader=Resources.Load<Shader>("HorizonImmersion");
             Assert.IsNotNull(shader); Assert.IsFalse(ShaderUtil.ShaderHasError(shader));
+            Shader result=Resources.Load<Shader>("HorizonResultLight");
+            Assert.IsNotNull(result); Assert.IsFalse(ShaderUtil.ShaderHasError(result));
         }
 
         [UnityTest]
