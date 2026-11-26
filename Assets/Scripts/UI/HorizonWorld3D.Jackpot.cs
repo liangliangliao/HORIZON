@@ -407,8 +407,15 @@ namespace Horizon.UI
                 moviePlan.Event.tier>=RewardTier.Combo
                 ? EnergyRelease.Sample(resultLightAge,.65f*(cinematicEnergy?.Strength??0))
                 : default(EnergyRelease);
-            resultLightMaterial.SetFloat("_Fire",rowRelease.Fire);
-            resultLightMaterial.SetFloat("_Wave",rowRelease.Wave);
+            // A memento shot can own the impact frame instead of the immersion
+            // membrane. Route the same primary release to that shot, never
+            // generate an independent flash at each result row.
+            EnergyRelease release=!still && !quiet && !resourceBeat.HasResource
+                ? energyFrame.Release : rowRelease;
+            resultLightMaterial.SetFloat("_ReleaseAge",release.Age);
+            resultLightMaterial.SetFloat("_Flash",resourceBeat.HasResource?0:release.Flash);
+            resultLightMaterial.SetFloat("_Fire",release.Fire);
+            resultLightMaterial.SetFloat("_Wave",release.Wave);
             resultLightMaterial.SetFloat("_Opacity",still?1:Mathf.Lerp(.15f,1,Smooth(0,.18f,resultLightAge)));
         }
 

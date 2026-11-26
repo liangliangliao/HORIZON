@@ -114,7 +114,10 @@ Shader "HORIZON/Immersion"
                 float3 rgb=tint*1.45*min(.72,saturate(light));
                 if(_Layer<.5 && (_Flash+_Fire+_Wave)>.001)
                     rgb+=releaseLight(p,_ReleaseAge,_Flash,_Fire,_Wave,_Color.rgb);
-                return half4(rgb,_Color.a);
+                // Preserve zero alpha outside the field and the legacy source-alpha
+                // blend. Normalize RGB so the added energy is not multiplied twice.
+                float alpha=min(1,max(rgb.r,max(rgb.g,rgb.b)));
+                return half4(rgb/max(.0001,alpha),alpha*_Color.a);
             }
             ENDCG
         }

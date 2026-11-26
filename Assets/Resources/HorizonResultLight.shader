@@ -6,8 +6,10 @@ Shader "HORIZON/Resource Reveal Horizon"
         _Pulse ("Release",Range(0,1))=0
         _Gain ("Positive accent",Range(0,1))=1
         _Opacity ("Entrance",Range(0,1))=1
+        _Flash ("Local release",Range(0,1))=0
         _Fire ("Irregular receipt energy",Range(0,1))=0
         _Wave ("Receipt propagation",Range(0,1))=0
+        _ReleaseAge ("Release age",Float)=0
     }
     SubShader {
         Tags { "Queue"="Transparent-4" "RenderType"="Transparent" }
@@ -21,7 +23,8 @@ Shader "HORIZON/Resource Reveal Horizon"
             #pragma target 3.0
             #include "UnityCG.cginc"
             half4 _Tint;
-            float _Age, _Pulse, _Gain, _Opacity, _Fire, _Wave;
+            float _Age, _Pulse, _Gain, _Opacity, _Flash, _Fire, _Wave;
+            float _ReleaseAge;
             struct v2f { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; };
             v2f vert(appdata_base v) {
                 v2f o; o.pos=UnityObjectToClipPos(v.vertex); o.uv=v.texcoord; return o;
@@ -108,7 +111,7 @@ Shader "HORIZON/Resource Reveal Horizon"
                 half3 ink=half3(.008,.012,.026)+accent*.033;
                 half3 light=accent*(.16*crest+rays)+foil*(.50*engraving+wave*.72)
                            +ivory*(sweep*engraving*.84+horizon*(.16+.68*_Pulse));
-                if(_Fire+_Wave>.001) light+=releaseLight(p,_Age,0,_Fire,_Wave,accent);
+                if(_Flash+_Fire+_Wave>.001) light+=releaseLight(p,_ReleaseAge,_Flash,_Fire,_Wave,accent);
                 return half4(ink*alpha+light*mask,alpha);
             }
             ENDCG

@@ -42,7 +42,22 @@ namespace Horizon.Tests
                     Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
                     var plan=world.Cinematics.Current; var visual=new RewardSpectacle(plan);
                     float at=Mathf.Min(plan.Duration*.9f,visual.HeroTime+.25f);
-                    world.Cinematics.Advance(at); yield return null;
+                    // Sample the actual Time Echo's impact window before its
+                    // later hero shot. Captures are evidence, not a claim of
+                    // visual parity; fixture filenames never say actual.
+                    if(kind==DomainEventKind.TimeEcho)
+                    {
+                        string evidence=source.id.StartsWith("preview-fixture")?"fixture":"actual";
+                        float[] offsets={-.24f,.02f,.20f,.55f};
+                        string[] stages={"charge","flash","fire","wave"};
+                        for(int frame=0;frame<offsets.Length;frame++)
+                        {
+                            float target=Mathf.Clamp(visual.ImpactTime+offsets[frame],0,plan.Duration-.01f);
+                            world.Cinematics.Advance(Mathf.Max(0,target-world.Cinematics.Elapsed)); yield return null;
+                            Capture(world,"v2-time-echo-"+evidence+"-"+stages[frame]);
+                        }
+                    }
+                    world.Cinematics.Advance(Mathf.Max(0,at-world.Cinematics.Elapsed)); yield return null;
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="HORIZON inward release depth field");
                     if(stage.gameObject.activeInHierarchy)
                     {
