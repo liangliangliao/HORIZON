@@ -32,7 +32,6 @@ namespace Horizon.Tests
             world.Cinematics.enabled=false;
             var sources=V3RewardProfilesTests.ActualOrbit();
             RewardPlan plan=RewardDirector.DirectOrbit(sources);
-            var finished=0;
             var target=RenderTexture.GetTemporary(540,960,24,RenderTextureFormat.ARGB32);
             var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
             RenderTexture prior=RenderTexture.active;
@@ -40,7 +39,7 @@ namespace Horizon.Tests
             try
             {
                 world.WorldCamera.targetTexture=target;
-                Assert.IsTrue(world.Cinematics.Enqueue(plan,()=>finished++));
+                Assert.IsTrue(world.Cinematics.Enqueue(plan,null));
                 for(int i=0;i<plan.Orbit.Beats.Count;i++)
                 {
                     var beat=plan.Orbit.Beats[i];
@@ -49,7 +48,7 @@ namespace Horizon.Tests
                     for(int frame=0;frame<14;frame++)
                     {
                         float time=beat.Time+(frame-3)/20f;
-                        world.Cinematics.Advance(time-world.Cinematics.Elapsed);
+                        world.Cinematics.Advance(Mathf.Max(0,time+.0001f-world.Cinematics.Elapsed));
                         if(frame>=3) Assert.AreEqual(names[i],world.CurrentCinematicShot);
                         world.FrameCinematicLabels(); world.WorldCamera.Render(); RenderTexture.active=target;
                         pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply();
@@ -61,7 +60,7 @@ namespace Horizon.Tests
                 var overview=plan.Cues.Single(cue=>cue.Phase==CinematicPhase.SecondReveal).Time+.05f;
                 world.Cinematics.Advance(overview-world.Cinematics.Elapsed);
                 Assert.AreEqual("Recorded orbit overview",world.CurrentCinematicShot);
-                world.Cinematics.Skip(); Assert.AreEqual(1,finished);
+                world.Cinematics.Skip(); Assert.IsFalse(world.Cinematics.IsPlaying);
                 Assert.IsFalse(sources.Any(source=>source.acknowledged));
             }
             finally

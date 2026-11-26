@@ -236,7 +236,6 @@ namespace Horizon.UI
                 if (Multiplier != null) Multiplier.text = "";
                 if (MultiplierCaption != null) MultiplierCaption.text = "";
                 if (OutcomeContext != null) OutcomeContext.text = "";
-                if (Resources != null) Resources.text = receipt > .001f ? plan.Orbit.ReceiptCopy : "";
                 CinematicTypography.Reveal(Story, int.MaxValue);
             }
 

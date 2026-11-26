@@ -94,6 +94,7 @@ namespace Horizon.Tests
                     archive.preferences.batterySaver=battery; archive.preferences.reducedMotion=reduced;
                     type.GetField("archive",Private).SetValue(app,archive);
                     type.GetField("session",Private).SetValue(app,life);
+                    type.GetMethod("SetPaused",Private).Invoke(app,new object[]{false});
                     type.GetMethod("ApplyPreferences",Private).Invoke(app,null);
                     type.GetMethod("BuildBoard",Private).Invoke(app,null);
                     world.WorldCamera.aspect=540f/height;
@@ -106,14 +107,19 @@ namespace Horizon.Tests
                     var counter=film.Find("Reward counter").GetComponent<Text>();
                     const BindingFlags fields=BindingFlags.Instance|BindingFlags.NonPublic;
                     var caseLightField=typeof(HorizonWorld3D).GetField("caseLight",fields);
-                    for(int step=0;step<180 && caseLightField.GetValue(world)==null;step++)
+                    var driver=app.StartCoroutine(ChoosePracticeRoutes(film));
+                    float deadline=Time.realtimeSinceStartup+30;
+                    try
                     {
-                        Button next=film.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.IsInteractable() &&
-                            (b.name=="Practice difficulty 2" || b.name=="Practice route B" || b.name=="Next shot"));
-                        if(next!=null) next.onClick.Invoke();
-                        yield return null;
+                        while(film!=null && caseLightField.GetValue(world)==null && Time.realtimeSinceStartup<deadline)
+                        {
+                            if(film.GetComponentsInChildren<Button>().Any(button=>button.name=="Finish practice")) break;
+                            yield return new WaitForSecondsRealtime(.06f);
+                        }
                     }
-                    Assert.That(caseLightField.GetValue(world),Is.Not.Null);
+                    finally { if(driver!=null) app.StopCoroutine(driver); }
+                    Assert.That(caseLightField.GetValue(world),Is.Not.Null,
+                        film==null?"The practice page closed before the reveal.":"Practice stopped at: "+heading.text);
                     Assert.That(life.HasChosen && archive.pendingFeedback!=null);
                     ActionRecord action=life.Actions.Single();
                     var receipt=new PracticeRewardCinematic(action);
@@ -207,9 +213,22 @@ namespace Horizon.Tests
             {
                 Time.captureFramerate=captureRate;
                 world.WorldCamera.ResetAspect();
-                world.EndPracticeSet();
+                type.GetMethod("CloseMasterPage",Private).Invoke(app,null);
+                type.GetField("practicePage",Private).SetValue(app,null);
+                type.GetField("busy",Private).SetValue(app,false);
             }
             yield return new ExitPlayMode();
+        }
+
+        private static IEnumerator ChoosePracticeRoutes(Transform film)
+        {
+            while(film!=null && film.gameObject.activeInHierarchy)
+            {
+                Button next=film.GetComponentsInChildren<Button>().FirstOrDefault(button=>button.IsInteractable() &&
+                    (button.name=="Practice difficulty 2" || button.name=="Practice route B" || button.name=="Next shot"));
+                if(next!=null) next.onClick.Invoke();
+                yield return null;
+            }
         }
 
         [UnityTest]
