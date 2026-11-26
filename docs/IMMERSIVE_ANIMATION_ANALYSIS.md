@@ -1,5 +1,7 @@
 # 四段捕鱼录屏拆解与 HORIZON 动画升级
 
+> 2026-11-26 后续开发增补：[Energy Cinematic System V2.0](ENERGY_CINEMATIC_SYSTEM_V2.md)。五段录屏与用户新增观察形成的十二阶段能量演出、技术方案及验收门禁；尚未实现，后续动画开发应同时阅读。Master v0.4.2 玩法基线不变。
+
 日期：2026-10-24。开发分支：`codex/immersive-animation-language`（PR #9）。玩法基线仍为 Master v0.4.2。
 
 ## 第三轮：用户真机截图推翻了“播放层已经隔离”的假设
