@@ -287,12 +287,14 @@ namespace Horizon.UI
 
         private void FrameShowcaseInReadingAperture(float time,ref Vector3 camera,ref Vector3 look)
         {
-            if(showcaseCameraWeight<=0 || showcaseSubjectRenderers==null) return;
-            // SampleJackpotStage has already eased the authored camera into the
-            // reveal. Apply the portrait bounds to that actual pose. Blending
-            // a second time left the first clearly visible object off-screen.
+            if(cinematicOverviewRequested || showcaseCameraWeight<=0 || showcaseSubjectRenderers==null ||
+                showcaseHero==null || !showcaseHero.gameObject.activeInHierarchy) return;
+            // This is the final camera correction. The reenactment can still
+            // stage its actor behind the reward, but it cannot move the lens
+            // back onto the actor while the reward is already being revealed.
             FitPortraitSubject(showcaseSubjectRenderers,HorizonCinemaLayout.SubjectAperture,
                 CinematicFieldOfView(time),ref camera,ref look);
+            CurrentCinematicFraming=CinematicFraming.Close;
         }
 
         private Color RewardEffectTint()

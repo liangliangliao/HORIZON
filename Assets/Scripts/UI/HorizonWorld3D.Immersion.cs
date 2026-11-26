@@ -207,7 +207,9 @@ namespace Horizon.UI
             // Align with the visible authored subject, including the current
             // causal close-up. Keep every membrane behind it in camera space.
             Vector3 localCenter=showcaseCenter;
-            if(LifeActionPlaying && energyFrame.Time<lifeAction.Reveal) localCenter=moviePlayer.localPosition+Vector3.up;
+            bool rewardVisible=showcaseHero!=null && showcaseHero.gameObject.activeInHierarchy;
+            if(!rewardVisible && LifeActionPlaying && energyFrame.Time<lifeAction.Reveal)
+                localCenter=moviePlayer.localPosition+Vector3.up;
             if(relayPlan!=null && relayPlan.Nodes.Count>0 && energyFrame.Time<spectacle.HeroTime)
                 localCenter=immersionFocus;
             Vector3 center=cinematicStage.TransformPoint(localCenter);
