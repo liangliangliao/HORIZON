@@ -316,8 +316,8 @@ namespace Horizon.Game
             if (chain >= (UsesExpedition && Day <= Master.overdriveUntilDay ? 4 : 5)) { Master.insightPoints += 2; Emit(chain >= 9 ? DomainEventKind.CausalSingularity : DomainEventKind.Cascade, n,
                 chain >= 9 ? "CAUSAL SINGULARITY" : "CASCADE ×" + chain, "过去多个选择形成了真实因果路径。", chain); }
             if (UsesExpedition && Day <= Master.overdriveUntilDay && chain >= 4)
-            { if (echo.delta?.money > 0 && Energy >= 4) ActivateOrbit(5, n); if (echo.replacementId == "opportunity") ActivateOrbit(0, n); }
-            if (echo.delta != null && (echo.delta.energy < 0 || echo.delta.mood < 0) && (Energy <= 3 || Mood <= 3))
+            { if (EchoAxis(echo,3) > 0 && Energy >= 4) ActivateOrbit(5, n); if (echo.replacementId == "opportunity") ActivateOrbit(0, n); }
+            if ((EchoAxis(echo,0) < 0 || EchoAxis(echo,1) < 0) && (Energy <= 3 || Mood <= 3))
             {
                 if (!Master.awaitingComeback) Master.resilienceChain = Math.Min(10, Master.resilienceChain + 1);
                 Master.awaitingComeback = true; Master.lastFailureNode = n?.id;

@@ -79,13 +79,14 @@ namespace Horizon.Game
     {
         public readonly RewardObjectKind Kind;
         public readonly RewardObjectClass Class;
-        public readonly int Amount, VisualCount, Scale;
+        public readonly decimal Amount;
+        public readonly int VisualCount, Scale;
         public readonly RewardObjectForm Form;
         public readonly string Copy;
-        public MaterialReward(RewardObjectKind kind, RewardObjectClass category, string copy, int amount = 0)
+        public MaterialReward(RewardObjectKind kind, RewardObjectClass category, string copy, decimal amount = 0)
         {
             Kind = kind; Class = category; Copy = copy; Amount = amount;
-            long magnitude = Math.Abs((long)amount);
+            long magnitude = (long)Math.Ceiling(Math.Abs(amount));
             Form = FormFor(kind, magnitude);
             // Large receipts become a device, rather than hundreds of meshes.
             VisualCount = category == RewardObjectClass.Resource ? magnitude <= 5 ? (int)magnitude : magnitude < 20 ? 3 : 1 : 1;
@@ -166,12 +167,19 @@ namespace Horizon.Game
             var objects = new List<MaterialReward>();
             if (r.resourcesRecorded)
             {
-                int[] axes = ResourceMath.Axes(r.resources);
+                bool fractional = r.resources?.ticks?.Length == 6;
+                int[] axes = fractional ? r.resources.ticks : ResourceMath.Axes(r.resources);
                 string[] names = { "精力", "心情", "专注", "金钱", "关系", "能力" };
                 RewardObjectKind[] kinds = { RewardObjectKind.EnergyCell, RewardObjectKind.WarmLamp, RewardObjectKind.FocusLens,
                     RewardObjectKind.MoneyWallet, RewardObjectKind.ConnectionRing, RewardObjectKind.ToolKit };
-                for (int i = 0; i < axes.Length; i++) if (axes[i] != 0)
-                    objects.Add(new MaterialReward(kinds[i], RewardObjectClass.Resource, names[i] + " " + (axes[i] > 0 ? "+" : "") + axes[i], axes[i]));
+                for (int i = 0; i < axes.Length; i++)
+                {
+                    if (axes[i] == 0) continue;
+                    string value = fractional ? PracticeReward.Format(axes[i]) : axes[i].ToString();
+                    decimal amount = fractional ? axes[i] / (decimal)PracticeReward.Unit : axes[i];
+                    objects.Add(new MaterialReward(kinds[i], RewardObjectClass.Resource,
+                        names[i] + " " + (amount > 0 ? "+" : "") + value, amount));
+                }
             }
             RewardObjectKind? system = ObjectFor(e.kind);
             if (system.HasValue) objects.Add(new MaterialReward(system.Value, IsMilestone(e.kind) ? RewardObjectClass.Milestone : RewardObjectClass.System, e.title));

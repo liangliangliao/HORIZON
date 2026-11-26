@@ -22,6 +22,19 @@ namespace Horizon.Tests
             Assert.AreEqual(5,plan.Objects.Single(x=>x.Kind==RewardObjectKind.EnergyCell).VisualCount);
             receipt.resources.energy=100; Assert.AreEqual(5,plan.Event.receipt.resources.energy);
         }
+        [Test]
+        public void MaturedFractionProducesSignedPhysicalRewardsAtTheirActualSize()
+        {
+            var receipt = new RewardReceipt { resourcesRecorded=true,
+                resources=PracticeReward.FromTicks(new[] { -9,0,0,0,0,187 }) };
+            var plan = RewardDirector.Direct(new DomainEvent { kind=DomainEventKind.TimeEcho, receipt=receipt });
+            var tool = plan.Objects.Single(o=>o.Kind==RewardObjectKind.ToolKit);
+            Assert.AreEqual(.0187m,tool.Amount);
+            Assert.AreEqual(1,tool.VisualCount);
+            Assert.AreEqual("能力 +0.0187",tool.Copy);
+            Assert.AreEqual(-.0009m,plan.Objects.Single(o=>o.Kind==RewardObjectKind.EnergyCell).Amount);
+        }
+
         [TestCase(1,1,0)] [TestCase(5,5,1)] [TestCase(20,1,2)] [TestCase(50,1,3)] [TestCase(100,1,4)] [TestCase(500,1,4)]
         public void LargeResourceReceiptsBecomeDevicesWithoutMultiplyingYield(int actual,int meshes,int scale)
         {

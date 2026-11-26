@@ -348,12 +348,21 @@ namespace Horizon.Game
             }
         }
 
+        // New receipts keep four decimal places, including the sign of a small cost.
+        private static int EchoAxis(PendingEcho echo, int axis)
+        {
+            var delta = echo.delta;
+            if (delta?.ticks?.Length == 6 && echo.actualDelta?.ticks?.Length == 6)
+                return echo.actualDelta.ticks[axis];
+            return PracticeReward.Ticks(delta)[axis];
+        }
+
         // A rule turns an arriving echo into a future choice event. The event may be
         // ignored, or its replacement action can produce another echo and more links.
         private static readonly CausalRule[] CausalRules =
         {
             new CausalRule(CardKind.Temptation,
-                (s, e) => e.delta != null && e.delta.energy < 0 && s.Energy <= 2,
+                (s, e) => EchoAxis(e,0) < 0 && s.Energy <= 2,
                 s => s.NextSupportDay(), CardKind.Recovery, CardCatalog.SoloRecovery,
                 new ResourceDelta(0, -1, 0, -1), "错过了一次邀约"),
             new CausalRule(CardKind.Growth,
@@ -365,11 +374,11 @@ namespace Horizon.Game
                 s => s.Day + 1, CardKind.Growth, CardCatalog.Together,
                 new ResourceDelta(), "有人愿意并肩准备"),
             new CausalRule(CardKind.Temptation,
-                (s, e) => s.CatalogVersion >= 6 && e.delta != null && e.delta.mood < 0 && s.Money <= 2,
+                (s, e) => s.CatalogVersion >= 6 && EchoAxis(e,1) < 0 && s.Money <= 2,
                 s => s.Day + 1, CardKind.Recovery, CardCatalog.FindById("budget"),
                 new ResourceDelta(), "给钱和心情留一点空间"),
             new CausalRule(CardKind.Temptation,
-                (s, e) => s.CatalogVersion >= 6 && e.delta != null && e.delta.mood > 0 && s.Mood >= 8,
+                (s, e) => s.CatalogVersion >= 6 && EchoAxis(e,1) > 0 && s.Mood >= 8,
                 s => s.Day + 1, CardKind.Growth, CardCatalog.FindById("create"),
                 new ResourceDelta(), "快乐带来了创作灵感"),
             new CausalRule(CardKind.Growth,
@@ -939,11 +948,14 @@ namespace Horizon.Game
                         n.day <= Day && CardCatalog.FindById(n.cardId)?.Kind == CardKind.Growth);
                     if (growth != null) CausalGraph.Link(eventNode, growth.id);
                 }
+                // A further link opens or closes a choice. This performance's resource
+                // budget has already been assigned to its completion and first echo.
+                ResourceDelta consequence = source.practice?.settleOnDueDay == true ? new ResourceDelta() : rule.Delta;
                 Pending.Add(new PendingEcho
                 {
                     sourceDay = cause.sourceDay, parentDay = Day, dueDay = day,
                     cardId = cause.cardId, cardName = cause.cardName,
-                    echoName = rule.Label, delta = rule.Delta, kind = cause.kind,
+                    echoName = rule.Label, delta = consequence, kind = cause.kind,
                     depth = 2, nodeId = eventNode.id, parentNodeId = cause.nodeId,
                     replacementId = rule.Replacement.Id, replacementSlot = rule.Slot
                 });
@@ -951,7 +963,7 @@ namespace Horizon.Game
                 {
                     source.secondaryDay = day;
                     source.secondaryName = rule.Label;
-                    source.secondary = rule.Delta;
+                    source.secondary = consequence;
                 }
             }
         }
