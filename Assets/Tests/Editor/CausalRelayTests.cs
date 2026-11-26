@@ -49,6 +49,26 @@ namespace Horizon.Tests
             CollectionAssert.AreEquivalent(new[] {"learn→merge","support→merge"},relay.Edges.Select(e=>relay.Nodes[e.From].Evidence.id+"→"+relay.Nodes[e.To].Evidence.id));
             Assert.AreNotEqual(relay.Nodes[0].X,relay.Nodes[1].X);
         }
+        [Test]
+        public void SameDayMergeWaitsForEveryRecordedParentAndReceivesBothPulses()
+        {
+            var plan=Merge();
+            var evidence=plan.Event.receipt.causes;
+            evidence.Reverse();
+            foreach(var node in evidence) node.day=3;
+            var relay=new CausalRelayPlan(RewardDirector.Direct(plan.Event));
+            Assert.AreEqual("merge",relay.Nodes.Last().Evidence.id);
+            Assert.AreEqual(2,relay.Edges.Count);
+            foreach(var edge in relay.Edges)
+            {
+                float arrival=relay.Nodes[edge.To].ActivationTime;
+                Assert.Less(relay.Nodes[edge.From].ActivationTime,arrival);
+                Assert.That(relay.EdgeArrival(edge,arrival-.12f,false),Is.InRange(.01f,.99f));
+                Assert.AreEqual(0,relay.EdgeArrival(edge,arrival-.12f,true));
+                Assert.AreEqual(1,relay.EdgeArrival(edge,arrival,false));
+            }
+        }
+
         [TestCase(DomainEventKind.Cascade)] [TestCase(DomainEventKind.CausalSingularity)]
         public void ActualLongLifeEventsKeepObservedEdgesAndTheirExactCueTimes(DomainEventKind kind)
         {

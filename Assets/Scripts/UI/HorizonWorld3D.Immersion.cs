@@ -217,7 +217,10 @@ namespace Horizon.UI
             {
                 Transform layer=immersionLayers[i]; layer.gameObject.SetActive(i<budget);
                 if(i>=budget) continue;
-                float offset=i==0 && actionClose?.08f:.7f+i*1.35f;
+                EnergyRelease release=energyFrame.Release;
+                bool impact=!tensionFrame.Silent && moviePhase!=CinematicPhase.HitStop && release.Flash+release.Fire+release.Wave>.002f;
+                bool foreground=i==1 && impact && budget>1;
+                float offset=foreground?-.26f:i==0 && actionClose?.08f:.7f+i*1.35f;
                 layer.position=center+WorldCamera.transform.forward*offset;
                 layer.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,0,i*31);
                 float layerDepth=Mathf.Max(1,WorldCamera.WorldToViewportPoint(layer.position).z);
@@ -225,22 +228,26 @@ namespace Horizon.UI
                 // On a tall phone, basing every radius on screen height pushed
                 // the incoming streaks outside the left and right edges. Place
                 // the first corona around the subject; deeper layers spill out.
-                float span=i==0?Mathf.Clamp(WorldCamera.aspect*1.54f,.52f,.96f):1.02f+i*.12f;
+                float span=foreground?Mathf.Clamp(WorldCamera.aspect*1.48f,.48f,.87f):
+                    i==0?Mathf.Clamp(WorldCamera.aspect*1.54f,.52f,.96f):1.02f+i*.12f;
                 layer.localScale=Vector3.one*(fullHeight*span+energyFrame.Burst*.34f);
                 Material material=immersionMaterials[i];
-                Color charged=Color.Lerp(RewardEffectTint(),new Color(1,.62f,.13f,1),
-                    Mathf.Clamp01(charge*.72f+Mathf.Max(energyFrame.Burst,lifeBurst)*.48f));
+                Color tint=RewardEffectTint();
+                bool violet=(relayPlan?.Nodes.Count??0)>0 || moviePlan.Event.kind==DomainEventKind.TimeEcho ||
+                    spectacle.Style==RewardSpectacleStyle.Mystery;
+                Color peak=violet?new Color(.65f,.20f,1):new Color(1,.57f,.13f);
+                Color charged=Color.Lerp(tint,peak,Mathf.Clamp01(charge*.80f+Mathf.Max(energyFrame.Burst,lifeBurst)*.61f));
                 material.SetColor("_Color",charged);
+                material.SetFloat("_Layer",foreground?3:i);
+                material.SetFloat("_Seed",cinematicEnergy.Seed);
                 material.SetFloat("_Clock",energyFrame.Time);
                 material.SetFloat("_Charge",charge*(1-energyFrame.Settlement));
                 material.SetFloat("_Burst",tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(energyFrame.Burst,lifeBurst));
                 material.SetFloat("_Afterglow",energyFrame.Afterglow);
-                EnergyRelease release=energyFrame.Release;
-                bool primary=i==0 && !tensionFrame.Silent && moviePhase!=CinematicPhase.HitStop;
                 material.SetFloat("_ReleaseAge",release.Age);
-                material.SetFloat("_Flash",primary?release.Flash:0);
-                material.SetFloat("_Fire",primary?release.Fire:0);
-                material.SetFloat("_Wave",primary?release.Wave:0);
+                material.SetFloat("_Flash",foreground || i==0 && budget==1 && impact?release.Flash:0);
+                material.SetFloat("_Fire",foreground?release.Fire:i==0 && impact?release.Fire*.47f:0);
+                material.SetFloat("_Wave",i==0 && impact?release.Wave:0);
             }
         }
 

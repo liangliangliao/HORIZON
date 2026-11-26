@@ -111,6 +111,26 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void OnlyVerifiedReleaseMakesAWhitePulseAndSeedStaysStable()
+        {
+            var ceremony = Plan(DomainEventKind.Victory,RewardTier.Epic).Event;
+            ceremony.receipt.resourcesRecorded=false;
+            RewardPlan victory=RewardDirector.Direct(ceremony);
+            var energy=new CinematicEnergy(victory);
+            float at=new RewardSpectacle(victory).ImpactTime;
+            Assert.Greater(energy.Sample(at).Release.Flash,0);
+            Assert.AreEqual(0,energy.Sample(at,true).Release.Flash);
+            Assert.AreEqual(0,energy.Sample(at+.18f).Release.Flash);
+            ceremony.kind=DomainEventKind.TimeEcho;
+            RewardPlan quiet=RewardDirector.Direct(ceremony);
+            Assert.AreEqual(0,new CinematicEnergy(quiet).Sample(new RewardSpectacle(quiet).ImpactTime).Release.Flash);
+            Assert.AreEqual(energy.Seed,CinematicEnergy.VisualSeed(ceremony.id));
+            Assert.AreNotEqual(CinematicEnergy.ChargeAt(.55f,energy.Seed),CinematicEnergy.ChargeAt(.55f,.36f));
+            Assert.AreEqual(0,CinematicEnergy.ChargeAt(0,energy.Seed));
+            Assert.AreEqual(1,CinematicEnergy.ChargeAt(1,energy.Seed));
+        }
+
+        [Test]
         public void MotionArrivesExactlyAndCountersNeverOvershoot()
         {
             float previous=0;

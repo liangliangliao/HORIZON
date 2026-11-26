@@ -10,7 +10,8 @@ namespace Horizon.Game
         private readonly RewardPlan plan;
         private readonly RewardSpectacle spectacle;
         private readonly CinematicCue[] accents;
-        private readonly bool realPositive;
+        private readonly bool verifiedRelease;
+        public readonly float Seed;
         public readonly float Strength;
         public readonly bool Celebrates;
 
@@ -19,7 +20,14 @@ namespace Horizon.Game
             plan=value ?? throw new ArgumentNullException(nameof(value));
             spectacle=new RewardSpectacle(plan);
             Celebrates=spectacle.Style!=RewardSpectacleStyle.Quiet && spectacle.Style!=RewardSpectacleStyle.Loss;
-            realPositive=plan.Outcome.Changes.Any(change=>change.Amount>0);
+            bool hasGain = plan.Outcome.Changes.Any(change => change.Amount > 0);
+            bool milestone = plan.Event.kind == DomainEventKind.Victory ||
+                plan.Event.kind == DomainEventKind.PatternBroken || plan.Event.kind == DomainEventKind.RealityConvergence ||
+                plan.Event.kind == DomainEventKind.AllLinked;
+            bool cascade = (plan.Event.kind == DomainEventKind.Cascade || plan.Event.kind == DomainEventKind.CausalSingularity) &&
+                plan.Event.receipt?.causes?.Count >= 3;
+            verifiedRelease = hasGain || milestone || cascade;
+            Seed = VisualSeed(plan.Event.id);
             Strength=new[] {.16f,.30f,.48f,.72f,.90f,1f}[Math.Max(0,Math.Min(5,(int)plan.Event.tier-1))];
             accents=plan.Cues.Where(c=>c.NodeHit || c.Phase==CinematicPhase.Impact ||
                 c.Phase==CinematicPhase.SecondReveal || c.Phase==CinematicPhase.Jackpot).ToArray();
@@ -45,11 +53,7 @@ namespace Horizon.Game
                 if(time>=from && time<cue.Time)
                     {
                     float p=Math.Max(0,Math.Min(1,(time-from)/Math.Max(.001f,cue.Time-from)));
-                    float rise=ImmersiveMotion.Smooth(p);
-                    // Endpoints stay stable; two incommensurate frequencies make
-                    // local peaks fall and rise without changing actual cue time.
-                    float pulse=cue.NodeHit?0:(float)(Math.Sin(p*32)*.11+Math.Sin(p*61)*.045)*4*p*(1-p);
-                    charge=Math.Max(charge,Math.Max(0,Math.Min(1,rise*(1+pulse)))*weight);
+                    charge=Math.Max(charge,ChargeAt(p,Seed,cue.NodeHit)*weight);
                 }
                 float age=time-cue.Time;
                 if(age<0) continue;
@@ -68,12 +72,30 @@ namespace Horizon.Game
             if(reducedMotion) return new CinematicEnergyFrame(time,0,0,.18f*afterglow,0,settle,last,0);
             // Only actual positive results receive the new celebration layers.
             // Node hits keep their original relay accents; only the main impact flashes.
-            var release=realPositive && plan.Event.tier>=RewardTier.Combo
+            var release=verifiedRelease && plan.Event.tier>=RewardTier.Combo
                 ? EnergyRelease.Sample(time-spectacle.ImpactTime,Strength*(1-settle))
                 : default(EnergyRelease);
             return new CinematicEnergyFrame(time,charge*Strength,burst*Strength*(1-settle),
                 afterglow*Strength,focus*Strength,settle,last,Math.Max(-1,Math.Min(1,recoil))*Strength,release);
         }
+        // A quiet onset, independent local pulses and a brief hold at the end.
+        // Time and seed are immutable presentation inputs.
+        public static float ChargeAt(float progress,float seed,bool relay=false)
+        {
+            float p=Math.Max(0,Math.Min(1,progress));
+            float rise=ImmersiveMotion.Smooth(p/.94f);
+            if(relay) return rise;
+            float pulse=(float)(Math.Sin(p*34+seed*4)*.18+Math.Sin(p*59)*.065)*4*p*(1-p);
+            return Math.Max(0,Math.Min(1,rise*(1+pulse)));
+        }
+
+        public static float VisualSeed(string id)
+        {
+            uint hash=2166136261u;
+            unchecked { foreach(char c in id??"") hash=(hash^c)*16777619u; }
+            return (hash&4095)/4096f;
+        }
+
     }
 
     // Separate white flash, fire volume and expanding wave, sampled by age.

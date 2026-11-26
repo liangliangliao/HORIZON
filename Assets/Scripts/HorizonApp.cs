@@ -919,9 +919,12 @@ namespace Horizon
                     description = description, stardust = stars, beats = beats
                 };
             }
+            if(session.UsesMasterRules && transition.Echos.Count>0) archive.seenFirstEcho=true;
             Save();
             PendingEcho strongest = transition.Echos.OrderByDescending(e => CausalGraph.Ancestors(session.CausalNodes, e.nodeId).Count).FirstOrDefault();
-            if (strongest != null)
+            // Master echoes and their chains are already queued from the actual receipts.
+            // The original interstitial remains for older runs without recorded events.
+            if (strongest != null && !session.UsesMasterRules)
             {
                 if (session.EchoChainSize(strongest) >= 3) yield return CascadeSequence(strongest);
                 else yield return EchoSequence(strongest);
@@ -1014,7 +1017,7 @@ namespace Horizon
             world.ArriveEcho(echo);
             Haptic();
             world.ReactToEcho(echo);
-            if (!difficult) { EchoCrown(new Vector2(0.5f, 0.542f), echoColor, 2); StarBurst(3, new Vector2(0.5f, 0.48f)); }
+            if (!difficult) EchoCrown(new Vector2(0.5f, 0.542f), echoColor, 2);
             yield return new WaitForSeconds(total * 0.34f);
             archive.seenFirstEcho = true;
             Save();
@@ -1099,8 +1102,7 @@ namespace Horizon
             Haptic();
             bool difficult = PlayExperience.IsDifficult(echo.actualDelta ?? echo.delta);
             if (difficult) world.ReactToEcho(echo);
-            else { world.Reward(chainSize, true); EchoCrown(new Vector2(0.5f, 0.522f), Palette.Gold, network ? 5 : 3);
-                StarBurst(path.Count, new Vector2(0.5f, 0.48f)); }
+            else EchoCrown(new Vector2(0.5f, 0.522f), Palette.Gold, network ? 5 : 3);
             yield return new WaitForSeconds(network ? 0.95f : 0.66f);
             int checkpoint=viewGeneration;
             yield return WaitForStoryCheckpoint("看清来路了 · 继续");

@@ -24,8 +24,7 @@ namespace Horizon.Game
             var nodes = new List<CausalRelayNode>(); var edges = new List<CausalRelayEdge>();
             if (cascade)
             {
-                List<RewardEvidence> evidence = (plan.Event.receipt?.causes ?? new List<RewardEvidence>())
-                    .OrderBy(x=>x.day).Take(MaximumNodes).Select(x => x.Copy()).ToList();
+                var evidence = OrderedEvidence(plan.Event.receipt?.causes).Select(x=>x.Copy()).ToList();
                 for (int i = 0; i < evidence.Count; i++)
                 {
                     RewardEvidence source = evidence[i];
@@ -49,6 +48,33 @@ namespace Horizon.Game
                             edges.Add(new CausalRelayEdge(from, node.Index));
             }
             Nodes = nodes.AsReadOnly(); Edges = edges.AsReadOnly();
+        }
+
+        public static IReadOnlyList<RewardEvidence> OrderedEvidence(IEnumerable<RewardEvidence> causes)
+        {
+            var waiting=(causes??Enumerable.Empty<RewardEvidence>()).Where(node=>node!=null).OrderBy(node=>node.day).ToList();
+            var ordered=new List<RewardEvidence>();
+            var pendingIds=new HashSet<string>(waiting.Where(node=>!string.IsNullOrEmpty(node.id)).Select(node=>node.id));
+            while(waiting.Count>0 && ordered.Count<MaximumNodes)
+            {
+                int next=waiting.FindIndex(node=>node.parentIds==null ||
+                    !node.parentIds.Any(parent=>parent!=node.id && pendingIds.Contains(parent)));
+                // Broken or cyclic historical evidence cannot invent an activation order.
+                if(next<0) break;
+                RewardEvidence node=waiting[next];
+                waiting.RemoveAt(next);
+                pendingIds.Remove(node.id);
+                ordered.Add(node);
+            }
+            return ordered;
+        }
+
+        public float EdgeArrival(CausalRelayEdge edge,float time,bool reducedMotion)
+        {
+            float end=Nodes[edge.To].ActivationTime;
+            if(reducedMotion) return time>=end?1:0;
+            float start=Math.Max(Nodes[edge.From].ActivationTime,end-.83f);
+            return Ease(start,end,time);
         }
 
         public CausalRelayFrame Sample(int index, float seconds, bool reducedMotion)

@@ -175,6 +175,88 @@ namespace Horizon.Tests
             yield return new ExitPlayMode();
         }
         [UnityTest]
+        public IEnumerator CompletedPracticeEchoRecordsTheRealReleaseAndFourDecimalReceipt()
+        {
+            yield return new EnterPlayMode();
+            var app=Object.FindObjectOfType<HorizonApp>() ?? new GameObject("Time echo capture app").AddComponent<HorizonApp>();
+            yield return null; yield return null;
+            var life=CreateMaturedEchoLife();
+            var source=life.Master.events.Single(e=>e.kind==DomainEventKind.TimeEcho && e.receipt?.sourceDay==1);
+            var action=life.Actions[0];
+            Assert.That(action.actualLater.ticks.Any(value=>value>0));
+            CollectionAssert.AreEqual(action.actualLater.ticks,source.receipt.resources.ticks);
+            Assert.AreEqual(1,source.receipt.sourceDay);
+            Assert.AreEqual(action.echoDay,source.day);
+            string receipt=JsonUtility.ToJson(source.receipt);
+            var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",Private).GetValue(app);
+            var root=(RectTransform)typeof(HorizonApp).GetField("root",Private).GetValue(app);
+            var archive=new ArchiveData {active=life.Snapshot(),nextRareRun=99}; archive.Repair();
+            archive.preferences.sound=false; archive.preferences.haptics=false;
+            typeof(HorizonApp).GetField("archive",Private).SetValue(app,archive);
+            typeof(HorizonApp).GetField("session",Private).SetValue(app,life);
+            typeof(HorizonApp).GetMethod("Clear",Private).Invoke(app,new object[] {false});
+            typeof(HorizonApp).GetMethod("ApplyPreferences",Private).Invoke(app,null);
+            typeof(HorizonApp).GetMethod("PlayMasterSpectacle",Private).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
+            world.Cinematics.enabled=false;
+            var plan=world.Cinematics.Current;
+            Assert.NotNull(plan);
+            Assert.IsTrue(plan.Outcome.Changes.All(change=>change.Copy().Contains(".")));
+            Canvas canvas=root.GetComponentInParent<Canvas>();
+            RenderMode mode=canvas.renderMode; Camera prior=canvas.worldCamera; float distance=canvas.planeDistance;
+            var ui=new GameObject("Time echo portrait camera",typeof(Camera)).GetComponent<Camera>();
+            ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20;
+            var target=new RenderTexture(540,960,24); target.Create(); ui.targetTexture=target;
+            var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
+            const string path="artifacts/time-echo-frames";
+            Directory.CreateDirectory(path);
+            try
+            {
+                foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                int frames=Mathf.CeilToInt(plan.Duration*20);
+                for(int frame=0;frame<frames;frame++)
+                {
+                    if(frame>0) world.Cinematics.Advance(.05f);
+                    yield return null;
+                    Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
+                    RenderTexture old=RenderTexture.active; RenderTexture.active=target;
+                    pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=old;
+                    File.WriteAllBytes(Path.Combine(path,"frame-"+frame.ToString("D5")+".jpg"),pixels.EncodeToJPG(91));
+                }
+                File.WriteAllText(Path.Combine(path,"complete.txt"),frames.ToString());
+                File.WriteAllText(Path.Combine(path,"receipt.json"),JsonUtility.ToJson(source,true));
+                Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
+                world.Cinematics.Skip(); Assert.IsFalse(world.Cinematics.IsPlaying);
+                CollectionAssert.AreEqual(action.actualLater.ticks,GameSession.Restore(life.Snapshot()).Actions[0].actualLater.ticks);
+            }
+            finally
+            {
+                canvas.renderMode=mode; canvas.worldCamera=prior; canvas.planeDistance=distance;
+                world.Cinematics.CancelAll(); world.Cinematics.enabled=true;
+                ui.targetTexture=null; target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
+            }
+            yield return new ExitPlayMode();
+        }
+
+        private static GameSession CreateMaturedEchoLife()
+        {
+            var life=GameSession.StartMasterLife(1,17,RunMode.Quick);
+            CardSpec practice=life.Hand.Single(card=>card.Id=="practice");
+            life.BeginPractice(practice,1); life.PickPracticeRoute(false);
+            var action=life.FinishPractice();
+            while(life.Day<action.echoDay)
+            {
+                if(life.NeedsStation) life.VisitStation();
+                life.Advance();
+                if(life.Day==action.echoDay) break;
+                if(life.HasPredictionReview) life.MarkPredictionReviewed();
+                if(life.CanPredict) life.SkipPrediction();
+                life.Choose(life.Hand[2].Id);
+            }
+            return life;
+        }
+
+        [UnityTest]
         public IEnumerator EachReceiptLightsItsOwnObjectAndMixedLossWithdrawsMoney()
         {
             yield return new EnterPlayMode(); yield return null;

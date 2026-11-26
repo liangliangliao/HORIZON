@@ -2,6 +2,7 @@ Shader "HORIZON/Practice prize light"
 {
     Properties { _Beat ("Phase, light, opening, charge", Vector) = (0,0,0,0)
                  _Column ("Landing beam", Color) = (0,0,0,0)
+                 _Seed ("Event seed", Float) = 0
                  _Layer ("Backlight, airborne sparks or chased enamel", Float) = 0 }
     SubShader
     {
@@ -14,9 +15,10 @@ Shader "HORIZON/Practice prize light"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
+            #include "HorizonEnergyRelease.cginc"
             struct v2f { float4 vertex:SV_POSITION; float2 uv:TEXCOORD0; };
             float4 _Beat, _Column;
-            float _Layer;
+            float _Layer, _Seed;
             float lineMask(float distance, float width)
             {
                 return 1.0-smoothstep(width,width+.012,abs(distance));
@@ -58,7 +60,7 @@ Shader "HORIZON/Practice prize light"
                 {
                     // One polar cell per flight path; each spark has a different launch and depth.
                     float sector=floor(spin*43);
-                    float seed=hashSector(sector);
+                    float seed=hashSector(sector+_Seed*15);
                     float lane=abs(frac(spin*43)-.5);
                     float flight=frac(phase*(.6+seed*.5)+seed);
                     float radius=lerp(.96,.14,flight);
@@ -67,7 +69,8 @@ Shader "HORIZON/Practice prize light"
                     float tail=exp2(-abs(r-radius-.04)*23)*exp2(-lane*lane*140);
                     float shock=lineMask(r-(.10+wave*.76),.008)*sin(3.14159*wave);
                     float fall=(1-smoothstep(.78,1,r))*smoothstep(.065,.2,r);
-                    return half4((brass*tip*1.8+amber*tail*.48+float3(.48,.77,1)*shock*.7)*fall*energy,0);
+                    float stream=opening>0 ? 0 : energyStreams(p,phase,_Seed,_Beat.w,37);
+                    return half4((brass*(tip*1.25+stream*.72)+amber*tail*.48+float3(.48,.77,1)*shock*.7)*fall*energy,0);
                 }
                 // Irregular broad shafts behind the relic, with brighter inner spines.
                 float angle=a+sin(3*a+phase)*.075;
@@ -77,7 +80,7 @@ Shader "HORIZON/Practice prize light"
                 float air=(1-smoothstep(.32*reach,reach,r))*exp2(-1.7*r);
                 float caustic=pow(saturate(.5+.5*cos(6*a+8*r-4*phase)),4);
                 float3 dusk=float3(.18,.23,.85);
-                float3 light=lerp(dusk,amber,smoothstep(.20,.88,phase))*(blades*.90+fine*.47)*air;
+                float3 light=lerp(dusk,amber,smoothstep(.20,.83,_Beat.w))*(blades*.90+fine*.47)*air;
                 light+=dusk*caustic*air*.24+brass*exp2(-r*r*76);
                 light+=float3(1,.93,.77)*exp2(-r*r*330)*1.8;
                 return half4(light*energy,0);

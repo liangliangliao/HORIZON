@@ -24,7 +24,10 @@ namespace Horizon.UI
         private Color practiceDaylight;
         private int dimmingStep;
         private MaterialPropertyBlock practiceLight;
-        private Renderer rayRenderer, sparkRenderer;
+        private Renderer rayRenderer, sparkRenderer, practiceFire;
+        private Material practiceEnergy;
+        private float practiceSeed, practiceStrength;
+        private bool practiceImpactPlayed;
         private Material prizeEnamel, prizeBrass, engraving;
         private readonly Transform[] prizePieces=new Transform[6], prizeSockets=new Transform[6], prizeBeams=new Transform[6];
         private readonly Vector3[] prizeLandings=new Vector3[6];
@@ -266,13 +269,25 @@ namespace Horizon.UI
             rays=Group("Radial light",chamber);
             Transform plane=Shape(rays,"Light fan",PrimitiveType.Quad,Vector3.zero,Vector3.one*4.5f,rayMaterial);
             rayRenderer=plane.GetComponent<Renderer>(); rays.localPosition=new Vector3(0,.37f,.31f);
+            if(practiceEnergy==null)
+            {
+                practiceEnergy=new Material(Resources.Load<Shader>("HorizonImmersion"));
+                practiceEnergy.SetFloat("_Layer",3);
+                materials.Add(practiceEnergy);
+            }
+            var fire=Shape(chamber,"Local ignition and fire plume",PrimitiveType.Quad,Vector3.zero,Vector3.one,practiceEnergy);
+            practiceFire=fire.GetComponent<Renderer>();
+            practiceFire.gameObject.SetActive(false);
             var sparks=Shape(chamber,"Foreground sparks and shockwave",PrimitiveType.Quad,new Vector3(0,.43f,-.38f),Vector3.one*2.65f,rayMaterial);
             sparkRenderer=sparks.GetComponent<Renderer>();
             chamber.gameObject.SetActive(false);
         }
 
-        public void PreparePracticePayout(int[] ticks)
+        public void PreparePracticePayout(int[] ticks,string eventId,int difficulty)
         {
+            practiceSeed=CinematicEnergy.VisualSeed(eventId);
+            practiceStrength=difficulty==1?.57f:difficulty==2?.74f:.88f;
+            practiceImpactPlayed=false;
             int count=System.Array.FindAll(ticks,v=>v!=0).Length;
             int slot=0;
             for (int axis=0;axis<6;axis++)
@@ -342,8 +357,7 @@ namespace Horizon.UI
             bool reward=shot>=PracticeShot.Charge, reduced=preferences.reducedMotion;
             if (firstPracticeShot || shot!=lastPracticeShot)
             {
-                if(shot==PracticeShot.Charge && !reduced && preferences.sound) PlayTensionCharge(2.8f);
-                if(shot==PracticeShot.Open && preferences.sound) CueSound(sounds[1],.75f);
+                if(shot==PracticeShot.Charge && !reduced && preferences.sound) PlayTensionCharge(2.70f);
                 firstPracticeShot=false; lastPracticeShot=shot;
             }
             chamber.gameObject.SetActive(reward);
@@ -404,10 +418,42 @@ namespace Horizon.UI
                     break;
                 default:
                     DimPracticeScenery(shot==PracticeShot.Charge?t:1);
-                    float release=Mathf.SmoothStep(0,1,Mathf.InverseLerp(.19f,.63f,p));
-                    float open=shot==PracticeShot.Charge?0:shot==PracticeShot.Open?release:1;
-                    lidLeft.localRotation=Quaternion.Euler(0,0,open*108); lidRight.localRotation=Quaternion.Euler(0,0,-open*108);
-                    float charge=shot==PracticeShot.Charge?t:1;
+                    bool charging=shot==PracticeShot.Charge;
+                    bool opening=shot==PracticeShot.Open;
+                    float ignitionAge=opening?p*1.48f-.16f:-1;
+                    float open=charging?0:opening?Mathf.SmoothStep(0,1,Mathf.InverseLerp(-.04f,.48f,ignitionAge)):1;
+                    float charge=charging?CinematicEnergy.ChargeAt(p,practiceSeed):1;
+                    EnergyRelease energy=!reduced && opening ? EnergyRelease.Sample(ignitionAge,practiceStrength) : default(EnergyRelease);
+                    if(opening && ignitionAge>=0 && !practiceImpactPlayed)
+                    {
+                        practiceImpactPlayed=true;
+                        if(p<.98f && !reduced)
+                        {
+                            CueSound(impactTone,.65f);
+                            PlayRevealShimmer(.23f);
+                            MasterHaptics.Cue(29,95,preferences);
+                        }
+                    }
+                    if(practiceFire!=null)
+                    {
+                        bool lit=energy.Flash+energy.Fire+energy.Wave>.002f;
+                        practiceFire.gameObject.SetActive(lit);
+                        if(lit)
+                        {
+                            practiceLight.Clear();
+                            practiceLight.SetColor("_Color",new Color(1,.56f,.13f,1));
+                            practiceLight.SetFloat("_Seed",practiceSeed);
+                            practiceLight.SetFloat("_ReleaseAge",energy.Age);
+                            practiceLight.SetFloat("_Flash",energy.Flash);
+                            practiceLight.SetFloat("_Fire",energy.Fire);
+                            practiceLight.SetFloat("_Wave",energy.Wave);
+                            practiceFire.SetPropertyBlock(practiceLight);
+                            practiceFire.transform.localPosition=new Vector3(0,.36f,-.23f);
+                            practiceFire.transform.localScale=Vector3.one*(LowCostEffects?1.74f:2.15f);
+                        }
+                    }
+                    lidLeft.localRotation=Quaternion.Euler(0,0,open*108);
+                    lidRight.localRotation=Quaternion.Euler(0,0,-open*108);
                     for(int i=0;i<orbitingSeals.Length;i++)
                     {
                         Transform seal=orbitingSeals[i];
@@ -418,18 +464,19 @@ namespace Horizon.UI
                         if(shot==PracticeShot.Open) seal.localPosition+=Vector3.back*(reduced?0:open*Mathf.Sin(angle+.7f)*.38f);
                         seal.localScale=Vector3.one*(shot==PracticeShot.Charge ? .4f+.62f*t:1-open*.36f);
                     }
-                    float scale=shot==PracticeShot.Charge ? .52f+.48f*t : 1f;
-                    chamber.localScale=Vector3.one*(scale+(reduced?0:shot==PracticeShot.Open?.12f*Mathf.Sin(p*Mathf.PI):.018f*Mathf.Sin(p*24)*charge));
-                    for(int i=0;i<3;i++) practiceMarks[i].gameObject.SetActive(i<=beat && charge>i*.22f);
-                    float impact=Mathf.Exp(-Mathf.Pow((p-.39f)*7.5f,2));
-                    float light=shot==PracticeShot.Charge ? .12f+.66f*t :
-                        shot==PracticeShot.Open ? .29f+impact*1.23f+open*.19f : .24f;
-                    float phase=reduced ? .68f : shot==PracticeShot.Charge ? p*.64f : shot==PracticeShot.Open ? .64f+p*.36f : 1;
+                    float tremor=charging?Mathf.Sin(p*96)*charge*(1-Mathf.SmoothStep(0,1,Mathf.InverseLerp(.85f,1,p))):0;
+                    chamber.localScale=Vector3.one*(1+(reduced?0:tremor*.024f));
+                    chamber.localRotation=Quaternion.Euler(0,reduced?0:tremor*2.4f,0);
+                    for(int i=0;i<3;i++) practiceMarks[i].gameObject.SetActive(i<=beat && charge>(i+1)*.19f);
+                    float light=charging?.055f+.58f*charge:opening?.13f+.53f*energy.Wave+.35f*energy.Fire:.18f;
+                    float phase=reduced?.68f:charging?p*2.85f:2.85f+p*1.48f;
                     practiceLight.Clear();
-                    practiceLight.SetVector("_Beat",new Vector4(phase,light*(reduced?.55f:1),shot==PracticeShot.Open && !reduced?p:0,charge));
+                    practiceLight.SetFloat("_Seed",practiceSeed);
+                    practiceLight.SetVector("_Beat",new Vector4(phase,light*(reduced?.55f:1),opening&&!reduced?open:0,charge));
                     rayRenderer.SetPropertyBlock(practiceLight);
                     practiceLight.SetFloat("_Layer",1);
                     sparkRenderer.SetPropertyBlock(practiceLight);
+                    sparkRenderer.gameObject.SetActive(!reduced && !LowCostEffects && (charging || energy.Fire+energy.Wave>.025f));
                     practiceLight.Clear();
                     for(int index=0;index<6;index++)
                     {
@@ -464,6 +511,8 @@ namespace Horizon.UI
             look=practiceStage.TransformPoint(look);
             WorldCamera.transform.position=look+offset; WorldCamera.transform.LookAt(look);
             WorldCamera.fieldOfView=fov;
+            if(reward && practiceFire!=null && practiceFire.gameObject.activeSelf)
+                practiceFire.transform.rotation=WorldCamera.transform.rotation;
         }
         private static HorizonBodyAction PracticePose(PracticeMove move)
         {

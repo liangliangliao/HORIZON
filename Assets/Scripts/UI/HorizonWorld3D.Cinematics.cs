@@ -216,18 +216,19 @@ namespace Horizon.UI
                 foreach (HorizonActor actor in cinematicStage.GetComponentsInChildren<HorizonActor>(true)) actor.MotionRate=1;
                 movieParticles.Play();
                 Vector3 hit=cinematicStage.TransformPoint(new Vector3(0,1.3f,2));
-                float strength=Mathf.Clamp01(Mathf.Log10(Mathf.Max(1,moviePlan.PresentationMultiplier))/2.7f);
-                MovieBurst(hit,Mathf.RoundToInt(8+56*strength));
-                CueSound(ImpactVoice(moviePlan.Event.kind),.25f+.75f*strength);
-                if(cinematicEnergy!=null && cinematicEnergy.Celebrates && moviePlan.Event.tier>=RewardTier.Major)
-                    PlayRevealShimmer(.22f+.3f*strength);
-                if(moviePlan.PresentationMultiplier>=50) CueSound(nodeTone,.3f);
-                if(moviePlan.PresentationMultiplier>=100) CueSound(heartbeatTone,.35f);
-                MasterHaptics.Impact(moviePlan.Event,preferences);
-                if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.11f:.025f; if(bloom!=null) bloom.Echo=.6f; }
-                bool losing = moviePlan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount < 0);
-                if (losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
-                else if(moviePlan.Event.kind!=DomainEventKind.FailAndAgain) moviePlayer.GetComponent<HorizonActor>().Celebrate();
+                float strength=cinematicEnergy?.Strength??0;
+                bool celebrating=cinematicEnergy?.Celebrates==true;
+                if(celebrating)
+                {
+                    MovieBurst(hit,Mathf.RoundToInt(6+38*strength));
+                    CueSound(ImpactVoice(moviePlan.Event.kind),.26f+.57f*strength);
+                    if(moviePlan.Event.tier>=RewardTier.Major) PlayRevealShimmer(.22f+.3f*strength);
+                    MasterHaptics.Impact(moviePlan.Event,preferences);
+                    if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.085f:.022f; if(bloom!=null) bloom.Echo=.45f; }
+                }
+                bool losing = spectacle.Style==RewardSpectacleStyle.Loss;
+                if(losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
+                else if(celebrating) moviePlayer.GetComponent<HorizonActor>().Celebrate();
                 foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) SetMovieColor(node,Palette.Mint);
             }
             if(LifeActionPlaying && cue.Phase==CinematicPhase.HeroMoment && !preferences.reducedMotion &&

@@ -101,8 +101,17 @@ namespace Horizon.Tests
                     if(difficulty!=null && frame>18) difficulty.onClick.Invoke();
                     if(fork!=null && ++waiting>=20) { Assert.IsFalse(life.HasChosen); fork.onClick.Invoke(); selected=true; }
                     if(heading.StartsWith("完成")) achieved=true;
-                    if(heading.Contains("蓄光")) { Assert.That(selected && achieved); sawCharge=true; }
-                    if(!sawCharge) { Assert.IsFalse(life.HasChosen); Assert.AreEqual(balance,life.AxisTicks(0)); }
+                    if(heading.Contains("蓄光"))
+                    {
+                        Assert.That(selected && achieved);
+                        Assert.That(life.HasChosen, "The actual result must be durable before the reveal.");
+                        Assert.NotNull(archive.pendingFeedback);
+                        sawCharge=true;
+                    }
+                    if(!achieved) { Assert.IsFalse(life.HasChosen); Assert.AreEqual(balance,life.AxisTicks(0)); }
+                    var counter=film.Find("Reward counter").GetComponent<Text>();
+                    Assert.That(counter.text,Does.Not.Contain("×"));
+                    if(!sawCharge) Assert.That(counter.text,Is.Empty);
                     foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                     canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                     Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);

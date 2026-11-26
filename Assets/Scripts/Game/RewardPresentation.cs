@@ -189,8 +189,8 @@ namespace Horizon.Game
             bool causalMovie=e.kind==DomainEventKind.Cascade || e.kind==DomainEventKind.CausalSingularity;
             // A node is a readable event, not a 150ms decorative flash. Reserve
             // its full sentence before constructing the common sensory clock.
-            var orderedCauses=r.causes.OrderBy(c=>c.day).Take(CausalRelayPlan.MaximumNodes).ToArray();
-            if(causalMovie && orderedCauses.Length>0)
+            var orderedCauses=CausalRelayPlan.OrderedEvidence(r.causes);
+            if(causalMovie && orderedCauses.Count>0)
                 duration=Math.Max(duration,5f+orderedCauses.Sum(c=>CausalNodeSeconds(c.label))+12f);
             int multiplier = PresentationStrength(e);
             var cues = new List<CinematicCue>();
@@ -210,7 +210,7 @@ namespace Horizon.Game
                 {
                     cues.RemoveAll(c=>c.Phase==CinematicPhase.Charge);
                     cues.Add(new CinematicCue(1.2f,CinematicPhase.Charge,SafeCopy(copy[1],CinematicPhase.Charge)));
-                    int count = orderedCauses.Length;
+                    int count = orderedCauses.Count;
                     float time = 3.2f;
                     for (int i = 0; i < count; i++)
                     { cues.Add(new CinematicCue(time, CinematicPhase.Escalation, orderedCauses[i].label, i)); time += CausalNodeSeconds(orderedCauses[i].label); }
@@ -336,7 +336,7 @@ namespace Horizon.Game
                 case DomainEventKind.VictoryAnchor: return RewardObjectKind.Projector;
                 case DomainEventKind.FutureMemory: case DomainEventKind.DejaVu: return RewardObjectKind.MemoryFilm;
                 case DomainEventKind.PatternBroken: return RewardObjectKind.BrokenLink;
-                case DomainEventKind.RealityNode: return RewardObjectKind.RealityMilestone;
+                case DomainEventKind.RealityNode: case DomainEventKind.Victory: return RewardObjectKind.RealityMilestone;
                 case DomainEventKind.RealityConvergence: return RewardObjectKind.ConvergencePrism;
                 case DomainEventKind.Overdrive: case DomainEventKind.HorizonChanged: return RewardObjectKind.HorizonLens;
                 case DomainEventKind.Cascade: case DomainEventKind.CausalSingularity: return RewardObjectKind.CausalChain;
@@ -348,7 +348,8 @@ namespace Horizon.Game
         public static bool IsMilestone(DomainEventKind kind)
         { return kind == DomainEventKind.PatternBroken || kind == DomainEventKind.RealityConvergence || kind == DomainEventKind.RealityNode ||
             kind == DomainEventKind.FutureMemory || kind == DomainEventKind.HorizonChanged || kind == DomainEventKind.AllLinked ||
-            kind == DomainEventKind.OrbitActivated || kind == DomainEventKind.Cascade || kind == DomainEventKind.CausalSingularity; }
+            kind == DomainEventKind.OrbitActivated || kind == DomainEventKind.Cascade || kind == DomainEventKind.CausalSingularity ||
+            kind == DomainEventKind.Victory; }
         private static string[] Story(DomainEvent e, RewardReceipt r)
         {
             if(e.kind==DomainEventKind.ActionTaken)

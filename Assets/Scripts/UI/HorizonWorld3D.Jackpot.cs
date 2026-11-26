@@ -348,6 +348,7 @@ namespace Horizon.UI
                 return;
             }
             float strength=(moviePlan.Event.tier>=RewardTier.Epic?1:moviePlan.Event.tier>=RewardTier.Combo?.55f:.23f)*(1-tensionFrame.Preview*.94f);
+            if(!cinematicEnergy.Celebrates) strength*=.18f;
             Aura(jackpotHalo,center+WorldCamera.transform.forward*.6f,3.8f+frame.Charge,0,tint,(.12f+frame.Charge*.12f+heroFocus*.3f)*frame.Fade*strength*afterglow);
             Aura(jackpotRays,center+WorldCamera.transform.forward*.85f,7+heroFocus*2,1,tint,
                 (burst+heroFocus*.08f+energyFrame.Afterglow*.16f)*strength*afterglow);
@@ -412,6 +413,7 @@ namespace Horizon.UI
             // generate an independent flash at each result row.
             EnergyRelease release=!still && !quiet && !resourceBeat.HasResource
                 ? energyFrame.Release : rowRelease;
+            resultLightMaterial.SetFloat("_Seed",cinematicEnergy?.Seed??0);
             resultLightMaterial.SetFloat("_ReleaseAge",release.Age);
             resultLightMaterial.SetFloat("_Flash",resourceBeat.HasResource?0:release.Flash);
             resultLightMaterial.SetFloat("_Fire",release.Fire);

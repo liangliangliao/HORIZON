@@ -153,21 +153,21 @@ namespace Horizon.UI
             {
                 CausalRelayEdge edge=relayPlan.Edges[i];
                 CausalRelayFrame from=relayPlan.Sample(edge.From,time,preferences.reducedMotion),to=relayPlan.Sample(edge.To,time,preferences.reducedMotion);
+                float travel=relayPlan.EdgeArrival(edge,time,preferences.reducedMotion);
+                bool travelling=from.Lit && travel>.002f && travel<.998f && !preferences.reducedMotion;
                 bool lit=from.Lit && to.Lit;
-                float travel=preferences.reducedMotion?1:Smooth(relayPlan.Nodes[edge.To].ActivationTime,
-                    relayPlan.Nodes[edge.To].ActivationTime+.65f,time);
                 Vector3 begin=movieNodes[edge.From].localPosition,end=movieNodes[edge.To].localPosition;
-                Vector3 tip=Vector3.Lerp(begin,end,lit?travel:1);
-                MovieLine(relayEdges[i],begin,tip);
-                bool travelling=lit && travel>.002f && travel<.998f && !preferences.reducedMotion;
+                Vector3 tip=Vector3.Lerp(begin,end,travel);
+                MovieLine(relayEdges[i],begin,travelling?tip:end);
                 relayPulses[i].gameObject.SetActive(travelling);
                 if(travelling)
                 {
                     relayPulses[i].localPosition=tip+Vector3.up*.065f;
-                    relayPulses[i].localScale=Vector3.one*(.07f+.07f*Mathf.Sin(travel*Mathf.PI));
+                    relayPulses[i].localScale=Vector3.one*(.07f+.08f*Mathf.Sin(travel*Mathf.PI));
                 }
-                relayEdges[i].widthMultiplier=lit?.022f+to.Pulse*.035f:.012f;
-                SetMovieColor(relayEdges[i].transform,(lit?final?Palette.Gold:Palette.Mint:Palette.Muted*.2f)*to.Fade*(1-tensionFrame.Focus*.9f));
+                relayEdges[i].widthMultiplier=travelling?.037f:lit?.022f+to.Pulse*.035f:.012f;
+                Color tint=travelling?Palette.Gold:lit?(final?Palette.Gold:Palette.Mint):Palette.Muted*.2f;
+                SetMovieColor(relayEdges[i].transform,tint*to.Fade*(1-tensionFrame.Focus*.9f));
             }
             foreach(Transform tile in movieTiles)
                 if(tensionFrame.Focus>.001f) SetMovieColor(tile,floor.GetColor("_Color")*(1-tensionFrame.Focus*.8f));

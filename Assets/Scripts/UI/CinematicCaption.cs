@@ -248,11 +248,7 @@ namespace Horizon.UI
             Style(Explanation,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.16f,.025f,0,false);
             Style(Resources,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Mint,.22f,.03f,1,true);
             Style(Prediction,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.12f,.02f,0,false);
-            if(Flash!=null)
-            {
-                float alpha=Mathf.Clamp01(frame.Flash*.26f);
-                Flash.color=new Color(1,.82f,.36f,alpha);
-            }
+            if(Flash!=null) Flash.color=Color.clear;
         }
 
         private void Style(Text text,float scale,Vector2 offset,float alpha,Color tint,float glow,float outline,float tracking,bool bold)

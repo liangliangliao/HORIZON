@@ -7,6 +7,7 @@ Shader "HORIZON/Immersion"
         _Burst ("Release", Range(0,1)) = 0
         _Afterglow ("Afterglow", Range(0,1)) = 0
         _Layer ("Depth layer", Float) = 0
+        _Seed ("Event seed", Float) = 0
         _ReleaseAge ("Release age", Float) = 0
         _Flash ("Local white flash", Range(0,1)) = 0
         _Fire ("Irregular energy volume", Range(0,1)) = 0
@@ -25,55 +26,22 @@ Shader "HORIZON/Immersion"
             #include "UnityCG.cginc"
             float4 _Color;
             float _Clock, _Charge, _Burst, _Afterglow, _Layer;
-            float _ReleaseAge, _Flash, _Fire, _Wave;
+            float _ReleaseAge, _Flash, _Fire, _Wave, _Seed;
             struct v2f { float4 vertex:SV_POSITION; float2 uv:TEXCOORD0; };
             v2f vert(appdata_base v) { v2f o; o.vertex=UnityObjectToClipPos(v.vertex); o.uv=v.texcoord; return o; }
             float bell(float distanceToBand,float sharpness) {
                 float x=distanceToBand*sharpness;
                 return exp(-x*x);
             }
-            // Bounded three-octave value noise, sampled only during a release.
-            // Distorted shell: not a smooth radial sprite scaled over time.
-            float releaseHash(float2 p) {
-                p=frac(p*float2(.1031,.11369));
-                p+=dot(p,p.yx+19.19);
-                return frac((p.x+p.y)*p.x);
-            }
-            float releaseNoise(float2 p) {
-                float2 cell=floor(p), f=frac(p); f=f*f*(3-2*f);
-                return lerp(lerp(releaseHash(cell),releaseHash(cell+float2(1,0)),f.x),
-                            lerp(releaseHash(cell+float2(0,1)),releaseHash(cell+1),f.x),f.y);
-            }
-            float3 releaseLight(float2 p,float age,float flash,float fire,float wave,float3 tint) {
-                float r=length(p);
-                float3 outLight=float3(0,0,0);
-                if(flash>.001) {
-                    float glow=exp(-r*r*9.5)*flash*.65;
-                    outLight+=float3(1,.97,.89)*glow;
-                }
-                if(fire>.001) {
-                    float spread=smoothstep(0,.8,age);
-                    float2 q=p*(5.0-spread*2.5)-float2(age*.45,age*.28);
-                    float n=releaseNoise(q)*.57+releaseNoise(q*2.08+7)*.28+releaseNoise(q*4.15-3)*.15;
-                    float edge=.23+spread*.56+(n-.5)*.32;
-                    float body=(1-smoothstep(edge-.065,edge+.085,r))*smoothstep(.12,.27,r);
-                    float detail=smoothstep(.23,.78,n);
-                    float hot=body*(.12+detail*.95)*fire;
-                    float rim=exp(-abs(r-edge)*18)*fire*(.2+.8*detail);
-                    float3 ember=lerp(tint,float3(1,.25,.035),.64);
-                    outLight+=ember*rim*.85+lerp(ember,float3(1,.87,.43),detail)*hot;
-                }
-                if(wave>.001) {
-                    float radius=.22+.69*smoothstep(.08,1.15,age);
-                    float ring=exp(-abs(r-radius)*43);
-                    float tail=exp(-abs(r-radius+.07)*19)*.23;
-                    outLight+=lerp(tint,float3(1,.85,.46),.72)*(ring+tail)*wave*.68;
-                }
-                return outLight*(1-smoothstep(.84,1,r));
-            }
+            #include "HorizonEnergyRelease.cginc"
             half4 frag(v2f i):SV_Target {
                 float2 p=(i.uv-.5)*2;
                 float r=length(p), a=atan2(p.y,p.x);
+                if(_Layer>2.5) {
+                    float3 spill=releaseLight(p,_ReleaseAge,_Flash,_Fire,_Wave,_Color.rgb,_Seed);
+                    float opacity=min(1,max(spill.r,max(spill.g,spill.b)));
+                    return half4(spill/max(.0001,opacity),opacity*_Color.a);
+                }
                 // Empty central aperture leaves the resource silhouette readable.
                 float mask=smoothstep(.16,.29,r)*(1-smoothstep(.85,1,r));
                 float spiral=pow(saturate(.5+.5*sin(a*(9+_Layer*2)+r*16+_Clock*(3+_Layer))),24);
@@ -104,16 +72,18 @@ Shader "HORIZON/Immersion"
                 float light=mask*(spiral*inward*_Charge*.46+beams*_Burst*.58+
                     wave*_Burst*.50+seam*(_Charge*.22+_Afterglow*.08)+halo+
                     fan*reach*growth*.42+filaments*reach*growth*growth*.22+
-                    sparkle*growth*.32+corona*growth*.16+inwardStreak);
+                    sparkle*growth*.18+corona*growth*.15+inwardStreak*.4+
+                    energyStreams(p,_Clock,_Seed+_Layer*.38,growth,33+_Layer*4)*.76);
                 // Thin high-frequency rays sit over a broad low-energy halo.
                 // This keeps the subject silhouette and text readable instead
                 // of turning every late frame into the same white starburst.
                 float3 tint=lerp(_Color.rgb,float3(1,.69,.19),growth*.72);
-                tint=lerp(tint,float3(1,.94,.68),saturate(_Burst*.7+sparkle*.25));
+                tint=lerp(tint,lerp(float3(1,.94,.68),_Color.rgb,smoothstep(.04,.26,_Color.b-_Color.g)),
+                    saturate(_Burst*.7+sparkle*.25));
                 // Blend SrcAlpha One: premultiply once, keep energy independent of ray mask.
                 float3 rgb=tint*1.45*min(.72,saturate(light));
                 if(_Layer<.5 && (_Flash+_Fire+_Wave)>.001)
-                    rgb+=releaseLight(p,_ReleaseAge,_Flash,_Fire,_Wave,_Color.rgb);
+                    rgb+=releaseLight(p,_ReleaseAge,_Flash,_Fire,_Wave,_Color.rgb,_Seed);
                 // Preserve zero alpha outside the field and the legacy source-alpha
                 // blend. Normalize RGB so the added energy is not multiplied twice.
                 float alpha=min(1,max(rgb.r,max(rgb.g,rgb.b)));

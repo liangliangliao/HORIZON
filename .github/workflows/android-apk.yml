@@ -298,6 +298,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Encode the matured practice echo filmed in Unity
+        run: |
+          tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i artifacts/time-echo-frames/frame-%05d.jpg -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart artifacts/HORIZON-time-echo.mp4
+          encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 artifacts/HORIZON-time-echo.mp4)
+          test "$encoded" = "$(cat artifacts/time-echo-frames/complete.txt)"
+          test -s artifacts/time-echo-frames/receipt.json
+      - name: Upload the actual TIME ECHO and its receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Actual-Time-Echo
+          path: |
+            artifacts/HORIZON-time-echo.mp4
+            artifacts/time-echo-frames/receipt.json
+            artifacts/cinematics/immersion/v2-time-echo-actual-*.png
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Unity portrait previews
         if: always()
         uses: actions/upload-artifact@v4
