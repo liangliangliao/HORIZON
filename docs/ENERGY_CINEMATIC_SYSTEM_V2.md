@@ -1,5 +1,7 @@
 # HORIZON Energy Cinematic System V2.0 — 能量蓄积、临界爆发与成果兑现
 
+> **真机复盘增补（2026-11-26）**：[V3.0 商业级演出重构与验收规范](ENERGY_CINEMATIC_V3_VISUAL_REBUILD.md)。用户四段实际录屏显示 V2 视觉效果未达到参考目标；后续开发优先依据 V3 的样片与验收门禁，保留 V2 的真实结算和单时钟原则。V3 尚未实现。
+
 日期：2026-11-26｜状态：后续实现与验收规范（未实现、未编译、未验收）
 适用：HORIZON / 远见。Master Product Specification v0.4.2 仍为玩法唯一基线；本文是表现层增补，不修改规则、经济、存档语义或概率。与 [既有四段录屏分析](IMMERSIVE_ANIMATION_ANALYSIS.md)、[三维演出升级](JACKPOT_3D_UPGRADE.md)、[因果中继](CAUSAL_RELAY_UPGRADE.md) 及 [电影奖励](CINEMATIC_REWARDS_V1.md) 配合使用。后续每次动画开发应将本文列为设计输入、回归清单及录像对照依据。
 
