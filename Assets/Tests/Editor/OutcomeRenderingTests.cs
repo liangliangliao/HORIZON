@@ -215,6 +215,8 @@ namespace Horizon.Tests
                 int firstRevealFrame=Mathf.CeilToInt((impact+.16f)*20);
                 int lastRevealFrame=Mathf.CeilToInt((impact+.50f)*20);
                 bool checkedFraming=false;
+                var caption=root.GetComponentInChildren<CinematicCaption>();
+                int gains=plan.Outcome.Changes.Count(change=>change.Amount>0);
                 foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                 canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                 int frames=Mathf.CeilToInt(plan.Duration*20);
@@ -228,6 +230,13 @@ namespace Horizon.Tests
                         Assert.IsTrue(hero.gameObject.activeInHierarchy);
                         AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
                         checkedFraming=true;
+                    }
+                    if(frame==lastRevealFrame)
+                    {
+                        string[] lines=caption.Multiplier.text.Split('\n');
+                        Assert.AreEqual(gains,lines.Length);
+                        Assert.That(lines.All(line=>line.Contains(" +") && line.Contains(".")),
+                            "Keep each resource name and its actual amount together.");
                     }
                     Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
                     RenderTexture old=RenderTexture.active; RenderTexture.active=target;

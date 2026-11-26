@@ -337,7 +337,8 @@ namespace Horizon
                 var beats=new CinematicTextChoreography(plan);
                 float second=plan.Cues.First(cue=>!cue.NodeHit && cue.Phase==CinematicPhase.SecondReveal).Time;
                 string expected=plan.Outcome.SampleRecordedEcho(world.Cinematics.Elapsed,beats.MultiplierTime,second,beats.SettlementTime,false).Copy;
-                AndroidSmoke.Require(!string.IsNullOrEmpty(copy) && copy==expected,"The native replay did not display its actual resource.");
+                AndroidSmoke.Require(!string.IsNullOrEmpty(copy) && copy==expected.Replace('　','\n'),
+                    "The native replay did not display its actual resources on separate lines.");
                 Transform contact=marks.Find("Stable echo receipt anchor");
                 CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.7f);
                 SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event");

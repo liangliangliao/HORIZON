@@ -14,6 +14,7 @@ namespace Horizon.UI
             public Vector2 Position, Min, Max;
             public Vector3 Scale;
             public Color Color;
+            public int Size;
         }
 
         public Text Phase,Title,Story,Multiplier,MultiplierCaption,OutcomeContext,Resources,Explanation,Prediction;
@@ -108,7 +109,7 @@ namespace Horizon.UI
             if(text==null || poses.ContainsKey(text)) return;
             var rect=(RectTransform)text.transform;
             poses.Add(text,new TextPose {Rect=rect,Position=rect.anchoredPosition,Min=rect.anchorMin,Max=rect.anchorMax,
-                Scale=rect.localScale,Color=text.color});
+                Scale=rect.localScale,Color=text.color,Size=text.fontSize});
         }
 
         private void OnStarted(RewardPlan value)
@@ -118,10 +119,14 @@ namespace Horizon.UI
             IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
             revealSeed=CinematicEnergy.VisualSeed(value.Event.id);
-            EchoLayout(Multiplier,.293f,.423f);
+            int rows=plan.RecordedEcho?plan.Outcome.Changes.Count:1;
+            bool tallReceipt=rows>2;
+            EchoLayout(Multiplier,tallReceipt?.232f:.293f,.423f);
             EchoLayout(MultiplierCaption,.418f,.452f);
+            if(Multiplier!=null && poses.TryGetValue(Multiplier,out TextPose resultPose))
+                CinematicTypography.Size(Multiplier,tallReceipt?Mathf.RoundToInt(resultPose.Size*2.8f/rows):resultPose.Size);
             var lightRect=outcomeLight.rectTransform;
-            lightRect.anchorMin=new Vector2(.015f,plan.RecordedEcho?.223f:HorizonCinemaLayout.MultiplierBottom-.08f);
+            lightRect.anchorMin=new Vector2(.015f,plan.RecordedEcho?(tallReceipt?.18f:.223f):HorizonCinemaLayout.MultiplierBottom-.08f);
             lightRect.anchorMax=new Vector2(.985f,plan.RecordedEcho?.495f:HorizonCinemaLayout.MultiplierTop+.08f);
             actionStory=new LifeActionStoryboard(value);
             accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
@@ -242,7 +247,11 @@ namespace Horizon.UI
             float receipt=1-frame.ReceiptVeil;
             if(Explanation!=null) Explanation.text=receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
             if(Resources!=null) Resources.text=receipt>.001f?plan.ResourceCopy:"";
-            if(Multiplier!=null) Multiplier.text=outcome.Visible?outcome.Copy:"";
+            if(Multiplier!=null)
+            {
+                string result=outcome.Visible?outcome.Copy:"";
+                Multiplier.text=plan.RecordedEcho && outcome.HasResource?result.Replace('　','\n'):result;
+            }
             if(MultiplierCaption!=null) MultiplierCaption.text=outcome.Visible?outcome.Heading:"";
             if(OutcomeContext!=null) OutcomeContext.text=outcome.Visible && !outcome.Future && outcome.Index>=0?
                 plan.RecordedEcho?"实际记录":(outcome.Index+1)+" / "+plan.Outcome.Changes.Count+" · 实际记录":"";
