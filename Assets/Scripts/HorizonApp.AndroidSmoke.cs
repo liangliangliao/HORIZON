@@ -252,7 +252,99 @@ namespace Horizon
             File.WriteAllText(Path.Combine(AndroidSmoke.DirectoryPath,"performance.json"),performance);
             SmokeButton("Back from performance"); yield return null;
             SmokeButton("Toggle 4"); yield return null; SmokeButton("Close settings");
+            AndroidSmoke.Write("playing_energy_reveal");
+            IEnumerator reveal=AndroidRevealSmoke();
+            while(reveal.MoveNext()) yield return reveal.Current;
         }
+
+        private IEnumerator AndroidRevealSmoke()
+        {
+            Shader fieldShader=Resources.Load<Shader>("HorizonRevealField");
+            AndroidSmoke.Require(fieldShader!=null && fieldShader.isSupported,"The native reveal field is unavailable.");
+            for(int seed=1;seed<=512;seed++)
+            {
+                session=GameSession.StartMasterLife(2,seed,RunMode.Quick);
+                if(session.Hand.Any(card=>card.Id=="ask" && session.CanPlay(card))) break;
+            }
+            archive.active=session.Snapshot(); archive.pendingFeedback=null; archive.playGuide.completed=true;
+            BuildBoard(); yield return null;
+            CardPlayed(root.GetComponentsInChildren<HorizonCardDrag>().Single(card=>card.name=="ask"));
+            RectTransform take=practicePage;
+            AndroidSmoke.Require(take!=null,"The native practice page did not open.");
+            SmokeButton("Practice difficulty 2");
+            for(int step=0;step<40 && take.Find("Screen energy release")==null;step++)
+            {
+                Button next=take.GetComponentsInChildren<Button>().FirstOrDefault(button=>button.IsInteractable() &&
+                    (button.name=="Next shot" || button.name=="Practice route B"));
+                if(next!=null) next.onClick.Invoke();
+                yield return null;
+            }
+            Transform fieldRect=take.Find("Screen energy release");
+            AndroidSmoke.Require(fieldRect!=null && session.HasChosen && archive.pendingFeedback!=null,"The native case did not reach a committed release.");
+            var field=fieldRect.GetComponent<CinematicRevealGraphic>();
+            Transform body=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Reward case at finished work").Find("Enamel case");
+            var actual=new PracticeRewardCinematic(session.Actions.Single());
+            int captureRate=Time.captureFramerate;
+            try
+            {
+                Time.captureFramerate=12;
+                float[] timings={-.32f,0,.44f,1.52f};
+                string[] phases={"charge","flash","wave","receipt"};
+                int index=0;
+                for(int frame=0;frame<90 && index<timings.Length;frame++)
+                {
+                    yield return new WaitForEndOfFrame();
+                    if(!field.gameObject.activeInHierarchy || field.material.GetVector("_Cue").x<timings[index]) continue;
+                    if(index==timings.Length-1)
+                        AndroidSmoke.Require(practiceMeter.text==actual.Changes(PracticeRewardCinematic.Duration,true,false),
+                            "The settlement number did not match the committed native receipt.");
+                    CaptureAndroidFrame("09-case-"+phases[index++],body,Vector3.zero);
+                }
+                AndroidSmoke.Require(index==timings.Length,"The native case did not show all reveal stages.");
+            }
+            finally
+            {
+                Time.captureFramerate=captureRate;
+                practicePage=null; CloseMasterPage(); busy=false;
+            }
+
+            ActionRecord action=session.Actions.Single();
+            while(session.Day<action.echoDay)
+            {
+                if(session.NeedsStation) session.VisitStation();
+                session.Advance();
+                if(session.Day==action.echoDay) break;
+                if(session.HasPredictionReview) session.MarkPredictionReviewed();
+                if(session.CanPredict) session.SkipPrediction();
+                session.Choose(session.Hand.First(session.CanPlay).Id);
+            }
+            DomainEvent echo=session.Master.events.Single(e=>e.kind==DomainEventKind.TimeEcho && e.receipt?.sourceDay==action.day);
+            world.Cinematics.enabled=false;
+            try
+            {
+                PlayMasterSpectacle(echo,()=>{});
+                var plan=world.Cinematics.Current;
+                AndroidSmoke.Require(plan.RecordedEcho,"The native replay lost its real source.");
+                var timing=new RewardSpectacle(plan);
+                world.Cinematics.Advance(timing.ImpactTime-.25f);
+                yield return null; yield return new WaitForEndOfFrame();
+                Transform marks=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Recorded source arriving on the time route");
+                Transform seal=marks.GetChild(0);
+                CaptureAndroidFrame("10-echo-charge",seal,Vector3.zero);
+                world.Cinematics.Advance(.72f);
+                yield return null; yield return new WaitForEndOfFrame();
+                string copy=overlay.GetComponent<CinematicCaption>().Multiplier.text;
+                var beats=new CinematicTextChoreography(plan);
+                float second=plan.Cues.First(cue=>!cue.NodeHit && cue.Phase==CinematicPhase.SecondReveal).Time;
+                string expected=plan.Outcome.SampleRecordedEcho(world.Cinematics.Elapsed,beats.MultiplierTime,second,beats.SettlementTime,false).Copy;
+                AndroidSmoke.Require(!string.IsNullOrEmpty(copy) && copy==expected,"The native replay did not display its actual resource.");
+                Transform contact=marks.Find("Stable echo receipt anchor");
+                CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.7f);
+                SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event");
+            }
+            finally { world.Cinematics.enabled=true; }
+        }
+
         private void SmokeButton(string name)
         {
             Button button=root.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.name==name && b.interactable);

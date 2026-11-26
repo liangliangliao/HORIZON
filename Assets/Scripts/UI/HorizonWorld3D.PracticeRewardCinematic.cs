@@ -9,6 +9,7 @@ namespace Horizon.UI
         private readonly LineRenderer[] caseRays = new LineRenderer[12], caseEmbers = new LineRenderer[18];
         private Renderer caseCore, caseWave;
         private Light caseLight;
+        private ScenicEnergy caseScenic;
         private Material caseEffectMaterial;
         private Vector3 caseRest;
         private float practiceBloomBefore;
@@ -32,6 +33,7 @@ namespace Horizon.UI
 
             EnsureCaseEffectMaterial();
             Transform effects = Group("Case energy effects", actionTable);
+            caseScenic = CreateScenicEnergy(effects);
             caseCore = CaseQuad(effects, "Release core");
             caseWave = CaseQuad(effects, "Tabletop impact wake");
             caseWave.transform.localRotation = Quaternion.Euler(90, 0, 0);
@@ -40,7 +42,7 @@ namespace Horizon.UI
             for (int i = 0; i < caseEmbers.Length; i++) caseEmbers[i] = CaseRibbon(effects, "Release ember " + i);
             caseLight = Group("Case light on desk and cast", effects).gameObject.AddComponent<Light>();
             caseLight.type = LightType.Point;
-            caseLight.range = 3.1f;
+            caseLight.range = 4.6f;
             caseLight.shadows = LightShadows.None;
             if (resourceChime == null) resourceChime = ShortCueTone("Glass resource contact", 528, .22f);
             if (bloom != null) practiceBloomBefore = bloom.Echo;
@@ -73,8 +75,8 @@ namespace Horizon.UI
             if (caseLight == null) return;
             bool reduced = preferences.reducedMotion, low = LowCostEffects;
             bool released = frame.Age >= 0;
-            float dim = Smooth(.48f, 2.65f, frame.Time) * (1 - Smooth(.2f, 2.15f, frame.Age));
-            DimPracticeScenery(reduced ? .12f : .1f + .25f * dim);
+            float dim = Smooth(.48f, 2.65f, frame.Time) * (1 - Smooth(.85f, 2.80f, frame.Age));
+            DimPracticeScenery(reduced ? .12f : .12f + .50f * dim);
             chamber.gameObject.SetActive(true);
             heroProp.gameObject.SetActive(false);
             obstacle.gameObject.SetActive(false);
@@ -86,20 +88,34 @@ namespace Horizon.UI
             for (int i = 0; i < practiceMarks.Length; i++)
                 practiceMarks[i].gameObject.SetActive(!reduced && !released && frame.Charge > .25f + i * .18f);
 
-            performer.localPosition = new Vector3(-.55f + frame.Compression * .6f, 0, .59f);
-            performer.localEulerAngles = new Vector3(0, -32, 0);
-            practiceActor.Play(reduced ? HorizonBodyAction.Wait : released ? HorizonBodyAction.Reach : HorizonBodyAction.Wait,
-                reduced ? .55f : released ? Mathf.Clamp01(frame.Age / 1.2f) : .45f + frame.Compression * 2);
+            float lean = reduced ? 0 : Smooth(.35f, 2.27f, frame.Time) * (1 - Smooth(-.13f, .03f, frame.Age));
+            float recoil = reduced ? 0 : Smooth(0, .16f, frame.Age) * (1 - Smooth(.27f, .89f, frame.Age));
+            float approach = reduced ? 0 : Smooth(.59f, 1.32f, frame.Age);
+            performer.localPosition = new Vector3(-.61f + .22f * lean - .17f * recoil + .17f * approach, 0,
+                .61f - .15f * lean + .28f * recoil - .06f * approach);
+            performer.localRotation = Quaternion.Euler(8 * lean - 10 * recoil, -33 + 15 * recoil, 8 * recoil);
+            if (reduced) practiceActor.Play(HorizonBodyAction.Wait, .55f);
+            else if (!released) practiceActor.Play(HorizonBodyAction.Reach, lean * .65f, .83f);
+            else if (frame.Age < .89f) practiceActor.Play(HorizonBodyAction.Stumble, recoil);
+            else practiceActor.Play(HorizonBodyAction.Reach, Smooth(.89f, 2.0f, frame.Age), .65f);
+            if (partner.gameObject.activeSelf)
+            {
+                partner.localPosition = new Vector3(.83f + .17f * recoil, 0, .87f + .12f * recoil);
+                partner.localRotation = Quaternion.Euler(-5 * recoil, 38 - 15 * recoil, -6 * recoil);
+                practicePartner.Play(HorizonBodyAction.Wait, .21f + .48f * approach);
+            }
 
             Vector3 center = actionTable.TransformPoint(caseRest + new Vector3(.01f, .33f, -.065f));
-            float push = reduced ? 0 : Smooth(.28f, 2.67f, frame.Time);
-            float pull = reduced ? 0 : Smooth(.06f, .91f, frame.Age);
-            float aspect = WorldCamera.aspect;
-            float distance = Mathf.Max(2.92f, 1.39f / Mathf.Max(.27f, aspect)) + .49f * pull - .28f * push * (1 - pull);
-            float side = Mathf.Lerp(-.40f, .26f, push) + .15f * pull;
-            Vector3 look = center + new Vector3(0, -.095f + .10f * pull, 0);
-            WorldCamera.fieldOfView = 42;
-            WorldCamera.transform.position = look + new Vector3(side, .75f, -distance);
+            float push = reduced ? 0 : Smooth(.25f, 2.51f, frame.Time);
+            float pull = reduced ? 0 : Smooth(.03f, .87f, frame.Age);
+            float lens = 45 - 6 * push * (1 - pull);
+            float aspect = Mathf.Max(.27f, WorldCamera.aspect);
+            float distance = Mathf.Max(2.83f, 1.61f / aspect) + .45f * pull - .25f * push * (1 - pull);
+            float side = Mathf.Lerp(-1.21f, .43f, push) + .22f * pull;
+            if (reduced) side = .22f;
+            Vector3 look = center + new Vector3(-.18f * (1 - push) + .11f * pull, -.07f + .10f * pull, .1f);
+            WorldCamera.fieldOfView = lens;
+            WorldCamera.transform.position = look + new Vector3(side, .94f - .58f * push + .47f * pull, -distance);
             WorldCamera.transform.LookAt(look);
 
             Vector3 seam = actionTable.InverseTransformPoint(chamber.TransformPoint(new Vector3(0, .31f, -.10f)));
@@ -145,12 +161,11 @@ namespace Horizon.UI
             Transform item = prizePieces[axis];
             item.gameObject.SetActive(age >= revealAge);
             item.localPosition = Vector3.Lerp(new Vector3(0, .35f, -.15f), prizeLandings[axis], flight) +
-                Vector3.up * (.47f * Mathf.Sin(Mathf.PI * flight));
-            item.localScale = Vector3.one * Mathf.Lerp(.39f, .53f, flight);
-            item.localRotation = Quaternion.Euler(-12 * (1 - flight), Mathf.Lerp(-26, 18, flight), 0);
+                Vector3.up * (.64f * Mathf.Sin(Mathf.PI * flight));
+            item.localScale = Vector3.one * (.50f + .14f * Mathf.Sin(Mathf.PI * flight));
+            item.localRotation = Quaternion.Euler(-18 * (1 - flight), Mathf.Lerp(-91, 14, flight), 10 * Mathf.Sin(Mathf.PI * flight));
             prizeSockets[axis].gameObject.SetActive(age >= (reduced ? revealAge : .43f));
-            // Keep the landing hardware without bringing back the persistent V2 light fan.
-            prizeBeams[axis].gameObject.SetActive(false);
+            prizeBeams[axis].gameObject.SetActive(!reduced && age >= landingAge && age < landingAge + .23f);
         }
 
         private void SamplePracticeCaseLight(PracticeRewardCinematicFrame frame, float seed, Vector3 seam, bool reduced, bool low)
@@ -162,24 +177,26 @@ namespace Horizon.UI
             Color light = Color.Lerp(cool, amber, warm);
             caseLight.transform.localPosition = seam + new Vector3(0, .22f * release.Fire + .02f, -.24f);
             caseLight.color = Color.Lerp(light, new Color(1, .89f, .71f), release.Flash);
-            caseLight.intensity = reduced ? .32f : .13f + frame.Charge * .83f + release.Flash * 3.0f + release.Fire * 1.65f;
+            caseLight.intensity = reduced ? .32f : .13f + frame.Charge * 1.38f + release.Flash * 3.25f + release.Fire * 2.48f;
             if (bloom != null) bloom.Echo = low || reduced ? 0 : release.Flash * .27f + release.Fire * .21f;
+            Vector3 worldSeam = actionTable.TransformPoint(seam);
+            SampleScenicEnergy(caseScenic, worldSeam, .012f, light, reduced ? 0 : frame.Charge, release, seed);
 
             Quaternion view = WorldCamera.transform.rotation;
             caseCore.transform.localPosition = seam + new Vector3(0, .035f, -.095f);
             caseCore.transform.rotation = view;
-            caseCore.transform.localScale = new Vector3(.47f, .30f, 1) * (1 + release.Flash * .31f);
+            caseCore.transform.localScale = new Vector3(.82f, .57f, 1) * (1 + release.Flash * .68f);
             CaseEffect(caseCore, 1, Color.Lerp(light * .83f, new Color(2.4f, 1.99f, 1.55f), release.Flash),
                 .23f * frame.Charge + release.Flash, 0, frame.Age, seed);
 
             for (int i = 0; i < caseFire.Length; i++)
             {
                 Renderer plume = caseFire[i];
-                float spread = Smooth(0, .95f, frame.Age);
+                float spread = Smooth(0, 1.52f, frame.Age);
                 plume.transform.localPosition = seam + new Vector3((i == 0 ? 0 : i == 1 ? -.22f : .20f) * spread,
                     .19f + .33f * spread, i == 0 ? -.14f : i == 1 ? .25f : -.26f);
                 plume.transform.rotation = view * Quaternion.Euler(0, (i - 1) * 31, (i - 1) * (18 + 14 * spread));
-                float size = Mathf.Lerp(.62f, 1.42f, spread) * (i == 0 ? 1 : .83f);
+                float size = Mathf.Lerp(1.26f, 2.08f, spread) * (i == 0 ? 1 : .81f);
                 plume.transform.localScale = new Vector3(size, size * 1.19f, 1);
                 float opacity = !low || i == 0 ? release.Fire * (i == 0 ? 1.06f : .54f) : 0;
                 CaseEffect(plume, 0, new Color(2.05f, 1.41f, .93f), opacity, 63 * spread, frame.Age, seed);
@@ -214,12 +231,12 @@ namespace Horizon.UI
             {
                 float age = frame.Age - (i % 6) * .027f;
                 LineRenderer spark = caseEmbers[i];
-                if (reduced || age <= 0 || age >= .96f || i >= (low ? 6 : caseEmbers.Length))
+                if (reduced || age <= 0 || age >= 1.38f || i >= (low ? 6 : caseEmbers.Length))
                 {
                     spark.gameObject.SetActive(false);
                     continue;
                 }
-                float opacity = Mathf.Clamp01(age * 37) * (1 - Smooth(.2f, .96f, age)) * .92f;
+                float opacity = Mathf.Clamp01(age * 29) * (1 - Smooth(.27f, 1.38f, age)) * .92f;
                 float angle = i * 2.39996f + seed * 7;
                 Vector3 velocity = new Vector3(Mathf.Cos(angle) * (1.0f + .11f * (i % 7)),
                     .83f + .24f * (i % 6), Mathf.Sin(angle) * (.63f + .15f * (i % 4)));
@@ -255,6 +272,7 @@ namespace Horizon.UI
             if (caseLight != null && bloom != null) bloom.Echo = practiceBloomBefore;
             if (caseVisualStarted) audioSource.Stop();
             caseLight = null;
+            caseScenic = null;
             caseVisualStarted = caseContactPlayed = false;
         }
     }

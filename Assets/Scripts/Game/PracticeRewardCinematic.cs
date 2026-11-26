@@ -7,10 +7,10 @@ namespace Horizon.Game
     {
         public const float ReleaseTime = 2.9f;
         public const float GainTime = ReleaseTime + .23f;
-        public const float LandingTime = ReleaseTime + .87f;
-        public const float CostTime = ReleaseTime + 1.40f;
-        public const float Duration = 5.5f;
-        private const float CountSeconds = .96f;
+        public const float LandingTime = ReleaseTime + 1.32f;
+        public const float CostTime = ReleaseTime + 1.78f;
+        public const float Duration = 6.1f;
+        private const float CountSeconds = 1.22f;
         private readonly int[] ticks;
         private readonly string finalGains, finalCosts;
         private readonly float strength;
@@ -26,14 +26,14 @@ namespace Horizon.Game
             EventId = action.nodeId;
             Seed = CinematicEnergy.VisualSeed(EventId);
             Difficulty = action.practice?.difficulty ?? 2;
-            strength = Difficulty == 1 ? .62f : Difficulty == 2 ? .78f : .88f;
+            strength = Difficulty == 1 ? .78f : Difficulty == 2 ? .90f : .98f;
             ticks = PracticeReward.Ticks(action.actualNow);
             HasGain = Array.Exists(ticks, value => value > 0);
             finalGains = FormatChanges(Duration, true, true);
             finalCosts = FormatChanges(Duration, false, true);
         }
 
-        public static bool Supports(string cardId) => cardId == "portfolio" || cardId == "ask";
+        public static bool Supports(PracticeSet set) => set != PracticeSet.Street && set != PracticeSet.Track;
 
         public int TicksAt(int axis) => ticks[axis];
 
@@ -64,6 +64,13 @@ namespace Horizon.Game
                 visible.Add(PracticeReward.Names[axis] + (gains ? " +" : " −") +
                     PracticeReward.Format(value > 0 ? value : -value));
             }
+            // Two axes per line keep receipts with four or more gains readable.
+            if (gains && visible.Count > 3)
+                for (int i = visible.Count - 2; i >= 0; i -= 2)
+                {
+                    visible[i] += "　" + visible[i + 1];
+                    visible.RemoveAt(i + 1);
+                }
             return string.Join(gains ? "\n" : "　", visible);
         }
 
@@ -86,8 +93,8 @@ namespace Horizon.Game
                 .13f * (1 - Window(age, 0, .11f)) - .055f * Crest(age, .04f, .15f, .39f);
             float tilt = age < 0 ? -5 * first + 7 * second - 9 * third - 3 * brace :
                 -3 * (1 - Window(age, 0, .08f)) + 9 * Crest(age, .02f, .15f, .49f) - 3 * Crest(age, .38f, .52f, .71f);
-            float lid = Window(age, .0f, .26f) + .07f * Crest(age, .15f, .29f, .53f);
-            return new PracticeRewardCinematicFrame(time, age, charge, compression, tilt, lid, EnergyRelease.Sample(age, strength));
+            float lid = Window(age, 0, .35f) + .15f * Crest(age, .15f, .39f, .70f);
+            return new PracticeRewardCinematicFrame(time, age, charge, compression, tilt, lid, EnergyRelease.SampleScenic(age, strength));
         }
 
         private static float Crest(float time, float from, float peak, float end) =>

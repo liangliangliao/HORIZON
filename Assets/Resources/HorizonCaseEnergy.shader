@@ -75,12 +75,40 @@ Shader "HORIZON/Case Energy"
                     density = (front + wake * .26) * (.67 + .33 * sin(angle * 3 + _Cue.z * 3)) * onDesk;
                     coverage = .36;
                 }
-                else
+                else if (_Layer < 3.5)
                 {
                     float taper = lerp(.28, 1, uv.x);
                     density = (1 - smoothstep(.08, 1, abs(p.y) / taper)) *
                         smoothstep(0, .14, uv.x) * (1 - smoothstep(.48, 1, uv.x));
                     coverage = .17;
+                }
+                else if (_Layer < 4.5)
+                {
+                    // Wide streaks and a soft colored halo in one local draw.
+                    // Their edges stay in world space and are occluded by the set.
+                    float2 space = p * float2(1.0, .76);
+                    float radius = length(space);
+                    float angle = atan2(space.y, space.x);
+                    float sweep = _Cue.z * .39 + _Cue.w * 1.4;
+                    float spokes = abs(sin(angle * 6 + sweep + .2 * sin(angle * 3)));
+                    float broad = pow(spokes, 5);
+                    float shafts = pow(spokes, 24) * (.53 + .47 * sin(angle * 7 - sweep));
+                    float edge = 1 - smoothstep(.41, .79, radius);
+                    float halo = (1 - smoothstep(.07, .71, radius)) * .60;
+                    density = (broad * .48 + shafts * .55) * edge + halo;
+                    coverage = .24;
+                }
+                else
+                {
+                    float angle = atan2(p.y, p.x);
+                    float radius = length(p * float2(.98, 1.03));
+                    float distortion = sin(angle * 3 - _Cue.z * 2) * .041 + sin(angle * 7 + _Cue.w * 6) * .029;
+                    float front = radius - (.72 + distortion);
+                    float crest = 1 - smoothstep(.018, .092, abs(front));
+                    float band = smoothstep(-.40, -.07, front) * (1 - smoothstep(-.06, .065, front));
+                    float marks = .59 + .41 * sin(angle * 6 + _Cue.z * 2);
+                    density = (crest * .82 + band * .42) * marks;
+                    coverage = .30;
                 }
                 half intensity = saturate(density * _Cue.y);
                 return half4(color * intensity, intensity * coverage);

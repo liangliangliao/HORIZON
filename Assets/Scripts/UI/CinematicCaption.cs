@@ -11,7 +11,7 @@ namespace Horizon.UI
         private sealed class TextPose
         {
             public RectTransform Rect;
-            public Vector2 Position;
+            public Vector2 Position, Min, Max;
             public Vector3 Scale;
             public Color Color;
         }
@@ -28,6 +28,8 @@ namespace Horizon.UI
         private readonly List<Transform> parkedPage=new List<Transform>();
         private RectTransform pageParking;
         private OutcomeRadianceGraphic outcomeLight;
+        private CinematicRevealGraphic releaseField;
+        private float revealSeed;
         private LifeActionStoryboard actionStory;
 
         private void IsolatePage()
@@ -62,6 +64,7 @@ namespace Horizon.UI
         private void OnCancelled()
         {
             RestorePage(); plan=null; choreography=null;
+            if(releaseField!=null) releaseField.Clear();
             // Clear/Close destroys the old page at end-of-frame. Detach now,
             // otherwise a new Started in that same frame can resurrect the old
             // caption and let it park the new page inside a doomed container.
@@ -79,6 +82,7 @@ namespace Horizon.UI
             var lightRect=View.Rect(transform,"Outcome optical radiance",.015f,
                 HorizonCinemaLayout.MultiplierBottom-.08f,.985f,HorizonCinemaLayout.MultiplierTop+.08f);
             lightRect.SetSiblingIndex(1); outcomeLight=lightRect.gameObject.AddComponent<OutcomeRadianceGraphic>(); outcomeLight.raycastTarget=false;
+            releaseField=CinematicRevealGraphic.Attach((RectTransform)transform,1);
             CinematicTypography.Upgrade(Phase);
             CinematicTypography.Upgrade(Title,true);
             CinematicTypography.Upgrade(Story,true);
@@ -103,7 +107,8 @@ namespace Horizon.UI
         {
             if(text==null || poses.ContainsKey(text)) return;
             var rect=(RectTransform)text.transform;
-            poses.Add(text,new TextPose {Rect=rect,Position=rect.anchoredPosition,Scale=rect.localScale,Color=text.color});
+            poses.Add(text,new TextPose {Rect=rect,Position=rect.anchoredPosition,Min=rect.anchorMin,Max=rect.anchorMax,
+                Scale=rect.localScale,Color=text.color});
         }
 
         private void OnStarted(RewardPlan value)
@@ -112,6 +117,12 @@ namespace Horizon.UI
             if(HideWhenIdle) gameObject.SetActive(true);
             IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
+            revealSeed=CinematicEnergy.VisualSeed(value.Event.id);
+            EchoLayout(Multiplier,.293f,.423f);
+            EchoLayout(MultiplierCaption,.418f,.452f);
+            var lightRect=outcomeLight.rectTransform;
+            lightRect.anchorMin=new Vector2(.015f,plan.RecordedEcho?.223f:HorizonCinemaLayout.MultiplierBottom-.08f);
+            lightRect.anchorMax=new Vector2(.985f,plan.RecordedEcho?.495f:HorizonCinemaLayout.MultiplierTop+.08f);
             actionStory=new LifeActionStoryboard(value);
             accent=value.Event.tier==RewardTier.Mythic?Palette.Gold:Palette.Mint;
             if(Title!=null) Title.text=CinematicOutcome.EventHeading(value.Event);
@@ -134,9 +145,17 @@ namespace Horizon.UI
                 // A finished movie leaves a readable result, not its nearly
                 // transparent last fade frame, while the user decides to go on.
                 if(choreography!=null) ApplyFrame(choreography.Sample(choreography.SettlementTime+1.1f,VisualPreferences.ReducedMotion));
+                releaseField.Clear();
                 return;
             }
-            RestorePage(); plan=null; choreography=null; gameObject.SetActive(false);
+            releaseField.Clear(); RestorePage(); plan=null; choreography=null; gameObject.SetActive(false);
+        }
+
+        private void EchoLayout(Text text,float bottom,float top)
+        {
+            if(text==null || !poses.TryGetValue(text,out TextPose pose)) return;
+            pose.Rect.anchorMin=plan.RecordedEcho?new Vector2(pose.Min.x,bottom):pose.Min;
+            pose.Rect.anchorMax=plan.RecordedEcho?new Vector2(pose.Max.x,top):pose.Max;
         }
 
         public static string PredictionCopy(RewardReceipt receipt)
@@ -170,6 +189,13 @@ namespace Horizon.UI
         private void ApplyFrame(CinematicTextFrame frame)
         {
             if(plan==null) return;
+            if(plan.RecordedEcho)
+            {
+                float age=frame.Time-choreography.ImpactTime;
+                float charge=age<0?ImmersiveMotion.Smooth((age+1.31f)/1.31f)*.86f:0;
+                releaseField.Sample(age,charge,CinematicEnergy.RecordedEchoRelease(age),revealSeed,true,VisualPreferences.ReducedMotion);
+            }
+            else releaseField.Clear();
             float second=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
             OutcomeFrame outcome=plan.RecordedEcho?
                 plan.Outcome.SampleRecordedEcho(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion):

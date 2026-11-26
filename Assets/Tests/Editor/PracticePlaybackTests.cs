@@ -78,6 +78,9 @@ namespace Horizon.Tests
                 Shader shader=Resources.Load<Shader>("HorizonCaseEnergy");
                 Assert.NotNull(shader);
                 Assert.IsFalse(ShaderUtil.ShaderHasError(shader));
+                var revealShader=Resources.Load<Shader>("HorizonRevealField");
+                Assert.NotNull(revealShader);
+                Assert.IsFalse(ShaderUtil.ShaderHasError(revealShader));
                 var atlas=Resources.Load<Texture2D>("HorizonCaseFlame");
                 Assert.NotNull(atlas);
                 Assert.AreEqual(512,atlas.width);
@@ -127,6 +130,8 @@ namespace Horizon.Tests
                     CollectionAssert.AreEqual(expected,PracticeReward.Ticks(action.actualNow));
                     int[] balance=Enumerable.Range(0,6).Select(life.AxisTicks).ToArray();
                     var light=(Light)caseLightField.GetValue(world);
+                    Transform screenField=film.Find("Screen energy release");
+                    Assert.NotNull(screenField);
                     var chamber=world.GetComponentsInChildren<Transform>().Single(x=>x.name=="Reward case at finished work");
                     var lid=chamber.Find("Hinged left leaf");
                     var core=(Renderer)typeof(HorizonWorld3D).GetField("caseCore",fields).GetValue(world);
@@ -142,6 +147,7 @@ namespace Horizon.Tests
                     var target=new RenderTexture(540,height,24); target.Create(); ui.targetTexture=target;
                     var pixels=new Texture2D(540,height,TextureFormat.RGB24,false);
                     int release=-1,reveal=-1,maxFlames=0,frame=0,lastFrame=-1;
+                    int fieldAfterOpen=0, flameFrames=0;
                     bool sawWave=false,skipped=false;
                     string finalGain="",finalCost="";
                     try
@@ -160,6 +166,8 @@ namespace Horizon.Tests
                             if(cost.Length>0) finalCost=cost;
                             int flames=fire.Count(layer=>layer.gameObject.activeInHierarchy);
                             maxFlames=Mathf.Max(maxFlames,flames);
+                            if(flames>0) flameFrames++;
+                            if(release>=0 && screenField.gameObject.activeInHierarchy) fieldAfterOpen++;
                             sawWave|=wave.gameObject.activeInHierarchy;
                             Vector3 bodyPosition=world.WorldCamera.WorldToViewportPoint(body.position);
                             Assert.That(bodyPosition.x,Is.InRange(.2f,.8f));
@@ -189,13 +197,16 @@ namespace Horizon.Tests
                     }
                     Assert.GreaterOrEqual(reveal,0);
                     Assert.IsTrue(film.GetComponentsInChildren<Button>().Any(b=>b.name=="Finish practice"));
-                    if(reduced) { Assert.AreEqual(0,maxFlames); Assert.IsFalse(sawWave); Assert.IsTrue(skipped); }
+                    if(reduced) { Assert.AreEqual(0,maxFlames); Assert.IsFalse(sawWave); Assert.IsTrue(skipped);
+                        Assert.IsFalse(screenField.gameObject.activeSelf); }
                     else
                     {
                         Assert.GreaterOrEqual(release,0);
                         Assert.That((reveal-release)/20f,Is.InRange(.05f,.35f));
                         Assert.That(maxFlames,Is.InRange(1,battery?1:3));
                         Assert.IsTrue(sawWave);
+                        Assert.GreaterOrEqual(fieldAfterOpen,33,"The direct screen field must remain visible as the numbers settle.");
+                        Assert.GreaterOrEqual(flameFrames,23,"The flame must survive for at least a second at 20 fps.");
                     }
                     Assert.AreEqual(receipt.Changes(PracticeRewardCinematic.Duration,true,reduced),finalGain);
                     Assert.That(finalCost,Does.Contain(receipt.Changes(PracticeRewardCinematic.Duration,false,reduced)));

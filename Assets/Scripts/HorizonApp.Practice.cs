@@ -35,7 +35,7 @@ namespace Horizon
             practicePlaque=View.Panel(practicePage,"Prize readout",new Color(.042f,.031f,.075f,.95f),.16f,.785f,.84f,.878f,24).rectTransform;
             View.Fill(practicePlaque,"Engraved lower edge",Palette.Gold,.12f,.035f,.88f,.061f);
             practicePlaque.gameObject.SetActive(false);
-            int counterSize=PracticeRewardCinematic.Supports(card.Id)?46:65;
+            int counterSize=PracticeRewardCinematic.Supports(film.Set)?78:65;
             practiceMeter=View.Label(practicePage,"Reward counter","",counterSize,Palette.Gold,TextAnchor.MiddleCenter,.18f,.796f,.82f,.869f);
             CinematicTypography.Upgrade(practiceMeter,true);
             CinematicTypography.Emboss(practiceMeter);
@@ -156,7 +156,7 @@ namespace Horizon
             ActionRecord action=CommitPracticeCard(card);
             int[] ticks=PracticeReward.Ticks(action.actualNow);
             int first=System.Array.FindIndex(ticks,v=>v>0);
-            if(first>=0 && PracticeRewardCinematic.Supports(card.Id))
+            if(first>=0 && PracticeRewardCinematic.Supports(film.Set))
             {
                 yield return PlayPracticeRewardCinematic(owner,new PracticeRewardCinematic(action));
                 if(owner!=practicePage || owner==null) yield break;
@@ -202,10 +202,14 @@ namespace Horizon
 
         private IEnumerator PlayPracticeRewardCinematic(RectTransform owner,PracticeRewardCinematic film)
         {
-            practiceSubtitle.color=new Color(.014f,.03f,.05f,.28f);
+            var reveal=CinematicRevealGraphic.Attach(owner,practiceSubtitle.transform.GetSiblingIndex());
+            var backing=View.Panel(owner,"Receipt contrast",new Color(.028f,.016f,.040f,0),.065f,.326f,.935f,.486f,24);
+            backing.transform.SetSiblingIndex(practiceMeter.transform.GetSiblingIndex());
+            backing.raycastTarget=false;
+            practiceSubtitle.color=new Color(.014f,.03f,.05f,.38f);
             var meter=(RectTransform)practiceMeter.transform;
-            meter.anchorMin=new Vector2(.10f,.155f);
-            meter.anchorMax=new Vector2(.90f,.270f);
+            meter.anchorMin=new Vector2(.075f,.329f);
+            meter.anchorMax=new Vector2(.925f,.483f);
             practiceMeter.color=Palette.Gold;
             practiceCosts=View.Label(owner,"Practice cost","",29,Palette.Coral,TextAnchor.MiddleCenter,.07f,.104f,.93f,.153f);
             practiceCaption.text="";
@@ -221,10 +225,16 @@ namespace Horizon
                     bool reduced=archive.preferences.reducedMotion;
                     PracticeRewardCinematicFrame frame=film.Sample(time,reduced);
                     world.SamplePracticeRewardCinematic(film,frame);
-                    float receiptLight=reduced?1:ImmersiveMotion.Smooth((time-PracticeRewardCinematic.GainTime+.08f)/.23f);
-                    practiceSubtitle.color=new Color(.014f,.03f,.05f,Mathf.Lerp(.28f,.79f,receiptLight));
+                    float charge=frame.Charge*ImmersiveMotion.Smooth((time-1.22f)/1.41f);
+                    reveal.Sample(frame.Age,charge,frame.Release,film.Seed,false,reduced);
+                    float resultAge=time-PracticeRewardCinematic.GainTime;
+                    float receiptLight=reduced?1:ImmersiveMotion.Smooth((resultAge+.02f)/.19f);
+                    practiceSubtitle.color=new Color(.014f,.03f,.05f,Mathf.Lerp(.38f,.79f,receiptLight));
                     string gains=film.Changes(time,true,reduced), cost=film.Changes(time,false,reduced);
                     practiceMeter.text=gains;
+                    backing.color=new Color(.028f,.016f,.040f,gains.Length==0?0:.73f*receiptLight);
+                    float emphasis=reduced || resultAge<0?0:Mathf.Sin(Mathf.PI*ImmersiveMotion.Smooth(resultAge/.38f));
+                    meter.localScale=Vector3.one*(1+.07f*emphasis);
                     practiceCosts.text=cost.Length>0?"本次付出　"+cost:"";
                     practiceHeading.text=time>=PracticeRewardCinematic.GainTime?"今日已入账":
                         time>=PracticeRewardCinematic.ReleaseTime?"今日所得 · 开匣":"今日所得 · 蓄光";
@@ -235,6 +245,8 @@ namespace Horizon
                 }
                 yield return null;
             }
+            if(reveal!=null) reveal.Clear();
+            if(backing!=null) Destroy(backing.gameObject);
             if(owner==practicePage && owner!=null && skipPracticeReveal)
                 world.SamplePracticeRewardCinematic(film,film.Sample(PracticeRewardCinematic.Duration,archive.preferences.reducedMotion),playCues:false);
         }
