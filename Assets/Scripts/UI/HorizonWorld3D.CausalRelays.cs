@@ -16,6 +16,7 @@ namespace Horizon.UI
         private readonly Renderer[][] relaySolids = new Renderer[CausalRelayPlan.MaximumNodes][];
         private readonly Color[][] relaySolidColors = new Color[CausalRelayPlan.MaximumNodes][];
         private readonly LineRenderer[] relayEdges = new LineRenderer[CausalRelayPlan.MaximumEdges];
+        private readonly Transform[] relayPulses = new Transform[CausalRelayPlan.MaximumEdges];
         private MaterialPropertyBlock relayProperties;
         private Renderer[] relayOverviewSolids,relaySourceSubjects;
 
@@ -55,13 +56,17 @@ namespace Horizon.UI
                     relaySolidColors[i]=relaySolids[i].Select(r=>r.sharedMaterial.GetColor("_Color")).ToArray();
                 }
                 for(int i=0;i<relayEdges.Length;i++)
+                {
                     relayEdges[i]=CausalLine(relayStage,"Recorded causal edge "+i,Vector3.zero,Vector3.zero,portalLight,.018f);
+                    relayPulses[i]=Shape(relayStage,"Travelling cause "+i,PrimitiveType.Sphere,Vector3.zero,Vector3.one*.1f,warmLight);
+                }
                 foreach(Renderer renderer in relayStage.GetComponentsInChildren<Renderer>())
                 { renderer.shadowCastingMode=ShadowCastingMode.Off; renderer.receiveShadows=false; }
             }
             relayStage.gameObject.SetActive(true);
             foreach(Transform relay in causalRelays) relay.gameObject.SetActive(false);
             foreach(LineRenderer edge in relayEdges) edge.gameObject.SetActive(false);
+            foreach(Transform pulse in relayPulses) pulse.gameObject.SetActive(false);
             // Chronological neighbours can be independent causes. Only the
             // recorded parent edges are allowed to join these physical relays.
             foreach(LineRenderer line in movieLines) line.gameObject.SetActive(false);
@@ -152,7 +157,15 @@ namespace Horizon.UI
                 float travel=preferences.reducedMotion?1:Smooth(relayPlan.Nodes[edge.To].ActivationTime,
                     relayPlan.Nodes[edge.To].ActivationTime+.65f,time);
                 Vector3 begin=movieNodes[edge.From].localPosition,end=movieNodes[edge.To].localPosition;
-                MovieLine(relayEdges[i],begin,Vector3.Lerp(begin,end,lit?travel:1));
+                Vector3 tip=Vector3.Lerp(begin,end,lit?travel:1);
+                MovieLine(relayEdges[i],begin,tip);
+                bool travelling=lit && travel>.002f && travel<.998f && !preferences.reducedMotion;
+                relayPulses[i].gameObject.SetActive(travelling);
+                if(travelling)
+                {
+                    relayPulses[i].localPosition=tip+Vector3.up*.065f;
+                    relayPulses[i].localScale=Vector3.one*(.07f+.07f*Mathf.Sin(travel*Mathf.PI));
+                }
                 relayEdges[i].widthMultiplier=lit?.022f+to.Pulse*.035f:.012f;
                 SetMovieColor(relayEdges[i].transform,(lit?final?Palette.Gold:Palette.Mint:Palette.Muted*.2f)*to.Fade*(1-tensionFrame.Focus*.9f));
             }

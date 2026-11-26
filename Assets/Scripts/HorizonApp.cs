@@ -734,7 +734,7 @@ namespace Horizon
             trail.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(vector.y, vector.x) * Mathf.Rad2Deg);
             dragHint.text = PlayExperience.DestinationLabel(card, session.Day, session.Deadline);
             if (boardHint != null) boardHint.text = ready ? "已接住「" + card.Name + "」 · 松手即可" :
-                "今天：" + PracticeReward.Label(card.Now,true);
+                "完成当天 · " + PracticeReward.Label(session.ImmediateEffect(card),true);
         }
 
         private bool IsInsideDropZone(Vector2 pointer)
@@ -753,15 +753,13 @@ namespace Horizon
             panel.gameObject.AddComponent<PanelEntrance>();
             View.Label(panel, "Name", card.Name, 48, Palette.Text, TextAnchor.MiddleLeft,
                 0.075f, 0.865f, 0.925f, 0.97f);
-            View.Label(panel, "Today", "今天\n" + PracticeReward.Label(session.ImmediateEffect(card),true), 32, Palette.Mint,
+            View.Label(panel, "Today", PracticeReward.Timing(card,session.ImmediateEffect(card)) + " · 完成当天\n" + PracticeReward.Label(session.ImmediateEffect(card),true), 32, Palette.Mint,
                 TextAnchor.MiddleLeft, 0.075f, 0.73f, 0.925f, 0.87f);
-            View.Label(panel, "Later", card.Delay == 0 ? "现在就能得到恢复。" :
-                "第 " + (session.Day + card.Delay) + " 天\n" + PlayExperience.FutureMeaning(card) +
-                (session.Day + card.Delay > session.Deadline ? "（超过本局截止日）" : ""),
+            View.Label(panel, "Later", PracticeReward.EchoPreview(card,session.Day,session.Deadline),
                 30, Palette.Gold, TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.73f);
             bool available = session.CanPlay(card);
             bool canImagine = session.CanPrepareImagination(card);
-            View.Label(panel, "Rule", available ? ExperienceContent.CardPurpose(card, session.Day, session.Deadline) :
+            View.Label(panel, "Rule", available ? "完成凭证 +1 星尘，可换外观。难度与抽取决定变化幅度，行动路线决定部分收益归属。" :
                 PlayExperience.BlockReason(session, card), 25, available ? Palette.Muted : Palette.Coral,
                 TextAnchor.MiddleLeft, 0.075f, 0.445f, 0.925f, 0.58f);
             View.Button(panel, "Cancel", "再想想", () => { Destroy(overlay.gameObject); overlay = null; },
@@ -804,13 +802,13 @@ namespace Horizon
             {
                 kind = FeedbackKind.Choice, runNumber = session.RunNumber, day = session.Day,
                 title = "今天选择了「" + card.Name + "」",
-                description = "今天实际变化\n" + PlayExperience.NowLabel(change) + "\n\n" +
-                    PlayExperience.FutureLabel(card, session.Day, session.Deadline), stardust = stars,
+                description = "今日已入账\n" + PlayExperience.NowLabel(change) + "\n\n" +
+                    PracticeReward.EchoReceipt(action, session.Deadline), stardust = stars,
                 preparedGates = PreparedGateChanges(before),
                 beats = new List<FeedbackBeat> { new FeedbackBeat {
                     title = card.Name, source = card.Name, sourceDay = session.Day,
-                    destinationDay = action.echoDay, intent = card.Kind, delta = change, support = card.GivesSupport,
-                    meaning = PlayExperience.FutureLabel(card, session.Day, session.Deadline), stardust = stars } }
+                    destinationDay = action.echoDay <= session.Deadline ? action.echoDay : 0, intent = card.Kind, delta = change, support = card.GivesSupport,
+                    meaning = PracticeReward.EchoReceipt(action, session.Deadline), stardust = stars } }
             };
             if (session.CompletedRun == null) archive.active = session.Snapshot();
             else
@@ -900,12 +898,14 @@ namespace Horizon
                 foreach (PendingEcho echo in transition.Echos)
                 {
                     int amount = echo.depth >= 2 ? CausalGraph.Ancestors(session.CausalNodes, echo.nodeId).Count : 3;
-                    int collected = archive.wallet.Claim("run:" + session.RunNumber + ":echo:" + echo.nodeId, amount);
+                    var origin = session.Actions.Find(a => a.day == echo.sourceDay && a.cardId == echo.cardId);
+                    int collected = origin?.practice?.settleOnDueDay == true ? 0 :
+                        archive.wallet.Claim("run:" + session.RunNumber + ":echo:" + echo.nodeId, amount);
                     stars += collected;
                     beats.Add(new FeedbackBeat { title = echo.echoName, source = echo.cardName,
                         sourceDay = echo.sourceDay, destinationDay = session.Day, intent = echo.kind,
                         delta = echo.actualDelta ?? echo.delta, support = CardCatalog.FindById(echo.cardId)?.GivesSupport ?? false,
-                        meaning = "D" + echo.sourceDay + " 的「" + echo.cardName + "」，在今天留下了这些变化。" +
+                        meaning = "来自第 " + echo.sourceDay + " 天的「" + echo.cardName + "」。本页只列今天到期的变化。" +
                             (string.IsNullOrEmpty(echo.replacementId) ? "" : "\n今天的选择也改变了：" + CardCatalog.FindById(echo.replacementId)?.Name),
                         stardust = collected, chainSize = session.EchoChainSize(echo) });
                     description += (description.Length == 0 ? "" : "\n\n") +

@@ -781,7 +781,7 @@ namespace Horizon.Game
             ResourceDelta before = Values();
             ResourceDelta immediate = ImmediateEffect(card), later = card.Later;
             int budget = take == null ? 0 : PracticeReward.Draw(WorldSeed,RunNumber,take);
-            if (take != null) PracticeReward.Allocate(take, budget, immediate, card.Delay > 0 && Day + card.Delay <= Deadline ? later : null, out immediate, out later);
+            if (take != null) PracticeReward.Allocate(take, budget, immediate, PracticeReward.DeferredWeights(take,card,Deadline), out immediate, out later);
             Apply(immediate);
             if (card.GivesSupport) SupportActions++;
             CausalNode changedChoice = CausalNodes.FindLast(n => (n.type == CausalNodeKind.Choice ||
@@ -1079,6 +1079,7 @@ namespace Horizon.Game
                 if (recorded.practice?.Complete == true)
                 {
                     replay.BeginPractice(choice,recorded.practice.difficulty);
+                    replay.Practice.settleOnDueDay = recorded.practice.settleOnDueDay;
                     foreach (char route in recorded.practice.routes) replay.PickPracticeRoute(route == 'B');
                     replay.FinishPractice();
                 }

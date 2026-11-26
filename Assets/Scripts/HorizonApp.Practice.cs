@@ -11,6 +11,7 @@ namespace Horizon
     {
         private RectTransform practicePage, practiceOptions;
         private Text practiceCaption, practiceHeading, practiceMeter;
+        private RectTransform practicePlaque;
         private Button practiceNext, practiceBack;
         private bool practiceCut, practiceBackground;
 
@@ -27,7 +28,10 @@ namespace Horizon
             View.Fill(practicePage,"Subtitle background",new Color(.014f,.03f,.05f,.95f),0,0,1,.33f);
             practiceHeading=View.Label(practicePage,"Scene heading","选择挑战",24,Palette.Mint,TextAnchor.MiddleLeft,.07f,.272f,.94f,.318f);
             practiceCaption=View.Label(practicePage,"Action caption",film.Goal,37,Palette.Text,TextAnchor.MiddleLeft,.07f,.184f,.94f,.27f);
-            practiceMeter=View.Label(practicePage,"Reward counter","",76,Palette.Gold,TextAnchor.MiddleCenter,.07f,.75f,.93f,.854f);
+            practicePlaque=View.Panel(practicePage,"Prize readout",new Color(.042f,.031f,.075f,.95f),.16f,.785f,.84f,.878f,24).rectTransform;
+            View.Fill(practicePlaque,"Engraved lower edge",Palette.Gold,.12f,.035f,.88f,.061f);
+            practicePlaque.gameObject.SetActive(false);
+            practiceMeter=View.Label(practicePage,"Reward counter","",65,Palette.Gold,TextAnchor.MiddleCenter,.18f,.796f,.82f,.869f);
             CinematicTypography.Upgrade(practiceMeter,true);
             CinematicTypography.Emboss(practiceMeter);
             CinematicTypography.Present(practiceMeter,Palette.Gold,.60f,.13f,.8f,true);
@@ -39,6 +43,10 @@ namespace Horizon
                 StartCoroutine(RunPractice(practicePage,drag,card,film));
                 return;
             }
+            practiceHeading.text=PracticeReward.Timing(card,session.ImmediateEffect(card))+" · 选择困难数";
+            practiceCaption.text=film.Goal+"\n"+(card.Delay==0 ? "完成当天结清。" :
+                session.Day+card.Delay>session.Deadline ? "后续超出本局，只结算当天变化。" :
+                "后续在第 "+(session.Day+card.Delay)+" 天自动结算。");
             NewPracticeOptions();
             for(int i=1;i<=3;i++)
             {
@@ -137,18 +145,21 @@ namespace Horizon
             int budget=session.PracticeBudget, ceiling=PracticeReward.Ceiling(take.difficulty);
             var actual=session.PreviewPractice(card);
             int[] ticks=PracticeReward.Ticks(actual);
-            world.PreparePracticePayout(ticks);
             int first=System.Array.FindIndex(ticks,v=>v>0);
-            if(first<0) first=System.Array.FindIndex(ticks,v=>v<0);
-            if(first>=0) world.SetPracticePrize(first,ticks[first]<0);
-            yield return FilmBeat(owner,PracticeShot.Charge,3.45f,"开奖 · 蓄光","每跨过一道困难，匣上的一枚刻印就会亮起。",film.MoveA,finalBeat,budget,ceiling);
-            if(owner!=practicePage || owner==null) yield break;
-            practiceMeter.text="× "+PracticeReward.Format(budget);
-            yield return FilmBeat(owner,PracticeShot.Open,1.65f,"倍率锁定","最后一枚刻印扣合，奖励匣在刚完成行动的地方展开。",film.MoveA,finalBeat);
-            if(owner!=practicePage || owner==null) yield break;
+            if(first>=0)
+            {
+                world.PreparePracticePayout(ticks);
+                world.SetPracticePrize(first,false);
+                practicePlaque.gameObject.SetActive(true);
+                yield return FilmBeat(owner,PracticeShot.Charge,3.45f,"行动强度 · 蓄光","刻印逐枚点亮。强度决定这次行动各项变化的总幅度。",film.MoveA,finalBeat,budget,ceiling);
+                if(owner!=practicePage || owner==null) yield break;
+                practiceMeter.text="× "+PracticeReward.Format(budget);
+                yield return FilmBeat(owner,PracticeShot.Open,1.95f,"强度锁定 · 即将显示今日所得","看匣口的亮点。今天生效的变化将依次落位。",film.MoveA,finalBeat);
+                if(owner!=practicePage || owner==null) yield break;
+            }
             practiceBack.gameObject.SetActive(false);
             ActionRecord action=CommitPracticeCard(card);
-            for(int n=0;n<6;n++)
+            for(int n=0;first>=0 && n<6;n++)
             {
                 int axis=(first+n+6)%6;
                 if(ticks[axis]==0) continue;
@@ -158,11 +169,12 @@ namespace Horizon
                 yield return FilmBeat(owner,PracticeShot.Receive,2.5f,"本次实际变化",RewardAction(axis,ticks[axis]>0),film.MoveA,finalBeat);
                 if(owner!=practicePage || owner==null) yield break;
             }
-            practiceHeading.text="已结算　·　× "+PracticeReward.Format(budget);
-            practiceCaption.text=PracticeReward.Label(action.actualNow);
+            practicePlaque.gameObject.SetActive(false);
+            practiceHeading.text="完成凭证 +1 星尘 · 今日已结算";
+            practiceCaption.text=PracticeReward.Label(action.actualNow)+"\n"+PracticeReward.EchoReceipt(action,session.Deadline).Replace('\n',' ');
             practiceMeter.text="";
             NewPracticeOptions();
-            View.Button(practiceOptions,"Finish practice","收下结果",()=>
+            View.Button(practiceOptions,"Finish practice","查看行动回执",()=>
             {
                 ClearPracticeOptions(); practicePage=null; CloseMasterPage();
                 StartCoroutine(ResolveChoice(drag,card,action));

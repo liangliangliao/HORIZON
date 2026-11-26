@@ -44,11 +44,11 @@ namespace Horizon
                 TextAnchor.MiddleRight, 0.6f, 0.951f, 0.94f, 0.986f);
             View.Panel(root, "Outcome ribbon", new Color(0.015f, 0.045f, 0.065f, 0.92f),
                 0.05f, 0.791f, 0.95f, 0.917f, 28);
-            View.Label(root, "Outcome type", action ? "行动完成 · 今天已记录" : chain ? "因果连锁 · " + beat.chainSize + " 个真实节点" : difficult ?
+            View.Label(root, "Outcome type", action ? "行动完成 · 今日回执" : chain ? "因果连锁 · " + beat.chainSize + " 个真实节点" : difficult ?
                 "回声抵达 · 现在仍可以调整" : "回声抵达 · 过去正在回应你", 29, accent,
                 TextAnchor.MiddleCenter, 0.085f, 0.861f, 0.915f, 0.903f);
             string origin = beat == null ? "" : "D" + beat.sourceDay.ToString("00") + " · " + beat.source;
-            string destination = beat == null ? "" : action ? beat.destinationDay == 0 ? "今天 · 恢复" :
+            string destination = beat == null ? "" : action ? beat.destinationDay == 0 ? "当天结算" :
                 "D" + beat.destinationDay.ToString("00") + " · 回声" : "D" + receipt.day.ToString("00") + " · 现在";
             View.Label(root, "Receipt origin", origin, 27, Palette.Text,
                 TextAnchor.MiddleCenter, 0.085f, 0.804f, 0.445f, 0.853f);
@@ -61,9 +61,9 @@ namespace Horizon
                 0.05f, 0.048f, 0.95f, 0.537f, 38).rectTransform;
             panel.gameObject.AddComponent<PanelEntrance>();
             View.Label(panel, "Result title", beat == null ? receipt.title :
-                action ? "「" + beat.title + "」已开始" : beat.title, 42, Palette.Text,
+                action ? "「" + beat.title + "」已完成" : beat.title, 42, Palette.Text,
                 TextAnchor.MiddleLeft, 0.065f, 0.797f, 0.935f, 0.948f);
-            View.Label(panel, "Result timing", action ? "今天已经发生的变化" : "这次回声带来的实际变化", 24,
+            View.Label(panel, "Result timing", action ? "今日已入账" : "今天到期 · 实际入账", 24,
                 Palette.Muted, TextAnchor.MiddleLeft, 0.065f, 0.735f, 0.935f, 0.798f);
             if (beat == null) ResultText(panel, receipt.description);
             else
@@ -72,8 +72,8 @@ namespace Horizon
                 View.Label(panel, "Result explanation", beat.meaning, 27, Palette.Text,
                     TextAnchor.UpperLeft, 0.065f, 0.287f, 0.935f, 0.441f);
             }
-            int pageStars = beat != null && beat.stardust > 0 ? beat.stardust : receipt.stardust;
-            View.Label(panel, "Reward", "+" + pageStars + " 星尘 · 已收集", 29, Palette.Gold,
+            int pageStars = beat != null ? beat.stardust : receipt.stardust;
+            View.Label(panel, "Reward", pageStars > 0 ? (action ? "完成凭证  +" : "已收集  +") + pageStars + " 星尘" : "回声已兑现", 29, Palette.Gold,
                 TextAnchor.MiddleLeft, 0.065f, 0.207f, 0.935f, 0.283f);
             bool more = hasBeats && receipt.page < beats.Count - 1;
             string next = more ? "下一条回声  " + (receipt.page + 2) + " / " + beats.Count : action ?
@@ -148,9 +148,8 @@ namespace Horizon
 
         private void DrawReceiptChanges(Transform parent, ResourceDelta delta, bool animate)
         {
-            int[] values = delta == null ? new int[6] : new[] {
-                delta.energy, delta.mood, delta.insight, delta.relation, delta.money, delta.ability };
-            string[] names = { "精力", "心情", "专注", "关系", "金钱", "能力" };
+            int[] values = PracticeReward.Ticks(delta);
+            string[] names = PracticeReward.Names;
             int count = 0;
             for (int i = 0; i < values.Length; i++)
             {
@@ -163,7 +162,7 @@ namespace Horizon
                     x, y, x + 0.276f, y + 0.115f, 17).rectTransform;
                 View.Label(chip, "Change name", names[i], 23, Palette.Muted,
                     TextAnchor.MiddleLeft, 0.1f, 0.58f, 0.9f, 0.94f);
-                View.Label(chip, "Change amount", (values[i] > 0 ? "+" : "") + values[i], 40, color,
+                View.Label(chip, "Change amount", (values[i] > 0 ? "+" : "") + PracticeReward.Format(values[i]), 30, color,
                     TextAnchor.MiddleLeft, 0.1f, 0.06f, 0.9f, 0.62f);
                 if (animate) chip.gameObject.AddComponent<ReceiptPop>().Delay = count * 0.08f;
                 count++;

@@ -24,7 +24,8 @@ namespace Horizon.UI
         private Color practiceDaylight;
         private int dimmingStep;
         private MaterialPropertyBlock practiceLight;
-        private Renderer rayRenderer;
+        private Renderer rayRenderer, sparkRenderer;
+        private Material prizeEnamel, prizeBrass, engraving;
         private readonly Transform[] prizePieces=new Transform[6], prizeSockets=new Transform[6], prizeBeams=new Transform[6];
         private readonly Vector3[] prizeLandings=new Vector3[6];
         private readonly bool[] prizeLanded=new bool[6];
@@ -199,8 +200,16 @@ namespace Horizon.UI
                     Box(obj,"Frame",new Vector3(-.13f,.18f,0),new Vector3(.09f,.4f,.19f),teal);
                     Disc(obj,"Flywheel",new Vector3(.03f,.29f,-.04f),.35f,gold,true);break;
                 case PracticeProp.Shoe:
-                    Shape(obj,"Running shoe",PrimitiveType.Sphere,new Vector3(0,.1f,0),new Vector3(.22f,.21f,.44f),teal);
-                    Box(obj,"Sole",Vector3.zero,new Vector3(.23f,.046f,.44f),ivory);break;
+                    Shape(obj,"Leather upper",PrimitiveType.Sphere,new Vector3(0,.078f,-.042f),new Vector3(.23f,.14f,.39f),cloth);
+                    Shape(obj,"Heel cup",PrimitiveType.Sphere,new Vector3(0,.12f,.12f),new Vector3(.22f,.21f,.19f),cloth);
+                    Shape(obj,"Ankle opening",PrimitiveType.Sphere,new Vector3(0,.209f,.105f),new Vector3(.15f,.034f,.115f),dark);
+                    Shape(obj,"Running sole",PrimitiveType.Sphere,new Vector3(0,.019f,-.023f),new Vector3(.25f,.066f,.46f),ivory);
+                    for(int j=0;j<3;j++)
+                    {
+                        var lace=Box(obj,"Lace",new Vector3(0,.143f+j*.009f,-.072f+j*.043f),new Vector3(.134f,.014f,.016f),ivory);
+                        lace.localRotation=Quaternion.Euler(0,j%2==0?14:-14,0);
+                    }
+                    break;
                 default:
                     Box(obj,"Container",new Vector3(0,.135f,0),new Vector3(.51f,.27f,.38f),wood);
                     Box(obj,"Banded rim",new Vector3(0,.28f,0),new Vector3(.53f,.045f,.40f),prop==PracticeProp.Basket?teal:ivory);break;
@@ -213,17 +222,39 @@ namespace Horizon.UI
             if(practiceLight==null) practiceLight=new MaterialPropertyBlock();
             chamber=Group("Reward case at finished work",actionTable);
             chamber.localPosition=new Vector3(.1f,propOrigin.y,-.36f);
-            Box(chamber,"Enamel case",new Vector3(0,.12f,0),new Vector3(.82f,.23f,.52f),teal);
+            if (rayMaterial==null)
+            {
+                rayMaterial=new Material(Resources.Load<Shader>("HorizonPracticeRays")); materials.Add(rayMaterial);
+                engraving=new Material(rayMaterial); engraving.SetFloat("_Layer",2); materials.Add(engraving);
+                prizeEnamel=Lit(new Color(.033f,.065f,.14f));
+                prizeEnamel.SetFloat("_Coat",.84f); prizeEnamel.SetFloat("_Smoothness",.81f);
+                prizeBrass=Lit(new Color(.82f,.44f,.115f));
+                prizeBrass.SetFloat("_Metallic",.74f); prizeBrass.SetFloat("_Smoothness",.7f);
+            }
+            Box(chamber,"Shadow plinth",new Vector3(0,.035f,0),new Vector3(.78f,.08f,.49f),dark);
+            Box(chamber,"Lower gold moulding",new Vector3(0,.079f,0),new Vector3(.86f,.043f,.56f),prizeBrass);
+            Box(chamber,"Enamel case",new Vector3(0,.171f,0),new Vector3(.83f,.173f,.53f),prizeEnamel);
+            Box(chamber,"Raised gold lip",new Vector3(0,.249f,0),new Vector3(.86f,.029f,.55f),prizeBrass);
+            Box(chamber,"Velvet interior",new Vector3(0,.265f,0),new Vector3(.75f,.022f,.46f),dark);
+            Shape(chamber,"Engraved compass frieze",PrimitiveType.Quad,new Vector3(0,.171f,-.268f),new Vector3(.77f,.145f,1),engraving);
             lidLeft=Group("Hinged left leaf",chamber); lidRight=Group("Hinged right leaf",chamber);
             for(int i=0;i<2;i++)
             {
                 int sign=i==0?-1:1; var hinge=i==0?lidLeft:lidRight;
-                hinge.localPosition=new Vector3(sign*.41f,.23f,0);
-                Box(hinge,"Brass leaf",new Vector3(-sign*.2f,.04f,0),new Vector3(.40f,.08f,.53f),gold);
+                hinge.localPosition=new Vector3(sign*.41f,.261f,0);
+                Box(hinge,"Bevelled lid",new Vector3(-sign*.20f,.035f,0),new Vector3(.40f,.064f,.53f),prizeBrass);
+                Box(hinge,"Lacquer insert",new Vector3(-sign*.20f,.069f,0),new Vector3(.34f,.026f,.46f),prizeEnamel);
+                var enamel=Shape(hinge,"Chased lid",PrimitiveType.Quad,new Vector3(-sign*.20f,.084f,0),new Vector3(.33f,.44f,1),engraving);
+                enamel.localRotation=Quaternion.Euler(90,0,0);
+                for(int edge=-1;edge<=1;edge+=2)
+                {
+                    Box(chamber,"Corner clasp",new Vector3(sign*.37f,.16f,edge*.246f),new Vector3(.053f,.16f,.054f),prizeBrass);
+                    Shape(hinge,"Lid rivet",PrimitiveType.Sphere,new Vector3(-sign*.045f,.084f,edge*.20f),Vector3.one*.028f,ivory);
+                }
             }
             practiceMarks=new Transform[3];
             for(int i=0;i<3;i++)
-                practiceMarks[i]=Shape(chamber,"Lock facet",PrimitiveType.Sphere,new Vector3((i-1)*.20f,.14f,-.273f),Vector3.one*.09f,warmLight);
+                practiceMarks[i]=Shape(chamber,"Lock facet",PrimitiveType.Sphere,new Vector3((i-1)*.20f,.169f,-.289f),Vector3.one*.045f,warmLight);
             orbitingSeals=new Transform[LowCostEffects?6:12];
             for(int i=0;i<orbitingSeals.Length;i++)
             {
@@ -233,9 +264,10 @@ namespace Horizon.UI
                 orbitingSeals[i]=seal;
             }
             rays=Group("Radial light",chamber);
-            if(rayMaterial==null) { rayMaterial=new Material(Resources.Load<Shader>("HorizonPracticeRays")); materials.Add(rayMaterial); }
             Transform plane=Shape(rays,"Light fan",PrimitiveType.Quad,Vector3.zero,Vector3.one*4.5f,rayMaterial);
-            rayRenderer=plane.GetComponent<Renderer>(); rays.localPosition=new Vector3(0,.30f,.28f);
+            rayRenderer=plane.GetComponent<Renderer>(); rays.localPosition=new Vector3(0,.37f,.31f);
+            var sparks=Shape(chamber,"Foreground sparks and shockwave",PrimitiveType.Quad,new Vector3(0,.43f,-.38f),Vector3.one*2.65f,rayMaterial);
+            sparkRenderer=sparks.GetComponent<Renderer>();
             chamber.gameObject.SetActive(false);
         }
 
@@ -372,7 +404,8 @@ namespace Horizon.UI
                     break;
                 default:
                     DimPracticeScenery(shot==PracticeShot.Charge?t:1);
-                    float open=shot==PracticeShot.Charge?0:shot==PracticeShot.Open?t:1;
+                    float release=Mathf.SmoothStep(0,1,Mathf.InverseLerp(.19f,.63f,p));
+                    float open=shot==PracticeShot.Charge?0:shot==PracticeShot.Open?release:1;
                     lidLeft.localRotation=Quaternion.Euler(0,0,open*108); lidRight.localRotation=Quaternion.Euler(0,0,-open*108);
                     float charge=shot==PracticeShot.Charge?t:1;
                     for(int i=0;i<orbitingSeals.Length;i++)
@@ -382,14 +415,22 @@ namespace Horizon.UI
                         float radius=shot==PracticeShot.Charge ? Mathf.Lerp(.98f,.17f,t) : Mathf.Lerp(.17f,1.02f,open);
                         seal.localPosition=new Vector3(Mathf.Cos(angle)*radius,.35f+Mathf.Sin(angle)*radius*.63f,Mathf.Sin(angle+.65f)*.16f);
                         seal.localRotation=Quaternion.Euler(12,Mathf.Sin(angle)*53,angle*12);
+                        if(shot==PracticeShot.Open) seal.localPosition+=Vector3.back*(reduced?0:open*Mathf.Sin(angle+.7f)*.38f);
                         seal.localScale=Vector3.one*(shot==PracticeShot.Charge ? .4f+.62f*t:1-open*.36f);
                     }
                     float scale=shot==PracticeShot.Charge ? .52f+.48f*t : 1f;
                     chamber.localScale=Vector3.one*(scale+(reduced?0:shot==PracticeShot.Open?.12f*Mathf.Sin(p*Mathf.PI):.018f*Mathf.Sin(p*24)*charge));
                     for(int i=0;i<3;i++) practiceMarks[i].gameObject.SetActive(i<=beat && charge>i*.22f);
-                    float light=shot==PracticeShot.Charge ? .08f+.67f*t : shot==PracticeShot.Open ? 1f-.5f*t : .29f;
-                    practiceLight.SetVector("_Beat",new Vector4(reduced?0:p,light*(reduced?.48f:1),shot==PracticeShot.Open?1:0,charge));
+                    float impact=Mathf.Exp(-Mathf.Pow((p-.39f)*7.5f,2));
+                    float light=shot==PracticeShot.Charge ? .12f+.66f*t :
+                        shot==PracticeShot.Open ? .29f+impact*1.23f+open*.19f : .24f;
+                    float phase=reduced ? .68f : shot==PracticeShot.Charge ? p*.64f : shot==PracticeShot.Open ? .64f+p*.36f : 1;
+                    practiceLight.Clear();
+                    practiceLight.SetVector("_Beat",new Vector4(phase,light*(reduced?.55f:1),shot==PracticeShot.Open && !reduced?p:0,charge));
                     rayRenderer.SetPropertyBlock(practiceLight);
+                    practiceLight.SetFloat("_Layer",1);
+                    sparkRenderer.SetPropertyBlock(practiceLight);
+                    practiceLight.Clear();
                     for(int index=0;index<6;index++)
                     {
                         if(prizeSockets[index]==null) continue;
@@ -408,7 +449,7 @@ namespace Horizon.UI
                             Vector3.Lerp(lifted,prizeLandings[prizeAxis],t)+Vector3.up*(reduced?0:.19f*Mathf.Sin(t*Mathf.PI)) : Vector3.Lerp(Vector3.up*.13f,lifted,open);
                         prize.localScale=Vector3.one*(shot==PracticeShot.Receive?Mathf.Lerp(1.06f,.50f,t):.09f+open*.97f);
                         if(shot==PracticeShot.Receive && p>=1) prizeLanded[prizeAxis]=true;
-                        prize.localEulerAngles=new Vector3(0,open*29+(reduced?0:p*24),prizeNegative?-12*t:0);
+                        prize.localEulerAngles=new Vector3(0,open*(prizeAxis==0?67:29)+(reduced?0:p*24),prizeNegative?-12*t:0);
                     }
                     look=actionTable.localPosition+chamber.localPosition+new Vector3(0,.36f,-.07f);
                     actorPos=chamber.localPosition+new Vector3(-.59f,-chamber.localPosition.y,.67f);

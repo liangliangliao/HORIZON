@@ -99,7 +99,7 @@ namespace Horizon.Game
 
         public static bool IsDifficult(ResourceDelta delta)
         {
-            return delta != null && (delta.energy < 0 || delta.mood < 0 || delta.relation < 0 || delta.money < 0);
+            return Array.Exists(PracticeReward.Ticks(delta), value => value < 0);
         }
 
         public static string NowLabel(ResourceDelta delta)

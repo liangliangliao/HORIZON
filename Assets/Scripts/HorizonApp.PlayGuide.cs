@@ -24,8 +24,8 @@ namespace Horizon
                 View.Label(overlay, "Guide mission", "第 " + session.Deadline + " 天，你会面对截止日。\n今天的准备，决定你能否从容抵达。", 35, Palette.Text,
                     TextAnchor.MiddleLeft, 0.075f, 0.665f, 0.925f, 0.785f);
                 string[] titles = { "成长 · 让努力来得及回来", "状态 · 留出恢复的日子", "支持 · 与别人一起走一段" };
-                string[] details = { "能力至少 6，成长回声至少 " + ProductExperience.EvidenceNeeded(session) + " 次。", "精力与心情至少 4，恢复行动至少 " + ProductExperience.EvidenceNeeded(session) + " 次。",
-                    "支援行动至少 " + ProductExperience.EvidenceNeeded(session) + " 次，关系至少 6、金钱至少 2。" };
+                string[] details = { "能力超过初始 2.0000，成长回声至少 " + ProductExperience.EvidenceNeeded(session) + " 次。", "精力与心情至少 4，恢复行动至少 " + ProductExperience.EvidenceNeeded(session) + " 次。",
+                    "支援行动至少 " + ProductExperience.EvidenceNeeded(session) + " 次，关系超过初始 4.0000、金钱至少 2。" };
                 for (int i = 0; i < 3; i++)
                 {
                     float y = 0.49f - i * 0.135f;
@@ -43,7 +43,7 @@ namespace Horizon
                     TextAnchor.MiddleLeft, 0.075f, 0.68f, 0.925f, 0.78f);
                 View.Label(overlay, "Guide now", "今天 · 付出与得到\n" + PracticeReward.Label(session.ImmediateEffect(sample),true), 33, Palette.Mint,
                     TextAnchor.MiddleLeft, 0.075f, 0.54f, 0.925f, 0.675f);
-                View.Label(overlay, "Guide future", "第 " + (session.Day + sample.Delay) + " 天 · 行动回来\n" + PlayExperience.FutureMeaning(sample), 33, Palette.Gold,
+                View.Label(overlay, "Guide future", PracticeReward.EchoPreview(sample,session.Day,session.Deadline), 33, Palette.Gold,
                     TextAnchor.MiddleLeft, 0.075f, 0.39f, 0.925f, 0.53f);
                 View.Label(overlay, "Guide control", "点牌：先看清，再选择。\n拖牌：向上送进金色圈，松手行动。\n做完一天后，过去的回声会自己抵达。", 28, Palette.Text,
                     TextAnchor.MiddleLeft, 0.075f, 0.225f, 0.925f, 0.38f);
@@ -79,7 +79,7 @@ namespace Horizon
             int pages = Math.Max(1, (echoes.Count + 3) / 4);
             schedulePage = Mathf.Clamp(schedulePage, 0, pages - 1);
             MasterPage("Future schedule", "今天安排的未来", CloseMasterPage);
-            View.Label(overlay, "Schedule explanation", "行动已经发生，回声还在路上。\n抵达日来自你选过的牌；更深的影响随视野逐渐显现。", 28, Palette.Text,
+            View.Label(overlay, "Schedule explanation", "以下数值尚未计入今天的余额。到期自动结算，实际入账受当日余额上下限影响。", 28, Palette.Text,
                 TextAnchor.MiddleLeft, 0.075f, 0.725f, 0.925f, 0.855f);
             if (echoes.Count == 0)
                 View.Label(overlay, "Empty schedule", "还没有在途的行动回声。\n点开一张牌，看看它准备去哪一天。", 34, Palette.Muted,
@@ -90,7 +90,7 @@ namespace Horizon
                 var panel = View.Panel(overlay, "Planned echo " + echo.nodeId, Palette.Panel, 0.075f, y, 0.925f, y + 0.105f, 20).rectTransform;
                 View.Label(panel, "Echo route", "D" + echo.sourceDay + "「" + echo.cardName + "」 → D" + echo.dueDay, 29, Palette.Mint,
                     TextAnchor.MiddleLeft, 0.04f, 0.46f, 0.96f, 0.95f);
-                View.Label(panel, "Echo visibility", (echo.dueDay - session.Day) + " 天后回来 · " + Vision.Clue(echo, i, session.Day), 24, Palette.Muted,
+                View.Label(panel, "Echo visibility", echo.depth == 1 && echo.delta != null ? "待结算  " + PracticeReward.Label(echo.delta) : Vision.Clue(echo, i, session.Day), 24, Palette.Muted,
                     TextAnchor.MiddleLeft, 0.04f, 0.025f, 0.96f, 0.48f);
             }
             if (pages > 1)

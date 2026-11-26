@@ -20,7 +20,7 @@ namespace Horizon
                 TextAnchor.MiddleLeft, 0.06f, 0.95f, 0.94f, 0.985f);
             View.Label(root, "Echo bundle title", receipt.beats.Count + " 条回声 · 一起抵达", 48, Palette.Mint,
                 TextAnchor.MiddleLeft, 0.075f, 0.835f, 0.925f, 0.915f);
-            View.Label(root, "Echo bundle context", "下面每一条，都来自已经发生的行动。", 32, Palette.Text,
+            View.Label(root, "Echo bundle context", "以下是今天到期的后果。每行列出原行动和本次实际入账。", 32, Palette.Text,
                 TextAnchor.MiddleLeft, 0.075f, 0.77f, 0.925f, 0.83f);
             RectTransform viewport = View.Rect(root, "Echo summary scroll", 0.075f, 0.275f, 0.925f, 0.75f);
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -43,7 +43,7 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.075f, 0.226f, 0.925f, 0.27f);
             View.Button(root, "Review echo details", "逐条细看", () => { receipt.detailed = true; Save(); ShowFeedback(); },
                 0.075f, 0.148f, 0.36f, 0.213f, Palette.Panel, Palette.Text, 29);
-            View.Label(root, "Bundle reward", "+" + receipt.stardust + " 星尘 · 已收集", 28, Palette.Gold,
+            View.Label(root, "Bundle reward", receipt.stardust > 0 ? "+" + receipt.stardust + " 星尘 · 已收集" : "到期变化已入账", 28, Palette.Gold,
                 TextAnchor.MiddleRight, 0.39f, 0.148f, 0.925f, 0.213f);
             Button next = View.Button(root, "Continue result", session.HasPredictionReview ? "看看预测与实际" : "回到今天 · 选择下一步", () => {
                 if (busy) return;

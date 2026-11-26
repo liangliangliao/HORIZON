@@ -53,6 +53,40 @@ namespace Horizon.Tests
         }
 
         [Test]
+        public void DeferredSkillDoesNotPayOnCompletionOrMoveIntoTheLastDay()
+        {
+            var life = new GameSession(1, 17);
+            var card = life.Hand.Single(c => c.Id == "practice");
+            life.BeginPractice(card,1); life.PickPracticeRoute(false);
+            var take = life.Practice.Copy();
+            var result = life.FinishPractice();
+            Assert.True(result.practice.settleOnDueDay);
+            Assert.False(result.actualNow.ticks.Any(v => v > 0));
+            Assert.Less(result.actualNow.ticks[0], 0);
+            Assert.Greater(result.later.ticks[5], 0);
+            CollectionAssert.AreEqual(result.later.ticks,life.Pending.Single(e => e.cardId==card.Id).delta.ticks);
+            Assert.AreEqual("成果在以后", PracticeReward.Timing(card,card.Now));
+            Assert.AreEqual("当日结清", PracticeReward.Timing(CardCatalog.SoloRecovery,CardCatalog.SoloRecovery.Now));
+            Assert.AreEqual("后续有代价", PracticeReward.Timing(life.Hand[0],life.Hand[0].Now));
+            Assert.That(PracticeReward.EchoReceipt(result,life.Deadline), Does.Contain("第 4 天"));
+            take.day = life.Deadline;
+            Assert.AreSame(card.Later, PracticeReward.DeferredWeights(take,card,life.Deadline));
+            Assert.That(PracticeReward.EchoPreview(card,take.day,life.Deadline), Does.Contain("超出本局"));
+            take.settleOnDueDay = false;
+            Assert.IsNull(PracticeReward.DeferredWeights(take,card,life.Deadline));
+            PracticeReward.Allocate(take, result.practiceBudget, card.Now, card.Later, out var oldNow, out _);
+            Assert.True(oldNow.ticks.Any(v => v > 0), "Historical performances retain their advance.");
+        }
+
+        [Test]
+        public void SignedFractionalCostsAreVisibleWhenAllWholeFieldsAreZero()
+        {
+            var cost=PracticeReward.FromTicks(new[] { -7,0,0,0,0,0 });
+            Assert.True(PlayExperience.IsDifficult(cost));
+            Assert.That(PlayExperience.NowLabel(cost), Does.Contain("-0.0007"));
+        }
+
+        [Test]
         public void NoRewardForAbandoningAndRerollsAreStable()
         {
             var life=new GameSession(1,448);

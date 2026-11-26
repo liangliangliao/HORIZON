@@ -9,6 +9,8 @@ namespace Horizon.Game
     {
         public string cardId;
         public int day, difficulty;
+        // Absent in older saved performances, which retain their original allocation on replay.
+        public bool settleOnDueDay;
         public string routes = "";
 
         public bool Complete => difficulty >= 1 && difficulty <= 3 && routes != null && routes.Length == difficulty;
@@ -45,6 +47,34 @@ namespace Horizon.Game
                     (values[i] > 0 ? " +" : " ") + Format(values[i])));
             return parts.Count == 0 ? "状态保持不变" : string.Join("　", parts.ToArray());
         }
+        public static ResourceDelta DeferredWeights(PracticeTake take, CardSpec card, int deadline)
+        {
+            if (card.Delay == 0) return null;
+            return take.settleOnDueDay || take.day + card.Delay <= deadline ? card.Later : null;
+        }
+
+        public static string Timing(CardSpec card, ResourceDelta immediate)
+        {
+            if (card.Delay == 0) return "当日结清";
+            if (Array.Exists(Ticks(card.Later), v => v < 0)) return "后续有代价";
+            return Array.Exists(Ticks(immediate), v => v > 0) ? "分两次生效" : "成果在以后";
+        }
+
+        public static string EchoPreview(CardSpec card, int day, int deadline)
+        {
+            if (card.Delay == 0) return "本次当日结清";
+            int due = day + card.Delay;
+            if (due > deadline) return "第 " + due + " 天超出本局，后续不计入本局余额";
+            return "第 " + due + " 天 · " + card.EchoName + "\n" + Label(card.Later, true);
+        }
+
+        public static string EchoReceipt(ActionRecord action, int deadline)
+        {
+            if (action.echoDay <= 0) return "当日结清";
+            if (action.echoDay > deadline) return "第 " + action.echoDay + " 天超出本局，后续不计入本局余额";
+            return "待结算 · 第 " + action.echoDay + " 天\n" + Label(action.later);
+        }
+
         public static int Ceiling(int difficulty) => difficulty == 1 ? 2200 : difficulty == 2 ? 4800 : MaxBudget;
 
         // Roll once per run, day and card. Changing or replaying a route cannot reroll the percentile.
@@ -81,8 +111,8 @@ namespace Horizon.Game
                     (i<6 ? x : y)[i%6] = Math.Sign(weight) * (carried / total);
                     carried %= total;
                 }
-                // Show a little of an earned skill now when all the card's gains otherwise arrive later.
-                if (!Array.Exists(x, value => value > 0))
+                // Legacy performances borrowed a quarter of a future gain for the reveal.
+                if (!take.settleOnDueDay && !Array.Exists(x, value => value > 0))
                 {
                     int axis = Array.FindIndex(y, value => value > 1);
                     if (axis >= 0) { x[axis] += y[axis] / 4; y[axis] -= y[axis] / 4; }
@@ -114,7 +144,7 @@ namespace Horizon.Game
         public void BeginPractice(CardSpec card, int difficulty)
         {
             if (!CanPlay(card) || difficulty < 1 || difficulty > 3) throw new InvalidOperationException("Practice unavailable.");
-            Practice = new PracticeTake { day=Day, cardId=card.Id, difficulty=difficulty };
+            Practice = new PracticeTake { day=Day, cardId=card.Id, difficulty=difficulty, settleOnDueDay=true };
         }
         public void PickPracticeRoute(bool second)
         {
@@ -131,7 +161,7 @@ namespace Horizon.Game
         public ResourceDelta PreviewPractice(CardSpec card)
         {
             if (Practice == null || Practice.cardId != card.Id || Practice.day != Day) throw new InvalidOperationException("Wrong practice.");
-            PracticeReward.Allocate(Practice, PracticeBudget, ImmediateEffect(card), card.Delay > 0 && Day+card.Delay <= Deadline ? card.Later : null, out var now, out _);
+            PracticeReward.Allocate(Practice, PracticeBudget, ImmediateEffect(card), PracticeReward.DeferredWeights(Practice,card,Deadline), out var now, out _);
             int[] current = PracticeReward.Ticks(Values()), delta = PracticeReward.Ticks(now);
             for (int i=0;i<6;i++) delta[i] = Math.Min(ResourceCap*PracticeReward.Unit,Math.Max(0,current[i]+delta[i])) - current[i];
             return PracticeReward.FromTicks(delta);

@@ -166,7 +166,7 @@ namespace Horizon.Tests
             archive.pendingFeedback.beats.Add(new FeedbackBeat { title = "努力回来了", source = "练习", sourceDay = 1,
                 destinationDay = 1, delta = new ResourceDelta(0,0,0,0,0,3), meaning = "第一条" });
             archive.pendingFeedback.beats.Add(new FeedbackBeat { title = "休息回来了", source = "休息", sourceDay = 1,
-                destinationDay = 1, delta = new ResourceDelta(1), meaning = "第二条" });
+                destinationDay = 1, delta = PracticeReward.FromTicks(new[] { 882, -7, 0, 0, 0, 0 }), meaning = "第二条" });
             Set(app,"session",session); Set(app,"archive",archive); Call(app,"ShowFeedback");
             yield return new WaitForSecondsRealtime(0.35f);
             ButtonNamed(app,"Review echo details").onClick.Invoke();
@@ -186,6 +186,8 @@ namespace Horizon.Tests
                 "Resuming an already presented result does not replay collection.");
             string text = string.Join(" ",System.Array.ConvertAll(Get<RectTransform>(app,"root").GetComponentsInChildren<Text>(), t => t.text));
             Assert.That(text, Does.Contain("第二条"));
+            Assert.That(text, Does.Contain("+0.0882"));
+            Assert.That(text, Does.Contain("-0.0007"));
             yield return new WaitForSecondsRealtime(0.3f);
             ButtonNamed(app,"Continue result").onClick.Invoke(); yield return null;
             Assert.IsNull(restored.pendingFeedback);
