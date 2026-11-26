@@ -160,13 +160,25 @@ namespace Horizon
             rewardLife.LockDecision(rewardLife.Hand[1].Id);
             for(int i=0;i<4;i++) rewardLife.ExecuteDecisionStep(); rewardLife.Choose(rewardLife.Master.decision.cardId);
             DomainEvent reward=rewardLife.Master.events.Single(e=>e.kind==DomainEventKind.PatternBroken);
-            androidSmokeRewardReturned=false; PlayMasterSpectacle(reward,AndroidSmokeFinishReward);
-            AndroidSmoke.Require(overlay.GetComponentsInChildren<TMPro.TextMeshProUGUI>().Length>=4,
-                "The reward did not create its cinematic captions.");
-            yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
-            AndroidSmoke.Require(home.All(g=>!g.activeInHierarchy),"Home leaked through the reward movie.");
-            CaptureAndroidFrame("05-reward-visible",world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Cinematic player").transform);
-            SmokeButton("Skip cinematic"); yield return null;
+            androidSmokeRewardReturned=false;
+            // Capture the authored opening on the rendered GLES backbuffer.
+            // A slow shader compilation frame must not advance to the product shot.
+            world.Cinematics.enabled=false;
+            try
+            {
+                PlayMasterSpectacle(reward,AndroidSmokeFinishReward);
+                AndroidSmoke.Require(overlay.GetComponentsInChildren<TMPro.TextMeshProUGUI>().Length>=4,
+                    "The reward did not create its cinematic captions.");
+                world.Cinematics.Advance(.50f);
+                yield return null; yield return new WaitForEndOfFrame();
+                AndroidSmoke.Require(home.All(g=>!g.activeInHierarchy),"Home leaked through the reward movie.");
+                HorizonActor actor=world.GetComponentsInChildren<HorizonActor>().SingleOrDefault(a=>a.name=="Cinematic player");
+                AndroidSmoke.Require(actor!=null,"The reward's opening performance has no visible actor.");
+                CaptureAndroidFrame("05-reward-visible",actor.transform);
+                SmokeButton("Skip cinematic");
+            }
+            finally { world.Cinematics.enabled=true; }
+            yield return null;
             AndroidSmoke.Write("await_back"); deadline=Time.realtimeSinceStartup+30;
             while (!androidSmokeRewardReturned && Time.realtimeSinceStartup<deadline) yield return null;
             AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
