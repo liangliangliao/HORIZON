@@ -54,6 +54,7 @@ namespace Horizon.UI
         }
         private void FrameCinematicSafety(float time,ref Vector3 camera,ref Vector3 look)
         {
+            if(moviePlan.Orbit!=null || moviePlan.Event.kind==DomainEventKind.Victory && futureDoorFrame.gameObject.activeSelf) return;
             bool life=LifeActionPlaying && lifeStage.gameObject.activeSelf;
             bool wide=cinematicOverviewRequested || CurrentCinematicFraming==CinematicFraming.ExtremeWide;
             // A causal source is a complete machined relay, not just the
@@ -199,7 +200,8 @@ namespace Horizon.UI
             float gather=actionClose && energyFrame.Time>=lifeAction.Impact?
                 .26f+.52f*Smooth(lifeAction.Impact+.25f,lifeAction.Reveal-.18f,energyFrame.Time):0;
             float charge=Mathf.Max(energyFrame.Inward,Mathf.Max(lifePressure*.92f,gather));
-            bool visible=(cinematicEnergy.Celebrates || charge>0 || lifeBurst>.003f) && !preferences.reducedMotion && !InResultShot;
+            bool visible=moviePlan.Orbit==null && !moviePlan.RecordedEcho && (relayPlan==null || relayPlan.Nodes.Count==0) &&
+                (cinematicEnergy.Celebrates || charge>0 || lifeBurst>.003f) && !preferences.reducedMotion && !InResultShot;
             immersionStage.gameObject.SetActive(visible);
             if(!visible) return;
             int tierBudget=moviePlan.Event.tier<=RewardTier.Local?1:moviePlan.Event.tier==RewardTier.Combo?2:3;

@@ -283,18 +283,19 @@ namespace Horizon.UI
             chamber.gameObject.SetActive(false);
         }
 
-        public void PreparePracticePayout(int[] ticks,string eventId,int difficulty)
+        public void PreparePracticePayout(int[] ticks,string eventId,int difficulty,bool gainsOnly=false)
         {
             practiceSeed=CinematicEnergy.VisualSeed(eventId);
             practiceStrength=difficulty==1?.57f:difficulty==2?.74f:.88f;
             practiceImpactPlayed=false;
-            int count=System.Array.FindAll(ticks,v=>v!=0).Length;
+            int count=System.Array.FindAll(ticks,v=>gainsOnly?v>0:v!=0).Length;
             int slot=0;
             for (int axis=0;axis<6;axis++)
             {
-                if(ticks[axis]==0) continue;
+                if(ticks[axis]==0 || gainsOnly && ticks[axis]<0) continue;
                 float angle=count==1 ? 0 : Mathf.Lerp(-1.10f,1.10f,slot++/(float)(count-1));
-                prizeLandings[axis]=new Vector3(Mathf.Sin(angle)*.61f,.16f,-.50f*Mathf.Cos(angle)-.16f);
+                prizeLandings[axis]=gainsOnly?new Vector3(Mathf.Sin(angle)*.65f,.018f,-.33f+Mathf.Abs(angle)*.087f):
+                    new Vector3(Mathf.Sin(angle)*.61f,.16f,-.50f*Mathf.Cos(angle)-.16f);
                 var socket=Group(PracticeReward.Names[axis]+" landing",chamber);
                 socket.localPosition=prizeLandings[axis]-Vector3.up*.055f;
                 Disc(socket,"Foot",Vector3.zero,.32f,dark);
@@ -317,13 +318,18 @@ namespace Horizon.UI
                 prize.localRotation=Quaternion.Euler(0,24,0);
             }
             prizeAxis=axis; prizeNegative=negative;
+            prize=EnsurePracticePrize(axis);
+        }
+
+        private Transform EnsurePracticePrize(int axis)
+        {
             if(prizePieces[axis]==null)
             {
                 PracticeProp[] symbols={PracticeProp.Shoe,PracticeProp.Flower,PracticeProp.Book,PracticeProp.Coin,PracticeProp.Cup,PracticeProp.Model};
                 prizePieces[axis]=PracticeObject(chamber,symbols[axis]);
                 prizePieces[axis].gameObject.SetActive(false);
             }
-            prize=prizePieces[axis];
+            return prizePieces[axis];
         }
 
         private void DimPracticeScenery(float progress)
@@ -528,6 +534,7 @@ namespace Horizon.UI
         public void EndPracticeSet()
         {
             if(practiceStage==null) return;
+            EndPracticeRewardCinematic();
             practiceStage.gameObject.SetActive(false); Dispose(practiceStage.gameObject); practiceStage=null; practiceScenery=null; prize=null;
             for(int i=0;i<6;i++)
             { prizePieces[i]=null; prizeSockets[i]=null; prizeBeams[i]=null; prizeLanded[i]=false; }

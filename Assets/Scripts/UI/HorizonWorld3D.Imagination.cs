@@ -1,3 +1,4 @@
+using System.Linq;
 using Horizon.Game;
 using UnityEngine;
 
@@ -24,6 +25,8 @@ namespace Horizon.UI
         private Vector3 imaginationSavedCamera, imaginationSavedLook;
         private Rect imaginationSavedRect;
         private float imaginationSavedFov;
+        private Transform futureDoorFrame, futureDoorLeaf;
+        private Renderer[] futureDoorSubjects;
         public void ShowImaginationScene(ImagineRun run)
         {
             if(run==null || run.timeline==null || run.timeline.Count==0) return;
@@ -36,6 +39,7 @@ namespace Horizon.UI
             movieMuted=run.phase==ImaginePhase.Failure; if(movieMuted) audioSource.Stop(); UpdateAudio();
             cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,0,1,1);
             PrepareProjectionWorld();
+            PrepareFutureDoor();
             imaginationScenicRenderers=projectionLayers[2].GetComponentsInChildren<Renderer>(true);
             moviePlayer.localScale=Vector3.one; ResetMovieColor(moviePlayer);
             imaginationPerformance=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
@@ -125,7 +129,7 @@ namespace Horizon.UI
             HorizonBodyAction action=HorizonBodyAction.Wait;
             switch(CurrentImaginationFrame.Shot)
             {
-                case ImaginationShot.VictoryAnchor: action=HorizonBodyAction.Celebrate; break;
+                case ImaginationShot.VictoryAnchor: action=HorizonBodyAction.Wait; break;
                 case ImaginationShot.Rewind:
                     position=new Vector3(0,0,Mathf.Lerp(5,-.5f,beat)); action=HorizonBodyAction.Walk;
                     for(int i=0;i<movieTiles.Count;i++) movieTiles[i].gameObject.SetActive(i<3 || i>21 || (1-beat)>i/(float)movieTiles.Count);
@@ -166,7 +170,13 @@ namespace Horizon.UI
             // progress. Only hide background bodies in a subject close-up.
             foreach(Renderer renderer in imaginationScenicRenderers)
                 renderer.enabled=!imaginationWalkSet && imaginationOverview;
-            if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor) position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
+            bool enteringFuture=CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor && !imaginationWalkSet;
+            futureDoorFrame.gameObject.SetActive(enteringFuture);
+            movieAnchor.Find("Possible future doorway").gameObject.SetActive(!enteringFuture);
+            if(enteringFuture)
+                SampleFutureDoor(beat, ref position, ref camera, ref look, ref action);
+            else if(CurrentImaginationFrame.Shot==ImaginationShot.VictoryAnchor)
+                position.z=Mathf.Lerp(3.5f,5,Smooth(.78f,1,beat));
             SampleImaginationLifeSet(ref position);
             imaginationPerformance.Play(action,beat);
             moviePlayer.localPosition=position;
@@ -192,7 +202,7 @@ namespace Horizon.UI
                 if(shot==ImaginationShot.ImaginedVictory)
                     movieLight.intensity=1.1f+Mathf.Sin(beat*Mathf.PI)*.6f;
             }
-            if(preferences.reducedMotion) camera=new Vector3(5,4,-6);
+            if(preferences.reducedMotion && !enteringFuture) camera=new Vector3(5,4,-6);
             // Follow the actual moving actor, rather than looking past them at
             // a fixed victory coordinate that clips on a tall full-screen phone.
             FitPortraitSubject(imaginationSubjectRenderers,HorizonCinemaLayout.ImaginationAperture,lens,ref camera,ref look);
@@ -204,6 +214,60 @@ namespace Horizon.UI
             optics.Glow=SystemInfo.graphicsDeviceType==UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?.25f:0;
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=lens;
         }
+
+        private void PrepareFutureDoor()
+        {
+            if(futureDoorFrame!=null) return;
+            futureDoorFrame=Group("Possible future working doorway",cinematicStage);
+            futureDoorFrame.localPosition=new Vector3(0,0,5.36f);
+            for(int side=-1;side<=1;side+=2)
+                Box(futureDoorFrame,"Door frame",new Vector3(side*.68f,1.14f,0),new Vector3(.11f,2.27f,.16f),wood);
+            Box(futureDoorFrame,"Door header",new Vector3(0,2.24f,0),new Vector3(1.48f,.13f,.17f),wood);
+            futureDoorLeaf=Group("Possible future door hinge",futureDoorFrame);
+            futureDoorLeaf.localPosition=new Vector3(-.62f,0,0);
+            Box(futureDoorLeaf,"Door panel",new Vector3(.62f,1.12f,0),new Vector3(1.23f,2.18f,.09f),dark);
+            Box(futureDoorLeaf,"Door inset",new Vector3(.62f,1.32f,-.052f),new Vector3(.90f,1.52f,.025f),wood);
+            Shape(futureDoorLeaf,"Door handle",PrimitiveType.Sphere,new Vector3(1.10f,1.02f,-.083f),Vector3.one*.085f,gold);
+            futureDoorSubjects=futureDoorFrame.GetComponentsInChildren<Renderer>(true)
+                .Concat(moviePlayer.GetComponentsInChildren<Renderer>(true)).ToArray();
+            futureDoorFrame.gameObject.SetActive(false);
+        }
+
+        private void SampleFutureDoor(float progress,ref Vector3 position,ref Vector3 camera,ref Vector3 look,ref HorizonBodyAction action)
+        {
+            bool still=preferences.reducedMotion;
+            float approach=still?1:Smooth(0,.40f,progress);
+            float open=still?1:Smooth(.42f,.72f,progress);
+            float enter=still?1:Smooth(.70f,1,progress);
+            futureDoorLeaf.localRotation=Quaternion.Euler(0,-105*open,0);
+            position=new Vector3(.35f*(1-enter),0,Mathf.Lerp(2.75f,4.72f,approach)+1.34f*enter);
+            action=still?HorizonBodyAction.Wait:progress<.40f || progress>.74f?HorizonBodyAction.Walk:HorizonBodyAction.Reach;
+            movieLight.transform.localPosition=new Vector3(-.25f,2.2f,5.65f);
+            movieLight.color=Color.Lerp(new Color(.38f,.61f,.84f),new Color(1,.72f,.48f),open);
+            movieLight.intensity=.48f+.81f*open;
+            camera=Vector3.Lerp(new Vector3(2.76f,2.40f,.48f),new Vector3(2.36f,2.31f,2.25f),approach);
+            camera=Vector3.Lerp(camera,new Vector3(2.92f,2.45f,3.3f),enter);
+            look=Vector3.Lerp(position+Vector3.up*1.1f,new Vector3(.30f,1.15f,5.48f),open*.62f);
+        }
+
+        private void SampleVictoryArrival(float time,ref Vector3 camera,ref Vector3 look)
+        {
+            if(moviePlan.Event.kind!=DomainEventKind.Victory) return;
+            bool entering=!cinematicOverviewRequested && time<movieImpactTime;
+            futureDoorFrame.gameObject.SetActive(entering);
+            movieAnchor.Find("Possible future doorway").gameObject.SetActive(!entering);
+            if(!entering) return;
+            HorizonBodyAction action=HorizonBodyAction.Wait;
+            Vector3 position=moviePlayer.localPosition;
+            float step=Smooth(0,Mathf.Max(1,movieImpactTime-.28f),time);
+            SampleFutureDoor(step,ref position,ref camera,ref look,ref action);
+            moviePlayer.localPosition=position;
+            moviePlayer.localRotation=Quaternion.Euler(0,180,0);
+            moviePerformance.Play(action,step);
+            FitPortraitSubject(futureDoorSubjects,HorizonCinemaLayout.SubjectAperture,CinematicFieldOfView(time),ref camera,ref look);
+            CurrentCinematicShot="Walk through the recorded future threshold";
+            CurrentCinematicFraming=CinematicFraming.Medium;
+        }
         public void EndImaginationScene()
         {
             if(!imaginationSceneActive) return;
@@ -212,6 +276,9 @@ namespace Horizon.UI
             imaginationSceneActive=false; imaginedScene=null; cinematicStage.gameObject.SetActive(false);
             imaginationWalkSet=false; imaginationOverview=false; if(lifeStage!=null) lifeStage.gameObject.SetActive(false);
             if(projectionWorld!=null) projectionWorld.gameObject.SetActive(false);
+            if(futureDoorFrame!=null) futureDoorFrame.gameObject.SetActive(false);
+            movieAnchor.Find("Possible future doorway").gameObject.SetActive(true);
+            movieLight.transform.localPosition=new Vector3(0,3,0);
             ResetAdditionalVfx();
             movieAnchor.localScale=Vector3.one; optics?.Clear();
             cameraPosition=imaginationSavedCamera; cameraLook=imaginationSavedLook; WorldCamera.rect=imaginationSavedRect; WorldCamera.fieldOfView=imaginationSavedFov; SnapCamera();

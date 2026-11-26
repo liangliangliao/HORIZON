@@ -132,9 +132,13 @@ namespace Horizon.Game
         public readonly int PresentationMultiplier;
         public readonly IReadOnlyList<PresentationBeat> PresentationBeats;
         public readonly CinematicOutcome Outcome;
-        public RewardPlan(DomainEvent e, List<MaterialReward> objects, List<CinematicCue> cues, float duration, int multiplier, List<PresentationBeat> beats = null)
+        public readonly OrbitCinematic Orbit;
+        public readonly bool RecordedEcho;
+        public RewardPlan(DomainEvent e, List<MaterialReward> objects, List<CinematicCue> cues, float duration, int multiplier,
+            List<PresentationBeat> beats = null, OrbitCinematic orbit = null)
         { Event = e.Copy(); Objects = objects.AsReadOnly(); Cues = cues.OrderBy(c => c.Time).ToList().AsReadOnly(); Duration = duration; PresentationMultiplier = multiplier;
-            PresentationBeats = (beats ?? new List<PresentationBeat> { new PresentationBeat(0, multiplier) }).AsReadOnly(); Outcome=new CinematicOutcome(Event); }
+            PresentationBeats = (beats ?? new List<PresentationBeat> { new PresentationBeat(0, multiplier) }).AsReadOnly(); Outcome=new CinematicOutcome(Event);
+            Orbit = orbit; RecordedEcho = RewardDirector.HasRecordedEcho(Event, objects); }
         public int PresentationMultiplierAt(float time)
         { int value = 1; foreach (PresentationBeat beat in PresentationBeats) { if (beat.Time > time) break; value = beat.Multiplier; } return value; }
         public string ResourceCopy { get { return string.Join(" · ", Objects.Where(o => o.Class == RewardObjectClass.Resource).Select(o => o.Copy)); } }
@@ -160,7 +164,25 @@ namespace Horizon.Game
     public static class RewardDirector
     {
         public const string Version = "1.1";
-        public static RewardPlan Direct(DomainEvent source)
+        public static RewardPlan Direct(DomainEvent source) => Direct(source, null);
+
+        public static RewardPlan DirectOrbit(IReadOnlyList<DomainEvent> sources)
+        {
+            if (sources == null || sources.Count == 0 || !sources.All(OrbitCinematic.HasRecordedNode) ||
+                sources.Any(source => source.day != sources[0].day))
+                throw new ArgumentException("Orbit sequences require recorded activations on one day.", nameof(sources));
+            for (int i = 1; i < sources.Count; i++)
+                if (sources[i].receipt.orbitBits != (sources[i - 1].receipt.orbitBits | (1 << sources[i].receipt.orbitIndex)) ||
+                    sources[i].receipt.orbitBits == sources[i - 1].receipt.orbitBits)
+                    throw new ArgumentException("Orbit sequences require consecutive state changes.", nameof(sources));
+            return Direct(sources[0], sources);
+        }
+
+        internal static bool HasRecordedEcho(DomainEvent source, IEnumerable<MaterialReward> objects) =>
+            source.kind == DomainEventKind.TimeEcho && source.receipt?.sourceDay > 0 && source.receipt.sourceDay < source.day &&
+            !string.IsNullOrWhiteSpace(source.receipt.action) && objects.Any(item => item.Class == RewardObjectClass.Resource && item.Amount > 0);
+
+        private static RewardPlan Direct(DomainEvent source, IReadOnlyList<DomainEvent> orbitSources)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             DomainEvent e = source.Copy(); RewardReceipt r = e.receipt ?? new RewardReceipt();
@@ -248,6 +270,18 @@ namespace Horizon.Game
                 AddCues(cues,duration,Story(e,r),e.tier);
             }
             duration=CinematicReading.Retime(e,cues,duration);
+            float impact = cues.Single(cue => !cue.NodeHit && cue.Phase == CinematicPhase.Impact).Time;
+            if (HasRecordedEcho(e, objects) || OrbitCinematic.HasRecordedNode(e))
+            {
+                int reveal = cues.FindIndex(cue => !cue.NodeHit && cue.Phase == CinematicPhase.Multiplication);
+                cues[reveal] = new CinematicCue(impact + .23f, CinematicPhase.Multiplication, cues[reveal].Copy);
+            }
+            OrbitCinematic orbit = null;
+            if (OrbitCinematic.HasRecordedNode(e))
+            {
+                float overview = cues.Single(cue => cue.Phase == CinematicPhase.SecondReveal).Time;
+                orbit = new OrbitCinematic(orbitSources ?? new[] { e }, impact, overview);
+            }
             var beats = new List<PresentationBeat>();
             if (e.kind == DomainEventKind.PatternBroken && e.tier == RewardTier.Mythic)
             {
@@ -256,7 +290,7 @@ namespace Horizon.Game
                 if (multiplier > 100) beats.Add(new PresentationBeat(duration * .75f, multiplier));
             }
             else { beats.Add(new PresentationBeat(0, 1)); beats.Add(new PresentationBeat(cues.First(c => c.Phase == CinematicPhase.Impact).Time, multiplier)); }
-            return new RewardPlan(e, objects, cues, duration, multiplier, beats);
+            return new RewardPlan(e, objects, cues, duration, multiplier, beats, orbit);
         }
         public static float CausalNodeSeconds(string copy)
         { return Math.Max(2.6f,CinematicReading.ReadSeconds(copy)+.5f); }

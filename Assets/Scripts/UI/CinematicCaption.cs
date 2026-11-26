@@ -171,7 +171,9 @@ namespace Horizon.UI
         {
             if(plan==null) return;
             float second=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
-            OutcomeFrame outcome=plan.Outcome.Sample(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion);
+            OutcomeFrame outcome=plan.RecordedEcho?
+                plan.Outcome.SampleRecordedEcho(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion):
+                plan.Outcome.Sample(frame.Time,choreography.MultiplierTime,second,choreography.SettlementTime,VisualPreferences.ReducedMotion);
             LifeActionFrame lifeAction=default(LifeActionFrame);
             bool actionBeforeReveal=actionStory!=null && actionStory.Enabled && frame.Time<actionStory.Reveal;
             if(actionBeforeReveal) lifeAction=actionStory.Sample(frame.Time,VisualPreferences.ReducedMotion);
@@ -217,12 +219,25 @@ namespace Horizon.UI
             if(Multiplier!=null) Multiplier.text=outcome.Visible?outcome.Copy:"";
             if(MultiplierCaption!=null) MultiplierCaption.text=outcome.Visible?outcome.Heading:"";
             if(OutcomeContext!=null) OutcomeContext.text=outcome.Visible && !outcome.Future && outcome.Index>=0?
-                (outcome.Index+1)+" / "+plan.Outcome.Changes.Count+" · 实际记录":"";
+                plan.RecordedEcho?"实际记录":(outcome.Index+1)+" / "+plan.Outcome.Changes.Count+" · 实际记录":"";
 
             if(OutcomeContext!=null && plan.Outcome.WalkRecovery && outcome.Visible)
             {
                 if(outcome.Future) OutcomeContext.text=plan.Outcome.RecoverySummary;
                 else if(outcome.Index>0) OutcomeContext.text=plan.Outcome.Changes[0].Copy()+"　·　已恢复";
+            }
+            if (plan.Orbit != null)
+            {
+                OrbitCinematicBeat beat = plan.Orbit.BeatAt(frame.Time);
+                bool lit = frame.Time >= beat.Time;
+                bool overview = frame.Time >= second;
+                if (Phase != null) Phase.text = lit ? "方向已点亮" : "方向即将点亮";
+                if (Story != null) Story.text = overview ? plan.Orbit.ReceiptCopy : MasterSpecification.OrbitNames[beat.Direction];
+                if (Multiplier != null) Multiplier.text = "";
+                if (MultiplierCaption != null) MultiplierCaption.text = "";
+                if (OutcomeContext != null) OutcomeContext.text = "";
+                if (Resources != null) Resources.text = receipt > .001f ? plan.Orbit.ReceiptCopy : "";
+                CinematicTypography.Reveal(Story, int.MaxValue);
             }
 
             float sx=VisualPreferences.ReducedMotion?0:
@@ -235,7 +250,8 @@ namespace Horizon.UI
                 Color.Lerp(accent,Palette.Gold,frame.Glow*.42f),frame.Glow*.72f,.035f,4,false);
             Style(Story,frame.CopyScale,new Vector2(sx*.68f,-sy*.42f),frame.CopyAlpha*frame.EndAlpha,
                 Color.Lerp(Palette.Text,Color.white,frame.Flash*.45f),frame.Glow*.82f,.045f,2,true);
-            float revealAlpha=outcome.Visible?Mathf.Clamp01(outcome.Age/.16f)*frame.EndAlpha:0;
+            float revealAlpha=outcome.Visible?(plan.RecordedEcho && !outcome.Future ? Mathf.Lerp(.82f,1,Mathf.Clamp01(outcome.Age/.16f)) :
+                Mathf.Clamp01(outcome.Age/.16f))*frame.EndAlpha:0;
             float revealScale=VisualPreferences.ReducedMotion?1:1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
             Color resultColor=outcome.Negative?Palette.Coral:Palette.Gold;
             if(plan.Outcome.WalkRecovery && outcome.HasResource && plan.Outcome.Changes[outcome.Index].Axis==0)

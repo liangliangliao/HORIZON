@@ -16,7 +16,7 @@ namespace Horizon.UI
         private Mesh embossedCoin, rewardStar;
         private Material showcaseEnamel, rewardCrystal, jackpotAura;
         private RewardSpectacle spectacle;
-        private MaterialReward activeHeroReward;
+        private MaterialReward activeHeroReward, echoGainSubject;
         private MaterialReward[] outcomeResources;
         private RewardSpectacleFrame spectacleFrame;
         private OutcomeFrame resourceBeat;
@@ -99,6 +99,7 @@ namespace Horizon.UI
             consequenceTime=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
             jackpotStage.gameObject.SetActive(true);
             outcomeResources=plan.Objects.Where(o=>o.Class==RewardObjectClass.Resource).ToArray();
+            echoGainSubject=plan.RecordedEcho?outcomeResources.FirstOrDefault(reward=>reward.Amount>0):null;
             MaterialReward receipt=spectacle.HasHero?spectacle.HeroReward:outcomeResources.FirstOrDefault();
             if(receipt!=null)
                 SelectShowcaseHero(receipt);
@@ -140,7 +141,7 @@ namespace Horizon.UI
 
         private void ResetJackpotStage()
         {
-            spectacle=null; showcaseHero=null; activeHeroReward=null; outcomeResources=null; outcomeSubjectFocus=0;
+            spectacle=null; showcaseHero=null; activeHeroReward=null; echoGainSubject=null; outcomeResources=null; outcomeSubjectFocus=0;
             showcaseCameraWeight=0; showcaseSubjectRenderers=null;
             foreach(Renderer renderer in showcaseOccluders) if(renderer!=null) renderer.enabled=true;
             showcaseOccluders.Clear();
@@ -157,6 +158,13 @@ namespace Horizon.UI
         private void SampleJackpotStage(float time,ref Vector3 camera,ref Vector3 look)
         {
             if(spectacle==null) return;
+            if(moviePlan.Orbit!=null)
+            {
+                resultLightAge=-1;
+                showcaseCameraWeight=0;
+                jackpotStage.gameObject.SetActive(false);
+                return;
+            }
             // Seeking can jump from an establishing shot with this parent
             // hidden straight into the resource reveal. Framing needs active
             // renderer bounds now, not after this frame has been rendered.
@@ -169,6 +177,7 @@ namespace Horizon.UI
             bool keepResource=resourceBeat.HasResource || resourceBeat.Visible && !spectacle.HasHero;
             MaterialReward subject=keepResource && resourceBeat.Index>=0 && resourceBeat.Index<outcomeResources.Length?
                 outcomeResources[resourceBeat.Index]:defaultSubject;
+            if(echoGainSubject!=null) subject=echoGainSubject;
             if(subject!=null && subject!=activeHeroReward) SelectShowcaseHero(subject);
             bool memento=spectacle.HasHero && subject!=null && subject.Class!=RewardObjectClass.Resource &&
                 time>=spectacle.HeroTime && time<spectacle.SettlementTime;
@@ -191,6 +200,11 @@ namespace Horizon.UI
             float preview=ShowingResource?0:tensionFrame.Preview;
             bool heldReveal=cinemaTension!=null && cinemaTension.PreviewStart<cinemaTension.Reveal && time>=cinemaTension.RevealHold && time<moviePlan.Duration*.94f && !preferences.reducedMotion;
             bool hero=heroFocus>.001f || preview>.001f || heldReveal;
+            if(moviePlan.RecordedEcho && time>=spectacle.ImpactTime && time<spectacle.SettlementTime)
+            {
+                hero=true;
+                heroFocus=1;
+            }
             showcaseCameraWeight=hero?(heldReveal?1:preview>0?preview:heroFocus):0;
             showcaseCenter=showcaseHero!=null?new Vector3(0,1.6f,2):moviePlayer.localPosition+Vector3.up*1.15f;
             if(showcaseHero!=null)
@@ -203,7 +217,8 @@ namespace Horizon.UI
                 float detailTremor=preferences.reducedMotion || tensionFrame.Silent || ShowingResource?0:Mathf.Pow(energyFrame.Inward,1.8f)*.035f*(.76f+.24f*Mathf.Sin(time*19));
                 float scale=showcaseScale*(.72f+heroFocus*.28f+breath+bounce);
                 if(preview>0) scale=showcaseScale*(.80f-preview*.055f);
-                float arrival=ShowingResource?resourceBeat.Entrance(preferences.reducedMotion):1;
+                float arrival=moviePlan.RecordedEcho ? preferences.reducedMotion?1:ImmersiveMotion.Land((time-spectacle.ImpactTime+.18f)/.52f) :
+                    ShowingResource?resourceBeat.Entrance(preferences.reducedMotion):1;
                 float turn=(1-arrival)*(resourceBeat.Negative?22:-48);
                 if(ShowingResource) scale=showcaseScale*(.78f+.22f*arrival);
                 showcaseHero.localScale=Vector3.one*scale;
@@ -212,7 +227,8 @@ namespace Horizon.UI
                     Mathf.Cos(time*67)*detailTremor*28);
                 showcaseHero.localPosition=showcaseCenter-showcaseHero.localRotation*(showcaseOffset*scale)+
                     new Vector3(Mathf.Sin(time*79),Mathf.Cos(time*71),0)*detailTremor;
-                float travel=ShowingResource?resourceBeat.DeviceTravel(preferences.reducedMotion):frame.Lid;
+                float travel=moviePlan.RecordedEcho?preferences.reducedMotion?1:Smooth(spectacle.ImpactTime,spectacle.ImpactTime+.47f,time):
+                    ShowingResource?resourceBeat.DeviceTravel(preferences.reducedMotion):frame.Lid;
                 // The lamp already reverses its own intensity for a loss.
                 float assembly=activeHeroReward.Amount<0 && activeHeroReward.Class==RewardObjectClass.Resource ? 1-travel : travel;
                 SampleRewardDevice(showcaseHero,activeHeroReward,activeHeroReward.Kind==RewardObjectKind.WarmLamp?travel:assembly);
@@ -333,7 +349,7 @@ namespace Horizon.UI
 
         private void FrameJackpotStage()
         {
-            if(spectacle==null) return;
+            if(spectacle==null || moviePlan.Orbit!=null) return;
             RewardSpectacleFrame frame=spectacleFrame; Color tint=RewardEffectTint();
             float heroFocus=Mathf.Max(frame.Hero,outcomeSubjectFocus);
             float burst=tensionFrame.Silent || moviePhase==CinematicPhase.HitStop?0:Mathf.Max(frame.Burst,energyFrame.Burst);
@@ -364,12 +380,12 @@ namespace Horizon.UI
                 PlayWalkRecoverySounds(previous,now);
                 return;
             }
-            if(!ShowingResource || preferences.reducedMotion || tensionFrame.Silent || paused) return;
+            if(!ShowingResource || preferences.reducedMotion || tensionFrame.Silent || paused || moviePlan.RecordedEcho && resourceBeat.Index>0) return;
             float contact=spectacle.MultiplierTime+resourceBeat.Index*CinematicOutcome.ChangeSeconds+ImmersiveMotion.RevealContactSeconds;
             // A skipped section never queues a backlog of late sounds. Pose
             // resampling for screenshots or a settings toggle never plays one.
             if(previous>=contact || now<contact || now-contact>.18f) return;
-            bool gentle=resourceBeat.Negative || spectacle.Style==RewardSpectacleStyle.Quiet || spectacle.Style==RewardSpectacleStyle.Loss;
+            bool gentle=!moviePlan.RecordedEcho && resourceBeat.Negative || spectacle.Style==RewardSpectacleStyle.Quiet || spectacle.Style==RewardSpectacleStyle.Loss;
             if(gentle && resourceTap==null) resourceTap=ShortCueTone("Matte resource contact",148,.13f);
             if(!gentle && resourceChime==null) resourceChime=ShortCueTone("Glass resource contact",528,.22f);
 #if UNITY_EDITOR
@@ -406,7 +422,7 @@ namespace Horizon.UI
             resultLightMaterial.SetFloat("_Gain",quiet?0:1);
             // The receipt row owns its own time; its energy front and actual
             // counter unfold together. No second full-white flash per row.
-            EnergyRelease rowRelease=!still && !quiet && resourceBeat.HasResource &&
+            EnergyRelease rowRelease=!moviePlan.RecordedEcho && !still && !quiet && resourceBeat.HasResource &&
                 moviePlan.Event.tier>=RewardTier.Combo
                 ? EnergyRelease.Sample(resultLightAge,.65f*(cinematicEnergy?.Strength??0))
                 : default(EnergyRelease);

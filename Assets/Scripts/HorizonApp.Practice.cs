@@ -10,7 +10,8 @@ namespace Horizon
     public sealed partial class HorizonApp
     {
         private RectTransform practicePage, practiceOptions;
-        private Text practiceCaption, practiceHeading, practiceMeter;
+        private Text practiceCaption, practiceHeading, practiceMeter, practiceCosts;
+        private Image practiceSubtitle;
         private RectTransform practicePlaque;
         private Button practiceNext, practiceBack;
         private bool practiceCut, practiceBackground, skipPracticeReveal;
@@ -27,13 +28,15 @@ namespace Horizon
             practiceBack=practicePage.Find("Back master").GetComponent<Button>();
             practiceBack.transform.SetAsLastSibling();
             world.BeginPracticeSet(film);
-            View.Fill(practicePage,"Subtitle background",new Color(.014f,.03f,.05f,.95f),0,0,1,.33f);
+            practiceSubtitle=View.Fill(practicePage,"Subtitle background",new Color(.014f,.03f,.05f,.95f),0,0,1,.33f);
+            practiceCosts=null;
             practiceHeading=View.Label(practicePage,"Scene heading","选择挑战",24,Palette.Mint,TextAnchor.MiddleLeft,.07f,.272f,.94f,.318f);
             practiceCaption=View.Label(practicePage,"Action caption",film.Goal,37,Palette.Text,TextAnchor.MiddleLeft,.07f,.184f,.94f,.27f);
             practicePlaque=View.Panel(practicePage,"Prize readout",new Color(.042f,.031f,.075f,.95f),.16f,.785f,.84f,.878f,24).rectTransform;
             View.Fill(practicePlaque,"Engraved lower edge",Palette.Gold,.12f,.035f,.88f,.061f);
             practicePlaque.gameObject.SetActive(false);
-            practiceMeter=View.Label(practicePage,"Reward counter","",65,Palette.Gold,TextAnchor.MiddleCenter,.18f,.796f,.82f,.869f);
+            int counterSize=PracticeRewardCinematic.Supports(card.Id)?46:65;
+            practiceMeter=View.Label(practicePage,"Reward counter","",counterSize,Palette.Gold,TextAnchor.MiddleCenter,.18f,.796f,.82f,.869f);
             CinematicTypography.Upgrade(practiceMeter,true);
             CinematicTypography.Emboss(practiceMeter);
             CinematicTypography.Present(practiceMeter,Palette.Gold,.60f,.13f,.8f,true);
@@ -153,7 +156,12 @@ namespace Horizon
             ActionRecord action=CommitPracticeCard(card);
             int[] ticks=PracticeReward.Ticks(action.actualNow);
             int first=System.Array.FindIndex(ticks,v=>v>0);
-            if(first>=0)
+            if(first>=0 && PracticeRewardCinematic.Supports(card.Id))
+            {
+                yield return PlayPracticeRewardCinematic(owner,new PracticeRewardCinematic(action));
+                if(owner!=practicePage || owner==null) yield break;
+            }
+            else if(first>=0)
             {
                 world.PreparePracticePayout(ticks, action.nodeId, take.difficulty);
                 world.SetPracticePrize(first,false);
@@ -176,6 +184,11 @@ namespace Horizon
             }
             practiceSkip.gameObject.SetActive(false);
             practicePlaque.gameObject.SetActive(false);
+            if(practiceCosts!=null)
+            {
+                practiceCosts.gameObject.SetActive(false);
+                practiceSubtitle.color=new Color(.014f,.03f,.05f,.85f);
+            }
             practiceHeading.text="完成凭证 +1 星尘 · 今日已结算";
             practiceCaption.text=PracticeReward.Label(action.actualNow)+"\n"+PracticeReward.EchoReceipt(action,session.Deadline).Replace('\n',' ');
             practiceMeter.text="";
@@ -185,6 +198,45 @@ namespace Horizon
                 ClearPracticeOptions(); practicePage=null; CloseMasterPage();
                 StartCoroutine(ResolveChoice(drag,card,action));
             },.16f,.04f,.84f,.14f,Palette.Mint,Palette.Ink,32);
+        }
+
+        private IEnumerator PlayPracticeRewardCinematic(RectTransform owner,PracticeRewardCinematic film)
+        {
+            practiceSubtitle.color=new Color(.014f,.03f,.05f,.28f);
+            var meter=(RectTransform)practiceMeter.transform;
+            meter.anchorMin=new Vector2(.10f,.155f);
+            meter.anchorMax=new Vector2(.90f,.270f);
+            practiceMeter.color=Palette.Gold;
+            practiceCosts=View.Label(owner,"Practice cost","",29,Palette.Coral,TextAnchor.MiddleCenter,.07f,.104f,.93f,.153f);
+            practiceCaption.text="";
+            practiceHeading.text="今日所得 · 蓄光";
+            practiceSkip.GetComponentInChildren<Text>().text="查看回执";
+            practiceSkip.gameObject.SetActive(true);
+            world.BeginPracticeRewardCinematic(film);
+            float time=archive.preferences.reducedMotion?PracticeRewardCinematic.GainTime:0;
+            while(owner==practicePage && owner!=null && !skipPracticeReveal)
+            {
+                if(!practiceBackground && !userPaused)
+                {
+                    bool reduced=archive.preferences.reducedMotion;
+                    PracticeRewardCinematicFrame frame=film.Sample(time,reduced);
+                    world.SamplePracticeRewardCinematic(film,frame);
+                    float receiptLight=reduced?1:ImmersiveMotion.Smooth((time-PracticeRewardCinematic.GainTime+.08f)/.23f);
+                    practiceSubtitle.color=new Color(.014f,.03f,.05f,Mathf.Lerp(.28f,.79f,receiptLight));
+                    string gains=film.Changes(time,true,reduced), cost=film.Changes(time,false,reduced);
+                    practiceMeter.text=gains;
+                    practiceCosts.text=cost.Length>0?"本次付出　"+cost:"";
+                    practiceHeading.text=time>=PracticeRewardCinematic.GainTime?"今日已入账":
+                        time>=PracticeRewardCinematic.ReleaseTime?"今日所得 · 开匣":"今日所得 · 蓄光";
+                    CinematicTypography.Sweep(practiceMeter,reduced?-1:time-PracticeRewardCinematic.GainTime);
+                    if(time>=PracticeRewardCinematic.Duration) break;
+                    time=Mathf.Min(PracticeRewardCinematic.Duration,time+
+                        Mathf.Min(.1f,Time.captureFramerate>0?Time.deltaTime:Time.unscaledDeltaTime));
+                }
+                yield return null;
+            }
+            if(owner==practicePage && owner!=null && skipPracticeReveal)
+                world.SamplePracticeRewardCinematic(film,film.Sample(PracticeRewardCinematic.Duration,archive.preferences.reducedMotion),playCues:false);
         }
 
         private static string RewardAction(int axis,bool gain)

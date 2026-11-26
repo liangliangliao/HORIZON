@@ -122,6 +122,23 @@ namespace Horizon.Game
             }
         }
         private static float Ease(float p) { p=Math.Max(0,Math.Min(1,p)); return p*p*(3-2*p); }
+
+        public OutcomeFrame SampleRecordedEcho(float seconds, float reveal, float secondReveal, float settlement, bool reducedMotion)
+        {
+            if (seconds < reveal || seconds >= secondReveal || seconds >= settlement)
+                return Sample(seconds, reveal, secondReveal, settlement, reducedMotion);
+            var gains = Changes.Where(change => change.Amount > 0);
+            var costs = Changes.Where(change => change.Amount < 0);
+            float age = seconds - reveal;
+            float progress = reducedMotion ? 1 : Ease(age / .93f);
+            string copy = string.Join("　", gains.Select(change => change.Copy(progress, true)));
+            if (reducedMotion || age >= 1.22f)
+            {
+                string debits = string.Join(" · ", costs.Select(change => change.Copy()));
+                if (debits.Length > 0) copy += "\n付出 · " + debits;
+            }
+            return new OutcomeFrame(true, false, 0, Heading, copy, Origin, age, progress, false);
+        }
     }
     public sealed class OutcomeChange
     {
@@ -129,11 +146,17 @@ namespace Horizon.Game
         public readonly string Name;
         private readonly int? ticks;
         public OutcomeChange(int axis,string name,int amount,bool precise=false) { Axis=axis; Name=name; Amount=precise ? Math.Sign(amount) : amount; if (precise) ticks=amount; }
-        public string Copy(float progress=1)
+        public string Copy(float progress=1, bool nonzeroGain=false)
         {
-            if (ticks.HasValue) return Name+" "+(ticks.Value < 0 ? "−" : "+")+PracticeReward.Format((int)(Math.Abs(ticks.Value)*Math.Min(1,Math.Max(0,progress))));
+            if (ticks.HasValue)
+            {
+                int displayed = (int)(Math.Abs(ticks.Value)*Math.Min(1,Math.Max(0,progress)));
+                if (nonzeroGain && ticks.Value > 0) displayed = Math.Max(1, displayed);
+                return Name+" "+(ticks.Value < 0 ? "−" : "+")+PracticeReward.Format(displayed);
+            }
             long magnitude=Math.Abs((long)Amount);
             long value=progress>=1?magnitude:(long)Math.Floor(magnitude*Math.Max(0,progress));
+            if (nonzeroGain && Amount > 0) value = Math.Max(1, value);
             return Name+" "+(Amount<0?"−":"+")+value;
         }
     }

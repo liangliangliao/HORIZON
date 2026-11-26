@@ -86,7 +86,12 @@ namespace Horizon.UI
                 burstCenter=moviePlayer.localPosition+Vector3.up;
                 effectPlane=Quaternion.Inverse(cinematicStage.rotation)*WorldCamera.transform.rotation;
             }
-            bool celebrates=spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
+            bool localComposition = moviePlan.Orbit!=null || moviePlan.RecordedEcho;
+            bool causal = relayPlan!=null && relayPlan.Nodes.Count>0;
+            bool celebrates=!localComposition && (!causal || relayPlan.MergeNode!=null) &&
+                spectacle.Style!=RewardSpectacleStyle.Loss && spectacle.Style!=RewardSpectacleStyle.Quiet;
+            if(causal && relayPlan.MergeNode is CausalRelayNode merge)
+                burstCenter=new Vector3(merge.X,merge.Y+.3f,merge.Z);
             float pose=cinemaTension!=null && cinemaTension.Enabled?tensionFrame.PoseTime:time;
             float attention=Mathf.Max(tensionFrame.Focus,energyFrame.Focus*.8f);
             // The aperture is a stage frame, never the subject. On action and
@@ -97,7 +102,7 @@ namespace Horizon.UI
             bool subjectClose=LifeActionPlaying && (actionShot==LifeActionShot.Action || actionShot==LifeActionShot.Suspense ||
                 moviePlan.Outcome.WalkRecovery && actionShot==LifeActionShot.Reveal && !cinematicOverviewRequested);
             if(cinemaHaloRenderers!=null)
-                foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!subjectClose;
+                foreach(Renderer renderer in cinemaHaloRenderers) renderer.enabled=!subjectClose && !localComposition;
             cinemaBackdropMaterial.SetColor("_Color",tint*(1-attention*.8f)); cinemaBackdropMaterial.SetFloat("_Clock",preferences.reducedMotion?0:pose);
             cinemaRotor.localRotation=Quaternion.Euler(0,0,preferences.reducedMotion?0:pose*7);
             if(!Mathf.Approximately(architectureFocus,attention))
@@ -110,14 +115,16 @@ namespace Horizon.UI
             float pulse=0,burstTime=-10;
             foreach(CinematicCue cue in moviePlan.Cues)
             {
-                bool burst=!cue.NodeHit && (cue.Phase==CinematicPhase.Impact || cue.Phase==CinematicPhase.SecondReveal || cue.Phase==CinematicPhase.Jackpot);
+                bool burst=!cue.NodeHit && (cue.Phase==CinematicPhase.Impact || !causal &&
+                    (cue.Phase==CinematicPhase.SecondReveal || cue.Phase==CinematicPhase.Jackpot));
                 if(!celebrates || !burst || cue.Time>time) continue;
                 float age=time-cue.Time;
                 pulse=Mathf.Max(pulse,Mathf.Exp(-age*3.2f)); burstTime=Mathf.Max(burstTime,cue.Time);
             }
             if(tensionFrame.Silent) pulse=0;
             int authoredRibbonBudget=moviePlan.Event.tier<=RewardTier.Local?4:moviePlan.Event.tier==RewardTier.Combo?8:cinemaRibbons.Length;
-            int ribbonBudget=preferences.reducedMotion || InResultShot?0:LowCostEffects?Mathf.Min(5,authoredRibbonBudget):authoredRibbonBudget;
+            int ribbonBudget=preferences.reducedMotion || InResultShot || localComposition || causal && relayPlan.MergeNode==null?0:
+                LowCostEffects?Mathf.Min(5,authoredRibbonBudget):authoredRibbonBudget;
             for(int i=0;i<cinemaRibbons.Length;i++)
             {
                 LineRenderer line=cinemaRibbons[i];

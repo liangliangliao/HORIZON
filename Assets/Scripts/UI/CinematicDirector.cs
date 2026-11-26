@@ -35,10 +35,22 @@ namespace Horizon.UI
         public void Initialize(HorizonWorld3D target) { world = target; }
         public bool Enqueue(DomainEvent e, bool fullscreen = false, Action completed = null)
         {
-            if (e == null || string.IsNullOrEmpty(e.id) || !scheduled.Add(e.id)) return false;
+            if (e == null || string.IsNullOrEmpty(e.id) || scheduled.Contains(e.id)) return false;
+            return Enqueue(RewardDirector.Direct(e), completed);
+        }
+        public bool Enqueue(RewardPlan plan, Action completed)
+        {
+            if (plan == null || string.IsNullOrEmpty(plan.Event.id)) return false;
+            if (scheduled.Contains(plan.Event.id)) return false;
+            if (plan.Orbit != null)
+                foreach (OrbitCinematicBeat beat in plan.Orbit.Beats)
+                    if (scheduled.Contains(beat.EventId)) return false;
+            scheduled.Add(plan.Event.id);
+            if (plan.Orbit != null)
+                foreach (OrbitCinematicBeat beat in plan.Orbit.Beats) scheduled.Add(beat.EventId);
             // Every authored reward is now a full-screen movie. Keep the
             // parameter for source compatibility with older callers/replays.
-            queue.Enqueue(new Request { plan = RewardDirector.Direct(e), completed = completed, fullscreen = true });
+            queue.Enqueue(new Request { plan = plan, completed = completed, fullscreen = true });
             if (active == null) BeginNext(); return true;
         }
         private void BeginNext()
@@ -71,6 +83,7 @@ namespace Horizon.UI
             if (active!=playing) return;
             if (graph.IsValid()) { track.SetTime(advancing.Elapsed); graph.Evaluate(0); }
             world.PlayResourceContact(previous,advancing.Elapsed);
+            world.PlayOrbitCinematicCue(previous,advancing.Elapsed);
             if (advancing.Finished) Finish();
         }
         public void Skip()
@@ -91,6 +104,8 @@ namespace Horizon.UI
             Request ended = active; active = null; clock = null;
             if (graph.IsValid()) graph.Destroy();
             world.EndCinematic(); scheduled.Remove(ended.plan.Event.id);
+            if (ended.plan.Orbit != null)
+                foreach (OrbitCinematicBeat beat in ended.plan.Orbit.Beats) scheduled.Remove(beat.EventId);
             Completed?.Invoke(ended.plan); ended.completed?.Invoke();
             if (active == null) BeginNext();
         }

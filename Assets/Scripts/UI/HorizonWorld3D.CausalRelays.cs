@@ -157,8 +157,15 @@ namespace Horizon.UI
                 bool travelling=from.Lit && travel>.002f && travel<.998f && !preferences.reducedMotion;
                 bool lit=from.Lit && to.Lit;
                 Vector3 begin=movieNodes[edge.From].localPosition,end=movieNodes[edge.To].localPosition;
-                Vector3 tip=Vector3.Lerp(begin,end,travel);
-                MovieLine(relayEdges[i],begin,travelling?tip:end);
+                LineRenderer line=relayEdges[i];
+                line.gameObject.SetActive(lit || travelling);
+                Vector3 tip=begin;
+                for(int point=0;point<line.positionCount;point++)
+                {
+                    float p=point/(float)(line.positionCount-1)*(lit?1:travel);
+                    tip=Vector3.Lerp(begin,end,p)+Vector3.up*Mathf.Sin(p*Mathf.PI)*.16f;
+                    line.SetPosition(point,tip);
+                }
                 relayPulses[i].gameObject.SetActive(travelling);
                 if(travelling)
                 {
@@ -168,6 +175,13 @@ namespace Horizon.UI
                 relayEdges[i].widthMultiplier=travelling?.037f:lit?.022f+to.Pulse*.035f:.012f;
                 Color tint=travelling?Palette.Gold:lit?(final?Palette.Gold:Palette.Mint):Palette.Muted*.2f;
                 SetMovieColor(relayEdges[i].transform,tint*to.Fade*(1-tensionFrame.Focus*.9f));
+            }
+            if(relayPlan.MergeNode is CausalRelayNode merge && time>=relayPlan.ImpactTime)
+            {
+                immersionFocus=new Vector3(merge.X,merge.Y+.27f,merge.Z);
+                movieLight.transform.localPosition=immersionFocus+new Vector3(0,.5f,-.4f);
+                movieLight.color=new Color(.64f,.79f,1);
+                movieLight.intensity=.48f+2.1f*relayPlan.Sample(merge.Index,time,preferences.reducedMotion).Pulse;
             }
             foreach(Transform tile in movieTiles)
                 if(tensionFrame.Focus>.001f) SetMovieColor(tile,floor.GetColor("_Color")*(1-tensionFrame.Focus*.8f));

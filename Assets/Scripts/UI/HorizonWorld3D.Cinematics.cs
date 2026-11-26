@@ -144,8 +144,12 @@ namespace Horizon.UI
             foreach(Transform x in movieNodes) { x.gameObject.SetActive(false); x.localScale=Vector3.one*.16f; }
             foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
-            movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
+            movieLight.intensity=0; movieLight.transform.localPosition=new Vector3(0,3,0); movieLight.range=10;
+            PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
             PrepareJackpotStage(plan,true);
+            PrepareOrbitCinematic();
+            PrepareRecordedEcho();
+            if(plan.Event.kind==DomainEventKind.Victory) PrepareFutureDoor();
             PrepareCausalRelays();
             PrepareCinemaProduction();
             PrepareCinemaTension();
@@ -215,10 +219,11 @@ namespace Horizon.UI
                 movieMuted=false; UpdateAudio();
                 foreach (HorizonActor actor in cinematicStage.GetComponentsInChildren<HorizonActor>(true)) actor.MotionRate=1;
                 movieParticles.Play();
-                Vector3 hit=cinematicStage.TransformPoint(new Vector3(0,1.3f,2));
+                Vector3 hit=cinematicStage.TransformPoint(relayPlan?.MergeNode is CausalRelayNode merge ?
+                    new Vector3(merge.X,merge.Y,merge.Z) : new Vector3(0,1.3f,2));
                 float strength=cinematicEnergy?.Strength??0;
                 bool celebrating=cinematicEnergy?.Celebrates==true;
-                if(celebrating)
+                if(celebrating && moviePlan.Orbit==null && !moviePlan.RecordedEcho && (relayPlan==null || relayPlan.Nodes.Count==0 || relayPlan.MergeNode!=null))
                 {
                     MovieBurst(hit,Mathf.RoundToInt(6+38*strength));
                     CueSound(ImpactVoice(moviePlan.Event.kind),.26f+.57f*strength);
@@ -226,6 +231,7 @@ namespace Horizon.UI
                     MasterHaptics.Impact(moviePlan.Event,preferences);
                     if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.085f:.022f; if(bloom!=null) bloom.Echo=.45f; }
                 }
+                if(moviePlan.RecordedEcho) CueSound(ImpactVoice(DomainEventKind.TimeEcho),.42f);
                 bool losing = spectacle.Style==RewardSpectacleStyle.Loss;
                 if(losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
                 else if(celebrating) moviePlayer.GetComponent<HorizonActor>().Celebrate();
@@ -242,11 +248,9 @@ namespace Horizon.UI
             {
                 movieFuture.gameObject.SetActive(true); movieFuture.GetComponent<HorizonActor>().Pointing=true;
                 CueSound(nodeTone,.5f);
-                if(cinemaTension!=null && cinemaTension.SourceCloseup) CueSound(impactTone,.65f);
-                if(cinematicEnergy!=null && cinematicEnergy.Celebrates) PlayRevealShimmer(.6f);
+                if(cinemaTension!=null && cinemaTension.SourceCloseup) CueSound(impactTone,.33f);
+                else if(cinematicEnergy!=null && cinematicEnergy.Celebrates && !moviePlan.RecordedEcho) PlayRevealShimmer(.6f);
             }
-            if(cue.Phase==CinematicPhase.Jackpot && cinemaTension!=null && cinemaTension.SourceCloseup)
-                CueSound(impactTone,.95f);
         }
         private void CueSound(AudioClip clip,float volume)
         {
@@ -375,9 +379,12 @@ namespace Horizon.UI
             FrameCinematicOverview(time,ref camera,ref look);
             SampleLifeAction(time,ref camera,ref look);
             FrameShowcaseInReadingAperture(time,ref camera,ref look);
+            SampleOrbitCinematic(time,ref camera,ref look);
+            SampleRecordedEcho(time);
+            SampleVictoryArrival(time,ref camera,ref look);
             FrameCinematicSafety(time,ref camera,ref look);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
-            if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent)
+            if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent && moviePlan.Orbit==null)
             {
                 float anticipation=Mathf.Pow(Mathf.Max(energyFrame.Inward,lifePressure),4)*(.008f+.018f*(int)moviePlan.Event.tier/6f);
                 WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*(shake+anticipation);
@@ -452,6 +459,10 @@ namespace Horizon.UI
             ResetImmersion();
             ResetCinemaProduction();
             ResetCausalRelays();
+            if(orbitCinematicStage!=null) orbitCinematicStage.gameObject.SetActive(false);
+            if(echoTrace!=null) echoTrace.gameObject.SetActive(false);
+            if(futureDoorFrame!=null) futureDoorFrame.gameObject.SetActive(false);
+            movieAnchor.Find("Possible future doorway").gameObject.SetActive(true);
             ResetJackpotStage();
             EndLifeAction();
             cinematicOverviewRequested=false;

@@ -72,7 +72,7 @@ namespace Horizon.Game
             if(reducedMotion) return new CinematicEnergyFrame(time,0,0,.18f*afterglow,0,settle,last,0);
             // Only actual positive results receive the new celebration layers.
             // Node hits keep their original relay accents; only the main impact flashes.
-            var release=verifiedRelease && plan.Event.tier>=RewardTier.Combo
+            var release=verifiedRelease && (plan.Event.tier>=RewardTier.Combo || plan.RecordedEcho)
                 ? EnergyRelease.Sample(time-spectacle.ImpactTime,Strength*(1-settle))
                 : default(EnergyRelease);
             return new CinematicEnergyFrame(time,charge*Strength,burst*Strength*(1-settle),

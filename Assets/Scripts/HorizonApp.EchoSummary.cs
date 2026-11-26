@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
@@ -59,11 +60,22 @@ namespace Horizon
             if (state == null) return;
             var pending = RewardPlayback.Pending(state.events).Where(e=>e.tier<RewardTier.Mythic).ToList();
             BindLocalCinematicCopy();
-            foreach (DomainEvent e in pending)
+            for (int i = 0; i < pending.Count; i++)
             {
-                DomainEvent shown = e;
-                world.PresentMasterEvent(shown, () => {
-                    shown.acknowledged = true;
+                DomainEvent first = pending[i];
+                var shown = new List<DomainEvent> { first };
+                if (OrbitCinematic.HasRecordedNode(first))
+                    while (i + 1 < pending.Count && OrbitCinematic.HasRecordedNode(pending[i + 1]) && pending[i + 1].day == first.day)
+                    {
+                        DomainEvent next = pending[i + 1];
+                        int previous = shown[shown.Count - 1].receipt.orbitBits;
+                        if (next.receipt.orbitBits == previous || next.receipt.orbitBits != (previous | (1 << next.receipt.orbitIndex))) break;
+                        shown.Add(next);
+                        i++;
+                    }
+                var plan = shown.Count > 1 ? RewardDirector.DirectOrbit(shown) : RewardDirector.Direct(first);
+                world.Cinematics.Enqueue(plan, () => {
+                    foreach (DomainEvent item in shown) item.acknowledged = true;
                     if (session != null && session.CompletedRun == null && archive.active?.runNumber == session.RunNumber) archive.active = session.Snapshot();
                     Save();
                 });

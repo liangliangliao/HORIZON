@@ -14,6 +14,7 @@ namespace Horizon.Game
         private readonly CinematicCue[] readingChapters;
         private readonly CinematicEnergy energy;
         private readonly LifeActionStoryboard action;
+        private readonly System.Collections.Generic.IReadOnlyList<RewardEvidence> causalEvidence;
         public readonly float ImpactTime, MultiplierTime, SettlementTime;
 
         public CinematicTextChoreography(RewardPlan value)
@@ -23,6 +24,7 @@ namespace Horizon.Game
             readingChapters=chapters.Where(c=>CinematicReading.IsChapter(plan.Event,c.Phase)).ToArray();
             energy=new CinematicEnergy(plan);
             action=new LifeActionStoryboard(plan);
+            causalEvidence=CausalRelayPlan.OrderedEvidence(plan.Event.receipt?.causes);
             ImpactTime=TimeOf(CinematicPhase.Impact,plan.Duration*.52f);
             MultiplierTime=TimeOf(CinematicPhase.Multiplication,ImpactTime);
             SettlementTime=TimeOf(CinematicPhase.Settlement,plan.Duration*.86f);
@@ -61,6 +63,7 @@ namespace Horizon.Game
                 if(age>=0) flash=Math.Max(flash,(float)Math.Exp(-age/.38f));
             }
             bool held=chapter!=null && chapter.Phase==CinematicPhase.HitStop && time<ImpactTime;
+            if(reducedMotion || plan.Orbit!=null || plan.RecordedEcho) flash=0;
             float tremor=reducedMotion || held?0:(float)Math.Pow(e.Inward,3.2f);
             float multiplierAge=time-MultiplierTime;
             float secondReveal=TimeOf(CinematicPhase.SecondReveal,SettlementTime);
@@ -72,7 +75,7 @@ namespace Horizon.Game
             CinematicCue node=plan.Cues.LastOrDefault(c=>c.NodeHit && c.Time<=time);
             if(node!=null && time<ImpactTime)
             {
-                RewardEvidence cause=plan.Event.receipt?.causes.OrderBy(c=>c.day).ElementAtOrDefault(node.NodeIndex);
+                RewardEvidence cause=node.NodeIndex<causalEvidence.Count?causalEvidence[node.NodeIndex]:null;
                 if(cause!=null) narration="第 "+cause.day+" 天 · "+PresentationCopy.Chinese(cause.label);
             }
             if(action.Enabled && time<MultiplierTime) narration=action.Sample(time,reducedMotion).Copy;

@@ -102,7 +102,10 @@ namespace Horizon.Tests
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled actual causal relays");
                     AssertOpeningCloseup(world,stage);
                     Assert.AreEqual(relay.Nodes.Count,stage.Cast<Transform>().Count(t=>t.gameObject.activeSelf && t.name.StartsWith("Causal relay ·")));
-                    Assert.AreEqual(relay.Edges.Count,stage.GetComponentsInChildren<LineRenderer>().Count(l=>l.name.StartsWith("Recorded cause ·")));
+                    Assert.AreEqual(relay.Edges.Count,stage.GetComponentsInChildren<LineRenderer>(true)
+                        .Count(l=>relay.Edges.Any(edge=>l.name=="Recorded cause · "+relay.Nodes[edge.From].Evidence.id+" → "+relay.Nodes[edge.To].Evidence.id)));
+                    Assert.IsFalse(stage.GetComponentsInChildren<LineRenderer>().Any(l=>l.name.StartsWith("Recorded cause ·")),
+                        "A causal edge is drawn only as its recorded parent sends a pulse.");
                     Assert.IsFalse(world.GetComponentsInChildren<LineRenderer>().Any(l=>l.name.StartsWith("Cause beam")),"Independent chronological neighbours must not be linked.");
                     float first=relay.Nodes[0].ActivationTime;
                     world.Cinematics.Advance(first-.01f);
@@ -186,7 +189,7 @@ namespace Horizon.Tests
                     Assert.Greater(PcmPeak(pcm,tension.PreviewStart+.1f,tension.RevealHold-.05f),50,"Charge must be audible before silence.");
                     Assert.Greater(PcmPeak(pcm,tension.Reveal,tension.Reveal+.15f),50,"Release must restore the node cue sound.");
                     float jackpot=world.Cinematics.Current.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot).Time;
-                    Assert.Greater(PcmPeak(pcm,jackpot,jackpot+.15f),50,"The final network burst must have its synchronized impact sound.");
+                    Assert.AreEqual(0,PcmPeak(pcm,jackpot,jackpot+.15f),"The receipt chapter must not replay a network impact.");
                     Assert.AreEqual(CinematicOutcome.EventHeading(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
                     Assert.AreEqual(CinematicOutcome.Readable(source.detail),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
                     foreach(string name in new[] {"Reward event title","Reward original explanation","Reward actual resources"})

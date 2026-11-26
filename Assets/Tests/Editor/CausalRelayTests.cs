@@ -125,14 +125,14 @@ namespace Horizon.Tests
             Assert.Throws<ArgumentOutOfRangeException>(()=>relay.Sample(0,float.NaN,false));
         }
         [Test]
-        public void ActualSecondRevealAndJackpotReigniteTheRecordedNetwork()
+        public void LaterReadingChaptersKeepTheRecordedNetworkLitWithoutASecondClimax()
         {
             var source=ActualCascade(DomainEventKind.CausalSingularity); string before=JsonUtility.ToJson(source);
             RewardPlan plan=RewardDirector.Direct(source); var relay=new CausalRelayPlan(plan);
             foreach(CinematicPhase phase in new[] {CinematicPhase.SecondReveal,CinematicPhase.Jackpot})
             {
                 float cue=plan.Cues.Single(c=>!c.NodeHit && c.Phase==phase).Time;
-                Assert.Greater(relay.Sample(0,cue+.001f,false).Beam,relay.Sample(0,cue-.01f,false).Beam);
+                Assert.LessOrEqual(relay.Sample(0,cue+.001f,false).Beam,relay.Sample(0,cue-.01f,false).Beam);
                 Assert.IsTrue(relay.Nodes.All(n=>relay.Sample(n.Index,cue+.001f,false).Lit));
                 Assert.AreEqual(0,relay.Sample(0,cue+.001f,true).Beam);
             }
@@ -142,7 +142,10 @@ namespace Horizon.Tests
         public void SharedNetworkReleaseKeepsDetailInsteadOfStackingEveryBeamAtFullWhite()
         {
             RewardPlan plan=Merge(); var relay=new CausalRelayPlan(plan);
-            Assert.That(relay.Sample(0,relay.ImpactTime,false).Beam,Is.InRange(.1f,.75f));
+            Assert.NotNull(relay.MergeNode);
+            Assert.AreEqual("merge",relay.MergeNode.Evidence.id);
+            Assert.That(relay.Sample(relay.MergeNode.Index,relay.ImpactTime,false).Beam,Is.InRange(.1f,.75f));
+            Assert.That(relay.Sample(0,relay.ImpactTime,false).Pulse,Is.LessThan(.02f));
             Assert.AreEqual(1,relay.Sample(0,relay.Nodes[0].ActivationTime,false).Beam,
                 "An individual recorded cause still receives its full close-up pulse.");
         }

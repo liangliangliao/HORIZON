@@ -12,14 +12,12 @@ namespace Horizon.Game
         public readonly IReadOnlyList<CausalRelayNode> Nodes;
         public readonly IReadOnlyList<CausalRelayEdge> Edges;
         public readonly float ImpactTime, Duration;
-        private readonly float secondRevealTime,jackpotTime;
+        public readonly CausalRelayNode MergeNode;
         public CausalRelayPlan(RewardPlan plan)
         {
             if (plan == null) throw new ArgumentNullException(nameof(plan));
             Duration = plan.Duration;
             ImpactTime = plan.Cues.First(c => !c.NodeHit && c.Phase == CinematicPhase.Impact).Time;
-            secondRevealTime=plan.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal)?.Time??Duration;
-            jackpotTime=plan.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot)?.Time??Duration;
             bool cascade = plan.Event.kind == DomainEventKind.Cascade || plan.Event.kind == DomainEventKind.CausalSingularity;
             var nodes = new List<CausalRelayNode>(); var edges = new List<CausalRelayEdge>();
             if (cascade)
@@ -48,6 +46,8 @@ namespace Horizon.Game
                             edges.Add(new CausalRelayEdge(from, node.Index));
             }
             Nodes = nodes.AsReadOnly(); Edges = edges.AsReadOnly();
+            var merge = edges.GroupBy(edge => edge.To).Where(incoming => incoming.Count() > 1).OrderBy(incoming => incoming.Key).LastOrDefault();
+            if (merge != null) MergeNode = nodes[merge.Key];
         }
 
         public static IReadOnlyList<RewardEvidence> OrderedEvidence(IEnumerable<RewardEvidence> causes)
@@ -85,9 +85,7 @@ namespace Horizon.Game
             float age = time - node.ActivationTime;
             bool lit = age >= 0;
             float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 1.7f);
-            float final = time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
-            if(!reducedMotion && time>=secondRevealTime) final=Math.Max(final,(float)Math.Exp(-(time-secondRevealTime)*3.5f));
-            if(!reducedMotion && time>=jackpotTime) final=Math.Max(final,(float)Math.Exp(-(time-jackpotTime)*3.5f));
+            float final = MergeNode?.Index != index || time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
             // A single relay may flare at full strength. At the shared release,
             // however, every recorded source lights at once. Capping only that
             // simultaneous component preserves the climbing node rhythm while

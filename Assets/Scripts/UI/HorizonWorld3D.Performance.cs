@@ -45,6 +45,7 @@ namespace Horizon.UI
             if(performanceWarmup>0) { performanceWarmup--; return; }
             float seconds=Time.unscaledDeltaTime;
             string scene=moviePlan!=null?moviePlan.Event.kind+" / "+moviePlan.Event.tier:
+                caseLight!=null?"Practice reward / "+script.Id:
                 imaginationSceneActive?(imaginedScene!=null?"Imagination / "+CurrentImaginationFrame.Shot:"System / "+inspectedSystem):
                 station?"Future station":"Board";
             string quality=(preferences.batterySaver?"Battery30":"Normal60")+" / L"+adaptiveBudget.Level;

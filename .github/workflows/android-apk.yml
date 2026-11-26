@@ -298,6 +298,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Encode the V3 case takes and measure their actual frames
+        run: |
+          git rev-parse HEAD > artifacts/energy-v3/source.txt
+          date -u +'%Y-%m-%dT%H:%M:%SZ' >> artifacts/energy-v3/source.txt
+          for profile in normal battery reduced; do
+            take="artifacts/energy-v3/$profile"
+            /tmp/horizon-gif-verification/bin/python tools/report_case_capture.py "$take"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart "$take/case.mp4"
+            encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/case.mp4")
+            test "$encoded" = "$(cat "$take/complete.txt")"
+          done
+          for direction in 1 2 3; do
+            take="artifacts/energy-v3/orbit-$direction"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -c:v libx264 -crf 18 -pix_fmt yuv420p "$take/orbit.mp4"
+            encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/orbit.mp4")
+            test "$encoded" = "$(cat "$take/complete.txt")"
+          done
+      - name: Upload HORIZON Energy Cinematic V3 case evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Energy-Cinematic-V3
+          path: |
+            artifacts/energy-v3/source.txt
+            artifacts/energy-v3/*/case.mp4
+            artifacts/energy-v3/*/release-contact.png
+            artifacts/energy-v3/*/*.csv
+            artifacts/energy-v3/*/receipt.json
+            artifacts/energy-v3/*/capture.txt
+            artifacts/energy-v3/orbit-*/orbit.mp4
+            artifacts/energy-v3/orbit-*/source.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Encode the matured practice echo filmed in Unity
         run: |
           tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i artifacts/time-echo-frames/frame-%05d.jpg -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart artifacts/HORIZON-time-echo.mp4

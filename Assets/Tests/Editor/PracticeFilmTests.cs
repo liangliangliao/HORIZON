@@ -7,6 +7,88 @@ namespace Horizon.Tests
 {
     public class PracticeFilmTests
     {
+        internal static GameSession CaseSampleLife(string id, out CardSpec card)
+        {
+            for (int seed = 1; seed <= 512; seed++)
+            {
+                var life = GameSession.StartMasterLife(2, seed, RunMode.Quick);
+                card = life.Hand.FirstOrDefault(candidate => candidate.Id == id && life.CanPlay(candidate));
+                if (card != null) return life;
+            }
+            throw new InvalidOperationException("No playable opening hand for " + id);
+        }
+
+        [TestCase("ask")]
+        [TestCase("portfolio")]
+        public void CaseReleaseShowsTheActualReceiptWithinAQuarterSecond(string id)
+        {
+            var life = CaseSampleLife(id, out CardSpec card);
+            life.BeginPractice(card, 2);
+            life.PickPracticeRoute(true);
+            life.PickPracticeRoute(false);
+            ActionRecord action = life.FinishPractice();
+            var film = new PracticeRewardCinematic(action);
+            int[] actual = PracticeReward.Ticks(action.actualNow);
+            int[] balances = Enumerable.Range(0, 6).Select(life.AxisTicks).ToArray();
+            Assert.IsTrue(film.HasGain);
+            Assert.AreEqual(action.nodeId, film.EventId);
+            Assert.LessOrEqual(PracticeRewardCinematic.GainTime - PracticeRewardCinematic.ReleaseTime, .35f);
+            Assert.IsEmpty(film.Changes(PracticeRewardCinematic.ReleaseTime, true, false));
+            Assert.IsNotEmpty(film.Changes(PracticeRewardCinematic.GainTime, true, false));
+            Assert.IsEmpty(film.Changes(PracticeRewardCinematic.GainTime, false, false));
+            Assert.Greater(film.Sample(PracticeRewardCinematic.ReleaseTime, false).Release.Flash, 0);
+            Assert.Greater(film.Sample(PracticeRewardCinematic.GainTime, false).Release.Fire, 0);
+            for (int axis = 0; axis < 6; axis++)
+            {
+                if (actual[axis] > 0)
+                {
+                    int previous = 0;
+                    for (int frame = 0; frame < 120; frame++)
+                    {
+                        int current = film.DisplayTicks(axis, PracticeRewardCinematic.GainTime + frame / 60f, false);
+                        Assert.That(current, Is.InRange(Math.Max(1, previous), actual[axis]));
+                        previous = current;
+                    }
+                    Assert.AreEqual(actual[axis], film.DisplayTicks(axis, PracticeRewardCinematic.GainTime, true));
+                }
+                Assert.AreEqual(actual[axis], film.DisplayTicks(axis, PracticeRewardCinematic.Duration, false));
+            }
+            CollectionAssert.AreEqual(balances, Enumerable.Range(0, 6).Select(life.AxisTicks));
+            Assert.Throws<InvalidOperationException>(() => life.FinishPractice());
+        }
+
+        [Test]
+        public void CasePoseIsSeekableAndMotionReductionKeepsTheFinalValues()
+        {
+            var receipt = new ActionRecord { nodeId = "case-pose", actualNow = PracticeReward.FromTicks(new[] { -2, 0, 7, 0, 0, 0 }) };
+            var film = new PracticeRewardCinematic(receipt);
+            var first = film.Sample(.79f, false);
+            var second = film.Sample(1.58f, false);
+            var third = film.Sample(2.40f, false);
+            Assert.Greater(first.Charge, film.Sample(0, false).Charge);
+            Assert.Less(first.Tilt, 0);
+            Assert.Greater(second.Tilt, 0);
+            Assert.Less(third.Tilt, first.Tilt);
+            Assert.AreEqual(second.Tilt, film.Sample(1.58f, false).Tilt);
+            var release = film.Sample(PracticeRewardCinematic.GainTime, false);
+            Assert.Greater(release.Lid, 0);
+            Assert.Greater(release.Release.Fire, 0);
+            Assert.Greater(release.Release.Wave, 0);
+
+            receipt.actualNow.ticks[2] = 9000;
+            var still = film.Sample(PracticeRewardCinematic.GainTime, true);
+            Assert.AreEqual(0, still.Tilt + still.Compression + still.Charge + still.Release.Fire + still.Release.Wave);
+            Assert.AreEqual(1, still.Lid);
+            Assert.AreEqual("专注 +0.0007", film.Changes(PracticeRewardCinematic.GainTime, true, true));
+            Assert.AreEqual("精力 −0.0002", film.Changes(PracticeRewardCinematic.CostTime, false, true));
+
+            receipt.actualNow = PracticeReward.FromTicks(new[] { -1, 0, 0, 0, 0, 0 });
+            var costOnly = new PracticeRewardCinematic(receipt);
+            Assert.IsFalse(costOnly.HasGain);
+            Assert.AreEqual(0, costOnly.Sample(PracticeRewardCinematic.ReleaseTime, false).Release.Flash);
+            Assert.IsEmpty(costOnly.Changes(PracticeRewardCinematic.Duration, true, false));
+        }
+
         [Test]
         public void CatalogHasDistinctThemesAndTwoPerformableRoutesPerObstacle()
         {

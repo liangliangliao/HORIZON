@@ -7,6 +7,66 @@ using UnityEngine;
 
 namespace Horizon.Tests
 {
+    public sealed class V3RewardProfilesTests
+    {
+        [Test]
+        public void OrbitGroupLightsRecordedMasksAndRetainsOneTimeline()
+        {
+            int[] directions = { OrbitCinematic.Ability, OrbitCinematic.Relationship, OrbitCinematic.Wealth };
+            IReadOnlyList<DomainEvent> events = ActualOrbit();
+            int bits = directions.Aggregate(0, (mask, direction) => mask | 1 << direction);
+            var plan = RewardDirector.DirectOrbit(events);
+            var orbit = plan.Orbit;
+            Assert.AreEqual(0, orbit.PreviousBits);
+            Assert.AreEqual(bits, orbit.FinalBits);
+            CollectionAssert.AreEqual(directions, orbit.Beats.Select(beat => beat.Direction));
+            for (int i = 0; i < directions.Length; i++)
+            {
+                var beat = orbit.Beats[i];
+                int bit = 1 << directions[i];
+                Assert.AreEqual(0, orbit.BitsAt(beat.Time - .001f) & bit);
+                Assert.AreEqual(bit, orbit.BitsAt(beat.Time) & bit);
+                Assert.AreEqual(events[i].id, beat.EventId);
+            }
+            Assert.AreEqual(bits, orbit.BitsAt(plan.Duration));
+            Assert.IsEmpty(plan.Outcome.Changes);
+            Assert.IsFalse(events.Any(entry => entry.acknowledged));
+            Assert.That(orbit.ReceiptCopy, Does.Contain("能力").And.Contain("财富").And.Contain("关系"));
+        }
+
+        internal static IReadOnlyList<DomainEvent> ActualOrbit()
+        {
+            var life = PracticeFilmTests.CaseSampleLife("ask", out CardSpec card);
+            life.BeginPractice(card, 2);
+            life.PickPracticeRoute(true);
+            life.PickPracticeRoute(false);
+            life.FinishPractice();
+            return life.Master.events.Where(OrbitCinematic.HasRecordedNode).ToArray();
+        }
+
+        [Test]
+        public void ARecordedEchoMovesItsRevealCueWithoutChangingReceiptOrLegacyEvidence()
+        {
+            var source = new DomainEvent { id = "echo-cue", day = 5, kind = DomainEventKind.TimeEcho, tier = RewardTier.Major,
+                receipt = new RewardReceipt { sourceDay = 2, action = "整理作品", resourcesRecorded = true,
+                    resources = PracticeReward.FromTicks(new[] { 0, 0, 1321, 0, 0, 0 }) } };
+            RewardPlan actual = RewardDirector.Direct(source);
+            var cue = new RewardSpectacle(actual);
+            Assert.IsTrue(actual.RecordedEcho);
+            Assert.AreEqual(.23f, cue.MultiplierTime - cue.ImpactTime, .001f);
+            Assert.AreEqual("专注 +0.1321", actual.Outcome.Changes.Single().Copy());
+            float second = actual.Cues.Single(item => item.Phase == CinematicPhase.SecondReveal).Time;
+            Assert.AreEqual("专注 +0.0001", actual.Outcome.SampleRecordedEcho(cue.MultiplierTime, cue.MultiplierTime, second, cue.SettlementTime, false).Copy);
+            Assert.AreEqual("专注 +0.1321", actual.Outcome.SampleRecordedEcho(cue.MultiplierTime + 1, cue.MultiplierTime, second, cue.SettlementTime, false).Copy);
+            Assert.AreEqual(1321, source.receipt.resources.ticks[2]);
+            source.receipt.sourceDay = 0;
+            RewardPlan hidden = RewardDirector.Direct(source);
+            Assert.IsFalse(hidden.RecordedEcho);
+            var legacy = new RewardSpectacle(hidden);
+            Assert.Greater(legacy.MultiplierTime - legacy.ImpactTime, .35f);
+        }
+    }
+
     public sealed class CinematicRewardTests
     {
         [Test]

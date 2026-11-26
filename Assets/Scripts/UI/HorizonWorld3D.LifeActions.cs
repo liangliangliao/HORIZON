@@ -136,7 +136,7 @@ namespace Horizon.UI
             CurrentLifeActionShot=frame.Shot; lifePressure=frame.Pressure;
             bool overview=frame.Shot==LifeActionShot.Overview || cinematicOverviewRequested;
             bool recovery=moviePlan.Outcome.WalkRecovery;
-            bool narrative=time<lifeAction.Reveal || overview || recovery;
+            bool narrative=time<(moviePlan.RecordedEcho?lifeAction.Impact:lifeAction.Reveal) || overview || recovery;
             lifeStage.gameObject.SetActive(narrative);
             if(jackpotStage!=null && (time<lifeAction.ActionEnd || overview || recovery)) jackpotStage.gameObject.SetActive(false);
             else if(jackpotStage!=null) jackpotStage.gameObject.SetActive(true);
