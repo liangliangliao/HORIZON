@@ -288,11 +288,11 @@ namespace Horizon.UI
         private void FrameShowcaseInReadingAperture(float time,ref Vector3 camera,ref Vector3 look)
         {
             if(showcaseCameraWeight<=0 || showcaseSubjectRenderers==null) return;
-            Vector3 fittedCamera=camera,fittedLook=look;
+            // SampleJackpotStage has already eased the authored camera into the
+            // reveal. Apply the portrait bounds to that actual pose. Blending
+            // a second time left the first clearly visible object off-screen.
             FitPortraitSubject(showcaseSubjectRenderers,HorizonCinemaLayout.SubjectAperture,
-                CinematicFieldOfView(time),ref fittedCamera,ref fittedLook);
-            camera=Vector3.Lerp(camera,fittedCamera,showcaseCameraWeight);
-            look=Vector3.Lerp(look,fittedLook,showcaseCameraWeight);
+                CinematicFieldOfView(time),ref camera,ref look);
         }
 
         private Color RewardEffectTint()

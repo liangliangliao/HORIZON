@@ -211,6 +211,10 @@ namespace Horizon.Tests
             Directory.CreateDirectory(path);
             try
             {
+                var impact=new RewardSpectacle(plan).ImpactTime;
+                int firstRevealFrame=Mathf.CeilToInt((impact+.16f)*20);
+                int lastRevealFrame=Mathf.CeilToInt((impact+.50f)*20);
+                bool checkedFraming=false;
                 foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                 canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
                 int frames=Mathf.CeilToInt(plan.Duration*20);
@@ -218,12 +222,20 @@ namespace Horizon.Tests
                 {
                     if(frame>0) world.Cinematics.Advance(.05f);
                     yield return null;
+                    if(frame>=firstRevealFrame && frame<=lastRevealFrame)
+                    {
+                        var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
+                        Assert.IsTrue(hero.gameObject.activeInHierarchy);
+                        AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
+                        checkedFraming=true;
+                    }
                     Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
                     RenderTexture old=RenderTexture.active; RenderTexture.active=target;
                     pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=old;
                     File.WriteAllBytes(Path.Combine(path,"frame-"+frame.ToString("D5")+".jpg"),pixels.EncodeToJPG(91));
                 }
                 File.WriteAllText(Path.Combine(path,"complete.txt"),frames.ToString());
+                Assert.IsTrue(checkedFraming);
                 File.WriteAllText(Path.Combine(path,"receipt.json"),JsonUtility.ToJson(source,true));
                 Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
                 world.Cinematics.Skip(); Assert.IsFalse(world.Cinematics.IsPlaying);
