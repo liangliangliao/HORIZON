@@ -245,6 +245,7 @@ namespace Horizon.Tests
                 }
                 File.WriteAllText(Path.Combine(path,"complete.txt"),frames.ToString());
                 Assert.IsTrue(checkedFraming);
+                File.WriteAllBytes(Path.Combine(path,"cues.pcm"),world.RecordedCinemaPcm());
                 File.WriteAllText(Path.Combine(path,"receipt.json"),JsonUtility.ToJson(source,true));
                 Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
                 world.Cinematics.Skip(); Assert.IsFalse(world.Cinematics.IsPlaying);

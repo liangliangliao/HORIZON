@@ -47,21 +47,23 @@ Shader "Horizon/RevealField"
                 float edge = length((input.uv - .5) * 2);
                 float broad = 1 - smoothstep(.14,.84,r);
                 float grain = .73 + .14 * sin(spin * 7 + r * 14) + .13 * sin(spin * 13 - r * 8);
-                float spokes = pow(saturate(.5 + .5 * sin(spin * 19 + sin(spin * 6) * 1.7)), 9);
+                float spokes = pow(saturate(.5 + .5 * sin(spin * 19 + sin(spin * 6) * 1.7 + r * sin(spin*3))), 9);
                 if (age < 0)
                 {
-                    float inward = sin(r * 28 + age * 13 + sin(spin * 6) * 2);
-                    float gathering = _Cue.y * (.10 * broad + .22 * spokes * broad
-                        + .24 * smoothstep(.60,1.38,edge) * grain + .032 * inward * broad);
-                    half3 tint = lerp(violet, gold, saturate(_Cue.y * .78 + spokes * .19));
-                    return half4(tint * gathering, gathering);
+                    float hold = step(-.191,age);
+                    float inward = pow(saturate(.5+.5*sin(r*43 + age*29 + sin(spin*6)*1.55)), 6);
+                    float filament = .82 * spokes * inward * broad * (1 - hold*.88);
+                    float gather = _Cue.y * (.040 * broad + filament + .060 * smoothstep(.55,1.27,edge) * grain);
+                    float shade = _Cue.y * (.28+.33*hold) * smoothstep(.19,.74,r);
+                    half3 tint = lerp(violet,gold,smoothstep(-1.04,-.24,age)*.86);
+                    return half4(tint*gather,saturate(gather+shade));
                 }
 
                 float flash = _Energy.x * (1 - smoothstep(.045, .34, r)) * .77;
                 float wake = _Energy.z;
                 float body = _Energy.y;
                 float furthest = length(float2(_Cue.w * .52, .61));
-                float radius = lerp(.072, furthest * 1.08, smoothstep(0,1.32,age));
+                float radius = lerp(.061, furthest * 1.03, _Origin.z);
                 float jagged = (sin(spin * 5 + age * 1.8) * .024 + sin(spin * 12 - age * 4) * .012
                     + sin(spin * 27 + age * 4.8) * .006) * smoothstep(.08,.35,radius);
                 float distance = abs(r - radius - jagged);
@@ -73,7 +75,9 @@ Shader "Horizon/RevealField"
                 float second = (1 - smoothstep(.013,.068,trailing)) * .31 * grain;
                 float sweep = wake * (crest * .63 + wakeGlow + lightning * .34 + second);
                 float rim = wake * smoothstep(.52,1.30,edge) * (.18 + spokes * .42) * (1 - smoothstep(.77,1.63,age));
-                float bloom = body * broad * (.22 + spokes * .48) * (.73 + .27 * grain);
+                float rest = smoothstep(.38,.79,age);
+                float bloom = body * broad * (.19 + spokes * .48) * (.73 + .27 * grain)
+                    * (1-rest*.78*(1-smoothstep(.09,.37,r)));
                 float streak = body * (1 - smoothstep(.005,.037,abs(p.y))) * (1 - smoothstep(.12,furthest,r)) * .29;
                 float late = smoothstep(.61,1.30,age);
                 float undertone = (wake*.27 + body*.14) * late * smoothstep(.38,1.17,edge) * grain;

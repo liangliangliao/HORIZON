@@ -20,13 +20,14 @@ namespace Horizon.Game
             FirstRelease=value.Cues.FirstOrDefault(c=>c.NodeHit)?.Time ?? visual.ImpactTime;
             // Legacy causal events without a source keep their established shot.
             OpeningHold=Enabled && (SourceCloseup || value.Event.kind!=DomainEventKind.Cascade && value.Event.kind!=DomainEventKind.CausalSingularity);
-            float firstPause=value.Event.tier==RewardTier.Major?.32f:value.Event.tier==RewardTier.Epic?.45f:.58f;
+            float firstPause=value.RecordedEcho?PracticeRewardCinematic.ReleaseTime-PracticeRewardCinematic.HoldTime:
+                value.Event.tier==RewardTier.Major?.32f:value.Event.tier==RewardTier.Epic?.45f:.58f;
             FirstHold=Math.Max(0,FirstRelease-Math.Min(firstPause,FirstRelease*.28f));
             ChargeAt=value.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge)?.Time ?? 0;
             Reveal=visual.HeroTime;
             float available=Reveal-visual.ImpactTime;
             float previewWindow=value.Event.tier==RewardTier.Mythic?2.1f:value.Event.tier==RewardTier.Epic?1.65f:1.25f;
-            PreviewStart=OpeningHold && available>1?Math.Max(visual.ImpactTime+.55f,Reveal-previewWindow):Reveal;
+            PreviewStart=!value.RecordedEcho && OpeningHold && available>1?Math.Max(visual.ImpactTime+.55f,Reveal-previewWindow):Reveal;
             float revealPause=value.Event.tier==RewardTier.Mythic?.78f:value.Event.tier==RewardTier.Epic?.60f:.40f;
             RevealHold=Math.Max(PreviewStart,Reveal-revealPause);
         }
@@ -45,7 +46,8 @@ namespace Horizon.Game
             // remain synchronized even though the subject's final detail lasts.
             float pose=time;
             float firstSlow=Math.Max(ChargeAt,FirstHold-.78f);
-            if(OpeningHold && time>=firstSlow && time<FirstRelease)
+            if(plan.RecordedEcho && firstQuiet) pose=FirstHold;
+            else if(!plan.RecordedEcho && OpeningHold && time>=firstSlow && time<FirstRelease)
                 pose=firstSlow+(Math.Min(time,FirstHold)-firstSlow)*.38f;
             float revealSlow=Math.Max(PreviewStart,RevealHold-.92f);
             if(PreviewStart<Reveal && time>=revealSlow && time<Reveal)

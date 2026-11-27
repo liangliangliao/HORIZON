@@ -311,7 +311,7 @@ jobs:
           for profile in normal battery reduced; do
             take="$export_dir/$profile"
             /tmp/horizon-gif-verification/bin/python tools/report_case_capture.py "$take"
-            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart "$take/case.mp4"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -f s16le -ar 22050 -ac 1 -i "$take/cues.pcm" -c:v libx264 -crf 18 -pix_fmt yuv420p -af apad -c:a aac -shortest -movflags +faststart "$take/case.mp4"
             encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/case.mp4")
             test "$encoded" = "$(cat "$take/complete.txt")"
           done
@@ -347,7 +347,7 @@ jobs:
 
       - name: Encode the matured practice echo filmed in Unity
         run: |
-          tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i artifacts/time-echo-frames/frame-%05d.jpg -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart artifacts/HORIZON-time-echo.mp4
+          tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i artifacts/time-echo-frames/frame-%05d.jpg -f s16le -ar 22050 -ac 1 -i artifacts/time-echo-frames/cues.pcm -c:v libx264 -crf 18 -pix_fmt yuv420p -af apad -c:a aac -shortest -movflags +faststart artifacts/HORIZON-time-echo.mp4
           encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 artifacts/HORIZON-time-echo.mp4)
           test "$encoded" = "$(cat artifacts/time-echo-frames/complete.txt)"
           test -s artifacts/time-echo-frames/receipt.json

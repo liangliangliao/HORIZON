@@ -82,7 +82,7 @@ namespace Horizon.UI
         private void UpdateAudio()
         {
             if (audioSource != null) audioSource.mute = paused || !preferences.sound;
-            if (ambience != null) ambience.mute = paused || movieMuted || !preferences.sound || !preferences.ambience;
+            if (ambience != null) ambience.mute = paused || movieMuted || caseSilent || !preferences.sound || !preferences.ambience;
         }
         private void RestoreRenderQuality()
         {

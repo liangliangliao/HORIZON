@@ -40,10 +40,17 @@ namespace Horizon.UI
         public byte[] RecordedCinemaPcm()
         {
             if(moviePlan==null) return new byte[0];
-            const int rate=22050; var mixed=new float[Mathf.CeilToInt(moviePlan.Duration*rate)];
             float stopped=moviePlan.Duration,released=moviePlan.Duration;
             foreach(CinematicCue cue in moviePlan.Cues)
             { if(!cue.NodeHit && cue.Phase==CinematicPhase.HitStop) stopped=cue.Time; if(!cue.NodeHit && cue.Phase==CinematicPhase.Impact) released=cue.Time; }
+            return MixRecordedCues(moviePlan.Duration,stopped,released);
+        }
+        public byte[] RecordedPracticePcm() =>
+            MixRecordedCues(PracticeRewardCinematic.Duration,PracticeRewardCinematic.HoldTime,PracticeRewardCinematic.ReleaseTime);
+
+        private byte[] MixRecordedCues(float duration,float stopped,float released)
+        {
+            const int rate=22050; var mixed=new float[Mathf.CeilToInt(duration*rate)];
             foreach(RecordedCinemaSound cue in recordedCinemaSounds)
             {
                 var samples=new float[cue.Clip.samples*cue.Clip.channels]; cue.Clip.GetData(samples,0);

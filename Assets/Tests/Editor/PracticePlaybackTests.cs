@@ -147,7 +147,9 @@ namespace Horizon.Tests
                     var target=new RenderTexture(540,height,24); target.Create(); ui.targetTexture=target;
                     var pixels=new Texture2D(540,height,TextureFormat.RGB24,false);
                     int release=-1,reveal=-1,maxFlames=0,frame=0,lastFrame=-1;
-                    int fieldAfterOpen=0, flameFrames=0;
+                    int fieldAfterOpen=0, flameFrames=0, heldFrames=0;
+                    Vector3 holdCamera=Vector3.zero;
+                    Quaternion holdLid=Quaternion.identity;
                     bool sawWave=false,skipped=false;
                     string finalGain="",finalCost="";
                     try
@@ -172,6 +174,17 @@ namespace Horizon.Tests
                             Vector3 bodyPosition=world.WorldCamera.WorldToViewportPoint(body.position);
                             Assert.That(bodyPosition.x,Is.InRange(.2f,.8f));
                             Assert.That(bodyPosition.y,Is.InRange(.39f,.75f));
+                            if(heading.text=="即将开启")
+                            {
+                                if(heldFrames==0)
+                                {
+                                    holdCamera=world.WorldCamera.transform.position;
+                                    holdLid=lid.localRotation;
+                                }
+                                Assert.That(Vector3.Distance(holdCamera,world.WorldCamera.transform.position),Is.LessThan(.001f));
+                                Assert.That(Quaternion.Angle(holdLid,lid.localRotation),Is.LessThan(.01f));
+                                heldFrames++;
+                            }
                             log.AppendLine(System.FormattableString.Invariant($"{frame},{frame/20f:F2},{heading.text},{counter.text.Replace('\n','|')},{flames},{core.gameObject.activeInHierarchy},{wave.gameObject.activeInHierarchy},{light.intensity:F3},{bodyPosition.x:F4},{bodyPosition.y:F4},{lid.localEulerAngles.z:F2},{world.AdaptiveQualityLevel}"));
                             HorizonPortraitRenderer.Render(world,ui,canvas,target);
                             RenderTexture previous=RenderTexture.active;
@@ -207,11 +220,19 @@ namespace Horizon.Tests
                         Assert.IsTrue(sawWave);
                         Assert.GreaterOrEqual(fieldAfterOpen,33,"The direct screen field must remain visible as the numbers settle.");
                         Assert.GreaterOrEqual(flameFrames,23,"The flame must survive for at least a second at 20 fps.");
+                        Assert.That(heldFrames,Is.InRange(3,5),"The camera and case must hold briefly before release.");
                     }
                     Assert.AreEqual(receipt.Changes(PracticeRewardCinematic.Duration,true,reduced),finalGain);
                     Assert.That(finalCost,Does.Contain(receipt.Changes(PracticeRewardCinematic.Duration,false,reduced)));
                     CollectionAssert.AreEqual(balance,Enumerable.Range(0,6).Select(life.AxisTicks));
                     File.WriteAllText(Path.Combine(folder,"trace.csv"),log.ToString());
+                    byte[] audio=world.RecordedPracticePcm();
+                    int holdStart=Mathf.CeilToInt(PracticeRewardCinematic.HoldTime*22050);
+                    int impactStart=Mathf.CeilToInt(PracticeRewardCinematic.ReleaseTime*22050);
+                    Assert.That(audio.Skip(holdStart*2).Take((impactStart-holdStart)*2).All(sample=>sample==0));
+                    if(!reduced)
+                        Assert.That(audio.Skip(impactStart*2).Take(2205).Any(sample=>sample!=0),"The release must carry a transitory impact.");
+                    File.WriteAllBytes(Path.Combine(folder,"cues.pcm"),audio);
                     File.WriteAllText(Path.Combine(folder,"receipt.json"),JsonUtility.ToJson(action,true));
                     File.WriteAllText(Path.Combine(folder,"complete.txt"),frame.ToString());
                     File.WriteAllText(Path.Combine(folder,"capture.txt"),$"{mode}, 540x{height}, 20 fps\nUnity {Application.unityVersion}\n{SystemInfo.deviceModel}\n{SystemInfo.graphicsDeviceName}\n{SystemInfo.graphicsDeviceType}\n");

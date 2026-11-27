@@ -46,7 +46,7 @@ namespace Horizon.UI
 
             Transform floor = track.Floor.transform;
             floor.position = new Vector3(center.x, floorHeight, center.z);
-            float reach = Mathf.Lerp(.40f, 8.1f, Smooth(.035f, 2.05f, release.Age));
+            float reach = Mathf.Lerp(.40f, 8.1f, EnergyRelease.WaveTravel(release.Age));
             floor.localScale = new Vector3(reach, reach * .81f, 1);
             CaseEffect(track.Floor, 5, tint * 1.7f, release.Wave * .93f, 0, release.Age, seed);
             track.Bounce.transform.position = center + camera.transform.forward * .67f + Vector3.up * .82f;

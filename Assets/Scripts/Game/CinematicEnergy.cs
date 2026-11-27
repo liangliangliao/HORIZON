@@ -39,6 +39,14 @@ namespace Horizon.Game
             float time=Math.Max(0,Math.Min(plan.Duration,seconds));
             if(time>=plan.Duration) return new CinematicEnergyFrame(time,0,0,0,0,1,-1,0);
             float settle=ImmersiveMotion.Smooth((time-spectacle.SettlementTime)/Math.Max(.01f,plan.Duration-spectacle.SettlementTime));
+            if(plan.RecordedEcho)
+            {
+                float age=time-spectacle.ImpactTime;
+                float inward=reducedMotion?0:RecordedEchoCharge(age);
+                EnergyRelease hit=reducedMotion?default:RecordedEchoRelease(age);
+                return new CinematicEnergyFrame(time,inward,Math.Max(hit.Fire*.40f,hit.Flash),hit.Wave*.54f,
+                    inward*.72f,settle,age<0?-1:spectacle.ImpactTime,reducedMotion?0:ImmersiveMotion.Punch(age,.26f),hit);
+            }
             float charge=0,burst=0,recoil=0,last=-1;
             for(int i=0;i<accents.Length;i++)
             {
@@ -72,15 +80,20 @@ namespace Horizon.Game
             if(reducedMotion) return new CinematicEnergyFrame(time,0,0,.18f*afterglow,0,settle,last,0);
             // Only actual positive results receive the new celebration layers.
             // Node hits keep their original relay accents; only the main impact flashes.
-            var release=verifiedRelease && (plan.Event.tier>=RewardTier.Combo || plan.RecordedEcho)
-                ? plan.RecordedEcho ? RecordedEchoRelease(time-spectacle.ImpactTime) :
-                    EnergyRelease.Sample(time-spectacle.ImpactTime,Strength*(1-settle))
+            var release=verifiedRelease && plan.Event.tier>=RewardTier.Combo
+                ? EnergyRelease.Sample(time-spectacle.ImpactTime,Strength*(1-settle))
                 : default(EnergyRelease);
             return new CinematicEnergyFrame(time,charge*Strength,burst*Strength*(1-settle),
                 afterglow*Strength,focus*Strength,settle,last,Math.Max(-1,Math.Min(1,recoil))*Strength,release);
         }
 
         public static EnergyRelease RecordedEchoRelease(float age) => EnergyRelease.SampleScenic(age,.84f);
+        public static float RecordedEchoCharge(float age) => age>=0?0:
+            .82f*ImmersiveMotion.Smooth((age+1.43f)/1.24f);
+
+        public static float RecordedEchoFlight(float age) => age>=0?1:
+            .26f*ImmersiveMotion.Smooth((age+2.5f)/1.46f) +
+            .67f*ImmersiveMotion.Smooth((age+.93f)/.74f);
 
         // A quiet onset, independent local pulses and a brief hold at the end.
         // Time and seed are immutable presentation inputs.
@@ -127,13 +140,16 @@ namespace Horizon.Game
         {
             if (age < 0 || age >= 2.15f || strength <= 0) return new EnergyRelease(age, 0, 0, 0);
             strength = ImmersiveMotion.Unit(strength);
-            float flash = strength * (1 - ImmersiveMotion.Smooth(age / .18f));
-            float fire = strength * ImmersiveMotion.Smooth((age - .035f) / .19f) *
-                (1 - ImmersiveMotion.Smooth((age - .61f) / .91f));
-            float wave = strength * ImmersiveMotion.Smooth((age - .035f) / .21f) *
-                (1 - ImmersiveMotion.Smooth((age - .80f) / 1.35f));
+            float flash = strength * (1 - ImmersiveMotion.Smooth(age / .145f));
+            float fire = strength * ImmersiveMotion.Smooth((age - .025f) / .14f) *
+                (1 - ImmersiveMotion.Smooth((age - .46f) / 1.06f));
+            float wave = strength * ImmersiveMotion.Smooth((age - .072f) / .21f) *
+                (1 - ImmersiveMotion.Smooth((age - .65f) / 1.5f));
             return new EnergyRelease(age, flash, fire, wave);
         }
+
+        public static float WaveTravel(float age) =>
+            .38f*ImmersiveMotion.Smooth(age/.43f) + .62f*ImmersiveMotion.Smooth((age-.25f)/.83f);
     }
 
     public readonly struct CinematicEnergyFrame

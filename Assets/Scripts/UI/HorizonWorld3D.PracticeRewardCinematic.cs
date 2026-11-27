@@ -10,10 +10,14 @@ namespace Horizon.UI
         private Renderer caseCore, caseWave;
         private Light caseLight;
         private ScenicEnergy caseScenic;
+        private readonly Transform[] caseLocks = new Transform[3];
+        private Transform caseHandle;
+        public Vector2 CaseRevealOrigin { get; private set; }
         private Material caseEffectMaterial;
         private Vector3 caseRest;
         private float practiceBloomBefore;
-        private bool caseVisualStarted, caseContactPlayed;
+        private bool caseVisualStarted, caseSilent;
+        private float caseCueTime;
 
         public void BeginPracticeRewardCinematic(PracticeRewardCinematic film)
         {
@@ -25,6 +29,18 @@ namespace Horizon.UI
 
             caseRest = new Vector3(.12f, .873f, -.05f);
             chamber.localPosition = caseRest;
+            caseHandle=Group("Manual release lever",chamber);
+            caseHandle.localPosition=new Vector3(-.34f,.277f,.15f);
+            Box(caseHandle,"Handle arm",new Vector3(-.051f,.018f,.01f),new Vector3(.15f,.036f,.054f),prizeBrass);
+            Shape(caseHandle,"Grip",PrimitiveType.Sphere,new Vector3(-.12f,.026f,.01f),new Vector3(.074f,.075f,.074f),teal);
+            for(int i=0;i<caseLocks.Length;i++)
+            {
+                Transform bolt=Group("Sliding case bolt "+(i+1),chamber);
+                bolt.localPosition=new Vector3((i-1)*.23f,.242f,-.277f);
+                Box(bolt,"Machined bolt",Vector3.up*.042f,new Vector3(.105f,.153f,.050f),prizeBrass);
+                Box(bolt,"Blue face inset",new Vector3(0,.073f,-.027f),new Vector3(.060f,.075f,.009f),prizeEnamel);
+                caseLocks[i]=bolt;
+            }
             rays.gameObject.SetActive(false);
             sparkRenderer.gameObject.SetActive(false);
             practiceFire.gameObject.SetActive(false);
@@ -44,7 +60,11 @@ namespace Horizon.UI
             caseLight.type = LightType.Point;
             caseLight.range = 4.6f;
             caseLight.shadows = LightShadows.None;
-            if (resourceChime == null) resourceChime = ShortCueTone("Glass resource contact", 528, .22f);
+            caseCueTime = -1;
+            PrepareRevealSounds();
+#if UNITY_EDITOR
+            recordedCinemaSounds.Clear();
+#endif
             if (bloom != null) practiceBloomBefore = bloom.Echo;
             WorldCamera.rect = new Rect(0, 0, 1, 1);
         }
@@ -75,8 +95,9 @@ namespace Horizon.UI
             if (caseLight == null) return;
             bool reduced = preferences.reducedMotion, low = LowCostEffects;
             bool released = frame.Age >= 0;
-            float dim = Smooth(.48f, 2.65f, frame.Time) * (1 - Smooth(.85f, 2.80f, frame.Age));
-            DimPracticeScenery(reduced ? .12f : .12f + .50f * dim);
+            float pose = released ? frame.Time : Mathf.Min(frame.Time,PracticeRewardCinematic.HoldTime);
+            float dim = Smooth(.79f, 2.35f, pose) * (1 - Smooth(.39f, 1.66f, frame.Age));
+            DimPracticeScenery(reduced ? .12f : .06f + .59f * dim);
             chamber.gameObject.SetActive(true);
             heroProp.gameObject.SetActive(false);
             obstacle.gameObject.SetActive(false);
@@ -86,119 +107,123 @@ namespace Horizon.UI
             lidLeft.localRotation = Quaternion.Euler(0, 0, frame.Lid * 108);
             lidRight.localRotation = Quaternion.Euler(0, 0, -frame.Lid * 108);
             for (int i = 0; i < practiceMarks.Length; i++)
-                practiceMarks[i].gameObject.SetActive(!reduced && !released && frame.Charge > .25f + i * .18f);
+            {
+                float age=pose-PracticeRewardCinematic.LatchTime(i);
+                float slide=reduced?1:Smooth(0,.14f,age);
+                Transform bolt=caseLocks[i];
+                float direction=i==1?0:i==0?-1:1;
+                bolt.localPosition=new Vector3((i-1)*.23f+direction*.057f*slide,.242f-.12f*slide,-.277f-.025f*slide);
+                bolt.localRotation=Quaternion.Euler(-53*slide,0,-direction*17*slide);
+                practiceMarks[i].gameObject.SetActive(!reduced && age>=0 && age<.12f && !released);
+            }
 
-            float lean = reduced ? 0 : Smooth(.35f, 2.27f, frame.Time) * (1 - Smooth(-.13f, .03f, frame.Age));
-            float recoil = reduced ? 0 : Smooth(0, .16f, frame.Age) * (1 - Smooth(.27f, .89f, frame.Age));
-            float approach = reduced ? 0 : Smooth(.59f, 1.32f, frame.Age);
-            performer.localPosition = new Vector3(-.61f + .22f * lean - .17f * recoil + .17f * approach, 0,
-                .61f - .15f * lean + .28f * recoil - .06f * approach);
-            performer.localRotation = Quaternion.Euler(8 * lean - 10 * recoil, -33 + 15 * recoil, 8 * recoil);
+            float lean = reduced ? 0 : Smooth(.29f, 1.24f, pose) * (1 - Smooth(0,.11f,frame.Age));
+            float grip=reduced?0:Smooth(.66f,1.18f,pose)*(1-Smooth(0,.09f,frame.Age));
+            float recoil = reduced ? 0 : Smooth(.021f,.15f,frame.Age) * (1 - Smooth(.24f,.61f,frame.Age));
+            float approach = reduced ? 0 : Smooth(.66f, 1.47f, frame.Age);
+            caseHandle.localRotation=Quaternion.Euler(0,0,-32*Smooth(1.13f,1.31f,pose)*(1-Smooth(0,.12f,frame.Age)));
+            Vector3 handle=caseHandle.TransformPoint(new Vector3(-.12f,.026f,.01f));
+            performer.localPosition = new Vector3(-.58f + .21f * lean - .21f * recoil + .13f * approach, 0,
+                .49f - .30f * lean + .31f * recoil - .05f * approach);
+            performer.localRotation = Quaternion.Euler(11 * lean - 15 * recoil, -26 + 16 * recoil, 11 * recoil);
             if (reduced) practiceActor.Play(HorizonBodyAction.Wait, .55f);
-            else if (!released) practiceActor.Play(HorizonBodyAction.Reach, lean * .65f, .83f);
-            else if (frame.Age < .89f) practiceActor.Play(HorizonBodyAction.Stumble, recoil);
-            else practiceActor.Play(HorizonBodyAction.Reach, Smooth(.89f, 2.0f, frame.Age), .65f);
+            else if (!released || frame.Age<.095f)
+                practiceActor.Play(HorizonBodyAction.Reach,lean*.57f,.80f,handle,grip);
+            else if (frame.Age < .64f) practiceActor.Play(HorizonBodyAction.Stumble, recoil);
+            else practiceActor.Play(HorizonBodyAction.Reach, Smooth(.73f, 1.96f, frame.Age), .65f);
             if (partner.gameObject.activeSelf)
             {
                 partner.localPosition = new Vector3(.83f + .17f * recoil, 0, .87f + .12f * recoil);
                 partner.localRotation = Quaternion.Euler(-5 * recoil, 38 - 15 * recoil, -6 * recoil);
-                practicePartner.Play(HorizonBodyAction.Wait, .21f + .48f * approach);
+                practicePartner.Play(recoil>.01f?HorizonBodyAction.Stumble:HorizonBodyAction.Wait,
+                    recoil>.01f?recoil*.63f:.21f+.48f*approach,focus:reduced?(Vector3?)null:handle);
             }
 
             Vector3 center = actionTable.TransformPoint(caseRest + new Vector3(.01f, .33f, -.065f));
-            float push = reduced ? 0 : Smooth(.25f, 2.51f, frame.Time);
-            float pull = reduced ? 0 : Smooth(.03f, .87f, frame.Age);
-            float lens = 45 - 6 * push * (1 - pull);
+            float push = reduced ? 0 : .65f*Smooth(.32f,1.45f,pose)+.35f*Smooth(1.89f,2.56f,pose);
+            float pull = reduced ? 0 : .84f*Smooth(.04f,.31f,frame.Age)+.16f*Smooth(.59f,1.26f,frame.Age);
+            float kick = reduced ? 0 : Smooth(0,.065f,frame.Age)*(1-Smooth(.072f,.28f,frame.Age));
+            float lens = 45 - 7 * push * (1 - pull) + 2.8f*kick;
             float aspect = Mathf.Max(.27f, WorldCamera.aspect);
-            float distance = Mathf.Max(2.83f, 1.61f / aspect) + .45f * pull - .25f * push * (1 - pull);
-            float side = Mathf.Lerp(-1.21f, .43f, push) + .22f * pull;
+            float distance = Mathf.Max(2.85f, 1.63f / aspect) + .32f * pull - .27f * push * (1 - pull) - .10f*kick;
+            float side = Mathf.Lerp(-1.26f,-.58f,push) + .96f * pull;
             if (reduced) side = .22f;
-            Vector3 look = center + new Vector3(-.18f * (1 - push) + .11f * pull, -.07f + .10f * pull, .1f);
+            Vector3 look = center + new Vector3(-.15f-.105f*push+.23f*pull,-.12f+.12f*pull+.04f*kick,.06f);
             WorldCamera.fieldOfView = lens;
             WorldCamera.transform.position = look + new Vector3(side, .94f - .58f * push + .47f * pull, -distance);
             WorldCamera.transform.LookAt(look);
 
             Vector3 seam = actionTable.InverseTransformPoint(chamber.TransformPoint(new Vector3(0, .31f, -.10f)));
-            SamplePracticeCaseLight(frame, film.Seed, seam, reduced, low);
-            int gain = 0;
+            CaseRevealOrigin=WorldCamera.WorldToViewportPoint(actionTable.TransformPoint(seam));
+            SamplePracticeCaseLight(film,frame,pose,seam,reduced,low);
             for (int axis = 0; axis < prizePieces.Length; axis++)
             {
                 if (prizePieces[axis] == null) continue;
-                SamplePracticeGain(axis, frame.Age - (reduced ? 0 : gain * .065f), reduced);
-                gain++;
+                SamplePracticeGain(axis,frame.Age-(reduced?0:film.GainSlot(axis)*PracticeRewardCinematic.ObjectSpacing),reduced);
             }
 
-            if (!playCues || reduced || !film.HasGain)
-            {
-                if (caseVisualStarted) audioSource.Stop();
-                caseVisualStarted = false;
-                return;
-            }
-            if (!caseVisualStarted && !released)
-            {
-                caseVisualStarted = true;
-                if (preferences.sound && frame.Time < 2.51f) PlayTensionCharge(2.66f - frame.Time);
-            }
-            if (released && !practiceImpactPlayed)
-            {
-                practiceImpactPlayed = true;
-                CueSound(impactTone, .49f);
-                PlayRevealShimmer(.24f);
-                MasterHaptics.Cue(29, 95, preferences);
-            }
-            if (frame.Time >= PracticeRewardCinematic.LandingTime && !caseContactPlayed)
-            {
-                caseContactPlayed = true;
-                CueSound(resourceChime, .35f);
-            }
+            SamplePracticeRevealSounds(film,frame.Time,playCues && !reduced && film.HasGain);
         }
 
         private void SamplePracticeGain(int axis, float age, bool reduced)
         {
             float revealAge = PracticeRewardCinematic.GainTime - PracticeRewardCinematic.ReleaseTime;
             float landingAge = PracticeRewardCinematic.LandingTime - PracticeRewardCinematic.ReleaseTime;
-            float flight = reduced ? 1 : Smooth(revealAge, landingAge, age);
+            float takeoff=revealAge-.095f;
+            float lift=reduced?1:Smooth(takeoff,.37f,age);
+            float drift=reduced?1:.57f*Smooth(.23f,.67f,age)+.43f*Smooth(.70f,landingAge,age);
+            float drop=reduced?1:Smooth(.73f,landingAge,age);
+            float bounce=reduced?0:.11f*ImmersiveMotion.Punch(age-landingAge,.21f);
             Transform item = prizePieces[axis];
-            item.gameObject.SetActive(age >= revealAge);
-            item.localPosition = Vector3.Lerp(new Vector3(0, .35f, -.15f), prizeLandings[axis], flight) +
-                Vector3.up * (.64f * Mathf.Sin(Mathf.PI * flight));
-            item.localScale = Vector3.one * (.50f + .14f * Mathf.Sin(Mathf.PI * flight));
-            item.localRotation = Quaternion.Euler(-18 * (1 - flight), Mathf.Lerp(-91, 14, flight), 10 * Mathf.Sin(Mathf.PI * flight));
-            prizeSockets[axis].gameObject.SetActive(age >= (reduced ? revealAge : .43f));
-            prizeBeams[axis].gameObject.SetActive(!reduced && age >= landingAge && age < landingAge + .23f);
+            item.gameObject.SetActive(age >= (reduced?revealAge:takeoff));
+            item.localPosition = Vector3.Lerp(new Vector3(0, .26f, -.14f),prizeLandings[axis],drift)+
+                Vector3.up*(lift*.63f*(1-drop)+bounce);
+            item.localScale = Vector3.one * (.50f + .17f * lift*(1-drop));
+            item.localRotation = Quaternion.Euler(-20*(1-drift),Mathf.Lerp(-115,14,lift)-21*drop,12*Mathf.Sin(Mathf.PI*drift));
+            prizeSockets[axis].gameObject.SetActive(age >= (reduced ? revealAge : .67f));
+            prizeBeams[axis].gameObject.SetActive(!reduced && age >= landingAge && age < landingAge + .18f);
         }
 
-        private void SamplePracticeCaseLight(PracticeRewardCinematicFrame frame, float seed, Vector3 seam, bool reduced, bool low)
+        private void SamplePracticeCaseLight(PracticeRewardCinematic film,PracticeRewardCinematicFrame frame,
+            float pose,Vector3 seam,bool reduced,bool low)
         {
+            float seed=film.Seed;
             EnergyRelease release = frame.Release;
-            float warm = Smooth(.95f, 2.72f, frame.Time);
+            bool held=frame.Time>=PracticeRewardCinematic.HoldTime && frame.Age<0;
+            float warm = Smooth(1.58f, 2.46f, pose);
             Color cool = script.Id == "ask" ? new Color(.27f, .69f, 1) : new Color(.57f, .47f, 1);
             Color amber = new Color(1, .51f, .16f);
             Color light = Color.Lerp(cool, amber, warm);
+            float sparkAtLatch=0,contact=0;
+            for(int i=0;i<caseLocks.Length;i++)
+                sparkAtLatch=Mathf.Max(sparkAtLatch,ImmersiveMotion.Punch(pose-PracticeRewardCinematic.LatchTime(i),.16f));
+            for(int axis=0;axis<prizePieces.Length;axis++)
+                if(film.TicksAt(axis)>0) contact=Mathf.Max(contact,ImmersiveMotion.Punch(frame.Time-film.ContactTime(axis),.23f));
             caseLight.transform.localPosition = seam + new Vector3(0, .22f * release.Fire + .02f, -.24f);
             caseLight.color = Color.Lerp(light, new Color(1, .89f, .71f), release.Flash);
-            caseLight.intensity = reduced ? .32f : .13f + frame.Charge * 1.38f + release.Flash * 3.25f + release.Fire * 2.48f;
+            caseLight.intensity = reduced ? .32f : .13f + frame.Charge*(held?.28f:.82f) + sparkAtLatch*.91f +
+                release.Flash*4.0f + release.Fire*2.32f + .78f*contact;
             if (bloom != null) bloom.Echo = low || reduced ? 0 : release.Flash * .27f + release.Fire * .21f;
             Vector3 worldSeam = actionTable.TransformPoint(seam);
-            SampleScenicEnergy(caseScenic, worldSeam, .012f, light, reduced ? 0 : frame.Charge, release, seed);
+            SampleScenicEnergy(caseScenic, worldSeam, .012f, light,reduced || held?0:frame.Charge*.34f,release,seed);
 
             Quaternion view = WorldCamera.transform.rotation;
             caseCore.transform.localPosition = seam + new Vector3(0, .035f, -.095f);
             caseCore.transform.rotation = view;
             caseCore.transform.localScale = new Vector3(.82f, .57f, 1) * (1 + release.Flash * .68f);
             CaseEffect(caseCore, 1, Color.Lerp(light * .83f, new Color(2.4f, 1.99f, 1.55f), release.Flash),
-                .23f * frame.Charge + release.Flash, 0, frame.Age, seed);
+                .18f * frame.Charge + release.Flash, 0, frame.Age, seed);
 
             for (int i = 0; i < caseFire.Length; i++)
             {
                 Renderer plume = caseFire[i];
-                float spread = Smooth(0, 1.52f, frame.Age);
+                float spread = .64f*Smooth(0,.38f,frame.Age)+.36f*Smooth(.33f,1.48f,frame.Age);
                 plume.transform.localPosition = seam + new Vector3((i == 0 ? 0 : i == 1 ? -.22f : .20f) * spread,
                     .19f + .33f * spread, i == 0 ? -.14f : i == 1 ? .25f : -.26f);
                 plume.transform.rotation = view * Quaternion.Euler(0, (i - 1) * 31, (i - 1) * (18 + 14 * spread));
                 float size = Mathf.Lerp(1.26f, 2.08f, spread) * (i == 0 ? 1 : .81f);
                 plume.transform.localScale = new Vector3(size, size * 1.19f, 1);
-                float opacity = !low || i == 0 ? release.Fire * (i == 0 ? 1.06f : .54f) : 0;
+                float opacity = i < (low?1:film.Difficulty)?release.Fire*(i==0?1.06f:.54f):0;
                 CaseEffect(plume, 0, new Color(2.05f, 1.41f, .93f), opacity, 63 * spread, frame.Age, seed);
             }
 
@@ -212,26 +237,27 @@ namespace Horizon.UI
             for (int i = 0; i < caseRays.Length; i++)
             {
                 LineRenderer ray = caseRays[i];
-                if (reduced || frame.Age >= 0 || i >= (low ? 4 : caseRays.Length))
+                if (reduced || held || pose < .99f || frame.Age >= 0 || i >= (low ? 4 : caseRays.Length))
                 {
                     ray.gameObject.SetActive(false);
                     continue;
                 }
                 float angle = i * 2.39996f + seed * 5.2f;
                 Vector3 direction = new Vector3(Mathf.Cos(angle), .40f + .15f * (i % 4), Mathf.Sin(angle));
-                float pulse = .58f + .42f * Mathf.Sin(frame.Time * (8 + i % 3) + i * 1.31f);
-                float intensity = Mathf.Max(0, frame.Charge - .10f - i * .018f) * pulse;
-                ray.widthMultiplier = (i % 3 == 0 ? .17f : .035f) * (.5f + frame.Charge);
-                ray.SetPosition(0, seam + direction * (.05f + .16f * (1 - pulse)));
-                ray.SetPosition(1, seam + direction * (.25f + frame.Charge * (.84f + .27f * pulse)));
-                CaseEffect(ray, 3, light * 1.28f, intensity, 0, frame.Age, seed);
+                float period=Mathf.Lerp(.49f,.19f,Smooth(1.12f,2.5f,pose));
+                float inward=1-Mathf.Repeat((pose-.99f)/period+i*.173f,1);
+                float intensity=frame.Charge*Smooth(0,.25f,inward)*(1-Smooth(.81f,1,inward));
+                ray.widthMultiplier=(i%3==0?.072f:.022f)*(.5f+frame.Charge);
+                ray.SetPosition(0,seam+direction*(.04f+inward*.94f));
+                ray.SetPosition(1,seam+direction*(.14f+inward*1.34f));
+                CaseEffect(ray,3,light*1.28f,intensity,0,frame.Age,seed);
             }
 
             for (int i = 0; i < caseEmbers.Length; i++)
             {
                 float age = frame.Age - (i % 6) * .027f;
                 LineRenderer spark = caseEmbers[i];
-                if (reduced || age <= 0 || age >= 1.38f || i >= (low ? 6 : caseEmbers.Length))
+                if (reduced || age <= 0 || age >= 1.38f || i >= (low?6:9+3*film.Difficulty))
                 {
                     spark.gameObject.SetActive(false);
                     continue;
@@ -271,9 +297,11 @@ namespace Horizon.UI
         {
             if (caseLight != null && bloom != null) bloom.Echo = practiceBloomBefore;
             if (caseVisualStarted) audioSource.Stop();
+            caseSilent=false;
+            UpdateAudio();
             caseLight = null;
             caseScenic = null;
-            caseVisualStarted = caseContactPlayed = false;
+            caseVisualStarted = false;
         }
     }
 }

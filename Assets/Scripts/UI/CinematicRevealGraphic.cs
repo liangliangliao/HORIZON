@@ -20,7 +20,7 @@ namespace Horizon.UI
             return graphic;
         }
 
-        public void Sample(float age, float charge, EnergyRelease release, float seed, bool echo, bool reduced)
+        public void Sample(float age, float charge, EnergyRelease release, float seed, Vector2 origin, bool echo, bool reduced)
         {
             bool visible = !reduced && (charge > .004f || release.Flash + release.Fire + release.Wave > .004f);
             if (!visible)
@@ -37,7 +37,7 @@ namespace Horizon.UI
             }
             field.SetVector("_Cue", new Vector4(age, charge, seed, rectTransform.rect.width / Mathf.Max(1, rectTransform.rect.height)));
             field.SetVector("_Energy", new Vector4(release.Flash, release.Fire, release.Wave, echo ? 1 : 0));
-            field.SetVector("_Origin", new Vector4(.50f, echo ? .566f : .574f, 0, 0));
+            field.SetVector("_Origin", new Vector4(origin.x, origin.y, EnergyRelease.WaveTravel(age), 0));
             if (!gameObject.activeSelf) gameObject.SetActive(true);
         }
 

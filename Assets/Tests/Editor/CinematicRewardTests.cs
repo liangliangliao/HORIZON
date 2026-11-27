@@ -53,6 +53,14 @@ namespace Horizon.Tests
             RewardPlan actual = RewardDirector.Direct(source);
             var cue = new RewardSpectacle(actual);
             Assert.IsTrue(actual.RecordedEcho);
+            Assert.Less(cue.ImpactTime,3.1f);
+            Assert.Less(actual.Duration,10f);
+            float held=actual.Cues.Single(item=>item.Phase==CinematicPhase.HitStop).Time;
+            Assert.That(cue.ImpactTime-held,Is.InRange(.16f,.23f));
+            var tension=new CinematicTension(actual);
+            Assert.AreEqual(tension.Sample(held+.04f).PoseTime,tension.Sample(cue.ImpactTime-.01f).PoseTime);
+            Assert.Greater(CinematicEnergy.RecordedEchoFlight(-.32f)-CinematicEnergy.RecordedEchoFlight(-.88f),
+                CinematicEnergy.RecordedEchoFlight(-1.3f)-CinematicEnergy.RecordedEchoFlight(-1.86f));
             Assert.AreEqual(.23f, cue.MultiplierTime - cue.ImpactTime, .001f);
             Assert.AreEqual("专注 +0.1321", actual.Outcome.Changes.Single().Copy());
             float second = actual.Cues.Single(item => item.Phase == CinematicPhase.SecondReveal).Time;

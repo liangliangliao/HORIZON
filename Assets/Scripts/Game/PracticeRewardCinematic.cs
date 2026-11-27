@@ -7,11 +7,14 @@ namespace Horizon.Game
     {
         public const float ReleaseTime = 2.9f;
         public const float GainTime = ReleaseTime + .23f;
-        public const float LandingTime = ReleaseTime + 1.32f;
+        public const float HoldTime = ReleaseTime - .19f;
+        public const float LandingTime = ReleaseTime + 1.16f;
         public const float CostTime = ReleaseTime + 1.78f;
-        public const float Duration = 6.1f;
-        private const float CountSeconds = 1.22f;
+        public const float Duration = 5.65f;
+        public const float ObjectSpacing = .094f;
+        private static readonly float[] LatchBeats = { 1.24f, 1.88f, 2.23f };
         private readonly int[] ticks;
+        private readonly int[] slots = new int[6];
         private readonly string finalGains, finalCosts;
         private readonly float strength;
 
@@ -26,9 +29,12 @@ namespace Horizon.Game
             EventId = action.nodeId;
             Seed = CinematicEnergy.VisualSeed(EventId);
             Difficulty = action.practice?.difficulty ?? 2;
-            strength = Difficulty == 1 ? .78f : Difficulty == 2 ? .90f : .98f;
+            strength = Difficulty == 1 ? .65f : Difficulty == 2 ? .88f : 1;
             ticks = PracticeReward.Ticks(action.actualNow);
             HasGain = Array.Exists(ticks, value => value > 0);
+            int slot = 0;
+            for (int axis = 0; axis < ticks.Length; axis++)
+                if (ticks[axis] > 0) slots[axis] = slot++;
             finalGains = FormatChanges(Duration, true, true);
             finalCosts = FormatChanges(Duration, false, true);
         }
@@ -36,6 +42,9 @@ namespace Horizon.Game
         public static bool Supports(PracticeSet set) => set != PracticeSet.Street && set != PracticeSet.Track;
 
         public int TicksAt(int axis) => ticks[axis];
+        public int GainSlot(int axis) => slots[axis];
+        public static float LatchTime(int index) => LatchBeats[index];
+        public float ContactTime(int axis) => LandingTime + GainSlot(axis) * ObjectSpacing;
 
         public int DisplayTicks(int axis, float time, bool reducedMotion)
         {
@@ -43,7 +52,10 @@ namespace Horizon.Game
             if (value <= 0) return time >= CostTime ? value : 0;
             if (time < GainTime) return 0;
             if (reducedMotion) return value;
-            float progress = ImmersiveMotion.Smooth((time - GainTime) / CountSeconds);
+            float contact = ContactTime(axis);
+            if (time + .00002f >= contact) return value;
+            float age = time - GainTime;
+            float progress = .74f * Window(age, .045f, .32f) + .18f * Window(time, GainTime + .31f, contact);
             return (int)Math.Min(value, 1 + Math.Floor((value - 1d) * progress));
         }
 
@@ -51,7 +63,7 @@ namespace Horizon.Game
         {
             if (!gains) return time >= CostTime ? finalCosts : "";
             if (time < GainTime) return "";
-            return reducedMotion || time >= GainTime + CountSeconds ? finalGains : FormatChanges(time, true, false);
+            return reducedMotion || time >= CostTime ? finalGains : FormatChanges(time, true, false);
         }
 
         private string FormatChanges(float time, bool gains, bool reducedMotion)
@@ -82,18 +94,19 @@ namespace Horizon.Game
             if (!HasGain || reducedMotion)
                 return new PracticeRewardCinematicFrame(time, age, 0, 0, 0, HasGain && age >= 0 ? 1 : 0, default);
 
-            // The case leans into three waves, braces, then recoils from its own hinge.
-            float first = Crest(time, .35f, .79f, 1.19f);
-            float second = Crest(time, 1.12f, 1.58f, 1.96f);
-            float third = Crest(time, 1.85f, 2.40f, 2.65f);
-            float brace = Window(time, 2.48f, 2.67f);
-            float charge = age < 0 ? Math.Min(1, .04f + .57f * Window(time, .25f, 2.64f) +
-                .32f * first + .36f * second + .42f * third) : .20f * (1 - Window(age, .11f, 1.42f));
-            float compression = age < 0 ? .07f * first + .095f * second + .12f * third + .13f * brace :
-                .13f * (1 - Window(age, 0, .11f)) - .055f * Crest(age, .04f, .15f, .39f);
-            float tilt = age < 0 ? -5 * first + 7 * second - 9 * third - 3 * brace :
-                -3 * (1 - Window(age, 0, .08f)) + 9 * Crest(age, .02f, .15f, .49f) - 3 * Crest(age, .38f, .52f, .71f);
-            float lid = Window(age, 0, .35f) + .15f * Crest(age, .15f, .39f, .70f);
+            float pose = age < 0 ? Math.Min(time, HoldTime) : time;
+            float first = Crest(pose, 1.02f, LatchBeats[0], 1.55f);
+            float second = Crest(pose, 1.68f, LatchBeats[1], 2.08f);
+            float third = Crest(pose, 2.07f, LatchBeats[2], 2.48f);
+            float brace = Window(pose, 2.30f, HoldTime);
+            float charge = age < 0 ? Math.Min(1, .08f + .69f * Window(pose, 1.10f, 2.55f) +
+                .22f * first + .26f * second + .29f * third) : 0;
+            float compression = age < 0 ? .045f * first + .072f * second + .10f * third + .13f * brace :
+                .13f * (1 - Window(age, 0, .060f)) - .048f * Crest(age, .035f, .104f, .33f);
+            float tilt = age < 0 ? -3.5f * first + 6 * second - 8.5f * third - 3 * brace :
+                -3 * (1 - Window(age, 0, .061f)) + 11 * Crest(age, .025f, .11f, .31f) - 4 * Crest(age, .23f, .33f, .56f);
+            float lid = .94f * Window(age, 0, .13f) + .06f * Window(age, .13f, .55f)
+                + .18f * Crest(age, .065f, .18f, .44f) - .06f * Crest(age, .33f, .45f, .71f);
             return new PracticeRewardCinematicFrame(time, age, charge, compression, tilt, lid, EnergyRelease.SampleScenic(age, strength));
         }
 

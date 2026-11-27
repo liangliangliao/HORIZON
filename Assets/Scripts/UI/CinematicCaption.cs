@@ -197,8 +197,9 @@ namespace Horizon.UI
             if(plan.RecordedEcho)
             {
                 float age=frame.Time-choreography.ImpactTime;
-                float charge=age<0?ImmersiveMotion.Smooth((age+1.31f)/1.31f)*.86f:0;
-                releaseField.Sample(age,charge,CinematicEnergy.RecordedEchoRelease(age),revealSeed,true,VisualPreferences.ReducedMotion);
+                float poseAge=age<0?Mathf.Min(age,PracticeRewardCinematic.HoldTime-PracticeRewardCinematic.ReleaseTime):age;
+                releaseField.Sample(poseAge,CinematicEnergy.RecordedEchoCharge(poseAge),
+                    CinematicEnergy.RecordedEchoRelease(age),revealSeed,director.EchoRevealOrigin,true,VisualPreferences.ReducedMotion);
             }
             else releaseField.Clear();
             float second=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
@@ -216,7 +217,11 @@ namespace Horizon.UI
                 Phase.text=shot==LifeActionShot.Suspense?"等一等 · 变化即将显现":shot==LifeActionShot.Establish?"看见这次行动":
                     shot==LifeActionShot.Arrive?"这一步，已经发生":"正在行动";
             }
+            if(Phase!=null && plan.RecordedEcho && !outcome.Visible)
+                Phase.text=frame.Time<1.22f?"回看行动":frame.Time<PracticeRewardCinematic.HoldTime?"印记沿时间返回":
+                    frame.Time<choreography.ImpactTime?"即将抵达":"回声抵达";
             string narration=CinematicOutcome.Readable(frame.Narration);
+            if(plan.RecordedEcho && !outcome.Visible && frame.Time<choreography.MultiplierTime) narration=plan.Outcome.Origin;
             if(plan.Event.kind==DomainEventKind.TimeEcho && !outcome.Visible && plan.Event.receipt?.sourceDay>0 &&
                 frame.Phase>=CinematicPhase.HeroMoment)
                 narration="第 "+plan.Event.receipt.sourceDay+" 天 · 「"+PresentationCopy.Chinese(plan.Event.receipt.action)+"」\n"+narration;
@@ -235,7 +240,7 @@ namespace Horizon.UI
             // At a release beat, reveal the new thought as one sentence and
             // let opacity/scale carry the entrance. A type-on during the flash
             // leaves isolated glyphs in screenshots and reads like corruption.
-            bool wholeSentence=outcome.Visible || VisualPreferences.ReducedMotion ||
+            bool wholeSentence=outcome.Visible || plan.RecordedEcho || VisualPreferences.ReducedMotion ||
                 frame.Phase==CinematicPhase.Impact || frame.Phase==CinematicPhase.SecondReveal ||
                 frame.Phase==CinematicPhase.Jackpot || actionBeforeReveal && lifeAction.Shot==LifeActionShot.Suspense;
             // The event heading is the viewer's fixed orientation landmark.
@@ -286,7 +291,9 @@ namespace Horizon.UI
                 Color.Lerp(Palette.Text,Color.white,frame.Flash*.45f),frame.Glow*.82f,.045f,2,true);
             float revealAlpha=outcome.Visible?(plan.RecordedEcho && !outcome.Future ? Mathf.Lerp(.82f,1,Mathf.Clamp01(outcome.Age/.16f)) :
                 Mathf.Clamp01(outcome.Age/.16f))*frame.EndAlpha:0;
-            float revealScale=VisualPreferences.ReducedMotion?1:1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
+            float revealScale=VisualPreferences.ReducedMotion?1:plan.RecordedEcho?
+                1+.28f*ImmersiveMotion.Punch(outcome.Age,.27f)+.18f*ImmersiveMotion.Punch(outcome.Age-CinematicOutcome.EchoCreditSeconds,.22f):
+                1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
             Color resultColor=outcome.Negative?Palette.Coral:Palette.Gold;
             if(plan.Outcome.WalkRecovery && outcome.HasResource && plan.Outcome.Changes[outcome.Index].Axis==0)
                 resultColor=Palette.Mint;

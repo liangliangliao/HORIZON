@@ -28,6 +28,7 @@ namespace Horizon.UI
         public bool IsPlaying { get { return active != null; } }
         public float Elapsed { get { return clock?.Elapsed ?? 0; } }
         public bool IsPaused { get { return paused; } }
+        internal Vector2 EchoRevealOrigin => world==null?new Vector2(.5f,.566f):world.EchoRevealOrigin;
         public event Action<CinematicCue> Cue;
         public event Action<RewardPlan> Started;
         public event Action<RewardPlan> Completed;

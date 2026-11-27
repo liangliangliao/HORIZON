@@ -149,7 +149,8 @@ namespace Horizon
             }
             if(owner!=practicePage || owner==null) yield break;
             int finalBeat=take.difficulty-1;
-            yield return FilmBeat(owner,PracticeShot.Success,3.4f,"完成 · "+card.Name,film.Success,film.Move(finalBeat,take.routes[finalBeat]=='B'),finalBeat);
+            float finishSeconds=PracticeRewardCinematic.Supports(film.Set)?2.0f:3.4f;
+            yield return FilmBeat(owner,PracticeShot.Success,finishSeconds,"完成 · "+card.Name,film.Success,film.Move(finalBeat,take.routes[finalBeat]=='B'),finalBeat);
             if(owner!=practicePage || owner==null) yield break;
             // The action has reached its outcome. Persist the receipt before showing any reveal.
             practiceBack.gameObject.SetActive(false);
@@ -213,7 +214,7 @@ namespace Horizon
             practiceMeter.color=Palette.Gold;
             practiceCosts=View.Label(owner,"Practice cost","",29,Palette.Coral,TextAnchor.MiddleCenter,.07f,.104f,.93f,.153f);
             practiceCaption.text="";
-            practiceHeading.text="今日所得 · 蓄光";
+            practiceHeading.text="行动完成 · 回执待开";
             practiceSkip.GetComponentInChildren<Text>().text="查看回执";
             practiceSkip.gameObject.SetActive(true);
             world.BeginPracticeRewardCinematic(film);
@@ -225,19 +226,26 @@ namespace Horizon
                     bool reduced=archive.preferences.reducedMotion;
                     PracticeRewardCinematicFrame frame=film.Sample(time,reduced);
                     world.SamplePracticeRewardCinematic(film,frame);
-                    float charge=frame.Charge*ImmersiveMotion.Smooth((time-1.22f)/1.41f);
-                    reveal.Sample(frame.Age,charge,frame.Release,film.Seed,false,reduced);
+                    float pose=Mathf.Min(time,PracticeRewardCinematic.HoldTime);
+                    float charge=frame.Charge*ImmersiveMotion.Smooth((pose-.89f)/1.49f);
+                    float effectAge=frame.Age<0?pose-PracticeRewardCinematic.ReleaseTime:frame.Age;
+                    reveal.Sample(effectAge,charge,frame.Release,film.Seed,world.CaseRevealOrigin,false,reduced);
                     float resultAge=time-PracticeRewardCinematic.GainTime;
                     float receiptLight=reduced?1:ImmersiveMotion.Smooth((resultAge+.02f)/.19f);
                     practiceSubtitle.color=new Color(.014f,.03f,.05f,Mathf.Lerp(.38f,.79f,receiptLight));
                     string gains=film.Changes(time,true,reduced), cost=film.Changes(time,false,reduced);
                     practiceMeter.text=gains;
                     backing.color=new Color(.028f,.016f,.040f,gains.Length==0?0:.73f*receiptLight);
-                    float emphasis=reduced || resultAge<0?0:Mathf.Sin(Mathf.PI*ImmersiveMotion.Smooth(resultAge/.38f));
-                    meter.localScale=Vector3.one*(1+.07f*emphasis);
+                    float emphasis=ImmersiveMotion.Punch(resultAge,.34f);
+                    for(int axis=0;axis<6;axis++)
+                        if(film.TicksAt(axis)>0) emphasis=Mathf.Max(emphasis,.71f*ImmersiveMotion.Punch(time-film.ContactTime(axis),.21f));
+                    meter.localScale=Vector3.one*(reduced?1:1+.32f*emphasis);
                     practiceCosts.text=cost.Length>0?"本次付出　"+cost:"";
-                    practiceHeading.text=time>=PracticeRewardCinematic.GainTime?"今日已入账":
-                        time>=PracticeRewardCinematic.ReleaseTime?"今日所得 · 开匣":"今日所得 · 蓄光";
+                    practiceHeading.text=time>=PracticeRewardCinematic.CostTime || reduced?"今日已入账":
+                        time>=PracticeRewardCinematic.GainTime?"收益正在入位":
+                        time>=PracticeRewardCinematic.ReleaseTime?"锁扣脱开 · 开匣":
+                        time>=PracticeRewardCinematic.HoldTime?"即将开启":
+                        time>=PracticeRewardCinematic.LatchTime(0)?"锁扣依次释放":"行动完成 · 回执待开";
                     CinematicTypography.Sweep(practiceMeter,reduced?-1:time-PracticeRewardCinematic.GainTime);
                     if(time>=PracticeRewardCinematic.Duration) break;
                     time=Mathf.Min(PracticeRewardCinematic.Duration,time+

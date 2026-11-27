@@ -217,7 +217,7 @@ namespace Horizon.UI
                 float detailTremor=preferences.reducedMotion || tensionFrame.Silent || ShowingResource?0:Mathf.Pow(energyFrame.Inward,1.8f)*.035f*(.76f+.24f*Mathf.Sin(time*19));
                 float scale=showcaseScale*(.72f+heroFocus*.28f+breath+bounce);
                 if(preview>0) scale=showcaseScale*(.80f-preview*.055f);
-                float arrival=moviePlan.RecordedEcho ? preferences.reducedMotion?1:ImmersiveMotion.Land((time-spectacle.ImpactTime+.18f)/.52f) :
+                float arrival=moviePlan.RecordedEcho ? preferences.reducedMotion?1:ImmersiveMotion.Land((time-spectacle.ImpactTime)/.32f) :
                     ShowingResource?resourceBeat.Entrance(preferences.reducedMotion):1;
                 float turn=(1-arrival)*(resourceBeat.Negative?22:-48);
                 if(ShowingResource) scale=showcaseScale*(.78f+.22f*arrival);
@@ -375,12 +375,24 @@ namespace Horizon.UI
 
         internal void PlayResourceContact(float previous,float now)
         {
+            if(moviePlan?.RecordedEcho==true)
+            {
+                float contactAt=spectacle.MultiplierTime+CinematicOutcome.EchoCreditSeconds;
+                if(!paused && !preferences.reducedMotion && CrossedRevealCue(previous,now,contactAt))
+                {
+                    SetPracticeAudioTime(contactAt);
+                    PrepareRevealSounds();
+                    CueSound(revealContacts[2],.47f);
+                    MasterHaptics.Cue(16,51,preferences);
+                }
+                return;
+            }
             if(moviePlan!=null && moviePlan.Outcome.WalkRecovery)
             {
                 PlayWalkRecoverySounds(previous,now);
                 return;
             }
-            if(!ShowingResource || preferences.reducedMotion || tensionFrame.Silent || paused || moviePlan.RecordedEcho && resourceBeat.Index>0) return;
+            if(!ShowingResource || preferences.reducedMotion || tensionFrame.Silent || paused) return;
             float contact=spectacle.MultiplierTime+resourceBeat.Index*CinematicOutcome.ChangeSeconds+ImmersiveMotion.RevealContactSeconds;
             // A skipped section never queues a backlog of late sounds. Pose
             // resampling for screenshots or a settings toggle never plays one.

@@ -47,7 +47,7 @@ namespace Horizon.UI
             data.maintainOffset=false; gaze.data=data; gaze.weight=.6f;
             builder.layers.Add(new RigLayer(rig));
         }
-        public void Play(HorizonBodyAction action,float progress,float emphasis=1)
+        public void Play(HorizonBodyAction action,float progress,float emphasis=1,Vector3? focus=null,float contact=0)
         {
             if(actor==null || actor.Head==null) return;
             performing=true; CurrentAction=action; actor.enabled=false;
@@ -75,6 +75,16 @@ namespace Horizon.UI
             actor.Head.localRotation=Quaternion.Euler(head,0,0);
             actor.SampleBreath(p*4,action==HorizonBodyAction.Rest || action==HorizonBodyAction.Sit?p:0);
             target.localPosition=new Vector3(action==HorizonBodyAction.Point?.7f:0,1.65f-Mathf.Sin(head*Mathf.Deg2Rad)*3,-3);
+            if(focus.HasValue)
+            {
+                target.position=focus.Value;
+                if(contact>0)
+                {
+                    Vector3 reach=focus.Value-actor.RightArm.position;
+                    Quaternion aim=Quaternion.FromToRotation(-actor.RightArm.up,reach)*actor.RightArm.rotation;
+                    actor.RightArm.rotation=Quaternion.Slerp(actor.RightArm.rotation,aim,contact);
+                }
+            }
             if(!GraphReady && gameObject.activeInHierarchy) { builder.Build(); if(GraphReady) builder.graph.SetTimeUpdateMode(DirectorUpdateMode.Manual); }
             if(GraphReady)
             {

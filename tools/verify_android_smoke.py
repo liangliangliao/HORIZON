@@ -15,7 +15,7 @@ assert "01b-depth-focus" in frames, "GLES depth focus was not rendered"
 for kind in ("Cascade", "CausalSingularity"):
     for phase in ("first", "impact"):
         assert f"08-causal-{kind}-{phase}" in frames, f"Native causal relay was not rendered: {kind}/{phase}"
-for phase in ("charge", "flash", "wave", "receipt"):
+for phase in ("charge", "hold", "flash", "wave", "receipt"):
     assert f"09-case-{phase}" in frames, f"Native case reveal was not rendered: {phase}"
 for phase in ("charge", "wave"):
     assert f"10-echo-{phase}" in frames, f"Native recorded echo was not rendered: {phase}"

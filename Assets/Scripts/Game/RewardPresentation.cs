@@ -216,7 +216,25 @@ namespace Horizon.Game
                 duration=Math.Max(duration,5f+orderedCauses.Sum(c=>CausalNodeSeconds(c.label))+12f);
             int multiplier = PresentationStrength(e);
             var cues = new List<CinematicCue>();
-            if (e.tier >= RewardTier.Epic)
+            bool recordedEcho = HasRecordedEcho(e, objects);
+            if (recordedEcho)
+            {
+                const float impactAt = PracticeRewardCinematic.ReleaseTime;
+                duration = 6.16f + Math.Max(1.6f, CinematicReading.ReadSeconds(e.detail));
+                string origin = "第 " + r.sourceDay + " 天 · 「" + PresentationCopy.Chinese(r.action) + "」";
+                cues.Add(new CinematicCue(0, CinematicPhase.Anticipation, origin));
+                cues.Add(new CinematicCue(.41f, CinematicPhase.Charge, origin));
+                cues.Add(new CinematicCue(1.22f, CinematicPhase.Escalation, origin));
+                cues.Add(new CinematicCue(2.08f, CinematicPhase.HeroMoment, origin));
+                cues.Add(new CinematicCue(PracticeRewardCinematic.HoldTime, CinematicPhase.HitStop, origin));
+                cues.Add(new CinematicCue(impactAt, CinematicPhase.Impact, "回声抵达"));
+                cues.Add(new CinematicCue(impactAt + .23f, CinematicPhase.Multiplication, "本次实际变化"));
+                cues.Add(new CinematicCue(5.64f, CinematicPhase.SecondReveal, origin));
+                cues.Add(new CinematicCue(5.92f, CinematicPhase.Jackpot, origin));
+                cues.Add(new CinematicCue(6.16f, CinematicPhase.Settlement, e.detail));
+                cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
+            }
+            else if (e.tier >= RewardTier.Epic)
             {
                 string[] copy = Story(e, r);
                 // Give the viewer time to identify the subject before light and
@@ -269,9 +287,9 @@ namespace Horizon.Game
             {
                 AddCues(cues,duration,Story(e,r),e.tier);
             }
-            duration=CinematicReading.Retime(e,cues,duration);
+            if(!recordedEcho) duration=CinematicReading.Retime(e,cues,duration);
             float impact = cues.Single(cue => !cue.NodeHit && cue.Phase == CinematicPhase.Impact).Time;
-            if (HasRecordedEcho(e, objects) || OrbitCinematic.HasRecordedNode(e))
+            if (OrbitCinematic.HasRecordedNode(e))
             {
                 int reveal = cues.FindIndex(cue => !cue.NodeHit && cue.Phase == CinematicPhase.Multiplication);
                 cues[reveal] = new CinematicCue(impact + .23f, CinematicPhase.Multiplication, cues[reveal].Copy);

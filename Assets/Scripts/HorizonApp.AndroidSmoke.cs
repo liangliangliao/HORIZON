@@ -288,13 +288,16 @@ namespace Horizon
             try
             {
                 Time.captureFramerate=12;
-                float[] timings={-.32f,0,.44f,1.52f};
-                string[] phases={"charge","flash","wave","receipt"};
+                float[] timings={-.32f,-.20f,0,.44f,1.52f};
+                string[] phases={"charge","hold","flash","wave","receipt"};
                 int index=0;
                 for(int frame=0;frame<90 && index<timings.Length;frame++)
                 {
                     yield return new WaitForEndOfFrame();
                     if(!field.gameObject.activeInHierarchy || field.material.GetVector("_Cue").x<timings[index]) continue;
+                    if(phases[index]=="hold")
+                        AndroidSmoke.Require(field.material.GetVector("_Cue").x<0 && field.material.GetVector("_Energy").x==0,
+                            "A flash preceded the case's silent hold on Android.");
                     if(index==timings.Length-1)
                         AndroidSmoke.Require(practiceMeter.text==actual.Changes(PracticeRewardCinematic.Duration,true,false),
                             "The settlement number did not match the committed native receipt.");

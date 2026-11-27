@@ -231,7 +231,7 @@ namespace Horizon.UI
                     MasterHaptics.Impact(moviePlan.Event,preferences);
                     if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.085f:.022f; if(bloom!=null) bloom.Echo=.45f; }
                 }
-                if(moviePlan.RecordedEcho) CueSound(ImpactVoice(DomainEventKind.TimeEcho),.42f);
+                if(moviePlan.RecordedEcho) PlayRevealStrike(true,.81f);
                 bool losing = spectacle.Style==RewardSpectacleStyle.Loss;
                 if(losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
                 else if(celebrating) moviePlayer.GetComponent<HorizonActor>().Celebrate();
@@ -255,7 +255,8 @@ namespace Horizon.UI
         private void CueSound(AudioClip clip,float volume)
         {
 #if UNITY_EDITOR
-            if(moviePlan!=null && !paused && !movieMuted && clip!=null) recordedCinemaSounds.Add(new RecordedCinemaSound { Time=recordedSoundTime,Volume=volume,Clip=clip });
+            if((moviePlan!=null || caseVisualStarted) && !paused && !movieMuted && !caseSilent && clip!=null)
+                recordedCinemaSounds.Add(new RecordedCinemaSound { Time=recordedSoundTime,Volume=volume,Clip=clip });
 #endif
             if(!paused && preferences.sound && !movieMuted) { audioSource.pitch=1; audioSource.PlayOneShot(clip,volume); }
         }

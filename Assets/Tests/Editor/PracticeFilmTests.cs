@@ -62,14 +62,23 @@ namespace Horizon.Tests
         {
             var receipt = new ActionRecord { nodeId = "case-pose", actualNow = PracticeReward.FromTicks(new[] { -2, 0, 7, 0, 0, 0 }) };
             var film = new PracticeRewardCinematic(receipt);
-            var first = film.Sample(.79f, false);
-            var second = film.Sample(1.58f, false);
-            var third = film.Sample(2.40f, false);
+            var first = film.Sample(PracticeRewardCinematic.LatchTime(0), false);
+            var second = film.Sample(PracticeRewardCinematic.LatchTime(1), false);
+            var third = film.Sample(PracticeRewardCinematic.LatchTime(2), false);
             Assert.Greater(first.Charge, film.Sample(0, false).Charge);
             Assert.Less(first.Tilt, 0);
             Assert.Greater(second.Tilt, 0);
             Assert.Less(third.Tilt, first.Tilt);
-            Assert.AreEqual(second.Tilt, film.Sample(1.58f, false).Tilt);
+            Assert.AreEqual(second.Tilt, film.Sample(PracticeRewardCinematic.LatchTime(1), false).Tilt);
+            float firstGap=PracticeRewardCinematic.LatchTime(1)-PracticeRewardCinematic.LatchTime(0);
+            float secondGap=PracticeRewardCinematic.LatchTime(2)-PracticeRewardCinematic.LatchTime(1);
+            Assert.Less(secondGap,firstGap);
+            var held=film.Sample(PracticeRewardCinematic.HoldTime,false);
+            var heldLast=film.Sample(PracticeRewardCinematic.ReleaseTime-.01f,false);
+            Assert.AreEqual(held.Compression,heldLast.Compression);
+            Assert.AreEqual(held.Tilt,heldLast.Tilt);
+            Assert.AreEqual(0,heldLast.Lid);
+            Assert.That(film.Sample(PracticeRewardCinematic.ReleaseTime+.14f,false).Lid,Is.GreaterThan(.9f));
             var release = film.Sample(PracticeRewardCinematic.GainTime, false);
             Assert.Greater(release.Lid, 0);
             Assert.Greater(release.Release.Fire, 0);
@@ -87,6 +96,23 @@ namespace Horizon.Tests
             Assert.IsFalse(costOnly.HasGain);
             Assert.AreEqual(0, costOnly.Sample(PracticeRewardCinematic.ReleaseTime, false).Release.Flash);
             Assert.IsEmpty(costOnly.Changes(PracticeRewardCinematic.Duration, true, false));
+        }
+
+        [Test]
+        public void EachNumberLocksAtItsOwnPhysicalContact()
+        {
+            var record=new ActionRecord { nodeId="timed-contact",
+                actualNow=PracticeReward.FromTicks(new[] {100,300,0,500,0,-2}) };
+            var film=new PracticeRewardCinematic(record);
+            float first=film.ContactTime(0), next=film.ContactTime(1);
+            Assert.Less(first,next);
+            Assert.Greater(film.DisplayTicks(0,PracticeRewardCinematic.GainTime+.34f,false),70);
+            Assert.Less(film.DisplayTicks(0,first-.02f,false),100);
+            Assert.AreEqual(100,film.DisplayTicks(0,first,false));
+            Assert.Less(film.DisplayTicks(1,first,false),300);
+            Assert.AreEqual(300,film.DisplayTicks(1,next,false));
+            Assert.AreEqual(0,film.DisplayTicks(5,film.ContactTime(3),false));
+            Assert.AreEqual(-2,film.DisplayTicks(5,PracticeRewardCinematic.CostTime,false));
         }
 
         [Test]
