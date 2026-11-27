@@ -31,6 +31,7 @@ namespace Horizon.UI
         private OutcomeRadianceGraphic outcomeLight;
         private CinematicRevealGraphic releaseField;
         private float revealSeed;
+        private string echoDebit;
         private LifeActionStoryboard actionStory;
 
         private void IsolatePage()
@@ -119,7 +120,8 @@ namespace Horizon.UI
             IsolatePage();
             plan=value; choreography=new CinematicTextChoreography(value);
             revealSeed=CinematicEnergy.VisualSeed(value.Event.id);
-            int rows=plan.RecordedEcho?plan.Outcome.Changes.Count:1;
+            echoDebit=plan.RecordedEcho?plan.Outcome.EchoCosts:"";
+            int rows=plan.RecordedEcho?plan.Outcome.Changes.Count(change=>change.Amount>0):1;
             bool tallReceipt=rows>2;
             EchoLayout(Multiplier,tallReceipt?.232f:.293f,.423f);
             EchoLayout(MultiplierCaption,.418f,.452f);
@@ -149,7 +151,8 @@ namespace Horizon.UI
             {
                 // A finished movie leaves a readable result, not its nearly
                 // transparent last fade frame, while the user decides to go on.
-                if(choreography!=null) ApplyFrame(choreography.Sample(choreography.SettlementTime+1.1f,VisualPreferences.ReducedMotion));
+                if(choreography!=null)
+                    ApplyFrame(choreography.Sample(plan.RecordedEcho?plan.Duration-.32f:choreography.SettlementTime+1.1f,VisualPreferences.ReducedMotion));
                 releaseField.Clear();
                 return;
             }
@@ -197,8 +200,8 @@ namespace Horizon.UI
             if(plan.RecordedEcho)
             {
                 float age=frame.Time-choreography.ImpactTime;
-                float poseAge=age<0?Mathf.Min(age,PracticeRewardCinematic.HoldTime-PracticeRewardCinematic.ReleaseTime):age;
-                releaseField.Sample(poseAge,CinematicEnergy.RecordedEchoCharge(poseAge),
+                float poseAge=RecordedEchoStory.Sample(frame.Time,false).PoseTime-RecordedEchoStory.ImpactAt;
+                releaseField.Sample(poseAge,.28f*CinematicEnergy.RecordedEchoCharge(poseAge),
                     CinematicEnergy.RecordedEchoRelease(age),revealSeed,director.EchoRevealOrigin,true,VisualPreferences.ReducedMotion);
             }
             else releaseField.Clear();
@@ -217,9 +220,20 @@ namespace Horizon.UI
                 Phase.text=shot==LifeActionShot.Suspense?"等一等 · 变化即将显现":shot==LifeActionShot.Establish?"看见这次行动":
                     shot==LifeActionShot.Arrive?"这一步，已经发生":"正在行动";
             }
-            if(Phase!=null && plan.RecordedEcho && !outcome.Visible)
-                Phase.text=frame.Time<1.22f?"回看行动":frame.Time<PracticeRewardCinematic.HoldTime?"印记沿时间返回":
-                    frame.Time<choreography.ImpactTime?"即将抵达":"回声抵达";
+            if(Phase!=null && plan.RecordedEcho)
+            {
+                RecordedEchoBeat beat=RecordedEchoStory.Sample(frame.Time,VisualPreferences.ReducedMotion).Beat;
+                switch(beat)
+                {
+                    case RecordedEchoBeat.Origin: Phase.text="来自过去的行动"; break;
+                    case RecordedEchoBeat.Prepare: Phase.text="拾起行动印记"; break;
+                    case RecordedEchoBeat.Develop: Phase.text="印记沿时间返回"; break;
+                    case RecordedEchoBeat.Dock: Phase.text="对齐阅读台"; break;
+                    case RecordedEchoBeat.Release: Phase.text="回声抵达"; break;
+                    default: Phase.text="已经入账"; break;
+                }
+                if(VisualPreferences.ReducedMotion) Phase.text="已经入账";
+            }
             string narration=CinematicOutcome.Readable(frame.Narration);
             if(plan.RecordedEcho && !outcome.Visible && frame.Time<choreography.MultiplierTime) narration=plan.Outcome.Origin;
             if(plan.Event.kind==DomainEventKind.TimeEcho && !outcome.Visible && plan.Event.receipt?.sourceDay>0 &&
@@ -236,7 +250,8 @@ namespace Horizon.UI
             }
             if(plan.Outcome.WalkRecovery && outcome.HasResource)
                 context=plan.Outcome.Changes[outcome.Index].Axis==0?"脚步落稳，感受身体恢复。":"慢慢呼气，让肩膀放松。";
-            if(Story!=null) Story.text=context;
+            if(Story!=null) Story.text=plan.RecordedEcho?
+                plan.Outcome.Origin+"  →  第 "+plan.Event.day+" 天":context;
             // At a release beat, reveal the new thought as one sentence and
             // let opacity/scale carry the entrance. A type-on during the flash
             // leaves isolated glyphs in screenshots and reads like corruption.
@@ -250,8 +265,11 @@ namespace Horizon.UI
             CinematicTypography.Reveal(Story,wholeSentence?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
             CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;
-            if(Explanation!=null) Explanation.text=receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
-            if(Resources!=null) Resources.text=receipt>.001f?plan.ResourceCopy:"";
+            if(Explanation!=null) Explanation.text=!plan.RecordedEcho && receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
+            bool showDebit=plan.RecordedEcho && outcome.Visible && echoDebit.Length>0 &&
+                (VisualPreferences.ReducedMotion || frame.Time>=RecordedEchoStory.SettleAt);
+            if(Resources!=null) Resources.text=plan.RecordedEcho?(showDebit?"本次付出  "+echoDebit:""):
+                receipt>.001f?plan.ResourceCopy:"";
             if(Multiplier!=null)
             {
                 string result=outcome.Visible?outcome.Copy:"";
@@ -298,12 +316,13 @@ namespace Horizon.UI
             if(plan.Outcome.WalkRecovery && outcome.HasResource && plan.Outcome.Changes[outcome.Index].Axis==0)
                 resultColor=Palette.Mint;
             Color radiance=resultColor; radiance.a=revealAlpha;
+            if(plan.RecordedEcho) radiance.a*=.36f;
             outcomeLight?.Sample(outcome.Visible?outcome.Age:-1,radiance,VisualPreferences.ReducedMotion,outcome.Negative);
             Style(Multiplier,revealScale,Vector2.zero,revealAlpha,resultColor,.65f+frame.Glow*.35f,.16f,2,true);
             Style(MultiplierCaption,1,Vector2.zero,revealAlpha,resultColor,.35f,.05f,3,false);
             Style(OutcomeContext,1,Vector2.zero,revealAlpha,Palette.Text,.12f,.02f,0,false);
             Style(Explanation,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.16f,.025f,0,false);
-            Style(Resources,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Mint,.22f,.03f,1,true);
+            Style(Resources,1,Vector2.zero,(showDebit?1:receipt)*frame.EndAlpha,showDebit?Palette.Coral:Palette.Mint,.22f,.03f,1,true);
             Style(Prediction,1,Vector2.zero,receipt*frame.EndAlpha,Palette.Text,.12f,.02f,0,false);
             if(Flash!=null) Flash.color=Color.clear;
         }

@@ -69,7 +69,8 @@ namespace Horizon
                 View.Label(overlay, "Convergence evidence labels", "想象 · 游戏预演 · 现实",24,Palette.Gold,TextAnchor.MiddleCenter,.035f,.768f,.965f,.798f);
             Button next = View.Button(overlay, "Continue master event", "让时间继续",finish,.075f,.027f,.925f,.095f,accent,Palette.Ink,30);
             next.interactable=false; next.gameObject.SetActive(false); busy = true;
-            Button skip=View.Button(overlay,"Skip cinematic","跳过 · 保留结果",()=> { world.Cinematics.Skip(); },.54f,.012f,.925f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
+            Button skip=View.Button(overlay,"Skip cinematic",e.kind==DomainEventKind.TimeEcho?"直接看回执":"跳过 · 保留结果",
+                ()=> { world.Cinematics.Skip(); },.54f,.012f,.925f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
             Button pause=View.Button(overlay,"Cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.075f,.012f,.46f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
             caption.Bind(world.Cinematics);
             UnityEngine.UI.Button framing=null;

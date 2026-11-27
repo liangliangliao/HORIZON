@@ -329,10 +329,14 @@ namespace Horizon
                 var plan=world.Cinematics.Current;
                 AndroidSmoke.Require(plan.RecordedEcho,"The native replay lost its real source.");
                 var timing=new RewardSpectacle(plan);
-                world.Cinematics.Advance(timing.ImpactTime-.25f);
+                world.Cinematics.Advance(.08f);
                 yield return null; yield return new WaitForEndOfFrame();
                 Transform marks=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Recorded source arriving on the time route");
                 Transform seal=marks.GetChild(0);
+                AndroidSmoke.Require(Resources.Load<GameObject>("EchoArchive/ArchiveReader")!=null,"The original reader model is missing from the APK.");
+                CaptureAndroidFrame("10-echo-origin",seal,Vector3.zero);
+                world.Cinematics.Advance(timing.ImpactTime-.25f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-charge",seal,Vector3.zero);
                 world.Cinematics.Advance(.72f);
                 yield return null; yield return new WaitForEndOfFrame();
@@ -343,7 +347,10 @@ namespace Horizon
                 AndroidSmoke.Require(!string.IsNullOrEmpty(copy) && copy==expected.Replace('　','\n'),
                     "The native replay did not display its actual resources on separate lines.");
                 Transform contact=marks.Find("Stable echo receipt anchor");
-                CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.7f);
+                CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.23f);
+                world.Cinematics.Advance(4.73f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                CaptureAndroidFrame("10-echo-settle",contact,Vector3.up*.11f);
                 SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event");
             }
             finally { world.Cinematics.enabled=true; }

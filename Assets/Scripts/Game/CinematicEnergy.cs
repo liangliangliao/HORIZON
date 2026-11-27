@@ -89,11 +89,8 @@ namespace Horizon.Game
 
         public static EnergyRelease RecordedEchoRelease(float age) => EnergyRelease.SampleScenic(age,.84f);
         public static float RecordedEchoCharge(float age) => age>=0?0:
-            .82f*ImmersiveMotion.Smooth((age+1.43f)/1.24f);
-
-        public static float RecordedEchoFlight(float age) => age>=0?1:
-            .26f*ImmersiveMotion.Smooth((age+2.5f)/1.46f) +
-            .67f*ImmersiveMotion.Smooth((age+.93f)/.74f);
+            .29f*ImmersiveMotion.Smooth((age+2.42f)/1.08f)+
+            .47f*ImmersiveMotion.Smooth((age+1.14f)/.88f);
 
         // A quiet onset, independent local pulses and a brief hold at the end.
         // Time and seed are immutable presentation inputs.

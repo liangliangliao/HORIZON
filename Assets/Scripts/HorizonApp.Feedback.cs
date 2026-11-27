@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
 using UnityEngine;
@@ -75,6 +76,17 @@ namespace Horizon
             int pageStars = beat != null ? beat.stardust : receipt.stardust;
             View.Label(panel, "Reward", pageStars > 0 ? (action ? "完成凭证  +" : "已收集  +") + pageStars + " 星尘" : "回声已兑现", 29, Palette.Gold,
                 TextAnchor.MiddleLeft, 0.065f, 0.207f, 0.935f, 0.283f);
+            if(receipt.kind==FeedbackKind.Echoes && beat!=null)
+            {
+                DomainEvent echo=CurrentMaster?.events.FirstOrDefault(e=>e.kind==DomainEventKind.TimeEcho &&
+                    e.day==receipt.day && e.receipt?.sourceDay==beat.sourceDay && e.receipt.action==beat.source &&
+                    RewardDirector.Direct(e).RecordedEcho);
+                if(echo!=null)
+                    View.Button(panel,"Replay recorded echo","重看回声",()=>{
+                        if(!busy && overlay==null && !world.Cinematics.IsPlaying)
+                            PlayMasterSpectacle(echo.Copy(),()=>{});
+                    },.64f,.212f,.935f,.28f,Palette.Deep,Palette.Text,25);
+            }
             bool more = hasBeats && receipt.page < beats.Count - 1;
             string next = more ? "下一条回声  " + (receipt.page + 2) + " / " + beats.Count : action ?
                 session.NeedsStation ? "走进未来站" : "前往第 " + (receipt.day + 1) + " 天" :

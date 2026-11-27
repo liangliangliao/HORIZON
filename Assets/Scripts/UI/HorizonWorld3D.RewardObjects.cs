@@ -150,10 +150,15 @@ namespace Horizon.UI
             int[] indices={0,2,1,3,4,5,0,1,4,0,4,3,1,2,5,1,5,4,2,0,3,2,3,5};
             prismMesh=Own(new Mesh { name="HORIZON optical prism",vertices=points,triangles=indices }); prismMesh.RecalculateNormals(); return prismMesh;
         }
-        private void PrepareRewardObjects(RewardPlan plan)
+        private void ClearRewardObjects()
         {
             foreach(Transform item in movieObjects) item.gameObject.SetActive(false);
             movieObjects.Clear(); movieObjectReceipts.Clear();
+        }
+
+        private void PrepareRewardObjects(RewardPlan plan)
+        {
+            ClearRewardObjects();
             var indices=new Dictionary<RewardObjectKind,int>();
             foreach(MaterialReward reward in plan.Objects)
             {

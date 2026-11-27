@@ -20,7 +20,7 @@ namespace Horizon.Game
             FirstRelease=value.Cues.FirstOrDefault(c=>c.NodeHit)?.Time ?? visual.ImpactTime;
             // Legacy causal events without a source keep their established shot.
             OpeningHold=Enabled && (SourceCloseup || value.Event.kind!=DomainEventKind.Cascade && value.Event.kind!=DomainEventKind.CausalSingularity);
-            float firstPause=value.RecordedEcho?PracticeRewardCinematic.ReleaseTime-PracticeRewardCinematic.HoldTime:
+            float firstPause=value.RecordedEcho?RecordedEchoStory.ImpactAt-RecordedEchoStory.HoldAt:
                 value.Event.tier==RewardTier.Major?.32f:value.Event.tier==RewardTier.Epic?.45f:.58f;
             FirstHold=Math.Max(0,FirstRelease-Math.Min(firstPause,FirstRelease*.28f));
             ChargeAt=value.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.Charge)?.Time ?? 0;

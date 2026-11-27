@@ -219,19 +219,18 @@ namespace Horizon.Game
             bool recordedEcho = HasRecordedEcho(e, objects);
             if (recordedEcho)
             {
-                const float impactAt = PracticeRewardCinematic.ReleaseTime;
-                duration = 6.16f + Math.Max(1.6f, CinematicReading.ReadSeconds(e.detail));
+                duration = RecordedEchoStory.Duration;
                 string origin = "第 " + r.sourceDay + " 天 · 「" + PresentationCopy.Chinese(r.action) + "」";
                 cues.Add(new CinematicCue(0, CinematicPhase.Anticipation, origin));
-                cues.Add(new CinematicCue(.41f, CinematicPhase.Charge, origin));
-                cues.Add(new CinematicCue(1.22f, CinematicPhase.Escalation, origin));
-                cues.Add(new CinematicCue(2.08f, CinematicPhase.HeroMoment, origin));
-                cues.Add(new CinematicCue(PracticeRewardCinematic.HoldTime, CinematicPhase.HitStop, origin));
-                cues.Add(new CinematicCue(impactAt, CinematicPhase.Impact, "回声抵达"));
-                cues.Add(new CinematicCue(impactAt + .23f, CinematicPhase.Multiplication, "本次实际变化"));
-                cues.Add(new CinematicCue(5.64f, CinematicPhase.SecondReveal, origin));
-                cues.Add(new CinematicCue(5.92f, CinematicPhase.Jackpot, origin));
-                cues.Add(new CinematicCue(6.16f, CinematicPhase.Settlement, e.detail));
+                cues.Add(new CinematicCue(RecordedEchoStory.PrepareAt, CinematicPhase.Charge, origin));
+                cues.Add(new CinematicCue(RecordedEchoStory.DevelopAt, CinematicPhase.Escalation, origin));
+                cues.Add(new CinematicCue(RecordedEchoStory.DockAt, CinematicPhase.HeroMoment, origin));
+                cues.Add(new CinematicCue(RecordedEchoStory.HoldAt, CinematicPhase.HitStop, origin));
+                cues.Add(new CinematicCue(RecordedEchoStory.ImpactAt, CinematicPhase.Impact, "回声抵达"));
+                cues.Add(new CinematicCue(RecordedEchoStory.RevealAt, CinematicPhase.Multiplication, "本次实际变化"));
+                cues.Add(new CinematicCue(RecordedEchoStory.SettleAt, CinematicPhase.SecondReveal, origin));
+                cues.Add(new CinematicCue(4.30f, CinematicPhase.Jackpot, origin));
+                cues.Add(new CinematicCue(4.34f, CinematicPhase.Settlement, e.detail));
                 cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
             }
             else if (e.tier >= RewardTier.Epic)

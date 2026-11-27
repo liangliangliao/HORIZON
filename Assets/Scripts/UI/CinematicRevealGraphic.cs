@@ -37,7 +37,7 @@ namespace Horizon.UI
             }
             field.SetVector("_Cue", new Vector4(age, charge, seed, rectTransform.rect.width / Mathf.Max(1, rectTransform.rect.height)));
             field.SetVector("_Energy", new Vector4(release.Flash, release.Fire, release.Wave, echo ? 1 : 0));
-            field.SetVector("_Origin", new Vector4(origin.x, origin.y, EnergyRelease.WaveTravel(age), 0));
+            field.SetVector("_Origin", new Vector4(origin.x, origin.y, EnergyRelease.WaveTravel(age), echo?.57f:1));
             if (!gameObject.activeSelf) gameObject.SetActive(true);
         }
 

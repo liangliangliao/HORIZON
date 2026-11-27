@@ -111,6 +111,11 @@ namespace Horizon.UI
         public void FrameCinematicLabels()
         {
             if(WorldCamera==null) return;
+            if(moviePlan?.RecordedEcho==true)
+            {
+                FrameRecordedEcho();
+                return;
+            }
             // A travelling day label on every 3D node becomes an unreadable
             // stack in perspective. Time-echo provenance lives in the caption.
             if(moviePlan?.Event.kind==DomainEventKind.TimeEcho)
@@ -118,7 +123,6 @@ namespace Horizon.UI
             foreach(TextMesh label in movieLabels) if(label.gameObject.activeSelf) label.transform.rotation=WorldCamera.transform.rotation;
             FrameJackpotStage();
             FrameImmersion();
-            FrameRecordedEcho();
             FrameCinemaTension();
             if(relayPlan!=null && relayPlan.Nodes.Count>0 && movieLabels[25].gameObject.activeSelf)
                 movieLabels[25].transform.position=WorldCamera.ViewportToWorldPoint(new Vector3(.5f,.71f,6));

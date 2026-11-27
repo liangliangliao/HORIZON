@@ -190,72 +190,134 @@ namespace Horizon.Tests
             string receipt=JsonUtility.ToJson(source.receipt);
             var world=(HorizonWorld3D)typeof(HorizonApp).GetField("world",Private).GetValue(app);
             var root=(RectTransform)typeof(HorizonApp).GetField("root",Private).GetValue(app);
-            var archive=new ArchiveData {active=life.Snapshot(),nextRareRun=99}; archive.Repair();
-            archive.preferences.sound=false; archive.preferences.haptics=false;
-            typeof(HorizonApp).GetField("archive",Private).SetValue(app,archive);
-            typeof(HorizonApp).GetField("session",Private).SetValue(app,life);
-            typeof(HorizonApp).GetMethod("Clear",Private).Invoke(app,new object[] {false});
-            typeof(HorizonApp).GetMethod("ApplyPreferences",Private).Invoke(app,null);
-            typeof(HorizonApp).GetMethod("PlayMasterSpectacle",Private).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
-            world.Cinematics.enabled=false;
-            var plan=world.Cinematics.Current;
-            Assert.NotNull(plan);
-            Assert.IsTrue(plan.Outcome.Changes.All(change=>change.Copy().Contains(".")));
             Canvas canvas=root.GetComponentInParent<Canvas>();
             RenderMode mode=canvas.renderMode; Camera prior=canvas.worldCamera; float distance=canvas.planeDistance;
             var ui=new GameObject("Time echo portrait camera",typeof(Camera)).GetComponent<Camera>();
             ui.enabled=false; ui.cullingMask=1<<5; ui.nearClipPlane=.1f; ui.farClipPlane=20;
-            var target=new RenderTexture(540,960,24); target.Create(); ui.targetTexture=target;
-            var pixels=new Texture2D(540,960,TextureFormat.RGB24,false);
             const string path="artifacts/time-echo-frames";
+            foreach(string name in new[] {"ArchiveReader","ArchiveFolio"})
+            {
+                var asset=Resources.Load<GameObject>("EchoArchive/"+name);
+                Assert.IsNotNull(asset,name);
+                Assert.That(asset.GetComponentsInChildren<MeshRenderer>().Length,Is.GreaterThanOrEqualTo(3),name);
+            }
+            Assert.IsFalse(ShaderUtil.ShaderHasError(Resources.Load<Shader>("HorizonLit")));
             Directory.CreateDirectory(path);
+            File.WriteAllText(Path.Combine(path,"receipt.json"),JsonUtility.ToJson(source,true));
+            File.WriteAllText(Path.Combine(path,"source-life.json"),JsonUtility.ToJson(life.Snapshot(),true));
             try
             {
-                var impact=new RewardSpectacle(plan).ImpactTime;
-                int firstRevealFrame=Mathf.CeilToInt((impact+.16f)*20);
-                int lastRevealFrame=Mathf.CeilToInt((impact+.50f)*20);
-                bool checkedFraming=false;
-                var caption=root.GetComponentInChildren<CinematicCaption>();
-                int gains=plan.Outcome.Changes.Count(change=>change.Amount>0);
-                foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
-                canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
-                int frames=Mathf.CeilToInt(plan.Duration*20);
-                for(int frame=0;frame<frames;frame++)
+                foreach(string profile in new[] {"normal","battery","reduced"})
                 {
-                    if(frame>0) world.Cinematics.Advance(.05f);
-                    yield return null;
-                    if(frame>=firstRevealFrame && frame<=lastRevealFrame)
+                    bool reduced=profile=="reduced";
+                    int height=profile=="normal"?960:1200;
+                    var archive=new ArchiveData {active=life.Snapshot(),nextRareRun=99}; archive.Repair();
+                    archive.preferences.sound=false; archive.preferences.haptics=false;
+                    archive.preferences.batterySaver=profile=="battery"; archive.preferences.reducedMotion=reduced;
+                    typeof(HorizonApp).GetField("archive",Private).SetValue(app,archive);
+                    typeof(HorizonApp).GetField("session",Private).SetValue(app,life);
+                    typeof(HorizonApp).GetMethod("Clear",Private).Invoke(app,new object[] {false});
+                    typeof(HorizonApp).GetMethod("ApplyPreferences",Private).Invoke(app,null);
+                    world.WorldCamera.aspect=540f/height;
+                    world.Cinematics.enabled=false;
+                    typeof(HorizonApp).GetMethod("PlayMasterSpectacle",Private).Invoke(app,new object[] {source.Copy(),(Action)(()=>{})});
+                    var plan=world.Cinematics.Current;
+                    Assert.IsTrue(plan.RecordedEcho);
+                    Assert.IsTrue(plan.Outcome.Changes.All(change=>change.Copy().Contains(".")));
+                    var caption=root.GetComponentInChildren<CinematicCaption>();
+                    var seal=world.GetComponentsInChildren<Transform>().Single(t=>t.name.StartsWith("Recorded action:"));
+                    var seat=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Stable echo receipt anchor");
+                    var actor=world.GetComponentsInChildren<HorizonActor>().Single(t=>t.name=="Cinematic player");
+                    var final=string.Join("\n",plan.Outcome.Changes.Where(change=>change.Amount>0).Select(change=>change.Copy()));
+                    var field=caption.transform.Find("Screen energy release");
+                    var core=world.GetComponentsInChildren<Renderer>(true).Single(r=>r.name=="White light at the seat");
+                    var target=new RenderTexture(540,height,24); target.Create(); ui.targetTexture=target;
+                    var pixels=new Texture2D(540,height,TextureFormat.RGB24,false);
+                    string folder=Path.Combine(path,profile); Directory.CreateDirectory(folder);
+                    var trace=new System.Text.StringBuilder("frame,seconds,beat,seatDistance,release,field,receipt\n");
+                    var cues=new System.Text.StringBuilder("time,phase\n");
+                    world.Cinematics.Cue+=OnCue;
+                    void OnCue(CinematicCue cue)
                     {
-                        var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
-                        Assert.IsTrue(hero.gameObject.activeInHierarchy);
-                        AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
-                        checkedFraming=true;
+                        cues.AppendLine(FormattableString.Invariant($"{cue.Time:F3},{cue.Phase}"));
                     }
-                    if(frame==lastRevealFrame)
+                    int frames=Mathf.CeilToInt(plan.Duration*20);
+                    float firstResult=-1;
+                    Vector3 startCamera=world.WorldCamera.transform.position;
+                    try
                     {
-                        string[] lines=caption.Multiplier.text.Split('\n');
-                        Assert.AreEqual(gains,lines.Length);
-                        Assert.That(lines.All(line=>line.Contains(" +") && line.Contains(".")),
-                            "Keep each resource name and its actual amount together.");
+                        foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
+                        canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
+                        for(int frame=0;frame<frames;frame++)
+                        {
+                            world.Cinematics.Advance(frame==0?0:.05f);
+                            yield return null;
+                            float time=world.Cinematics.Elapsed;
+                            if(caption.Multiplier.text.Length>0 && firstResult<0) firstResult=time;
+                            if(frame==23 && !reduced)
+                            {
+                                world.Cinematics.SetPaused(true);
+                                Vector3 frozen=seal.position;
+                                world.Cinematics.Advance(.50f);
+                                Assert.AreEqual(time,world.Cinematics.Elapsed);
+                                Assert.AreEqual(frozen,seal.position);
+                                world.Cinematics.SetPaused(false);
+                            }
+                            float remaining=Vector3.Distance(seal.position,seat.position);
+                            bool flash=core.gameObject.activeInHierarchy;
+                            Assert.IsTrue(actor.gameObject.activeInHierarchy && seal.gameObject.activeInHierarchy);
+                            if(reduced)
+                            {
+                                Assert.IsFalse(flash || field.gameObject.activeSelf);
+                                Assert.AreEqual(final,caption.Multiplier.text);
+                                Assert.That(Vector3.Distance(startCamera,world.WorldCamera.transform.position),Is.LessThan(.001f));
+                            }
+                            else if(time>=RecordedEchoStory.ImpactAt+.16f && time<=RecordedEchoStory.ImpactAt+.50f)
+                            {
+                                Assert.That(remaining,Is.LessThan(.012f));
+                                var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
+                                Assert.IsTrue(hero.gameObject.activeInHierarchy);
+                                AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
+                            }
+                            trace.AppendLine(FormattableString.Invariant($"{frame},{time:F3},{world.CurrentCinematicShot},{remaining:F4},{flash},{field.gameObject.activeSelf},{caption.Multiplier.text.Replace('\n','|')}"));
+                            Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
+                            RenderTexture old=RenderTexture.active;
+                            try
+                            {
+                                RenderTexture.active=target;
+                                pixels.ReadPixels(new Rect(0,0,540,height),0,0);
+                                pixels.Apply(); File.WriteAllBytes(Path.Combine(folder,"frame-"+frame.ToString("D5")+".jpg"),pixels.EncodeToJPG(91));
+                            }
+                            finally { RenderTexture.active=old; }
+                        }
+                        if(!reduced)
+                            Assert.That(firstResult-RecordedEchoStory.ImpactAt,Is.InRange(.19f,.35f));
+                        Assert.AreEqual(final,caption.Multiplier.text);
+                        Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
+                        File.WriteAllText(Path.Combine(folder,"complete.txt"),frames.ToString());
+                        File.WriteAllText(Path.Combine(folder,"trace.csv"),trace.ToString());
+                        File.WriteAllText(Path.Combine(folder,"cues.csv"),cues.ToString());
+                        File.WriteAllBytes(Path.Combine(folder,"cues.pcm"),world.RecordedCinemaPcm());
+                        File.WriteAllText(Path.Combine(folder,"capture.txt"),
+                            $"actual {source.id} / {profile} / 540x{height} @ 20 fps / Unity {Application.unityVersion} / {SystemInfo.graphicsDeviceName} / {SystemInfo.graphicsDeviceType} / {SystemInfo.deviceModel}");
+                        world.Cinematics.Skip(); Assert.IsFalse(world.Cinematics.IsPlaying);
+                        Assert.AreEqual(final,caption.Multiplier.text);
+                        var next=root.GetComponentsInChildren<Button>().Single(button=>button.name=="Continue master event");
+                        Assert.IsTrue(next.interactable); next.onClick.Invoke(); yield return null;
+                        CollectionAssert.AreEqual(action.actualLater.ticks,GameSession.Restore(archive.active).Actions[0].actualLater.ticks);
                     }
-                    Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
-                    RenderTexture old=RenderTexture.active; RenderTexture.active=target;
-                    pixels.ReadPixels(new Rect(0,0,540,960),0,0); pixels.Apply(); RenderTexture.active=old;
-                    File.WriteAllBytes(Path.Combine(path,"frame-"+frame.ToString("D5")+".jpg"),pixels.EncodeToJPG(91));
+                    finally
+                    {
+                        world.Cinematics.Cue-=OnCue;
+                        canvas.renderMode=mode; canvas.worldCamera=prior; canvas.planeDistance=distance;
+                        ui.targetTexture=null; target.Release(); Object.Destroy(target); Object.Destroy(pixels);
+                    }
                 }
-                File.WriteAllText(Path.Combine(path,"complete.txt"),frames.ToString());
-                Assert.IsTrue(checkedFraming);
-                File.WriteAllBytes(Path.Combine(path,"cues.pcm"),world.RecordedCinemaPcm());
-                File.WriteAllText(Path.Combine(path,"receipt.json"),JsonUtility.ToJson(source,true));
-                Assert.AreEqual(receipt,JsonUtility.ToJson(source.receipt));
-                world.Cinematics.Skip(); Assert.IsFalse(world.Cinematics.IsPlaying);
-                CollectionAssert.AreEqual(action.actualLater.ticks,GameSession.Restore(life.Snapshot()).Actions[0].actualLater.ticks);
             }
             finally
             {
-                canvas.renderMode=mode; canvas.worldCamera=prior; canvas.planeDistance=distance;
-                world.Cinematics.CancelAll(); world.Cinematics.enabled=true;
-                ui.targetTexture=null; target.Release(); Object.Destroy(target); Object.Destroy(pixels); Object.Destroy(ui.gameObject);
+                world.Cinematics.CancelAll(); world.Cinematics.enabled=true; world.WorldCamera.ResetAspect();
+                Object.Destroy(ui.gameObject);
             }
             yield return new ExitPlayMode();
         }

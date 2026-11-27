@@ -347,18 +347,30 @@ jobs:
 
       - name: Encode the matured practice echo filmed in Unity
         run: |
-          tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i artifacts/time-echo-frames/frame-%05d.jpg -f s16le -ar 22050 -ac 1 -i artifacts/time-echo-frames/cues.pcm -c:v libx264 -crf 18 -pix_fmt yuv420p -af apad -c:a aac -shortest -movflags +faststart artifacts/HORIZON-time-echo.mp4
-          encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 artifacts/HORIZON-time-echo.mp4)
-          test "$encoded" = "$(cat artifacts/time-echo-frames/complete.txt)"
-          test -s artifacts/time-echo-frames/receipt.json
+          export_dir="$RUNNER_TEMP/time-echo-v4-review"
+          mkdir -p "$export_dir"
+          cp -R --no-preserve=mode,ownership artifacts/time-echo-frames/. "$export_dir/"
+          git rev-parse HEAD > "$export_dir/source.txt"
+          date -u +'%Y-%m-%dT%H:%M:%SZ' >> "$export_dir/source.txt"
+          for profile in normal battery reduced; do
+            take="$export_dir/$profile"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -f s16le -ar 22050 -ac 1 -i "$take/cues.pcm" -c:v libx264 -crf 18 -pix_fmt yuv420p -af apad -c:a aac -shortest -movflags +faststart "$take/HORIZON-time-echo.mp4"
+            encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/HORIZON-time-echo.mp4")
+            test "$encoded" = "$(cat "$take/complete.txt")"
+            /tmp/horizon-gif-verification/bin/python tools/report_echo_capture.py "$take"
+          done
+          test -s "$export_dir/receipt.json"
       - name: Upload the actual TIME ECHO and its receipt
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Actual-Time-Echo
           path: |
-            artifacts/HORIZON-time-echo.mp4
-            artifacts/time-echo-frames/receipt.json
-            artifacts/cinematics/immersion/v2-time-echo-actual-*.png
+            ${{ runner.temp }}/time-echo-v4-review/source.txt
+            ${{ runner.temp }}/time-echo-v4-review/*.json
+            ${{ runner.temp }}/time-echo-v4-review/*/HORIZON-time-echo.mp4
+            ${{ runner.temp }}/time-echo-v4-review/*/*.csv
+            ${{ runner.temp }}/time-echo-v4-review/*/capture.txt
+            ${{ runner.temp }}/time-echo-v4-review/*/contact.png
           if-no-files-found: error
           retention-days: 14
 

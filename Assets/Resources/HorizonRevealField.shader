@@ -40,7 +40,7 @@ Shader "Horizon/RevealField"
                 float r = length(p);
                 float angle = atan2(p.y, p.x + .0001);
                 float spin = angle + seed * 6.283 + age * .31;
-                half3 violet = lerp(half3(.33,.18,.79), half3(.55,.24,.92), _Energy.w);
+                half3 violet = lerp(half3(.33,.18,.79),half3(.22,.45,.85),_Energy.w);
                 half3 copper = half3(1,.34,.061);
                 half3 gold = half3(1,.72,.23);
                 half3 light = half3(1,.97,.82);
@@ -56,10 +56,10 @@ Shader "Horizon/RevealField"
                     float gather = _Cue.y * (.040 * broad + filament + .060 * smoothstep(.55,1.27,edge) * grain);
                     float shade = _Cue.y * (.28+.33*hold) * smoothstep(.19,.74,r);
                     half3 tint = lerp(violet,gold,smoothstep(-1.04,-.24,age)*.86);
-                    return half4(tint*gather,saturate(gather+shade));
+                    return half4(tint*gather,saturate(gather+shade))*_Origin.w;
                 }
 
-                float flash = _Energy.x * (1 - smoothstep(.045, .34, r)) * .77;
+                float flash = _Energy.x*(1-smoothstep(.045,lerp(.34,.217,_Energy.w),r))*.77;
                 float wake = _Energy.z;
                 float body = _Energy.y;
                 float furthest = length(float2(_Cue.w * .52, .61));
@@ -85,7 +85,7 @@ Shader "Horizon/RevealField"
                 float alpha = saturate(flash + sweep + rim + bloom + streak + undertone);
                 half3 rgb = light * flash + lerp(copper,light,saturate(crest*.89+lightning*.49)) * sweep
                     + lerp(copper,violet,late*.58) * rim + gold * bloom + light * streak + violet * undertone;
-                return half4(min(rgb, alpha), alpha);
+                return half4(min(rgb,alpha),alpha)*_Origin.w;
             }
             ENDCG
         }
