@@ -141,9 +141,11 @@ namespace Horizon.Tests
                     Assert.IsTrue(world.Cinematics.Enqueue(source,true));
                     float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
                     world.Cinematics.Advance(impact+.25f);
-                    Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
-                    Assert.IsNotNull(stage.Find("Reward showcase "+kinds[i]));
-                    Assert.IsTrue(stage.Find("Reward showcase "+kinds[i]).gameObject.activeInHierarchy);
+                    Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Assembled actual resources");
+                    Transform resource=stage.Find(kinds[i].ToString());
+                    Assert.IsNotNull(resource);
+                    Assert.IsTrue(resource.gameObject.activeInHierarchy);
+                    Assert.AreEqual(1,stage.GetComponentsInChildren<Transform>().Count(t=>t.parent==stage));
                     Capture(world,"showcase-resource-"+kinds[i]);
                     Assert.AreEqual(before,JsonUtility.ToJson(source)); world.Cinematics.Skip();
                 }

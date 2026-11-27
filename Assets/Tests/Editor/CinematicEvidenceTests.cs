@@ -82,9 +82,17 @@ namespace Horizon.Tests
                             Assert.AreEqual(CinematicOutcome.Readable(source.detail),
                                 root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text,
                                 "The settlement shot must restore the exact receipt explanation.");
-                            Assert.AreEqual(plan.ResourceCopy,
-                                root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward actual resources").text,
-                                "The settlement shot must show only the resources in the immutable receipt.");
+                            var caption=root.GetComponentsInChildren<CinematicCaption>().Single();
+                            if(plan.RecordedEcho)
+                            {
+                                var gains=plan.Outcome.Changes.Where(change=>change.Amount>0).Select(change=>change.Copy());
+                                Assert.AreEqual(string.Join("\n",gains),caption.Multiplier.text);
+                                string costs=plan.Outcome.EchoCosts;
+                                Assert.AreEqual(costs.Length>0?"本次付出  "+costs:"",caption.Resources.text);
+                            }
+                            else
+                                Assert.AreEqual(plan.ResourceCopy,caption.Resources.text,
+                                    "The settlement shot must show only the resources in the immutable receipt.");
                         }
                         if(source.receipt!=null && source.receipt.predictionRecorded)
                             Assert.AreEqual(CinematicCaption.PredictionCopy(source.receipt),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original prediction").text);

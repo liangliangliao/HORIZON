@@ -333,7 +333,8 @@ namespace Horizon
                 yield return null; yield return new WaitForEndOfFrame();
                 Transform marks=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Recorded source arriving on the time route");
                 Transform seal=marks.GetChild(0);
-                AndroidSmoke.Require(Resources.Load<GameObject>("EchoArchive/ArchiveReader")!=null,"The original reader model is missing from the APK.");
+                AndroidSmoke.Require(marks.Find("ArchiveReader/Bronze")?.GetComponentInChildren<MeshRenderer>()!=null,
+                    "The original bronze reader is missing from the APK.");
                 CaptureAndroidFrame("10-echo-origin",seal,Vector3.zero);
                 world.Cinematics.Advance(timing.ImpactTime-.25f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();

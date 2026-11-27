@@ -116,14 +116,15 @@ namespace Horizon.UI
         private void MountEchoModel(Transform parent,string name,Vector3 position,Material enamel,Material bronze,
             Material walnut,Material paper,Material ink)
         {
-            var model=Instantiate(Resources.Load<GameObject>("EchoArchive/"+name),parent,false);
-            model.name=name;
-            model.transform.localPosition=position;
-            foreach(Renderer mesh in model.GetComponentsInChildren<Renderer>(true))
+            Transform assembly=Group(name,parent);
+            assembly.localPosition=position;
+            foreach(GameObject asset in Resources.LoadAll<GameObject>("EchoArchive/"+name))
             {
-                string part=mesh.name;
-                mesh.sharedMaterial=part.StartsWith("Bronze")?bronze:part.StartsWith("Walnut")?walnut:
-                    part.StartsWith("Paper")?paper:part.StartsWith("Etch")?ink:enamel;
+                GameObject model=Instantiate(asset,assembly,false);
+                model.name=asset.name;
+                Material finish=asset.name=="Bronze"?bronze:asset.name=="Walnut"?walnut:
+                    asset.name=="Paper"?paper:asset.name=="Etch"?ink:enamel;
+                foreach(Renderer mesh in model.GetComponentsInChildren<Renderer>(true)) mesh.sharedMaterial=finish;
             }
         }
 

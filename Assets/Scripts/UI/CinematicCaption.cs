@@ -125,6 +125,7 @@ namespace Horizon.UI
             bool tallReceipt=rows>2;
             EchoLayout(Multiplier,tallReceipt?.232f:.293f,.423f);
             EchoLayout(MultiplierCaption,.418f,.452f);
+            EchoLayout(Explanation,.149f,.189f);
             if(Multiplier!=null && poses.TryGetValue(Multiplier,out TextPose resultPose))
                 CinematicTypography.Size(Multiplier,tallReceipt?Mathf.RoundToInt(resultPose.Size*2.8f/rows):resultPose.Size);
             var lightRect=outcomeLight.rectTransform;
@@ -265,7 +266,7 @@ namespace Horizon.UI
             CinematicTypography.Reveal(Story,wholeSentence?int.MaxValue:Mathf.Max(1,Mathf.CeilToInt((Story?.text?.Length??0)*frame.CharacterProgress)));
             CinematicTypography.Sweep(Multiplier,VisualPreferences.ReducedMotion?-1:outcome.Age);
             float receipt=1-frame.ReceiptVeil;
-            if(Explanation!=null) Explanation.text=!plan.RecordedEcho && receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
+            if(Explanation!=null) Explanation.text=receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
             bool showDebit=plan.RecordedEcho && outcome.Visible && echoDebit.Length>0 &&
                 (VisualPreferences.ReducedMotion || frame.Time>=RecordedEchoStory.SettleAt);
             if(Resources!=null) Resources.text=plan.RecordedEcho?(showDebit?"本次付出  "+echoDebit:""):

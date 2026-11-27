@@ -197,9 +197,9 @@ namespace Horizon.Tests
             const string path="artifacts/time-echo-frames";
             foreach(string name in new[] {"ArchiveReader","ArchiveFolio"})
             {
-                var asset=Resources.Load<GameObject>("EchoArchive/"+name);
-                Assert.IsNotNull(asset,name);
-                Assert.That(asset.GetComponentsInChildren<MeshRenderer>().Length,Is.GreaterThanOrEqualTo(3),name);
+                var assets=Resources.LoadAll<GameObject>("EchoArchive/"+name);
+                Assert.That(assets.Length,Is.EqualTo(name=="ArchiveReader"?3:4),name);
+                Assert.That(assets.All(asset=>asset.GetComponentInChildren<MeshRenderer>()!=null),name);
             }
             Assert.IsFalse(ShaderUtil.ShaderHasError(Resources.Load<Shader>("HorizonLit")));
             Directory.CreateDirectory(path);
