@@ -346,7 +346,13 @@ jobs:
           retention-days: 3
 
       - name: Encode the matured practice echo filmed in Unity
+        id: echo_movie
+        if: ${{ !cancelled() && hashFiles('artifacts/time-echo-frames/normal/complete.txt', 'artifacts/time-echo-frames/battery/complete.txt', 'artifacts/time-echo-frames/reduced/complete.txt') != '' }}
         run: |
+          if [ ! -x /tmp/horizon-gif-verification/bin/python ]; then
+            python3 -m venv /tmp/horizon-gif-verification
+            /tmp/horizon-gif-verification/bin/python -m pip install pillow==12.3.0
+          fi
           export_dir="$RUNNER_TEMP/time-echo-v4-review"
           mkdir -p "$export_dir"
           cp -R --no-preserve=mode,ownership artifacts/time-echo-frames/. "$export_dir/"
@@ -361,6 +367,7 @@ jobs:
           done
           test -s "$export_dir/receipt.json"
       - name: Upload the actual TIME ECHO and its receipt
+        if: ${{ !cancelled() && steps.echo_movie.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: HORIZON-Actual-Time-Echo
@@ -374,6 +381,14 @@ jobs:
             ${{ runner.temp }}/time-echo-v4-review/*/intensity.json
           if-no-files-found: error
           retention-days: 14
+      - name: Retain the real echo capture if verification fails
+        if: ${{ failure() && steps.echo_movie.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Actual-Time-Echo-Raw
+          path: artifacts/time-echo-frames/
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Upload Unity portrait previews
         if: always()

@@ -148,6 +148,8 @@ namespace Horizon.Tests
                     Assert.AreEqual(1,stage.GetComponentsInChildren<Transform>().Count(t=>t.parent==stage));
                     Capture(world,"showcase-resource-"+kinds[i]);
                     Assert.AreEqual(before,JsonUtility.ToJson(source)); world.Cinematics.Skip();
+                    // Capture schedules its readback texture for destruction at the end of the frame.
+                    yield return null;
                 }
             }
             finally { world.Cinematics.CancelAll(); Object.Destroy(world.gameObject); }
