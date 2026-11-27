@@ -307,8 +307,7 @@ namespace Horizon.UI
 
             EnergyRelease release=energyFrame.Release;
             float stage=still?0:Smooth(RecordedEchoStory.DockAt,RecordedEchoStory.HoldAt,pose)*(1-story.Rest);
-            int focus=0;
-            while(focus+1<results && pose>=RecordedEchoStory.ResultTurnAt(focus+1,results)-.29f) focus++;
+            int focus=EchoFocus(pose,results);
             float opening=pose-RecordedEchoStory.ResultTurnAt(focus,results);
             float local=still?0:EchoLocalIntensity(opening,focus,results);
             Vector3 emitter=age<-.44f?folio:EchoGateCenter(focus,results);
@@ -352,7 +351,7 @@ namespace Horizon.UI
             CurrentCinematicFraming=wide?CinematicFraming.Wide:forward>.67f?CinematicFraming.Close:CinematicFraming.Medium;
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             ApplyCinematicCamera(look,lens);
-            FrameRecordedEcho(joinAge,focus,opening,local,still);
+            FrameRecordedEcho();
         }
 
         private void SampleEchoGuides(float pose,RecordedEchoStory story,bool still)
@@ -385,6 +384,13 @@ namespace Horizon.UI
         }
 
         private static Color EchoSlotColor(int slot,int count) => Color.Lerp(EchoCyan,EchoViolet,slot/(float)Mathf.Max(1,count-1));
+
+        private static int EchoFocus(float pose,int count)
+        {
+            int slot=0;
+            while(slot+1<count && pose>=RecordedEchoStory.ResultTurnAt(slot+1,count)-.29f) slot++;
+            return slot;
+        }
 
         private static float EchoLocalIntensity(float age,int slot,int count)
         {
@@ -500,8 +506,15 @@ namespace Horizon.UI
             }
         }
 
-        private void FrameRecordedEcho(float joinAge,int focus,float opening,float local,bool still)
+        private void FrameRecordedEcho()
         {
+            int count=echoActiveObjects.Count;
+            float time=energyFrame.Time;
+            bool still=preferences.reducedMotion;
+            float joinAge=time-RecordedEchoStory.ConvergenceAt(count);
+            int focus=EchoFocus(time,count);
+            float opening=time-RecordedEchoStory.ResultTurnAt(focus,count);
+            float local=still?0:EchoLocalIntensity(opening,focus,count);
             EnergyRelease release=energyFrame.Release;
             float spread=Smooth(0,.72f,joinAge);
             Vector3 worldSeat=echoTrace.TransformPoint(EchoArrival);
@@ -518,7 +531,6 @@ namespace Horizon.UI
             echoCore.transform.localScale=new Vector3(1.12f,.83f,1)*(1+.22f*release.Flash);
             CaseEffect(echoCore,1,new Color(2.14f,2.08f,1.88f),release.Flash,0,joinAge,cinematicEnergy.Seed);
 
-            int count=echoActiveObjects.Count;
             Vector3 gate=EchoGateCenter(focus,count);
             Color color=EchoSlotColor(focus,count);
             float radius=EchoGateSize(count)*Mathf.Lerp(1.06f,focus==count-1?1.95f:1.49f,Smooth(.06f,.45f,opening));
