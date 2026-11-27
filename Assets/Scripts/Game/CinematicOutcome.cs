@@ -123,19 +123,20 @@ namespace Horizon.Game
         }
         private static float Ease(float p) { p=Math.Max(0,Math.Min(1,p)); return p*p*(3-2*p); }
 
-        public const float EchoCreditSeconds=.93f;
         public string EchoCosts => string.Join(" · ",Changes.Where(change=>change.Amount<0).Select(change=>change.Copy()));
 
         public OutcomeFrame SampleRecordedEcho(float seconds, float reveal, float secondReveal, float settlement, bool reducedMotion)
         {
             if (seconds < reveal && !reducedMotion)
                 return Sample(seconds, reveal, secondReveal, settlement, reducedMotion);
-            var gains = Changes.Where(change => change.Amount > 0);
             float age = Math.Max(0,seconds-reveal);
-            float progress = reducedMotion || age>=EchoCreditSeconds ? 1 :
-                .77f*Ease((age-.04f)/.26f) + .15f*Ease((age-.29f)/(EchoCreditSeconds-.29f));
-            string copy = string.Join("　", gains.Select(change => change.Copy(progress, true)));
-            return new OutcomeFrame(true, false, 0, Heading, copy, Origin, age, progress, false);
+            int count=Changes.Count(change=>change.Amount>0);
+            string copy=string.Join("　",Changes.Where(change=>change.Amount>0).Select((change,slot)=>
+                change.Copy(reducedMotion?1:RecordedEchoStory.CreditProgress(seconds,reveal,
+                    RecordedEchoStory.ResultContactAt(slot,count)),true)));
+            float lastContact=RecordedEchoStory.ResultContactAt(Math.Max(0,count-1),count);
+            float progress=reducedMotion?1:RecordedEchoStory.CreditProgress(seconds,reveal,lastContact);
+            return new OutcomeFrame(true,false,0,Heading,copy,Origin,age,progress,false);
         }
     }
     public sealed class OutcomeChange

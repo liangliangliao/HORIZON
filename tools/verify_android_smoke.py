@@ -17,7 +17,7 @@ for kind in ("Cascade", "CausalSingularity"):
         assert f"08-causal-{kind}-{phase}" in frames, f"Native causal relay was not rendered: {kind}/{phase}"
 for phase in ("charge", "hold", "flash", "wave", "receipt"):
     assert f"09-case-{phase}" in frames, f"Native case reveal was not rendered: {phase}"
-for phase in ("origin", "charge", "wave", "settle"):
+for phase in ("origin", "guides", "charge", "wave", "settle"):
     assert f"10-echo-{phase}" in frames, f"Native recorded echo was not rendered: {phase}"
 assert any(name.endswith("-Complete") for name in frames), "The actual imagination flow did not finish"
 assert any(name.endswith("-Recover") for name in frames), "Recovery was not exercised"

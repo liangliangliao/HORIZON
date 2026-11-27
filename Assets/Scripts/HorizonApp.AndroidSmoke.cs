@@ -336,6 +336,9 @@ namespace Horizon
                 AndroidSmoke.Require(marks.Find("ArchiveReader/Bronze")?.GetComponentInChildren<MeshRenderer>()!=null,
                     "The original bronze reader is missing from the APK.");
                 CaptureAndroidFrame("10-echo-origin",seal,Vector3.zero);
+                world.Cinematics.Advance(RecordedEchoStory.GuideAt(1)+.19f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                CaptureAndroidFrame("10-echo-guides",marks.Find("Echo guide 2"),Vector3.up*.10f);
                 world.Cinematics.Advance(timing.ImpactTime-.25f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-charge",seal,Vector3.zero);
@@ -349,7 +352,7 @@ namespace Horizon
                     "The native replay did not display its actual resources on separate lines.");
                 Transform contact=marks.Find("Stable echo receipt anchor");
                 CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.23f);
-                world.Cinematics.Advance(4.73f-world.Cinematics.Elapsed);
+                world.Cinematics.Advance(RecordedEchoStory.SettleAt+.46f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-settle",contact,Vector3.up*.11f);
                 SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event");

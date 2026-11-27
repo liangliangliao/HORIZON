@@ -32,6 +32,7 @@ namespace Horizon.UI
         private CinematicRevealGraphic releaseField;
         private float revealSeed;
         private string echoDebit;
+        private int echoGainCount;
         private LifeActionStoryboard actionStory;
 
         private void IsolatePage()
@@ -121,13 +122,13 @@ namespace Horizon.UI
             plan=value; choreography=new CinematicTextChoreography(value);
             revealSeed=CinematicEnergy.VisualSeed(value.Event.id);
             echoDebit=plan.RecordedEcho?plan.Outcome.EchoCosts:"";
-            int rows=plan.RecordedEcho?plan.Outcome.Changes.Count(change=>change.Amount>0):1;
-            bool tallReceipt=rows>2;
+            echoGainCount=plan.RecordedEcho?plan.Outcome.Changes.Count(change=>change.Amount>0):0;
+            bool tallReceipt=echoGainCount>2;
             EchoLayout(Multiplier,tallReceipt?.232f:.293f,.423f);
             EchoLayout(MultiplierCaption,.418f,.452f);
             EchoLayout(Explanation,.149f,.189f);
             if(Multiplier!=null && poses.TryGetValue(Multiplier,out TextPose resultPose))
-                CinematicTypography.Size(Multiplier,tallReceipt?Mathf.RoundToInt(resultPose.Size*2.8f/rows):resultPose.Size);
+                CinematicTypography.Size(Multiplier,tallReceipt?Mathf.RoundToInt(resultPose.Size*2.8f/echoGainCount):resultPose.Size);
             var lightRect=outcomeLight.rectTransform;
             lightRect.anchorMin=new Vector2(.015f,plan.RecordedEcho?(tallReceipt?.18f:.223f):HorizonCinemaLayout.MultiplierBottom-.08f);
             lightRect.anchorMax=new Vector2(.985f,plan.RecordedEcho?.495f:HorizonCinemaLayout.MultiplierTop+.08f);
@@ -228,9 +229,10 @@ namespace Horizon.UI
                 {
                     case RecordedEchoBeat.Origin: Phase.text="来自过去的行动"; break;
                     case RecordedEchoBeat.Prepare: Phase.text="拾起行动印记"; break;
-                    case RecordedEchoBeat.Develop: Phase.text="印记沿时间返回"; break;
-                    case RecordedEchoBeat.Dock: Phase.text="对齐阅读台"; break;
-                    case RecordedEchoBeat.Release: Phase.text="回声抵达"; break;
+                    case RecordedEchoBeat.Develop: Phase.text="导轨逐段接通"; break;
+                    case RecordedEchoBeat.Dock: Phase.text="印记即将入槽"; break;
+                    case RecordedEchoBeat.Release: Phase.text=frame.Time>=RecordedEchoStory.ResultContactAt(0,echoGainCount)-.45f?
+                        "成果落位":"回声抵达"; break;
                     default: Phase.text="已经入账"; break;
                 }
                 if(VisualPreferences.ReducedMotion) Phase.text="已经入账";
@@ -310,9 +312,10 @@ namespace Horizon.UI
                 Color.Lerp(Palette.Text,Color.white,frame.Flash*.45f),frame.Glow*.82f,.045f,2,true);
             float revealAlpha=outcome.Visible?(plan.RecordedEcho && !outcome.Future ? Mathf.Lerp(.82f,1,Mathf.Clamp01(outcome.Age/.16f)) :
                 Mathf.Clamp01(outcome.Age/.16f))*frame.EndAlpha:0;
-            float revealScale=VisualPreferences.ReducedMotion?1:plan.RecordedEcho?
-                1+.28f*ImmersiveMotion.Punch(outcome.Age,.27f)+.18f*ImmersiveMotion.Punch(outcome.Age-CinematicOutcome.EchoCreditSeconds,.22f):
-                1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
+            float revealScale=1;
+            if(!VisualPreferences.ReducedMotion)
+                revealScale=plan.RecordedEcho?1+.28f*ImmersiveMotion.Punch(outcome.Age,.27f):
+                    1+Mathf.Exp(-Mathf.Max(0,outcome.Age)/.18f)*.16f;
             Color resultColor=outcome.Negative?Palette.Coral:Palette.Gold;
             if(plan.Outcome.WalkRecovery && outcome.HasResource && plan.Outcome.Changes[outcome.Index].Axis==0)
                 resultColor=Palette.Mint;

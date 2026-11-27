@@ -9,9 +9,17 @@ namespace Horizon.UI
     {
         private Transform echoTrace, echoImprint, echoArrivalMark, echoResult;
         private readonly Transform[] echoJaws=new Transform[2];
-        private readonly Dictionary<RewardObjectKind,Transform> echoObjects=new Dictionary<RewardObjectKind,Transform>();
+        private readonly Transform[] echoGuideFlags=new Transform[RecordedEchoStory.GuideCount];
+        private readonly Renderer[] echoGuideTips=new Renderer[RecordedEchoStory.GuideCount];
+        private readonly AudioClip[] echoGuideNotes=new AudioClip[RecordedEchoStory.GuideCount];
+        private readonly Transform[] echoSockets=new Transform[6];
+        private readonly Renderer[] echoSocketInsets=new Renderer[6];
+        private readonly Dictionary<(RewardObjectKind,RewardObjectForm),Transform> echoObjects=
+            new Dictionary<(RewardObjectKind,RewardObjectForm),Transform>();
         private readonly List<Transform> echoActiveObjects=new List<Transform>();
+        private readonly List<MaterialReward> echoActiveRewards=new List<MaterialReward>();
         private readonly List<float> echoObjectScales=new List<float>();
+        private readonly List<float> echoObjectHeights=new List<float>();
         private readonly List<Vector3> echoObjectCenters=new List<Vector3>();
         private Renderer[] echoSubjects;
         private LineRenderer echoRoute, echoPulse;
@@ -20,7 +28,7 @@ namespace Horizon.UI
         private Light echoLamp, echoWindow;
         private HorizonActorPerformance echoActor;
         private Color echoTint;
-        private AudioClip echoPaper, echoRail, echoSeat, echoEnd;
+        private AudioClip echoPaper, echoSeat, echoEnd;
         private static readonly Vector3 EchoStart=new Vector3(-.55f,1.40f,2.13f);
         private static readonly Vector3 EchoArrival=new Vector3(.22f,1.412f,2.22f);
         internal Vector2 EchoRevealOrigin { get; private set; } = new Vector2(.5f,.566f);
@@ -87,6 +95,20 @@ namespace Horizon.UI
 
             echoArrivalMark=Group("Stable echo receipt anchor",echoTrace);
             echoArrivalMark.localPosition=EchoArrival;
+            Material indicator=Lit(new Color(.19f,.30f,.29f));
+            for(int i=0;i<echoGuideFlags.Length;i++)
+            {
+                Transform guide=Group("Echo guide "+(i+1),echoTrace);
+                guide.localPosition=new Vector3(-.37f+i*.25f,1.328f,1.965f);
+                Soft(guide,"Guide bearing",Vector3.zero,new Vector3(.19f,.07f,.15f),bronze);
+                Transform flag=Group("Echo contact flag "+(i+1),guide);
+                flag.localPosition=new Vector3(0,.027f,0);
+                Soft(flag,"Guide lever",new Vector3(0,.009f,.078f),new Vector3(.09f,.028f,.165f),enamel);
+                echoGuideTips[i]=Soft(flag,"Glass guide tip",new Vector3(0,.024f,.147f),
+                    new Vector3(.080f,.025f,.062f),indicator).GetComponent<Renderer>();
+                echoGuideFlags[i]=flag;
+                echoGuideNotes[i]=ShortCueTone("Archive guide "+(i+1),349.2f*Mathf.Pow(2,i*.25f),.18f+i*.025f);
+            }
             Transform echoLeaves=Group("Opening reader leaves",echoArrivalMark);
             for(int i=0;i<echoJaws.Length;i++)
             {
@@ -100,6 +122,14 @@ namespace Horizon.UI
                 echoJaws[i]=hinge;
             }
             echoResult=Group("Assembled actual resources",echoTrace);
+            for(int i=0;i<echoSockets.Length;i++)
+            {
+                Transform socket=Group("Echo result mount "+(i+1),echoTrace);
+                Soft(socket,"Bronze socket",new Vector3(0,.029f,0),new Vector3(.23f,.058f,.20f),bronze);
+                echoSocketInsets[i]=Soft(socket,"Recessed contact glass",new Vector3(0,.056f,0),
+                    new Vector3(.18f,.018f,.15f),indicator).GetComponent<Renderer>();
+                echoSockets[i]=socket;
+            }
             echoActor=HorizonActorPerformance.Attach(moviePlayer.GetComponent<HorizonActor>());
             echoRoute=CausalLine(echoTrace,"Illuminated contact path",Vector3.zero,Vector3.zero,glass,.033f);
             EnsureCaseEffectMaterial();
@@ -108,7 +138,6 @@ namespace Horizon.UI
             echoFire=CaseQuad(echoTrace,"Seated echo flame");
             echoCore=CaseQuad(echoTrace,"White light at the seat");
             echoPaper=ShortCueTone("Folio lifted from leather",316,.20f);
-            echoRail=ShortCueTone("Archive rail resonance",445,.36f);
             echoSeat=ShortCueTone("Reader guides meet",278,.19f);
             echoEnd=ShortCueTone("Settled archive overtone",418.6f,.64f);
         }
@@ -143,14 +172,16 @@ namespace Horizon.UI
         {
             foreach(Transform item in echoObjects.Values) item.gameObject.SetActive(false);
             echoResult.gameObject.SetActive(true);
-            echoActiveObjects.Clear(); echoObjectScales.Clear(); echoObjectCenters.Clear();
+            echoActiveObjects.Clear(); echoActiveRewards.Clear();
+            echoObjectScales.Clear(); echoObjectHeights.Clear(); echoObjectCenters.Clear();
             foreach(MaterialReward reward in moviePlan.Objects.Where(item=>item.Class==RewardObjectClass.Resource && item.Amount>0))
             {
-                if(!echoObjects.TryGetValue(reward.Kind,out Transform item))
+                var key=(reward.Kind,reward.Form);
+                if(!echoObjects.TryGetValue(key,out Transform item))
                 {
                     item=BuildRewardObject(reward.Kind,reward.Form,default);
                     item.SetParent(echoResult,false);
-                    echoObjects.Add(reward.Kind,item);
+                    echoObjects.Add(key,item);
                 }
                 RestoreRewardObject(item,reward.Kind);
                 item.SetLocalPositionAndRotation(Vector3.zero,Quaternion.identity);
@@ -161,8 +192,11 @@ namespace Horizon.UI
                 for(int i=1;i<renderers.Length;i++) bounds.Encapsulate(renderers[i].bounds);
                 echoObjectCenters.Add(item.InverseTransformPoint(bounds.center));
                 echoObjectScales.Add(Mathf.Max(.24f,bounds.size.magnitude));
+                echoObjectHeights.Add(bounds.extents.y);
                 echoActiveObjects.Add(item);
+                echoActiveRewards.Add(reward);
             }
+            foreach(Transform socket in echoSockets) socket.gameObject.SetActive(false);
             showcaseHero=echoResult;
             echoSubjects=echoResult.GetComponentsInChildren<Renderer>();
             echoResult.gameObject.SetActive(false);
@@ -180,10 +214,12 @@ namespace Horizon.UI
             energyFrame=cinematicEnergy.Sample(still?time:pose,still);
             Vector3 folio=EchoPath(story.Progress);
             echoImprint.localPosition=folio;
-            echoImprint.localRotation=Quaternion.Euler(49*(1-story.Alignment), -13+28*story.Progress, 9-9*story.Alignment);
+            float present=Smooth(RecordedEchoStory.PrepareAt,1.42f,pose);
+            echoImprint.localRotation=Quaternion.Euler((-12-55*present)*(1-story.Alignment),
+                -13+28*story.Progress,9*(1-story.Alignment));
             echoImprint.localScale=Vector3.one*(1-.37f*story.Assembly);
             echoImprint.gameObject.SetActive(true);
-            echoRoute.gameObject.SetActive(!still && story.Progress>.16f && age<.40f);
+            echoRoute.gameObject.SetActive(!still && !story.Held && pose>=RecordedEchoStory.DevelopAt && age<0);
             for(int i=0;i<echoRoute.positionCount;i++)
             {
                 float step=i/(float)(echoRoute.positionCount-1);
@@ -192,21 +228,27 @@ namespace Horizon.UI
                 echoPulse.SetPosition(i,EchoPath(front));
             }
             CaseEffect(echoPulse,3,Color.Lerp(echoTint,new Color(1.2f,.83f,.39f),story.Alignment),
-                still || age>=0?0:Smooth(.15f,.45f,story.Progress)*.74f,0,age,cinematicEnergy.Seed);
+                still || story.Held || age>=0?0:Smooth(.18f,.45f,story.Progress)*.63f,0,age,cinematicEnergy.Seed);
+
+            SampleEchoGuides(pose,story,still);
 
             for(int i=0;i<echoJaws.Length;i++)
             {
                 float direction=i==0?-1:1;
-                float tilt=14*story.Alignment+89*story.Assembly+19*story.Release;
+                float unlock=Smooth(RecordedEchoStory.GuideAt(i+1),RecordedEchoStory.GuideAt(i+1)+.29f,pose);
+                float tilt=18*unlock+71*story.Assembly+23*story.Release;
                 echoJaws[i].localRotation=Quaternion.Euler(0,0,direction*tilt);
             }
             PoseEchoSubjects(story,age,still);
 
-            float lean=still?0:Smooth(.22f,1.38f,pose)*(1-Smooth(2.59f,3.13f,pose));
-            float earnest=still?0:Smooth(1.7f,RecordedEchoStory.HoldAt,pose)*(1-Smooth(2.92f,3.22f,pose));
+            float lean=still?0:Smooth(.32f,1.28f,pose)*(1-Smooth(1.66f,2.39f,pose));
+            float earnest=still?0:Smooth(RecordedEchoStory.DockAt-.28f,RecordedEchoStory.HoldAt,pose)*
+                (1-Smooth(.02f,.44f,age));
+            float observe=still?0:Smooth(.78f,1.39f,age)*(1-Smooth(RecordedEchoStory.SettleAt,RecordedEchoStory.Duration,pose));
             moviePlayer.localPosition=new Vector3(-.60f+.16f*lean+.09f*earnest-.13f*story.Release,.0f,
-                2.77f-.24f*lean-.12f*earnest+.13f*story.Release);
-            moviePlayer.localRotation=Quaternion.Euler(9*lean-13*story.Release,-21-26*earnest,-6*story.Release);
+                2.77f-.24f*lean-.12f*earnest+.13f*story.Release-.11f*observe);
+            moviePlayer.localRotation=Quaternion.Euler(9*lean+6*observe-13*story.Release,
+                -21-26*earnest-13*observe,-6*story.Release);
             Vector3 handTarget=age>=.33f?EchoArrival+Vector3.up*(.25f+.36f*story.Assembly):folio;
             float reach=Mathf.Max(story.Grip,.71f*earnest);
             echoActor.Play(story.Release>.06f?HorizonBodyAction.Stumble:reach>.02f?HorizonBodyAction.Reach:HorizonBodyAction.Wait,
@@ -223,20 +265,20 @@ namespace Horizon.UI
             optics.Clear();
 
             bool wide=cinematicOverviewRequested || still;
-            float forward=wide?0:Smooth(.42f,2.58f,pose);
-            float back=wide?0:Smooth(3.84f,5.31f,pose);
+            float forward=wide?0:.58f*Smooth(.52f,1.54f,pose)+.42f*Smooth(RecordedEchoStory.DevelopAt,RecordedEchoStory.HoldAt,pose);
+            float back=wide?0:Smooth(RecordedEchoStory.SettleAt-.16f,RecordedEchoStory.Duration-.32f,pose);
             float aspect=Mathf.Max(.30f,Mathf.Min(.58f,WorldCamera.aspect));
             float distance=Mathf.Max(3.0f,1.64f/aspect)+.53f*back-.59f*forward+.12f*story.Release+(wide?.78f:0);
             float lens=43f-6*forward+4*back;
-            Vector3 look=Vector3.Lerp(new Vector3(-.34f,1.51f,2.26f),new Vector3(.17f,1.50f,2.23f),forward);
+            Vector3 look=Vector3.Lerp(new Vector3(-.33f,1.51f,2.26f),new Vector3(.13f,1.53f,2.22f),forward);
             look=Vector3.Lerp(look,new Vector3(-.05f,1.47f,2.27f),back);
             if(wide) look=new Vector3(-.08f,1.51f,2.26f);
-            Vector3 camera=look+new Vector3(Mathf.Lerp(-.62f,.28f,forward),.71f-.26f*forward+.21f*back,-distance);
-            if(!wide && echoResult.gameObject.activeSelf && age<1.91f)
+            Vector3 camera=look+new Vector3(Mathf.Lerp(-.53f,.22f,forward),.87f-.20f*forward+.12f*back,-distance);
+            if(!wide && echoResult.gameObject.activeSelf && age<2.58f)
             {
                 Vector3 framedCamera=camera, framedLook=look;
                 FitPortraitSubject(echoSubjects,HorizonCinemaLayout.SubjectAperture,lens,ref framedCamera,ref framedLook);
-                float framing=Smooth(.12f,.24f,age)*(1-Smooth(1.12f,1.91f,age));
+                float framing=Smooth(.14f,.20f,age)*(1-Smooth(2.16f,2.58f,age));
                 camera=Vector3.Lerp(camera,framedCamera,framing);
                 look=Vector3.Lerp(look,framedLook,framing);
             }
@@ -247,24 +289,79 @@ namespace Horizon.UI
             FrameRecordedEcho();
         }
 
+        private void SampleEchoGuides(float pose,RecordedEchoStory story,bool still)
+        {
+            Color copper=new Color(.98f,.53f,.20f);
+            for(int i=0;i<echoGuideFlags.Length;i++)
+            {
+                float age=pose-RecordedEchoStory.GuideAt(i);
+                float step=still?1:Smooth(0,.115f,age);
+                float spring=still?0:ImmersiveMotion.Punch(age-.05f,.23f);
+                echoGuideFlags[i].localRotation=Quaternion.Euler(-43*step-14*spring,0,0);
+                EchoIndicator(echoGuideTips[i],Color.Lerp(echoTint,copper,i*.5f),step*(.39f+.95f*spring)*(1-.66f*story.Assembly));
+            }
+        }
+
+        private void EchoIndicator(Renderer indicator,Color color,float intensity)
+        {
+            effectProperties.Clear();
+            effectProperties.SetColor("_Emission",color*intensity);
+            indicator.SetPropertyBlock(effectProperties);
+        }
+
         private void PoseEchoSubjects(RecordedEchoStory story,float age,bool still)
         {
-            echoResult.gameObject.SetActive(still || age>=.14f);
+            echoResult.gameObject.SetActive(still || age>=RecordedEchoStory.MaterializeAfter);
             int count=echoActiveObjects.Count;
+            float width=count>3?.26f:count==3?.39f:.58f;
             for(int i=0;i<count;i++)
             {
                 float slot=i-(count-1)*.5f;
-                float lift=still?1:Smooth(.14f+i*.036f,.68f+i*.047f,age);
-                float width=count>3?.26f:count==3?.37f:.56f;
-                Vector3 at=EchoArrival+new Vector3(slot*width*lift,.18f+.49f*lift+.10f*Mathf.Sin(Mathf.PI*lift),
-                    -.10f+.09f*Mathf.Abs(slot)*lift);
+                float contactAt=RecordedEchoStory.ResultContactAt(i,count);
+                float ascent=still?1:Smooth(RecordedEchoStory.MaterializeAfter+i*.021f,.76f+i*.049f,age);
+                float land=still?1:Smooth(contactAt-.59f,contactAt,story.PoseTime);
+                float compression=still?0:ImmersiveMotion.Punch(story.PoseTime-contactAt,.22f);
+                Transform socket=echoSockets[i];
+                socket.gameObject.SetActive(still || story.Assembly>.08f);
+                socket.localPosition=new Vector3(.07f+slot*width,1.257f+.079f*story.Assembly-.017f*compression,2.51f);
+                EchoIndicator(echoSocketInsets[i],new Color(.68f,.87f,1),land*(.23f+.84f*compression));
                 Transform part=echoActiveObjects[i];
                 float size=(count>3?.39f:count==3?.48f:.66f)/echoObjectScales[i];
-                float scale=size*Mathf.Lerp(.27f,1,lift);
+                float scale=size*Mathf.Lerp(.31f,1,ascent);
+                Vector3 airborne=EchoArrival+new Vector3(slot*width*ascent,.12f+.53f*ascent,
+                    -.12f-.052f*Mathf.Abs(slot)*ascent);
+                Vector3 settled=socket.localPosition+Vector3.up*(.065f+echoObjectHeights[i]*scale);
+                Vector3 at=Vector3.Lerp(airborne,settled,land)+Vector3.up*(.048f*compression);
+                float tilt=still?0:24f*Mathf.Sin(ascent*Mathf.PI)*(1-land);
                 part.localScale=Vector3.one*scale;
-                float tilt=still?0:16f*Mathf.Sin(lift*Mathf.PI);
-                part.localRotation=Quaternion.Euler(tilt,10+slot*13-44*(1-lift),tilt*.31f);
+                part.localRotation=Quaternion.Euler(tilt,9+slot*10-53*(1-ascent),tilt*.37f);
                 part.localPosition=at-part.localRotation*(echoObjectCenters[i]*scale);
+                MaterialReward reward=echoActiveRewards[i];
+                float assembled=Mathf.Max(land,ascent*.88f);
+                PoseResourceMechanism(part,reward.Kind,assembled);
+                if(reward.Kind==RewardObjectKind.ToolKit && echoResult.gameObject.activeSelf)
+                    SampleRewardDevice(part,reward,assembled);
+            }
+        }
+
+        private void PlayRecordedEchoContacts(float previous,float now)
+        {
+            if(paused || preferences.reducedMotion) return;
+            for(int i=0;i<echoGuideNotes.Length;i++)
+            {
+                float at=RecordedEchoStory.GuideAt(i);
+                if(!CrossedRevealCue(previous,now,at)) continue;
+                SetPracticeAudioTime(at);
+                CueSound(echoGuideNotes[i],.38f+i*.06f);
+            }
+            for(int i=0;i<echoActiveObjects.Count;i++)
+            {
+                float at=RecordedEchoStory.ResultContactAt(i,echoActiveObjects.Count);
+                if(!CrossedRevealCue(previous,now,at)) continue;
+                SetPracticeAudioTime(at);
+                PrepareRevealSounds();
+                CueSound(revealContacts[i],.43f);
+                MasterHaptics.Cue(16,51,preferences);
             }
         }
 
@@ -302,7 +399,6 @@ namespace Horizon.UI
             switch(cue.Phase)
             {
                 case CinematicPhase.Charge: CueSound(echoPaper,.46f); break;
-                case CinematicPhase.Escalation: CueSound(echoRail,.57f); break;
                 case CinematicPhase.HeroMoment: CueSound(echoSeat,.47f); break;
                 case CinematicPhase.HitStop: movieMuted=true; audioSource.Stop(); UpdateAudio(); break;
                 case CinematicPhase.Settlement: CueSound(echoEnd,.36f); break;

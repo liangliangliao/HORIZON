@@ -368,14 +368,7 @@ namespace Horizon.UI
         {
             if(moviePlan?.RecordedEcho==true)
             {
-                float contactAt=spectacle.MultiplierTime+CinematicOutcome.EchoCreditSeconds;
-                if(!paused && !preferences.reducedMotion && CrossedRevealCue(previous,now,contactAt))
-                {
-                    SetPracticeAudioTime(contactAt);
-                    PrepareRevealSounds();
-                    CueSound(revealContacts[2],.47f);
-                    MasterHaptics.Cue(16,51,preferences);
-                }
+                PlayRecordedEchoContacts(previous,now);
                 return;
             }
             if(moviePlan!=null && moviePlan.Outcome.WalkRecovery)

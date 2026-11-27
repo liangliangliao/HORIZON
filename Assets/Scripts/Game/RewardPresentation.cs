@@ -229,8 +229,8 @@ namespace Horizon.Game
                 cues.Add(new CinematicCue(RecordedEchoStory.ImpactAt, CinematicPhase.Impact, "回声抵达"));
                 cues.Add(new CinematicCue(RecordedEchoStory.RevealAt, CinematicPhase.Multiplication, "本次实际变化"));
                 cues.Add(new CinematicCue(RecordedEchoStory.SettleAt, CinematicPhase.SecondReveal, origin));
-                cues.Add(new CinematicCue(4.30f, CinematicPhase.Jackpot, origin));
-                cues.Add(new CinematicCue(4.34f, CinematicPhase.Settlement, e.detail));
+                cues.Add(new CinematicCue(RecordedEchoStory.SettleAt+.04f, CinematicPhase.Jackpot, origin));
+                cues.Add(new CinematicCue(RecordedEchoStory.SettleAt+.15f, CinematicPhase.Settlement, e.detail));
                 cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
             }
             else if (e.tier >= RewardTier.Epic)

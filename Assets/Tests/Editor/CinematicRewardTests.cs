@@ -49,7 +49,7 @@ namespace Horizon.Tests
         {
             var source = new DomainEvent { id = "echo-cue", day = 5, kind = DomainEventKind.TimeEcho, tier = RewardTier.Major,
                 receipt = new RewardReceipt { sourceDay = 2, action = "整理作品", resourcesRecorded = true,
-                    resources = PracticeReward.FromTicks(new[] { 0, 0, 1321, 0, 0, 0 }) } };
+                    resources = PracticeReward.FromTicks(new[] { 0, 0, 1321, 0, 0, 840 }) } };
             RewardPlan actual = RewardDirector.Direct(source);
             var cue = new RewardSpectacle(actual);
             Assert.IsTrue(actual.RecordedEcho);
@@ -67,12 +67,24 @@ namespace Horizon.Tests
             Assert.Less(RecordedEchoStory.Sample(held+.01f,false).Progress,1f);
             Assert.AreEqual(1,RecordedEchoStory.Sample(cue.ImpactTime,false).Progress);
             Assert.AreEqual(.23f, cue.MultiplierTime - cue.ImpactTime, .001f);
-            Assert.AreEqual("专注 +0.1321", actual.Outcome.Changes.Single().Copy());
+            for(int i=0;i<RecordedEchoStory.GuideCount;i++)
+            {
+                float at=RecordedEchoStory.GuideAt(i);
+                Assert.That(at,Is.InRange(RecordedEchoStory.DevelopAt,RecordedEchoStory.DockAt));
+                Assert.Greater(RecordedEchoStory.Sample(at+.08f,false).Progress,RecordedEchoStory.Sample(at-.08f,false).Progress);
+                if(i>0) Assert.Greater(at-RecordedEchoStory.GuideAt(i-1),.55f);
+            }
             float second = actual.Cues.Single(item => item.Phase == CinematicPhase.SecondReveal).Time;
-            Assert.AreEqual("专注 +0.0001", actual.Outcome.SampleRecordedEcho(cue.MultiplierTime, cue.MultiplierTime, second, cue.SettlementTime, false).Copy);
-            Assert.AreEqual("专注 +0.1321", actual.Outcome.SampleRecordedEcho(cue.MultiplierTime + 1, cue.MultiplierTime, second, cue.SettlementTime, false).Copy);
-            Assert.AreEqual("专注 +0.1321", actual.Outcome.SampleRecordedEcho(actual.Duration, cue.MultiplierTime, second, cue.SettlementTime, false).Copy);
-            Assert.AreEqual("专注 +0.1321", actual.Outcome.SampleRecordedEcho(0, cue.MultiplierTime, second, cue.SettlementTime, true).Copy);
+            string Read(float at,bool reduced=false) => actual.Outcome.SampleRecordedEcho(at,cue.MultiplierTime,second,cue.SettlementTime,reduced).Copy;
+            float firstContact=RecordedEchoStory.ResultContactAt(0,2), lastContact=RecordedEchoStory.ResultContactAt(1,2);
+            const string final="专注 +0.1321　能力 +0.0840";
+            Assert.AreEqual("专注 +0.0001　能力 +0.0001",Read(cue.MultiplierTime));
+            Assert.That(Read(firstContact-.01f),Does.Not.Contain("+0.1321"));
+            Assert.That(Read(firstContact),Does.Contain("+0.1321").And.Not.Contain("+0.0840"));
+            Assert.That(Read(lastContact-.01f),Does.Not.Contain("+0.0840"));
+            Assert.AreEqual(final,Read(lastContact));
+            Assert.AreEqual(final,Read(actual.Duration));
+            Assert.AreEqual(final,Read(0,true));
             Assert.AreEqual(1321, source.receipt.resources.ticks[2]);
             source.receipt.sourceDay = 0;
             RewardPlan hidden = RewardDirector.Direct(source);
