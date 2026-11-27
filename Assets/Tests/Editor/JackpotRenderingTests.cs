@@ -126,7 +126,9 @@ namespace Horizon.Tests
         {
             yield return new EnterPlayMode(); yield return null;
             var world=new GameObject("Resource material rendering verification").AddComponent<HorizonWorld3D>(); world.Initialize();
-            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            // Inspect the actual models in one repeatable pose. The continuous
+            // outcome capture exercises the moving shutters, particles and light.
+            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,reducedMotion=true }); world.Cinematics.enabled=false;
             ResourceDelta[] changes={new ResourceDelta(energy:2),new ResourceDelta(mood:2),new ResourceDelta(insight:2),
                 new ResourceDelta(money:2),new ResourceDelta(relation:2),new ResourceDelta(ability:2)};
             RewardObjectKind[] kinds={RewardObjectKind.EnergyCell,RewardObjectKind.WarmLamp,RewardObjectKind.FocusLens,
@@ -139,8 +141,7 @@ namespace Horizon.Tests
                         receipt=new RewardReceipt { resourcesRecorded=true,resources=changes[i],sourceDay=3,action="实际行动" } };
                     string before=JsonUtility.ToJson(source);
                     Assert.IsTrue(world.Cinematics.Enqueue(source,true));
-                    float impact=world.Cinematics.Current.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
-                    world.Cinematics.Advance(impact+.25f);
+                    world.Cinematics.Advance(0);
                     Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Assembled actual resources");
                     Transform resource=stage.Find(kinds[i].ToString());
                     Assert.IsNotNull(resource);
