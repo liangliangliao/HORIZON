@@ -233,14 +233,19 @@ namespace Horizon.Tests
                     var guideFlags=Enumerable.Range(1,RecordedEchoStory.GuideCount).Select(index=>seal.parent
                         .Find("Echo guide "+index+"/Echo contact flag "+index)).ToArray();
                     var mounts=Enumerable.Range(1,gains.Length).Select(index=>seal.parent.Find("Echo result mount "+index)).ToArray();
-                    var objects=seal.parent.Find("Assembled actual resources").Cast<Transform>().Where(item=>item.gameObject.activeSelf).ToArray();
+                    var group=seal.parent.Find("Assembled actual resources");
+                    var objects=plan.Objects.Where(item=>item.Class==RewardObjectClass.Resource && item.Amount>0)
+                        .Select(item=>group.Find(item.Kind.ToString())).ToArray();
+                    var shutters=Enumerable.Range(1,gains.Length).Select(index=>seal.parent.Find("Archive aperture "+index+"/Archive shutter")).ToArray();
+                    var ducts=Enumerable.Range(1,gains.Length).Select(index=>seal.parent.Find("Echo conduit "+index)).ToArray();
                     Assert.AreEqual(gains.Length,objects.Length);
                     var field=caption.transform.Find("Screen energy release");
                     var core=world.GetComponentsInChildren<Renderer>(true).Single(r=>r.name=="White light at the seat");
                     var target=new RenderTexture(540,height,24); target.Create(); ui.targetTexture=target;
                     var pixels=new Texture2D(540,height,TextureFormat.RGB24,false);
                     string folder=Path.Combine(path,profile); Directory.CreateDirectory(folder);
-                    var trace=new System.Text.StringBuilder("frame,seconds,beat,seatDistance,release,field,guides,landed,receipt\n");
+                    var local=seal.parent.Find("Archive aperture halo");
+                    var trace=new System.Text.StringBuilder("frame,seconds,beat,seatDistance,release,field,guides,opened,visible,landed,local,conduits,receipt\n");
                     var cues=new System.Text.StringBuilder("time,phase\n");
                     world.Cinematics.Cue+=OnCue;
                     void OnCue(CinematicCue cue)
@@ -271,7 +276,7 @@ namespace Horizon.Tests
                             }
                             float remaining=Vector3.Distance(seal.position,seat.position);
                             bool flash=core.gameObject.activeInHierarchy;
-                            int illuminated=0, landed=0;
+                            int illuminated=0, landed=0, opened=0, shown=0;
                             for(int i=0;i<guideFlags.Length;i++)
                             {
                                 bool raised=Quaternion.Angle(Quaternion.identity,guideFlags[i].localRotation)>21;
@@ -282,6 +287,17 @@ namespace Horizon.Tests
                             }
                             for(int i=0;i<gains.Length;i++)
                             {
+                                float turn=RecordedEchoStory.ResultTurnAt(i,gains.Length);
+                                bool visible=objects[i].gameObject.activeInHierarchy;
+                                if(visible) shown++;
+                                if(!shutters[i].gameObject.activeSelf) opened++;
+                                if(!reduced && time<turn-.001f)
+                                {
+                                    Assert.IsFalse(visible,"A sealed aperture gave away a future row");
+                                    Assert.IsTrue(shutters[i].gameObject.activeSelf);
+                                    Assert.IsFalse(caption.Multiplier.text.Contains(gains[i].Split(' ')[0]));
+                                }
+                                if(reduced || time>turn+.28f) Assert.IsTrue(visible);
                                 float at=RecordedEchoStory.ResultContactAt(i,gains.Length);
                                 if(!reduced && time<at+.17f) continue;
                                 Assert.IsTrue(mounts[i].gameObject.activeInHierarchy);
@@ -299,14 +315,15 @@ namespace Horizon.Tests
                                 Assert.AreEqual(final,caption.Multiplier.text);
                                 Assert.That(Vector3.Distance(startCamera,world.WorldCamera.transform.position),Is.LessThan(.001f));
                             }
-                            else if(time>=RecordedEchoStory.ImpactAt+.16f && time<=RecordedEchoStory.ImpactAt+.50f)
+                            else if(time>=RecordedEchoStory.ImpactAt+.19f && time<=RecordedEchoStory.ImpactAt+.38f)
                             {
                                 Assert.That(remaining,Is.LessThan(.012f));
                                 var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
                                 Assert.IsTrue(hero.gameObject.activeInHierarchy);
                                 AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
                             }
-                            trace.AppendLine(FormattableString.Invariant($"{frame},{time:F3},{world.CurrentCinematicShot},{remaining:F4},{flash},{field.gameObject.activeSelf},{illuminated},{landed},{caption.Multiplier.text.Replace('\n','|')}"));
+                            if(time<RecordedEchoStory.ConvergenceAt(gains.Length)) Assert.IsFalse(field.gameObject.activeSelf);
+                            trace.AppendLine(FormattableString.Invariant($"{frame},{time:F3},{world.CurrentCinematicShot},{remaining:F4},{flash},{field.gameObject.activeSelf},{illuminated},{opened},{shown},{landed},{local.gameObject.activeInHierarchy},{ducts.Count(duct=>duct.gameObject.activeInHierarchy)},{caption.Multiplier.text.Replace('\n','|')}"));
                             Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
                             RenderTexture old=RenderTexture.active;
                             try

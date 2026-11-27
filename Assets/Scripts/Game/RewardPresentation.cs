@@ -219,7 +219,9 @@ namespace Horizon.Game
             bool recordedEcho = HasRecordedEcho(e, objects);
             if (recordedEcho)
             {
-                duration = RecordedEchoStory.Duration;
+                int results=objects.Count(item=>item.Class==RewardObjectClass.Resource && item.Amount>0);
+                float settle=RecordedEchoStory.SettleFor(results);
+                duration = RecordedEchoStory.DurationFor(results);
                 string origin = "第 " + r.sourceDay + " 天 · 「" + PresentationCopy.Chinese(r.action) + "」";
                 cues.Add(new CinematicCue(0, CinematicPhase.Anticipation, origin));
                 cues.Add(new CinematicCue(RecordedEchoStory.PrepareAt, CinematicPhase.Charge, origin));
@@ -228,9 +230,9 @@ namespace Horizon.Game
                 cues.Add(new CinematicCue(RecordedEchoStory.HoldAt, CinematicPhase.HitStop, origin));
                 cues.Add(new CinematicCue(RecordedEchoStory.ImpactAt, CinematicPhase.Impact, "回声抵达"));
                 cues.Add(new CinematicCue(RecordedEchoStory.RevealAt, CinematicPhase.Multiplication, "本次实际变化"));
-                cues.Add(new CinematicCue(RecordedEchoStory.SettleAt, CinematicPhase.SecondReveal, origin));
-                cues.Add(new CinematicCue(RecordedEchoStory.SettleAt+.04f, CinematicPhase.Jackpot, origin));
-                cues.Add(new CinematicCue(RecordedEchoStory.SettleAt+.15f, CinematicPhase.Settlement, e.detail));
+                cues.Add(new CinematicCue(settle, CinematicPhase.SecondReveal, origin));
+                cues.Add(new CinematicCue(settle+.04f, CinematicPhase.Jackpot, origin));
+                cues.Add(new CinematicCue(settle+.15f, CinematicPhase.Settlement, e.detail));
                 cues.Add(new CinematicCue(duration, CinematicPhase.ReturnToGame));
             }
             else if (e.tier >= RewardTier.Epic)

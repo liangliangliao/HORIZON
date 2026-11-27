@@ -131,11 +131,13 @@ namespace Horizon.Game
                 return Sample(seconds, reveal, secondReveal, settlement, reducedMotion);
             float age = Math.Max(0,seconds-reveal);
             int count=Changes.Count(change=>change.Amount>0);
-            string copy=string.Join("　",Changes.Where(change=>change.Amount>0).Select((change,slot)=>
-                change.Copy(reducedMotion?1:RecordedEchoStory.CreditProgress(seconds,reveal,
-                    RecordedEchoStory.ResultContactAt(slot,count)),true)));
+            string copy=string.Join("　",Changes.Where(change=>change.Amount>0).Select((change,slot)=>(change,slot))
+                .Where(gain=>reducedMotion || seconds>=RecordedEchoStory.ResultShownAt(gain.slot,count))
+                .Select(gain=>gain.change.Copy(reducedMotion?1:RecordedEchoStory.CreditProgress(seconds,
+                    RecordedEchoStory.ResultShownAt(gain.slot,count),RecordedEchoStory.ResultContactAt(gain.slot,count)),true)));
             float lastContact=RecordedEchoStory.ResultContactAt(Math.Max(0,count-1),count);
-            float progress=reducedMotion?1:RecordedEchoStory.CreditProgress(seconds,reveal,lastContact);
+            float progress=reducedMotion?1:RecordedEchoStory.CreditProgress(seconds,
+                RecordedEchoStory.ResultShownAt(Math.Max(0,count-1),count),lastContact);
             return new OutcomeFrame(true,false,0,Heading,copy,Origin,age,progress,false);
         }
     }

@@ -328,7 +328,7 @@ namespace Horizon
                 PlayMasterSpectacle(echo,()=>{});
                 var plan=world.Cinematics.Current;
                 AndroidSmoke.Require(plan.RecordedEcho,"The native replay lost its real source.");
-                var timing=new RewardSpectacle(plan);
+                int results=plan.Outcome.Changes.Count(change=>change.Amount>0);
                 world.Cinematics.Advance(.08f);
                 yield return null; yield return new WaitForEndOfFrame();
                 Transform marks=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Recorded source arriving on the time route");
@@ -339,10 +339,10 @@ namespace Horizon
                 world.Cinematics.Advance(RecordedEchoStory.GuideAt(1)+.19f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-guides",marks.Find("Echo guide 2"),Vector3.up*.10f);
-                world.Cinematics.Advance(timing.ImpactTime-.25f-world.Cinematics.Elapsed);
+                world.Cinematics.Advance(RecordedEchoStory.HoldAt+.07f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-charge",seal,Vector3.zero);
-                world.Cinematics.Advance(.72f);
+                world.Cinematics.Advance(RecordedEchoStory.RevealAt+.09f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 string copy=overlay.GetComponent<CinematicCaption>().Multiplier.text;
                 var beats=new CinematicTextChoreography(plan);
@@ -351,8 +351,14 @@ namespace Horizon
                 AndroidSmoke.Require(!string.IsNullOrEmpty(copy) && copy==expected.Replace('　','\n'),
                     "The native replay did not display its actual resources on separate lines.");
                 Transform contact=marks.Find("Stable echo receipt anchor");
+                CaptureAndroidFrame("10-echo-local",marks.Find("Archive aperture 1"),Vector3.zero);
+                world.Cinematics.Advance(RecordedEchoStory.ResultTurnAt(results-1,results)+.25f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                CaptureAndroidFrame("10-echo-burst",marks.Find("Archive aperture "+results),Vector3.zero);
+                world.Cinematics.Advance(RecordedEchoStory.ConvergenceAt(results)+.35f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.23f);
-                world.Cinematics.Advance(RecordedEchoStory.SettleAt+.46f-world.Cinematics.Elapsed);
+                world.Cinematics.Advance(RecordedEchoStory.SettleFor(results)+.46f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-settle",contact,Vector3.up*.11f);
                 SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event");

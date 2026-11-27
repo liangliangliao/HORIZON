@@ -371,6 +371,7 @@ jobs:
             ${{ runner.temp }}/time-echo-v4-review/*/*.csv
             ${{ runner.temp }}/time-echo-v4-review/*/capture.txt
             ${{ runner.temp }}/time-echo-v4-review/*/contact.png
+            ${{ runner.temp }}/time-echo-v4-review/*/intensity.json
           if-no-files-found: error
           retention-days: 14
 

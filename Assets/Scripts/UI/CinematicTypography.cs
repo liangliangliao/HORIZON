@@ -49,6 +49,15 @@ namespace Horizon.UI
         { var t=text!=null?text.GetComponent<CinematicTypography>():null; if(t!=null && t.rendered!=null) t.rendered.maxVisibleCharacters=count; }
         public static void Sweep(Text text,float time)
         { var t=text!=null?text.GetComponent<CinematicTypography>():null; if(t!=null) t.sweep=time; }
+        public static void AlignResult(Text text,TextAnchor fallback,bool top)
+        {
+            text.alignment=top?TextAnchor.UpperCenter:fallback;
+            var typography=text.GetComponent<CinematicTypography>();
+            if(typography?.rendered==null) return;
+            TextAlignmentOptions alignment=top?TextAlignmentOptions.Top:TextAlignmentOptions.Center;
+            typography.rendered.alignment=alignment;
+            if(typography.relief!=null) typography.relief.alignment=alignment;
+        }
         public static void Size(Text text,int size)
         {
             if(text==null || text.fontSize==size) return;

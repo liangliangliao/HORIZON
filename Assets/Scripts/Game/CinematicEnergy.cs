@@ -11,6 +11,7 @@ namespace Horizon.Game
         private readonly RewardSpectacle spectacle;
         private readonly CinematicCue[] accents;
         private readonly bool verifiedRelease;
+        private readonly int echoResults;
         public readonly float Seed;
         public readonly float Strength;
         public readonly bool Celebrates;
@@ -21,6 +22,7 @@ namespace Horizon.Game
             spectacle=new RewardSpectacle(plan);
             Celebrates=spectacle.Style!=RewardSpectacleStyle.Quiet && spectacle.Style!=RewardSpectacleStyle.Loss;
             bool hasGain = plan.Outcome.Changes.Any(change => change.Amount > 0);
+            if(plan.RecordedEcho) echoResults=plan.Outcome.Changes.Count(change=>change.Amount>0);
             bool milestone = plan.Event.kind == DomainEventKind.Victory ||
                 plan.Event.kind == DomainEventKind.PatternBroken || plan.Event.kind == DomainEventKind.RealityConvergence ||
                 plan.Event.kind == DomainEventKind.AllLinked;
@@ -43,7 +45,7 @@ namespace Horizon.Game
             {
                 float age=time-spectacle.ImpactTime;
                 float inward=reducedMotion?0:RecordedEchoCharge(age);
-                EnergyRelease hit=reducedMotion?default:RecordedEchoRelease(age);
+                EnergyRelease hit=reducedMotion?default:RecordedEchoRelease(time-RecordedEchoStory.ConvergenceAt(echoResults));
                 return new CinematicEnergyFrame(time,inward,Math.Max(hit.Fire*.40f,hit.Flash),hit.Wave*.54f,
                     inward*.72f,settle,age<0?-1:spectacle.ImpactTime,reducedMotion?0:ImmersiveMotion.Punch(age,.26f),hit);
             }
@@ -89,9 +91,9 @@ namespace Horizon.Game
 
         public static EnergyRelease RecordedEchoRelease(float age) => EnergyRelease.SampleRecordedEcho(age);
         public static float RecordedEchoCharge(float age) => age>=0?0:
-            .23f*ImmersiveMotion.Smooth((age+3.79f)/1.23f)+
-            .31f*ImmersiveMotion.Smooth((age+2.57f)/1.22f)+
-            .29f*ImmersiveMotion.Smooth((age+1.30f)/1.00f);
+            .19f*ImmersiveMotion.Smooth((age+2.97f)/1.03f)+
+            .28f*ImmersiveMotion.Smooth((age+1.95f)/1.02f)+
+            .27f*ImmersiveMotion.Smooth((age+.91f)/.70f);
 
         // A quiet onset, independent local pulses and a brief hold at the end.
         // Time and seed are immutable presentation inputs.
@@ -152,11 +154,11 @@ namespace Horizon.Game
         public static EnergyRelease SampleRecordedEcho(float age)
         {
             if(age<0 || age>=2.20f) return new EnergyRelease(age,0,0,0);
-            float core=.86f*(1-ImmersiveMotion.Smooth(age/.14f));
-            float fire=.93f*ImmersiveMotion.Smooth((age-.018f)/.145f)*
-                (1-ImmersiveMotion.Smooth((age-.54f)/1.09f));
-            float wave=.92f*ImmersiveMotion.Smooth((age-.08f)/.23f)*
-                (1-ImmersiveMotion.Smooth((age-.71f)/1.49f));
+            float core=.65f*ImmersiveMotion.Smooth(age/.09f)*(1-ImmersiveMotion.Smooth((age-.09f)/.18f));
+            float fire=ImmersiveMotion.Smooth((age-.03f)/.19f)*
+                (1-ImmersiveMotion.Smooth((age-.39f)/.76f));
+            float wave=ImmersiveMotion.Smooth((age-.075f)/.26f)*
+                (1-ImmersiveMotion.Smooth((age-.47f)/.94f));
             return new EnergyRelease(age,core,fire,wave);
         }
     }

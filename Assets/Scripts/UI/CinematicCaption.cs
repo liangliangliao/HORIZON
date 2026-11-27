@@ -15,6 +15,7 @@ namespace Horizon.UI
             public Vector3 Scale;
             public Color Color;
             public int Size;
+            public TextAnchor Alignment;
         }
 
         public Text Phase,Title,Story,Multiplier,MultiplierCaption,OutcomeContext,Resources,Explanation,Prediction;
@@ -111,7 +112,7 @@ namespace Horizon.UI
             if(text==null || poses.ContainsKey(text)) return;
             var rect=(RectTransform)text.transform;
             poses.Add(text,new TextPose {Rect=rect,Position=rect.anchoredPosition,Min=rect.anchorMin,Max=rect.anchorMax,
-                Scale=rect.localScale,Color=text.color,Size=text.fontSize});
+                Scale=rect.localScale,Color=text.color,Size=text.fontSize,Alignment=text.alignment});
         }
 
         private void OnStarted(RewardPlan value)
@@ -128,7 +129,10 @@ namespace Horizon.UI
             EchoLayout(MultiplierCaption,.418f,.452f);
             EchoLayout(Explanation,.149f,.189f);
             if(Multiplier!=null && poses.TryGetValue(Multiplier,out TextPose resultPose))
+            {
+                CinematicTypography.AlignResult(Multiplier,resultPose.Alignment,plan.RecordedEcho);
                 CinematicTypography.Size(Multiplier,tallReceipt?Mathf.RoundToInt(resultPose.Size*2.8f/echoGainCount):resultPose.Size);
+            }
             var lightRect=outcomeLight.rectTransform;
             lightRect.anchorMin=new Vector2(.015f,plan.RecordedEcho?(tallReceipt?.18f:.223f):HorizonCinemaLayout.MultiplierBottom-.08f);
             lightRect.anchorMax=new Vector2(.985f,plan.RecordedEcho?.495f:HorizonCinemaLayout.MultiplierTop+.08f);
@@ -201,9 +205,8 @@ namespace Horizon.UI
             if(plan==null) return;
             if(plan.RecordedEcho)
             {
-                float age=frame.Time-choreography.ImpactTime;
-                float poseAge=RecordedEchoStory.Sample(frame.Time,false).PoseTime-RecordedEchoStory.ImpactAt;
-                releaseField.Sample(poseAge,.28f*CinematicEnergy.RecordedEchoCharge(poseAge),
+                float age=frame.Time-RecordedEchoStory.ConvergenceAt(echoGainCount);
+                releaseField.Sample(age,0,
                     CinematicEnergy.RecordedEchoRelease(age),revealSeed,director.EchoRevealOrigin,true,VisualPreferences.ReducedMotion);
             }
             else releaseField.Clear();
@@ -224,15 +227,15 @@ namespace Horizon.UI
             }
             if(Phase!=null && plan.RecordedEcho)
             {
-                RecordedEchoBeat beat=RecordedEchoStory.Sample(frame.Time,VisualPreferences.ReducedMotion).Beat;
+                RecordedEchoBeat beat=RecordedEchoStory.Sample(frame.Time,VisualPreferences.ReducedMotion,echoGainCount).Beat;
                 switch(beat)
                 {
                     case RecordedEchoBeat.Origin: Phase.text="来自过去的行动"; break;
                     case RecordedEchoBeat.Prepare: Phase.text="拾起行动印记"; break;
                     case RecordedEchoBeat.Develop: Phase.text="导轨逐段接通"; break;
                     case RecordedEchoBeat.Dock: Phase.text="印记即将入槽"; break;
-                    case RecordedEchoBeat.Release: Phase.text=frame.Time>=RecordedEchoStory.ResultContactAt(0,echoGainCount)-.45f?
-                        "成果落位":"回声抵达"; break;
+                    case RecordedEchoBeat.Release: Phase.text=frame.Time>=RecordedEchoStory.ConvergenceAt(echoGainCount)?
+                        "回声汇入记录":"成果逐项揭晓"; break;
                     default: Phase.text="已经入账"; break;
                 }
                 if(VisualPreferences.ReducedMotion) Phase.text="已经入账";
@@ -270,7 +273,7 @@ namespace Horizon.UI
             float receipt=1-frame.ReceiptVeil;
             if(Explanation!=null) Explanation.text=receipt>.001f?CinematicOutcome.Readable(plan.Event.detail):"";
             bool showDebit=plan.RecordedEcho && outcome.Visible && echoDebit.Length>0 &&
-                (VisualPreferences.ReducedMotion || frame.Time>=RecordedEchoStory.SettleAt);
+                (VisualPreferences.ReducedMotion || frame.Time>=RecordedEchoStory.SettleFor(echoGainCount));
             if(Resources!=null) Resources.text=plan.RecordedEcho?(showDebit?"本次付出  "+echoDebit:""):
                 receipt>.001f?plan.ResourceCopy:"";
             if(Multiplier!=null)

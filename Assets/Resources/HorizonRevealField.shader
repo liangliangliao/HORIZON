@@ -81,10 +81,17 @@ Shader "Horizon/RevealField"
                 float streak = body * (1 - smoothstep(.005,.037,abs(p.y))) * (1 - smoothstep(.12,furthest,r)) * .29;
                 float late = smoothstep(.61,1.30,age);
                 float undertone = (wake*.27 + body*.14) * late * smoothstep(.38,1.17,edge) * grain;
+                // The archive convergence throws light across the frame while
+                // the persistent result rows remain in front of this layer.
+                float fans = pow(saturate(.54 + .46 * sin(spin * 11 + sin(spin*7)*1.13 + r*2)), 4);
+                float flood = _Energy.w * (wake*.27 + body*.30) * (1-smoothstep(.35,1.02,age));
+                float fanLight = flood * (.22 + fans*.89) * (1-smoothstep(radius + .07,radius + .40,r));
+                float crown = flood * (1 - smoothstep(.006,.067,abs(p.y+.18*p.x))) * .62;
 
-                float alpha = saturate(flash + sweep + rim + bloom + streak + undertone);
+                float alpha = saturate(flash + sweep + rim + bloom + streak + undertone + fanLight + crown);
                 half3 rgb = light * flash + lerp(copper,light,saturate(crest*.89+lightning*.49)) * sweep
-                    + lerp(copper,violet,late*.58) * rim + gold * bloom + light * streak + violet * undertone;
+                    + lerp(copper,violet,late*.58) * rim + gold * bloom + light * streak + violet * undertone
+                    + lerp(gold,light,fans*.69) * fanLight + gold*crown;
                 return half4(min(rgb,alpha),alpha)*_Origin.w;
             }
             ENDCG
