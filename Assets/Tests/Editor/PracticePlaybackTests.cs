@@ -138,6 +138,7 @@ namespace Horizon.Tests
                     var wave=(Renderer)typeof(HorizonWorld3D).GetField("caseWave",fields).GetValue(world);
                     var fire=(Renderer[])typeof(HorizonWorld3D).GetField("caseFire",fields).GetValue(world);
                     var body=chamber.Find("Enamel case");
+                    var prizes=(Transform[])typeof(HorizonWorld3D).GetField("prizePieces",Private).GetValue(world);
                     Assert.AreEqual(new Rect(0,0,1,1),world.WorldCamera.rect);
 
                     string folder=Path.Combine(path,mode); Directory.CreateDirectory(folder);
@@ -147,7 +148,7 @@ namespace Horizon.Tests
                     var target=new RenderTexture(540,height,24); target.Create(); ui.targetTexture=target;
                     var pixels=new Texture2D(540,height,TextureFormat.RGB24,false);
                     int release=-1,reveal=-1,maxFlames=0,frame=0,lastFrame=-1;
-                    int fieldAfterOpen=0, flameFrames=0, heldFrames=0;
+                    int fieldAfterOpen=0, flameFrames=0, heldFrames=0, prizeFrames=0;
                     Vector3 holdCamera=Vector3.zero;
                     Quaternion holdLid=Quaternion.identity;
                     bool sawWave=false,skipped=false;
@@ -156,7 +157,7 @@ namespace Horizon.Tests
                     {
                         foreach(Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;
                         canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=ui; canvas.planeDistance=5;
-                        while(frame<140)
+                        while(frame<(PracticeRewardCinematic.Duration+.70f)*20)
                         {
                             if(Time.frameCount==lastFrame) { yield return null; continue; }
                             lastFrame=Time.frameCount;
@@ -172,8 +173,18 @@ namespace Horizon.Tests
                             if(release>=0 && screenField.gameObject.activeInHierarchy) fieldAfterOpen++;
                             sawWave|=wave.gameObject.activeInHierarchy;
                             Vector3 bodyPosition=world.WorldCamera.WorldToViewportPoint(body.position);
-                            Assert.That(bodyPosition.x,Is.InRange(.2f,.8f));
-                            Assert.That(bodyPosition.y,Is.InRange(.39f,.75f));
+                            bool visiblePrize=prizes.Any(item=>item!=null && item.gameObject.activeInHierarchy);
+                            if(!reduced && release>=0 && screenField.gameObject.activeInHierarchy)
+                            {
+                                Assert.IsFalse(visiblePrize);
+                                Assert.IsEmpty(counter.text);
+                            }
+                            if(heading.text=="成果特写" && visiblePrize && world.WorldCamera.fieldOfView<39f) prizeFrames++;
+                            if(!visiblePrize)
+                            {
+                                Assert.That(bodyPosition.x,Is.InRange(.2f,.8f));
+                                Assert.That(bodyPosition.y,Is.InRange(.39f,.75f));
+                            }
                             if(heading.text=="即将开启")
                             {
                                 if(heldFrames==0)
@@ -215,7 +226,8 @@ namespace Horizon.Tests
                     else
                     {
                         Assert.GreaterOrEqual(release,0);
-                        Assert.That((reveal-release)/20f,Is.InRange(.05f,.35f));
+                        Assert.That((reveal-release)/20f,Is.InRange(EnergyRelease.PrizeDelay,3f));
+                        Assert.GreaterOrEqual(prizeFrames,24);
                         Assert.That(maxFlames,Is.InRange(1,battery?1:3));
                         Assert.IsTrue(sawWave);
                         Assert.GreaterOrEqual(fieldAfterOpen,33,"The direct screen field must remain visible as the numbers settle.");

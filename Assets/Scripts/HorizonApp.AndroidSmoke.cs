@@ -288,22 +288,31 @@ namespace Horizon
             try
             {
                 Time.captureFramerate=12;
-                float[] timings={-.32f,-.20f,0,.44f,1.52f};
-                string[] phases={"charge","hold","flash","wave","receipt"};
+                float[] timings={-.41f,-.20f,0,.48f};
+                string[] phases={"charge","hold","flash","wave"};
                 int index=0;
-                for(int frame=0;frame<90 && index<timings.Length;frame++)
+                for(int frame=0;frame<150;frame++)
                 {
                     yield return new WaitForEndOfFrame();
+                    if(index==timings.Length)
+                    {
+                        if(practiceHeading.text!="今日已入账") continue;
+                        AndroidSmoke.Require(!field.gameObject.activeInHierarchy,"The case field is still covering the prize.");
+                        AndroidSmoke.Require(practiceMeter.text==actual.Changes(PracticeRewardCinematic.Duration,true,false),
+                            "The settlement number did not match the committed native receipt.");
+                        CaptureAndroidFrame("09-case-receipt",world.PracticeRewardSubject,Vector3.up*.13f);
+                        index++;
+                        break;
+                    }
                     if(!field.gameObject.activeInHierarchy || field.material.GetVector("_Cue").x<timings[index]) continue;
                     if(phases[index]=="hold")
                         AndroidSmoke.Require(field.material.GetVector("_Cue").x<0 && field.material.GetVector("_Energy").x==0,
                             "A flash preceded the case's silent hold on Android.");
-                    if(index==timings.Length-1)
-                        AndroidSmoke.Require(practiceMeter.text==actual.Changes(PracticeRewardCinematic.Duration,true,false),
-                            "The settlement number did not match the committed native receipt.");
+                    AndroidSmoke.Require(string.IsNullOrEmpty(practiceMeter.text) &&
+                        !world.PracticeRewardSubject.gameObject.activeInHierarchy,"The case disclosed the prize during the release.");
                     CaptureAndroidFrame("09-case-"+phases[index++],body,Vector3.zero);
                 }
-                AndroidSmoke.Require(index==timings.Length,"The native case did not show all reveal stages.");
+                AndroidSmoke.Require(index==timings.Length+1,"The native case did not show all reveal stages.");
             }
             finally
             {
@@ -336,28 +345,46 @@ namespace Horizon
                 AndroidSmoke.Require(marks.Find("ArchiveReader/Bronze")?.GetComponentInChildren<MeshRenderer>()!=null,
                     "The original bronze reader is missing from the APK.");
                 CaptureAndroidFrame("10-echo-origin",seal,Vector3.zero);
-                world.Cinematics.Advance(RecordedEchoStory.GuideAt(1)+.19f-world.Cinematics.Elapsed);
+                world.Cinematics.Advance(1.16f-world.Cinematics.Elapsed);
+                yield return null;
+                float focusAt=world.Cinematics.Elapsed;
+                SmokeButton("Focus reward charge");
+                AndroidSmoke.Require(world.Cinematics.Elapsed==focusAt,"Focusing advanced the reveal clock.");
+                world.Cinematics.Advance(.17f);
+                yield return null;
+                AndroidSmoke.Require(marks.Find("Reader seam light 1").GetComponent<LineRenderer>().widthMultiplier>.016f,
+                    "The reader seam did not respond to touch.");
+                world.Cinematics.Advance(RecordedEchoStory.GuideAt(1)+.24f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-guides",marks.Find("Echo guide 2"),Vector3.up*.10f);
                 world.Cinematics.Advance(RecordedEchoStory.HoldAt+.07f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-charge",seal,Vector3.zero);
-                world.Cinematics.Advance(RecordedEchoStory.RevealAt+.09f-world.Cinematics.Elapsed);
+                var caption=overlay.GetComponent<CinematicCaption>();
+                Transform contact=marks.Find("Stable echo receipt anchor");
+                Transform items=marks.Find("Assembled actual resources");
+                Transform echoField=overlay.Find("Screen energy release");
+                world.Cinematics.Advance(RecordedEchoStory.ImpactAt+.075f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
-                string copy=overlay.GetComponent<CinematicCaption>().Multiplier.text;
+                AndroidSmoke.Require(!items.gameObject.activeInHierarchy && caption.Multiplier.text.Length==0,
+                    "The echo prize was exposed at the flash.");
+                CaptureAndroidFrame("10-echo-burst",contact,Vector3.up*.12f);
+                world.Cinematics.Advance(RecordedEchoStory.ImpactAt+.48f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                AndroidSmoke.Require(echoField.gameObject.activeInHierarchy && !items.gameObject.activeInHierarchy,
+                    "The wide release and prize overlapped.");
+                CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.20f);
+                world.Cinematics.Advance(RecordedEchoStory.RevealAt+.19f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
                 var beats=new CinematicTextChoreography(plan);
                 float second=plan.Cues.First(cue=>!cue.NodeHit && cue.Phase==CinematicPhase.SecondReveal).Time;
                 string expected=plan.Outcome.SampleRecordedEcho(world.Cinematics.Elapsed,beats.MultiplierTime,second,beats.SettlementTime,false).Copy;
-                AndroidSmoke.Require(!string.IsNullOrEmpty(copy) && copy==expected.Replace('　','\n'),
-                    "The native replay did not display its actual resources on separate lines.");
-                Transform contact=marks.Find("Stable echo receipt anchor");
-                CaptureAndroidFrame("10-echo-local",marks.Find("Archive aperture 1"),Vector3.zero);
-                world.Cinematics.Advance(RecordedEchoStory.ResultTurnAt(results-1,results)+.25f-world.Cinematics.Elapsed);
-                yield return null; yield return new WaitForEndOfFrame();
-                CaptureAndroidFrame("10-echo-burst",marks.Find("Archive aperture "+results),Vector3.zero);
-                world.Cinematics.Advance(RecordedEchoStory.ConvergenceAt(results)+.35f-world.Cinematics.Elapsed);
-                yield return null; yield return new WaitForEndOfFrame();
-                CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.23f);
+                string copy=caption.Multiplier.text;
+                AndroidSmoke.Require(!echoField.gameObject.activeInHierarchy && !string.IsNullOrEmpty(copy) &&
+                    copy==expected.Replace('　','\n') && world.WorldCamera.fieldOfView<36,
+                    "The native replay did not hold a clean close-up of the recorded prize.");
+                Transform reward=items.Cast<Transform>().Single(item=>item.gameObject.activeInHierarchy);
+                CaptureAndroidFrame("10-echo-local",reward,Vector3.zero);
                 world.Cinematics.Advance(RecordedEchoStory.SettleFor(results)+.46f-world.Cinematics.Elapsed);
                 yield return null; yield return new WaitForEndOfFrame();
                 CaptureAndroidFrame("10-echo-settle",contact,Vector3.up*.11f);

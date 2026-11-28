@@ -128,7 +128,7 @@ namespace Horizon.Game
         public OutcomeFrame SampleRecordedEcho(float seconds, float reveal, float secondReveal, float settlement, bool reducedMotion)
         {
             if (seconds < reveal && !reducedMotion)
-                return Sample(seconds, reveal, secondReveal, settlement, reducedMotion);
+                return new OutcomeFrame(false,false,-1,Heading,"",Origin,0,0,false);
             float age = Math.Max(0,seconds-reveal);
             int count=Changes.Count(change=>change.Amount>0);
             string copy=string.Join("　",Changes.Where(change=>change.Amount>0).Select((change,slot)=>(change,slot))

@@ -20,7 +20,7 @@ namespace Horizon.Tests
 
         [TestCase("ask")]
         [TestCase("portfolio")]
-        public void CaseReleaseShowsTheActualReceiptWithinAQuarterSecond(string id)
+        public void CasePrizesAndReceiptFollowTheMainRelease(string id)
         {
             var life = CaseSampleLife(id, out CardSpec card);
             life.BeginPractice(card, 2);
@@ -32,20 +32,25 @@ namespace Horizon.Tests
             int[] balances = Enumerable.Range(0, 6).Select(life.AxisTicks).ToArray();
             Assert.IsTrue(film.HasGain);
             Assert.AreEqual(action.nodeId, film.EventId);
-            Assert.LessOrEqual(PracticeRewardCinematic.GainTime - PracticeRewardCinematic.ReleaseTime, .35f);
+            Assert.GreaterOrEqual(PracticeRewardCinematic.GainTime-PracticeRewardCinematic.ReleaseTime,EnergyRelease.PrizeDelay);
+            Assert.IsEmpty(film.Changes(PracticeRewardCinematic.ReleaseTime+.55f,true,false));
             Assert.IsEmpty(film.Changes(PracticeRewardCinematic.ReleaseTime, true, false));
             Assert.IsNotEmpty(film.Changes(PracticeRewardCinematic.GainTime, true, false));
             Assert.IsEmpty(film.Changes(PracticeRewardCinematic.GainTime, false, false));
             Assert.Greater(film.Sample(PracticeRewardCinematic.ReleaseTime, false).Release.Flash, 0);
-            Assert.Greater(film.Sample(PracticeRewardCinematic.GainTime, false).Release.Fire, 0);
+            Assert.Greater(film.Sample(PracticeRewardCinematic.ReleaseTime+.53f,false).Release.Fire,0);
+            var close=film.Sample(PracticeRewardCinematic.PrizeTime,false).Release;
+            Assert.AreEqual(0,close.Flash+close.Fire+close.Wave);
             for (int axis = 0; axis < 6; axis++)
             {
                 if (actual[axis] > 0)
                 {
+                    float readAt=PracticeRewardCinematic.GainTime+film.GainSlot(axis)*PracticeRewardCinematic.ObjectSpacing;
+                    Assert.AreEqual(0,film.DisplayTicks(axis,readAt-.01f,false));
                     int previous = 0;
                     for (int frame = 0; frame < 120; frame++)
                     {
-                        int current = film.DisplayTicks(axis, PracticeRewardCinematic.GainTime + frame / 60f, false);
+                        int current = film.DisplayTicks(axis,readAt+frame/60f,false);
                         Assert.That(current, Is.InRange(Math.Max(1, previous), actual[axis]));
                         previous = current;
                     }
@@ -68,8 +73,8 @@ namespace Horizon.Tests
             Assert.Greater(first.Charge, film.Sample(0, false).Charge);
             Assert.Less(first.LidStrain,second.LidStrain);
             Assert.Less(second.LidStrain,third.LidStrain);
-            Assert.Less(film.Sample(1.57f,false).LidStrain, first.LidStrain*.5f);
-            Assert.Less(film.Sample(PracticeRewardCinematic.LatchTime(2)+.43f,false).LidStrain, third.LidStrain*.5f);
+            Assert.Less(film.Sample(PracticeRewardCinematic.LatchTime(0)+.68f,false).LidStrain, first.LidStrain*.5f);
+            Assert.Less(film.Sample(PracticeRewardCinematic.LatchTime(2)+.57f,false).LidStrain, third.LidStrain*.5f);
             Assert.Less(first.Tilt, 0);
             Assert.Greater(second.Tilt, 0);
             Assert.Less(third.Tilt, first.Tilt);
@@ -77,7 +82,7 @@ namespace Horizon.Tests
             float firstGap=PracticeRewardCinematic.LatchTime(1)-PracticeRewardCinematic.LatchTime(0);
             float secondGap=PracticeRewardCinematic.LatchTime(2)-PracticeRewardCinematic.LatchTime(1);
             Assert.Less(secondGap,firstGap);
-            Assert.Greater(secondGap,.70f);
+            Assert.Greater(secondGap,1.10f);
             var held=film.Sample(PracticeRewardCinematic.HoldTime,false);
             var heldLast=film.Sample(PracticeRewardCinematic.ReleaseTime-.01f,false);
             Assert.AreEqual(held.Compression,heldLast.Compression);
@@ -86,7 +91,7 @@ namespace Horizon.Tests
             Assert.AreEqual(held.LidStrain,heldLast.LidStrain);
             Assert.AreEqual(held.LidStrain,film.Sample(PracticeRewardCinematic.ReleaseTime,false).LidStrain);
             Assert.That(film.Sample(PracticeRewardCinematic.ReleaseTime+.14f,false).Lid,Is.GreaterThan(.9f));
-            var release = film.Sample(PracticeRewardCinematic.GainTime, false);
+            var release = film.Sample(PracticeRewardCinematic.ReleaseTime+.29f, false);
             Assert.Greater(release.Lid, 0);
             Assert.Greater(release.Release.Fire, 0);
             Assert.Greater(release.Release.Wave, 0);

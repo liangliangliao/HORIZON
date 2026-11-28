@@ -46,7 +46,7 @@ for take in ("09-case", "10-echo"):
     release_coverage[take] = {"charge": round(charge, 4), "wave": round(wave, 4)}
 local = warm_coverage("10-echo-local")
 release_coverage["10-echo"]["local"] = round(local, 4)
-assert release_coverage["10-echo"]["wave"] > local + .10, "The convergence did not extend beyond the local reveal"
+assert release_coverage["10-echo"]["wave"] > local + .10, "The main release lacked contrast with the final prize close-up"
 performance = json.loads((directory / "performance.json").read_text())
 assert performance["graphicsApi"] == report["graphics"]
 assert (performance["width"], performance["height"]) == (report["width"], report["height"])

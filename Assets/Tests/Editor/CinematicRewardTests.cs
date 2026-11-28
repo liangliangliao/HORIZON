@@ -56,17 +56,17 @@ namespace Horizon.Tests
             Assert.AreEqual(RecordedEchoStory.ImpactAt,cue.ImpactTime);
             Assert.AreEqual(RecordedEchoStory.Duration,actual.Duration);
             float held=actual.Cues.Single(item=>item.Phase==CinematicPhase.HitStop).Time;
-            Assert.That(cue.ImpactTime-held,Is.InRange(.16f,.23f));
+            Assert.That(cue.ImpactTime-held,Is.InRange(.20f,.30f));
             var tension=new CinematicTension(actual);
             Assert.AreEqual(tension.Sample(held+.04f).PoseTime,tension.Sample(cue.ImpactTime-.01f).PoseTime);
             var steps=new[] { 0f,RecordedEchoStory.PrepareAt,RecordedEchoStory.DevelopAt,RecordedEchoStory.DockAt,
-                RecordedEchoStory.ImpactAt,RecordedEchoStory.SettleAt };
+                RecordedEchoStory.ImpactAt,RecordedEchoStory.PrizeAt,RecordedEchoStory.SettleAt };
             CollectionAssert.AreEqual(System.Enum.GetValues(typeof(RecordedEchoBeat)),
                 steps.Select(time=>RecordedEchoStory.Sample(time,false).Beat));
             Assert.IsTrue(RecordedEchoStory.Sample(held+.01f,false).Held);
             Assert.Less(RecordedEchoStory.Sample(held+.01f,false).Progress,1f);
             Assert.AreEqual(1,RecordedEchoStory.Sample(cue.ImpactTime,false).Progress);
-            Assert.AreEqual(.23f, cue.MultiplierTime - cue.ImpactTime, .001f);
+            Assert.Greater(cue.MultiplierTime-cue.ImpactTime,EnergyRelease.PrizeDelay);
             var energy=new CinematicEnergy(actual);
             float previousLoad=0, previousCharge=energy.Sample(.50f).Inward;
             for(int i=0;i<RecordedEchoStory.GuideCount;i++)
@@ -74,14 +74,14 @@ namespace Horizon.Tests
                 float at=RecordedEchoStory.GuideAt(i);
                 Assert.That(at,Is.InRange(RecordedEchoStory.DevelopAt,RecordedEchoStory.DockAt));
                 Assert.Greater(RecordedEchoStory.Sample(at+.08f,false).Progress,RecordedEchoStory.Sample(at-.08f,false).Progress);
-                if(i>0) Assert.Greater(at-RecordedEchoStory.GuideAt(i-1),.80f);
-                float load=RecordedEchoStory.Sample(at+.07f,false).ReaderLoad;
-                float charge=energy.Sample(at+.19f).Inward;
+                if(i>0) Assert.Greater(at-RecordedEchoStory.GuideAt(i-1),1.08f);
+                float load=RecordedEchoStory.Sample(at+.12f,false).ReaderLoad;
+                float charge=energy.Sample(at+.24f).Inward;
                 Assert.That(load,Is.GreaterThan(previousLoad+.16f));
-                Assert.That(RecordedEchoStory.Sample(at+.15f,false).ReaderLoad,Is.EqualTo(load).Within(.005f));
-                Assert.That(RecordedEchoStory.Sample(at+.47f,false).ReaderLoad,Is.LessThan(load*.5f));
+                Assert.That(RecordedEchoStory.Sample(at+.22f,false).ReaderLoad,Is.EqualTo(load).Within(.005f));
+                Assert.That(RecordedEchoStory.Sample(at+.64f,false).ReaderLoad,Is.LessThan(load*.5f));
                 Assert.That(charge,Is.GreaterThan(previousCharge+.12f));
-                Assert.That(energy.Sample(at+.56f).Inward,Is.LessThan(charge));
+                Assert.That(energy.Sample(at+.74f).Inward,Is.LessThan(charge));
                 previousLoad=load;
                 previousCharge=charge;
             }
@@ -89,11 +89,13 @@ namespace Horizon.Tests
             Assert.AreEqual(0,RecordedEchoStory.Sample(held,true).ReaderLoad);
             Assert.AreEqual(0,energy.Sample(held,true).Inward);
             Assert.Greater(RecordedEchoStory.ResultTurnAt(1,6)-RecordedEchoStory.ResultContactAt(0,6),.75f);
-            Assert.Greater(RecordedEchoStory.SettleFor(6)-RecordedEchoStory.ConvergenceAt(6),.8f);
+            Assert.Greater(RecordedEchoStory.SettleFor(6)-RecordedEchoStory.ConvergenceAt(6),.30f);
             float second = actual.Cues.Single(item => item.Phase == CinematicPhase.SecondReveal).Time;
             string Read(float at,bool reduced=false) => actual.Outcome.SampleRecordedEcho(at,cue.MultiplierTime,second,cue.SettlementTime,reduced).Copy;
             float firstContact=RecordedEchoStory.ResultContactAt(0,2), lastContact=RecordedEchoStory.ResultContactAt(1,2);
             const string final="专注 +0.1321　能力 +0.0840";
+            Assert.IsEmpty(Read(cue.ImpactTime+.50f));
+            Assert.IsEmpty(Read(RecordedEchoStory.PrizeAt+.20f));
             Assert.AreEqual("专注 +0.0001",Read(cue.MultiplierTime));
             Assert.That(Read(firstContact-.01f),Does.Not.Contain("+0.1321"));
             Assert.That(Read(firstContact),Does.Contain("+0.1321").And.Not.Contain("+0.0840"));
@@ -104,7 +106,10 @@ namespace Horizon.Tests
             Assert.AreEqual(final,Read(actual.Duration));
             Assert.AreEqual(final,Read(0,true));
             Assert.AreEqual(0,energy.Sample(lastContact).Release.Fire);
-            Assert.Greater(energy.Sample(RecordedEchoStory.ConvergenceAt(2)+.32f).Release.Wave,.8f);
+            Assert.Greater(energy.Sample(cue.ImpactTime+.40f).Release.Wave,.8f);
+            var prizeFrame=energy.Sample(RecordedEchoStory.PrizeAt).Release;
+            Assert.AreEqual(0,prizeFrame.Flash+prizeFrame.Fire+prizeFrame.Wave);
+            Assert.AreEqual(0,energy.Sample(RecordedEchoStory.ConvergenceAt(2)+.32f).Release.Wave);
             Assert.AreEqual(1321, source.receipt.resources.ticks[2]);
             source.receipt.sourceDay = 0;
             RewardPlan hidden = RewardDirector.Direct(source);

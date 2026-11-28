@@ -11,7 +11,6 @@ namespace Horizon.Game
         private readonly RewardSpectacle spectacle;
         private readonly CinematicCue[] accents;
         private readonly bool verifiedRelease;
-        private readonly int echoResults;
         public readonly float Seed;
         public readonly float Strength;
         public readonly bool Celebrates;
@@ -22,7 +21,6 @@ namespace Horizon.Game
             spectacle=new RewardSpectacle(plan);
             Celebrates=spectacle.Style!=RewardSpectacleStyle.Quiet && spectacle.Style!=RewardSpectacleStyle.Loss;
             bool hasGain = plan.Outcome.Changes.Any(change => change.Amount > 0);
-            if(plan.RecordedEcho) echoResults=plan.Outcome.Changes.Count(change=>change.Amount>0);
             bool milestone = plan.Event.kind == DomainEventKind.Victory ||
                 plan.Event.kind == DomainEventKind.PatternBroken || plan.Event.kind == DomainEventKind.RealityConvergence ||
                 plan.Event.kind == DomainEventKind.AllLinked;
@@ -45,7 +43,7 @@ namespace Horizon.Game
             {
                 float age=time-spectacle.ImpactTime;
                 float inward=reducedMotion?0:RecordedEchoCharge(age);
-                EnergyRelease hit=reducedMotion?default:RecordedEchoRelease(time-RecordedEchoStory.ConvergenceAt(echoResults));
+                EnergyRelease hit=reducedMotion?default:RecordedEchoRelease(age);
                 return new CinematicEnergyFrame(time,inward,Math.Max(hit.Fire*.40f,hit.Flash),hit.Wave*.54f,
                     inward*.72f,settle,age<0?-1:spectacle.ImpactTime,reducedMotion?0:ImmersiveMotion.Punch(age,.26f),hit);
             }
@@ -116,6 +114,8 @@ namespace Horizon.Game
     // No RNG, wall clock, or business-state access.
     public readonly struct EnergyRelease
     {
+        public const float ScenicDuration=2.15f;
+        public const float PrizeDelay=2.25f;
         public readonly float Age, Flash, Fire, Wave;
         private EnergyRelease(float age,float flash,float fire,float wave)
         { Age=age; Flash=flash; Fire=fire; Wave=wave; }
@@ -135,7 +135,7 @@ namespace Horizon.Game
         // and a moving light front that remain legible at normal playback speed.
         public static EnergyRelease SampleScenic(float age, float strength)
         {
-            if (age < 0 || age >= 2.15f || strength <= 0) return new EnergyRelease(age, 0, 0, 0);
+            if (age < 0 || age >= ScenicDuration || strength <= 0) return new EnergyRelease(age, 0, 0, 0);
             strength = ImmersiveMotion.Unit(strength);
             float flash = strength * (1 - ImmersiveMotion.Smooth(age / .145f));
             float fire = strength * ImmersiveMotion.Smooth((age - .025f) / .14f) *
@@ -151,11 +151,11 @@ namespace Horizon.Game
         public static EnergyRelease SampleRecordedEcho(float age)
         {
             if(age<0 || age>=2.20f) return new EnergyRelease(age,0,0,0);
-            float core=.65f*ImmersiveMotion.Smooth(age/.09f)*(1-ImmersiveMotion.Smooth((age-.09f)/.18f));
-            float fire=ImmersiveMotion.Smooth((age-.03f)/.19f)*
-                (1-ImmersiveMotion.Smooth((age-.39f)/.76f));
-            float wave=ImmersiveMotion.Smooth((age-.075f)/.26f)*
-                (1-ImmersiveMotion.Smooth((age-.47f)/.94f));
+            float core=.84f*(1-ImmersiveMotion.Smooth(age/.19f));
+            float fire=ImmersiveMotion.Smooth((age-.04f)/.24f)*
+                (1-ImmersiveMotion.Smooth((age-.59f)/.97f));
+            float wave=ImmersiveMotion.Smooth((age-.11f)/.28f)*
+                (1-ImmersiveMotion.Smooth((age-.75f)/1.35f));
             return new EnergyRelease(age,core,fire,wave);
         }
     }

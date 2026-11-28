@@ -27,6 +27,49 @@ namespace Horizon.UI
             return new ScenicEnergy(rays, floor, bounce);
         }
 
+        private static float RewardFocusPulse(float age) => Smooth(0,.11f,age)*(1-Smooth(.20f,.66f,age));
+
+        public void FocusRewardCharge()
+        {
+            if(paused || preferences.reducedMotion) return;
+            bool echo=Cinematics.IsPlaying && moviePlan?.RecordedEcho==true;
+            float time=echo?Cinematics.Elapsed:caseCueTime;
+            float last=echo?echoFocusAt:caseFocusAt;
+            float hold=echo?RecordedEchoStory.HoldAt:PracticeRewardCinematic.HoldTime;
+            if((!echo && caseLight==null) || time<.70f || time>=hold || time-last<.60f) return;
+            if(echo) echoFocusAt=time;
+            else caseFocusAt=time;
+            PrepareRevealSounds();
+            SetPracticeAudioTime(time);
+            CueSound(revealBolts[0],.27f);
+            MasterHaptics.Cue(15,42,preferences);
+        }
+
+        private void SampleRewardChargeBeams(LineRenderer[] beams,Vector3 origin,Color tint,float charge,float time,float seed)
+        {
+            bool low=LowCostEffects;
+            float reach=Mathf.Lerp(.14f,1.65f,Smooth(.07f,.83f,charge));
+            float speed=Mathf.Lerp(1.35f,3.7f,charge);
+            int count=charge>.018f?Mathf.Min(low?6:beams.Length,2+Mathf.FloorToInt(charge*beams.Length)):0;
+            for(int i=0;i<beams.Length;i++)
+            {
+                LineRenderer beam=beams[i];
+                if(i>=count)
+                {
+                    beam.gameObject.SetActive(false);
+                    continue;
+                }
+                float angle=i*2.39996f+seed*5.2f+time*.26f;
+                Vector3 direction=new Vector3(Mathf.Cos(angle),Mathf.Sin(angle)*.75f+.27f,(i%5-2)*.22f);
+                float travel=1-Mathf.Repeat(time*speed+i*.173f,1);
+                float intensity=charge*Smooth(0,.23f,travel)*(1-Smooth(.71f,1,travel));
+                beam.widthMultiplier=(i%3==0?.067f:.021f)*(.30f+charge);
+                beam.SetPosition(0,origin+direction*(.04f+reach*travel*.73f));
+                beam.SetPosition(1,origin+direction*(.11f+reach*travel));
+                CaseEffect(beam,3,tint*1.52f,intensity,0,time,seed);
+            }
+        }
+
         // This goes through scene transparency on GLES. The direct glow and
         // spill use a fixed draw budget in normal and battery quality.
         private void SampleScenicEnergy(ScenicEnergy track, Vector3 center, float floorHeight, Color tint,

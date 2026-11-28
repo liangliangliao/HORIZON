@@ -13,17 +13,20 @@ namespace Horizon.UI
         private readonly Transform[] caseLocks = new Transform[3];
         private Transform caseHandle;
         public Vector2 CaseRevealOrigin { get; private set; }
+        internal Transform PracticeRewardSubject => caseHeroAxis>=0?prizePieces[caseHeroAxis]:null;
         private Material caseEffectMaterial;
         private Vector3 caseRest;
         private float practiceBloomBefore;
         private bool caseVisualStarted, caseSilent;
-        private float caseCueTime;
+        private float caseCueTime, caseFocusAt;
+        private int caseHeroAxis=-1;
 
         public void BeginPracticeRewardCinematic(PracticeRewardCinematic film)
         {
             int[] receipt = new int[6];
             for (int axis = 0; axis < receipt.Length; axis++) receipt[axis] = film.TicksAt(axis);
             PreparePracticePayout(receipt, film.EventId, film.Difficulty, gainsOnly: true);
+            caseHeroAxis=System.Array.FindIndex(receipt,value=>value>0);
             for (int axis = 0; axis < receipt.Length; axis++)
                 if (receipt[axis] > 0) EnsurePracticePrize(axis);
 
@@ -61,6 +64,7 @@ namespace Horizon.UI
             caseLight.range = 4.6f;
             caseLight.shadows = LightShadows.None;
             caseCueTime = -1;
+            caseFocusAt=-10;
             PrepareRevealSounds();
 #if UNITY_EDITOR
             recordedCinemaSounds.Clear();
@@ -96,9 +100,13 @@ namespace Horizon.UI
             bool reduced = preferences.reducedMotion, low = LowCostEffects;
             bool released = frame.Age >= 0;
             float pose = released ? frame.Time : Mathf.Min(frame.Time,PracticeRewardCinematic.HoldTime);
-            float dim = Smooth(.79f, PracticeRewardCinematic.HoldTime-.31f, pose) *
-                (1 - Smooth(.39f, 1.66f, frame.Age));
-            DimPracticeScenery(reduced ? .12f : .06f + .59f * dim);
+            float touch=reduced || released?0:RewardFocusPulse(pose-caseFocusAt);
+            float charge=Mathf.Clamp01(frame.Charge+.16f*touch);
+            float prizeAge=frame.Time-PracticeRewardCinematic.PrizeTime;
+            float detail=reduced || caseHeroAxis<0?0:Smooth(.02f,.45f,prizeAge)*
+                (1-Smooth(1.97f,2.92f,prizeAge));
+            float dim=Smooth(.75f,PracticeRewardCinematic.HoldTime-.26f,pose);
+            DimPracticeScenery(reduced?.12f:.06f+.46f*dim+.32f*detail);
             chamber.gameObject.SetActive(true);
             heroProp.gameObject.SetActive(false);
             obstacle.gameObject.SetActive(false);
@@ -149,52 +157,63 @@ namespace Horizon.UI
             float kick = reduced ? 0 : Smooth(0,.065f,frame.Age)*(1-Smooth(.072f,.28f,frame.Age));
             float lens = 45 - 7 * push * (1 - pull) + 2.8f*kick;
             float aspect = Mathf.Max(.27f, WorldCamera.aspect);
-            float distance = Mathf.Max(2.85f, 1.63f / aspect) + .32f * pull - .27f * push * (1 - pull) - .10f*kick;
+            float distance = Mathf.Max(2.85f, 1.63f / aspect) + .32f * pull - .36f * push * (1 - pull)
+                - .10f*kick-.22f*touch;
             float side = Mathf.Lerp(-1.26f,-.58f,push) + .96f * pull;
             if (reduced) side = .22f;
             Vector3 look = center + new Vector3(-.15f-.105f*push+.23f*pull,-.12f+.12f*pull+.04f*kick,.06f);
-            WorldCamera.fieldOfView = lens;
-            WorldCamera.transform.position = look + new Vector3(side, .94f - .58f * push + .47f * pull, -distance);
+            Vector3 camera=look+new Vector3(side,.94f-.58f*push+.47f*pull,-distance);
+            for(int axis=0;axis<prizePieces.Length;axis++)
+            {
+                if(prizePieces[axis]==null) continue;
+                float offset=reduced?0:film.GainSlot(axis)*PracticeRewardCinematic.ObjectSpacing;
+                SamplePracticeGain(axis,prizeAge-offset,reduced);
+            }
+            if(detail>0)
+            {
+                Vector3 subject=prizePieces[caseHeroAxis].position+Vector3.up*.13f;
+                Vector3 prizeLook=subject-Vector3.up*.085f;
+                Vector3 prizeCamera=prizeLook+new Vector3(-.23f,.19f,-Mathf.Max(1.03f,.64f/aspect));
+                look=Vector3.Lerp(look,prizeLook,detail);
+                camera=Vector3.Lerp(camera,prizeCamera,detail);
+                lens=Mathf.Lerp(lens,36,detail);
+            }
+            WorldCamera.fieldOfView=lens;
+            WorldCamera.transform.position=camera;
             WorldCamera.transform.LookAt(look);
 
-            Vector3 seam = actionTable.InverseTransformPoint(chamber.TransformPoint(new Vector3(0, .31f, -.10f)));
+            Vector3 seam=actionTable.InverseTransformPoint(chamber.TransformPoint(new Vector3(0,.31f,-.10f)));
             CaseRevealOrigin=WorldCamera.WorldToViewportPoint(actionTable.TransformPoint(seam));
-            SamplePracticeCaseLight(film,frame,pose,seam,reduced,low);
-            for (int axis = 0; axis < prizePieces.Length; axis++)
-            {
-                if (prizePieces[axis] == null) continue;
-                SamplePracticeGain(axis,frame.Age-(reduced?0:film.GainSlot(axis)*PracticeRewardCinematic.ObjectSpacing),reduced);
-            }
+            SamplePracticeCaseLight(film,frame,pose,seam,charge,detail,reduced,low);
 
             SamplePracticeRevealSounds(film,frame.Time,playCues && !reduced && film.HasGain);
         }
 
         private void SamplePracticeGain(int axis, float age, bool reduced)
         {
-            float revealAge = PracticeRewardCinematic.GainTime - PracticeRewardCinematic.ReleaseTime;
-            float landingAge = PracticeRewardCinematic.LandingTime - PracticeRewardCinematic.ReleaseTime;
-            float takeoff=revealAge-.095f;
-            float lift=reduced?1:Smooth(takeoff,.37f,age);
-            float drift=reduced?1:.57f*Smooth(.23f,.74f,age)+.43f*Smooth(.79f,landingAge,age);
-            float drop=reduced?1:Smooth(.83f,landingAge,age);
-            float bounce=reduced?0:.11f*ImmersiveMotion.Punch(age-landingAge,.21f);
-            Transform item = prizePieces[axis];
-            item.gameObject.SetActive(age >= (reduced?revealAge:takeoff));
-            item.localPosition = Vector3.Lerp(new Vector3(0, .26f, -.14f),prizeLandings[axis],drift)+
-                Vector3.up*(lift*.63f*(1-drop)+bounce);
-            item.localScale = Vector3.one * (.50f + .17f * lift*(1-drop));
-            item.localRotation = Quaternion.Euler(-20*(1-drift),Mathf.Lerp(-115,14,lift)-21*drop,12*Mathf.Sin(Mathf.PI*drift));
-            prizeSockets[axis].gameObject.SetActive(age >= (reduced ? revealAge : .67f));
-            prizeBeams[axis].gameObject.SetActive(!reduced && age >= landingAge && age < landingAge + .18f);
+            const float landingAge=PracticeRewardCinematic.LandingTime-PracticeRewardCinematic.PrizeTime;
+            float lift=reduced?1:Smooth(0,.62f,age);
+            float drift=reduced?1:.36f*Smooth(.18f,.74f,age)+.64f*Smooth(.82f,landingAge,age);
+            float drop=reduced?1:Smooth(.91f,landingAge,age);
+            float bounce=reduced?0:.09f*ImmersiveMotion.Punch(age-landingAge,.29f);
+            Transform item=prizePieces[axis];
+            item.gameObject.SetActive(age>=0);
+            item.localPosition=Vector3.Lerp(new Vector3(0,.35f,-.14f),prizeLandings[axis],drift)+
+                Vector3.up*(lift*.66f*(1-drop)+bounce);
+            item.localScale=Vector3.one*(.56f+.28f*lift*(1-drop));
+            item.localRotation=Quaternion.Euler(-13*(1-drift),Mathf.Lerp(-86,21,lift)-21*drop,9*Mathf.Sin(Mathf.PI*drift));
+            prizeSockets[axis].gameObject.SetActive(age >= (reduced?0:.85f));
+            prizeBeams[axis].gameObject.SetActive(!reduced && age>=landingAge && age<landingAge+.18f);
         }
 
         private void SamplePracticeCaseLight(PracticeRewardCinematic film,PracticeRewardCinematicFrame frame,
-            float pose,Vector3 seam,bool reduced,bool low)
+            float pose,Vector3 seam,float charge,float detail,bool reduced,bool low)
         {
             float seed=film.Seed;
             EnergyRelease release = frame.Release;
             bool held=frame.Time>=PracticeRewardCinematic.HoldTime && frame.Age<0;
-            float warm = Smooth(PracticeRewardCinematic.LatchTime(1)-.30f, PracticeRewardCinematic.HoldTime-.15f, pose);
+            float warm=Smooth(.14f,.78f,charge);
+            if(frame.Age>=0) warm=1;
             Color cool = script.Id == "ask" ? new Color(.27f, .69f, 1) : new Color(.57f, .47f, 1);
             Color amber = new Color(1, .51f, .16f);
             Color light = Color.Lerp(cool, amber, warm);
@@ -203,14 +222,18 @@ namespace Horizon.UI
                 sparkAtLatch=Mathf.Max(sparkAtLatch,ImmersiveMotion.Punch(pose-PracticeRewardCinematic.LatchTime(i),.16f));
             for(int axis=0;axis<prizePieces.Length;axis++)
                 if(film.TicksAt(axis)>0) contact=Mathf.Max(contact,ImmersiveMotion.Punch(frame.Time-film.ContactTime(axis),.23f));
-            caseLight.transform.localPosition = seam + new Vector3(0, .22f * release.Fire + .02f, -.24f);
+            Vector3 key=seam+new Vector3(0,.22f*release.Fire+.02f,-.24f);
+            if(detail>0)
+                key=Vector3.Lerp(key,actionTable.InverseTransformPoint(prizePieces[caseHeroAxis].position)+
+                    new Vector3(-.18f,.34f,-.28f),detail);
+            caseLight.transform.localPosition=key;
             caseLight.color = Color.Lerp(light, new Color(1, .89f, .71f), release.Flash);
-            caseLight.intensity = reduced ? .32f : .11f + frame.Charge*(held?.28f:.75f) +
-                frame.LidStrain*1.6f + sparkAtLatch*.91f +
-                release.Flash*4.0f + release.Fire*2.32f + .78f*contact;
+            caseLight.intensity=reduced?.32f:.10f+charge*(held?.76f:1.60f)+
+                frame.LidStrain*1.6f+sparkAtLatch*.68f+release.Flash*4.0f+release.Fire*2.32f+
+                1.45f*detail+.48f*contact;
             if (bloom != null) bloom.Echo = low || reduced ? 0 : release.Flash * .27f + release.Fire * .21f;
             Vector3 worldSeam = actionTable.TransformPoint(seam);
-            SampleScenicEnergy(caseScenic, worldSeam, .012f, light,reduced || held?0:frame.Charge*.34f,release,seed);
+            SampleScenicEnergy(caseScenic, worldSeam, .012f, light,reduced?0:.74f*Smooth(.12f,.81f,charge),release,seed);
 
             Quaternion view = WorldCamera.transform.rotation;
             caseCore.transform.localPosition = seam + new Vector3(0, .035f, -.095f);
@@ -218,7 +241,7 @@ namespace Horizon.UI
             caseCore.transform.localScale = Vector3.Lerp(new Vector3(.27f,.11f,1),new Vector3(.82f,.57f,1),
                 release.Flash)*(1 + release.Flash*.68f);
             CaseEffect(caseCore, 1, Color.Lerp(light * .83f, new Color(2.4f, 1.99f, 1.55f), release.Flash),
-                .10f*frame.Charge+.70f*frame.LidStrain+release.Flash, 0, frame.Age, seed);
+                .22f*charge+.76f*frame.LidStrain+release.Flash, 0, frame.Age, seed);
 
             for (int i = 0; i < caseFire.Length; i++)
             {
@@ -240,24 +263,7 @@ namespace Horizon.UI
             caseWave.transform.localScale = new Vector3(waveSize, waveSize * .84f, 1);
             CaseEffect(caseWave, 2, new Color(1.24f, .47f, .105f), release.Wave * .82f, 0, frame.Age, seed);
 
-            for (int i = 0; i < caseRays.Length; i++)
-            {
-                LineRenderer ray = caseRays[i];
-                if (reduced || held || pose < .99f || frame.Age >= 0 || i >= (low ? 4 : caseRays.Length))
-                {
-                    ray.gameObject.SetActive(false);
-                    continue;
-                }
-                float angle = i * 2.39996f + seed * 5.2f;
-                Vector3 direction = new Vector3(Mathf.Cos(angle), .40f + .15f * (i % 4), Mathf.Sin(angle));
-                float period=Mathf.Lerp(.49f,.19f,Smooth(PracticeRewardCinematic.LatchTime(0),PracticeRewardCinematic.HoldTime,pose));
-                float inward=1-Mathf.Repeat((pose-.99f)/period+i*.173f,1);
-                float intensity=frame.Charge*Smooth(0,.25f,inward)*(1-Smooth(.81f,1,inward));
-                ray.widthMultiplier=(i%3==0?.072f:.022f)*(.5f+frame.Charge);
-                ray.SetPosition(0,seam+direction*(.04f+inward*.94f));
-                ray.SetPosition(1,seam+direction*(.14f+inward*1.34f));
-                CaseEffect(ray,3,light*1.28f,intensity,0,frame.Age,seed);
-            }
+            SampleRewardChargeBeams(caseRays,seam,light,reduced?0:charge,pose,seed);
 
             for (int i = 0; i < caseEmbers.Length; i++)
             {

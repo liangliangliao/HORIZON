@@ -241,14 +241,14 @@ namespace Horizon.Tests
                     Assert.AreEqual(gains.Length,objects.Length);
                     var field=caption.transform.Find("Screen energy release");
                     var core=world.GetComponentsInChildren<Renderer>(true).Single(r=>r.name=="White light at the seat");
-                    var apertureCore=seal.parent.Find("White light at the aperture");
                     var jaw=seat.Find("Opening reader leaves/Archive leaf hinge -1");
                     var seamLight=seal.parent.Find("Reader seam light 1").GetComponent<LineRenderer>();
                     var target=new RenderTexture(540,height,24); target.Create(); ui.targetTexture=target;
                     var pixels=new Texture2D(540,height,TextureFormat.RGB24,false);
                     string folder=Path.Combine(path,profile); Directory.CreateDirectory(folder);
-                    var local=seal.parent.Find("Archive aperture halo");
-                    var trace=new System.Text.StringBuilder("frame,seconds,beat,seatDistance,release,field,guides,opened,visible,landed,local,conduits,leafAngle,seamWidth,apertureCore,receipt\n");
+                    var chargeBeams=seal.parent.GetComponentsInChildren<LineRenderer>(true)
+                        .Where(beam=>beam.name.StartsWith("Reader charge beam")).ToArray();
+                    var trace=new System.Text.StringBuilder("frame,seconds,beat,seatDistance,release,field,guides,opened,visible,landed,conduits,leafAngle,seamWidth,chargeBeams,lens,receipt\n");
                     var cues=new System.Text.StringBuilder("time,phase\n");
                     world.Cinematics.Cue+=OnCue;
                     void OnCue(CinematicCue cue)
@@ -259,7 +259,7 @@ namespace Horizon.Tests
                     float firstResult=-1;
                     var loadedAngles=new float[guideFlags.Length];
                     var recoveredAngles=new float[guideFlags.Length];
-                    bool firstCoreSeen=false;
+                    bool firstCoreSeen=false, closeShotSeen=false;
                     Vector3 startCamera=world.WorldCamera.transform.position;
                     try
                     {
@@ -282,10 +282,9 @@ namespace Horizon.Tests
                             }
                             float remaining=Vector3.Distance(seal.position,seat.position);
                             float leafAngle=Quaternion.Angle(Quaternion.identity,jaw.localRotation);
-                            bool localCore=apertureCore.gameObject.activeSelf;
-                            if(time>=RecordedEchoStory.ImpactAt && time<RecordedEchoStory.RevealAt && localCore)
-                                firstCoreSeen=true;
                             bool flash=core.gameObject.activeInHierarchy;
+                            if(flash && time>=RecordedEchoStory.ImpactAt && time<RecordedEchoStory.PrizeAt)
+                                firstCoreSeen=true;
                             int illuminated=0, landed=0, opened=0, shown=0;
                             for(int i=0;i<guideFlags.Length;i++)
                             {
@@ -294,8 +293,8 @@ namespace Horizon.Tests
                                 float at=RecordedEchoStory.GuideAt(i);
                                 if(reduced || time>=at+.16f) Assert.IsTrue(raised);
                                 else if(time<at) Assert.IsFalse(raised);
-                                if(Mathf.Abs(time-at-.07f)<.027f) loadedAngles[i]=leafAngle;
-                                if(Mathf.Abs(time-at-.48f)<.027f) recoveredAngles[i]=leafAngle;
+                                if(Mathf.Abs(time-at-.12f)<.027f) loadedAngles[i]=leafAngle;
+                                if(Mathf.Abs(time-at-.66f)<.027f) recoveredAngles[i]=leafAngle;
                             }
                             for(int i=0;i<gains.Length;i++)
                             {
@@ -323,19 +322,27 @@ namespace Horizon.Tests
                             Assert.IsTrue(actor.gameObject.activeInHierarchy && seal.gameObject.activeInHierarchy);
                             if(reduced)
                             {
-                                Assert.IsFalse(flash || field.gameObject.activeSelf || localCore || seamLight.gameObject.activeSelf);
+                                Assert.IsFalse(flash || field.gameObject.activeSelf || seamLight.gameObject.activeSelf);
                                 Assert.AreEqual(final,caption.Multiplier.text);
                                 Assert.That(Vector3.Distance(startCamera,world.WorldCamera.transform.position),Is.LessThan(.001f));
                             }
-                            else if(time>=RecordedEchoStory.ImpactAt+.19f && time<=RecordedEchoStory.ImpactAt+.38f)
+                            else
                             {
-                                Assert.That(remaining,Is.LessThan(.012f));
-                                var hero=(Transform)typeof(HorizonWorld3D).GetField("showcaseHero",Private).GetValue(world);
-                                Assert.IsTrue(hero.gameObject.activeInHierarchy);
-                                AssertSubjectAperture(world,hero,HorizonCinemaLayout.SubjectAperture);
+                                if(field.gameObject.activeSelf || time<RecordedEchoStory.PrizeAt)
+                                {
+                                    Assert.AreEqual(0,shown);
+                                    Assert.IsEmpty(caption.Multiplier.text);
+                                }
+                                if(time>=RecordedEchoStory.ImpactAt+.19f && time<=RecordedEchoStory.ImpactAt+.38f)
+                                    Assert.That(remaining,Is.LessThan(.012f));
+                                if(time>=RecordedEchoStory.RevealAt+.12f && time<RecordedEchoStory.RevealAt+.42f)
+                                {
+                                    Assert.IsTrue(objects[0].gameObject.activeInHierarchy);
+                                    Assert.Less(world.WorldCamera.fieldOfView,36f);
+                                    closeShotSeen=true;
+                                }
                             }
-                            if(time<RecordedEchoStory.ConvergenceAt(gains.Length)) Assert.IsFalse(field.gameObject.activeSelf);
-                            trace.AppendLine(FormattableString.Invariant($"{frame},{time:F3},{world.CurrentCinematicShot},{remaining:F4},{flash},{field.gameObject.activeSelf},{illuminated},{opened},{shown},{landed},{local.gameObject.activeInHierarchy},{ducts.Count(duct=>duct.gameObject.activeInHierarchy)},{leafAngle:F2},{seamLight.widthMultiplier:F4},{localCore},{caption.Multiplier.text.Replace('\n','|')}"));
+                            trace.AppendLine(FormattableString.Invariant($"{frame},{time:F3},{world.CurrentCinematicShot},{remaining:F4},{flash},{field.gameObject.activeSelf},{illuminated},{opened},{shown},{landed},{ducts.Count(duct=>duct.gameObject.activeInHierarchy)},{leafAngle:F2},{seamLight.widthMultiplier:F4},{chargeBeams.Count(beam=>beam.gameObject.activeInHierarchy)},{world.WorldCamera.fieldOfView:F2},{caption.Multiplier.text.Replace('\n','|')}"));
                             Canvas.ForceUpdateCanvases(); HorizonPortraitRenderer.Render(world,ui,canvas,target);
                             RenderTexture old=RenderTexture.active;
                             try
@@ -348,8 +355,8 @@ namespace Horizon.Tests
                         }
                         if(!reduced)
                         {
-                            Assert.That(firstResult-RecordedEchoStory.ImpactAt,Is.InRange(.19f,.35f));
-                            Assert.IsTrue(firstCoreSeen);
+                            Assert.That(firstResult,Is.InRange(RecordedEchoStory.RevealAt-.004f,RecordedEchoStory.RevealAt+.075f));
+                            Assert.IsTrue(firstCoreSeen && closeShotSeen);
                             for(int i=0;i<loadedAngles.Length;i++)
                             {
                                 Assert.That(loadedAngles[i]-recoveredAngles[i],Is.GreaterThan(3f));

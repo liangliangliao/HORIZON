@@ -217,6 +217,7 @@ namespace Horizon
             practiceHeading.text="行动完成 · 回执待开";
             practiceSkip.GetComponentInChildren<Text>().text="查看回执";
             practiceSkip.gameObject.SetActive(true);
+            Button focus=RewardChargeButton(owner);
             world.BeginPracticeRewardCinematic(film);
             float time=archive.preferences.reducedMotion?PracticeRewardCinematic.GainTime:0;
             while(owner==practicePage && owner!=null && !skipPracticeReveal)
@@ -225,6 +226,7 @@ namespace Horizon
                 {
                     bool reduced=archive.preferences.reducedMotion;
                     PracticeRewardCinematicFrame frame=film.Sample(time,reduced);
+                    focus.gameObject.SetActive(!reduced && time>=.72f && time<PracticeRewardCinematic.HoldTime);
                     world.SamplePracticeRewardCinematic(film,frame);
                     float pose=Mathf.Min(time,PracticeRewardCinematic.HoldTime);
                     float charge=frame.Charge*ImmersiveMotion.Smooth((pose-.89f)/(PracticeRewardCinematic.HoldTime-.89f));
@@ -241,11 +243,7 @@ namespace Horizon
                         if(film.TicksAt(axis)>0) emphasis=Mathf.Max(emphasis,.71f*ImmersiveMotion.Punch(time-film.ContactTime(axis),.21f));
                     meter.localScale=Vector3.one*(reduced?1:1+.32f*emphasis);
                     practiceCosts.text=cost.Length>0?"本次付出　"+cost:"";
-                    practiceHeading.text=time>=PracticeRewardCinematic.CostTime || reduced?"今日已入账":
-                        time>=PracticeRewardCinematic.GainTime?"收益正在入位":
-                        time>=PracticeRewardCinematic.ReleaseTime?"锁扣脱开 · 开匣":
-                        time>=PracticeRewardCinematic.HoldTime?"即将开启":
-                        time>=PracticeRewardCinematic.LatchTime(0)?"锁扣依次释放":"行动完成 · 回执待开";
+                    practiceHeading.text=PracticeRewardStage(time,reduced);
                     CinematicTypography.Sweep(practiceMeter,reduced?-1:time-PracticeRewardCinematic.GainTime);
                     if(time>=PracticeRewardCinematic.Duration) break;
                     time=Mathf.Min(PracticeRewardCinematic.Duration,time+
@@ -254,9 +252,22 @@ namespace Horizon
                 yield return null;
             }
             if(reveal!=null) reveal.Clear();
+            if(focus!=null) Destroy(focus.gameObject);
             if(backing!=null) Destroy(backing.gameObject);
             if(owner==practicePage && owner!=null && skipPracticeReveal)
                 world.SamplePracticeRewardCinematic(film,film.Sample(PracticeRewardCinematic.Duration,archive.preferences.reducedMotion),playCues:false);
+        }
+
+        private static string PracticeRewardStage(float time,bool reduced)
+        {
+            if(reduced || time>=PracticeRewardCinematic.CostTime) return "今日已入账";
+            if(time>=PracticeRewardCinematic.PrizeTime) return "成果特写";
+            if(time>=PracticeRewardCinematic.ReleaseTime) return "锁扣脱开 · 开匣";
+            if(time>=PracticeRewardCinematic.HoldTime) return "即将开启";
+            if(time>=PracticeRewardCinematic.LatchTime(2)) return "第三道锁扣 · 汇集";
+            if(time>=PracticeRewardCinematic.LatchTime(1)) return "第二道锁扣 · 增强";
+            if(time>=PracticeRewardCinematic.LatchTime(0)) return "第一道锁扣 · 接通";
+            return "行动完成 · 回执待开";
         }
 
         private static string RewardAction(int axis,bool gain)

@@ -5,14 +5,15 @@ namespace Horizon.Game
 {
     public sealed class PracticeRewardCinematic
     {
-        public const float ReleaseTime = 3.55f;
-        public const float GainTime = ReleaseTime + .23f;
+        public const float ReleaseTime = 4.80f;
+        public const float PrizeTime = ReleaseTime + EnergyRelease.PrizeDelay;
+        public const float GainTime = PrizeTime + .40f;
         public const float HoldTime = ReleaseTime - .19f;
-        public const float LandingTime = ReleaseTime + 1.34f;
-        public const float CostTime = ReleaseTime + 2.05f;
-        public const float Duration = 6.75f;
-        public const float ObjectSpacing = .094f;
-        private static readonly float[] LatchBeats = { 1.12f, 1.88f, 2.61f };
+        public const float LandingTime = PrizeTime + 1.48f;
+        public const float CostTime = PrizeTime + 2.18f;
+        public const float Duration = PrizeTime + 3.55f;
+        public const float ObjectSpacing = .118f;
+        private static readonly float[] LatchBeats = { 1.25f, 2.51f, 3.67f };
         private readonly int[] ticks;
         private readonly int[] slots = new int[6];
         private readonly string finalGains, finalCosts;
@@ -52,10 +53,12 @@ namespace Horizon.Game
             if (value <= 0) return time >= CostTime ? value : 0;
             if (time < GainTime) return 0;
             if (reducedMotion) return value;
+            float readAt=GainTime+GainSlot(axis)*ObjectSpacing;
+            if(time<readAt) return 0;
             float contact = ContactTime(axis);
             if (time + .00002f >= contact) return value;
-            float age = time - GainTime;
-            float progress = .74f * Window(age, .045f, .32f) + .18f * Window(time, GainTime + .31f, contact);
+            float age = time - readAt;
+            float progress = .74f * Window(age, .045f, .32f) + .18f * Window(time, readAt + .31f, contact);
             return (int)Math.Min(value, 1 + Math.Floor((value - 1d) * progress));
         }
 
@@ -95,12 +98,12 @@ namespace Horizon.Game
                 return new PracticeRewardCinematicFrame(time, age, 0, 0, 0, HasGain && age >= 0 ? 1 : 0, default);
 
             float pose = age < 0 ? Math.Min(time, HoldTime) : time;
-            float first = ImmersiveMotion.Crest(pose, .81f, LatchBeats[0], 1.51f);
-            float second = ImmersiveMotion.Crest(pose, 1.61f, LatchBeats[1], 2.27f);
-            float third = ImmersiveMotion.Crest(pose, 2.34f, LatchBeats[2], 3.04f);
-            float brace = Window(pose, 2.97f, HoldTime);
-            float charge = age < 0 ? Math.Min(1, .06f + .71f * Window(pose, .93f, HoldTime) +
-                .22f * first + .26f * second + .29f * third) : 0;
+            float first = ImmersiveMotion.Crest(pose, .77f, LatchBeats[0], 1.93f);
+            float second = ImmersiveMotion.Crest(pose, 2.02f, LatchBeats[1], 3.11f);
+            float third = ImmersiveMotion.Crest(pose, 3.16f, LatchBeats[2], 4.19f);
+            float brace = Window(pose, 4.00f, HoldTime);
+            float charge = age < 0 ? Math.Min(1, .016f + .63f * Window(pose, .97f, HoldTime) +
+                .13f * first + .28f * second + .50f * third) : 0;
             float lidStrain = age < 0 ? .065f * first + .13f * second + .20f * third + .10f * brace :
                 .10f * (1 - Window(age, 0, .095f));
             float compression = age < 0 ? .045f * first + .072f * second + .10f * third + .13f * brace :

@@ -23,8 +23,11 @@ def main(folder):
     assert frames == [folder / f"frame-{i:05}.jpg" for i in range(len(rows))]
 
     first_release = next((int(row["frame"]) for row in rows if "开匣" in row["stage"]), 0)
-    samples = sorted({min(len(rows) - 1, max(0, first_release + offset))
-                      for offset in (-54, -40, -24, -12, -3, -1, 0, 1, 2, 3, 4, 5, 6, 8, 12, 18, 26, 44)})
+    offsets = {-78, -60, -46, -31, -18, -5, 0, 2, 5, 10, 19, 33, 43, 50, 57, 70, 91}
+    samples = sorted({min(len(rows) - 1, max(0, first_release + offset)) for offset in offsets})
+    if folder.name != "reduced":
+        first_counter = next(int(row["frame"]) for row in rows if row["counter"])
+        assert (first_counter - first_release) / 20 >= 2.25
     width, height = 156, 360
     columns = 6
     sheet = Image.new("RGB", (width * columns, height * ((len(samples) + columns - 1) // columns)), (13, 21, 33))

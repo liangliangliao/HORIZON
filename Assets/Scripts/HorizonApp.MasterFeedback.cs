@@ -72,6 +72,7 @@ namespace Horizon
             Button skip=View.Button(overlay,"Skip cinematic",e.kind==DomainEventKind.TimeEcho?"直接看回执":"跳过 · 保留结果",
                 ()=> { world.Cinematics.Skip(); },.54f,.012f,.925f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
             Button pause=View.Button(overlay,"Cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.075f,.012f,.46f,.058f,new Color(Palette.Panel.r,Palette.Panel.g,Palette.Panel.b,.62f),Palette.Text,21);
+            if(e.kind==DomainEventKind.TimeEcho) caption.ChargeFocus=RewardChargeButton(overlay);
             caption.Bind(world.Cinematics);
             UnityEngine.UI.Button framing=null;
             framing=View.Button(overlay,"Cinematic framing","查看全景",()=> {
@@ -81,6 +82,7 @@ namespace Horizon
                 if (next == null) return; next.gameObject.SetActive(true); next.interactable=true;
                 if(skip!=null) skip.gameObject.SetActive(false); if(pause!=null) pause.gameObject.SetActive(false);
                 if(framing!=null) framing.gameObject.SetActive(false);
+                if(caption.ChargeFocus!=null) caption.ChargeFocus.gameObject.SetActive(false);
                 busy=false; e.acknowledged=true; PersistMasterAction(); }, true);
             View.RefreshText(overlay);
         }
@@ -101,11 +103,20 @@ namespace Horizon
             caption.Explanation=View.Label(layer,"Reward original explanation","",24,Palette.Text,TextAnchor.MiddleCenter,.06f,.15f,.94f,.21f);
             View.Button(layer,"Local cinematic pause","暂停 / 继续",()=>SetPaused(!VisualPreferences.Paused),.06f,.018f,.40f,.064f,Palette.Deep,Palette.Text,23);
             View.Button(layer,"Skip cinematic","跳过 · 保留结果",()=>world.Cinematics.SkipPending(),.60f,.018f,.94f,.064f,Palette.Deep,Palette.Text,23);
+            caption.ChargeFocus=RewardChargeButton(layer);
             caption.Bind(world.Cinematics);
             UnityEngine.UI.Button framing=null;
             framing=View.Button(layer,"Cinematic framing","查看全景",()=> {
                 world.ToggleCinematicOverview(); framing.GetComponentInChildren<Text>().text=world.CinematicOverview?"自动镜头":"查看全景";
             },.735f,.958f,.935f,.994f,Palette.Deep,Palette.Mint,21);
+        }
+
+        private Button RewardChargeButton(RectTransform parent)
+        {
+            Button button=View.Button(parent,"Focus reward charge","聚焦蓄力",world.FocusRewardCharge,
+                .39f,.071f,.61f,.118f,Palette.Deep,Palette.Mint,22);
+            button.gameObject.SetActive(false);
+            return button;
         }
     }
 }

@@ -2,18 +2,19 @@ using System;
 
 namespace Horizon.Game
 {
-    public enum RecordedEchoBeat { Origin, Prepare, Develop, Dock, Release, Settle }
+    public enum RecordedEchoBeat { Origin, Prepare, Develop, Dock, Release, Prize, Settle }
 
     // The existing director owns time. This track describes one continuous
     // handoff of the original action into the reader and its result.
     public readonly struct RecordedEchoStory
     {
-        public const float PrepareAt=.62f, DevelopAt=1.62f, DockAt=4.24f;
-        public const float HoldAt=4.49f, ImpactAt=4.70f, RevealAt=ImpactAt+.23f;
-        public const float SettleAt=9.18f, Duration=10.68f;
+        public const float PrepareAt=.72f, DevelopAt=1.55f, DockAt=4.94f;
+        public const float HoldAt=5.35f, ImpactAt=5.60f, PrizeAt=ImpactAt+EnergyRelease.PrizeDelay;
+        public const float RevealAt=PrizeAt+.44f;
+        public const float SettleAt=12.75f, Duration=14.55f;
         public const int GuideCount=3;
-        public const float MaterializeAfter=.14f;
-        private const float ResultSpacing=1.96f;
+        public const float MaterializeAfter=.20f;
+        private const float ResultSpacing=2.56f;
 
         public readonly RecordedEchoBeat Beat;
         public readonly float PoseTime, Grip, Progress, Alignment, Release, Assembly, Rest;
@@ -33,21 +34,21 @@ namespace Horizon.Game
             float time=Math.Max(0,Math.Min(duration,seconds));
             var beat=time<PrepareAt?RecordedEchoBeat.Origin:time<DevelopAt?RecordedEchoBeat.Prepare:
                 time<DockAt?RecordedEchoBeat.Develop:time<ImpactAt?RecordedEchoBeat.Dock:
-                time<settle?RecordedEchoBeat.Release:RecordedEchoBeat.Settle;
+                time<PrizeAt?RecordedEchoBeat.Release:time<settle?RecordedEchoBeat.Prize:RecordedEchoBeat.Settle;
             if(reduced) return new RecordedEchoStory(beat,settle,0,1,1,0,1,1,0,false);
             bool held=time>=HoldAt && time<ImpactAt;
             float pose=held?HoldAt:time;
             float grip=Ease(.36f,1.02f,pose)*(1-Ease(1.75f,2.18f,pose));
-            float travel=pose>=ImpactAt?1:.20f*Ease(.76f,1.35f,pose)+.40f*Ease(1.60f,3.04f,pose)+
-                .26f*Ease(3.04f,3.96f,pose)+.09f*Ease(3.96f,HoldAt,pose);
-            float align=.32f*Ease(2.12f,3.54f,pose)+.68f*Ease(3.64f,HoldAt,pose);
+            float travel=pose>=ImpactAt?1:.20f*Ease(.84f,1.48f,pose)+.40f*Ease(1.55f,3.38f,pose)+
+                .26f*Ease(3.38f,4.57f,pose)+.09f*Ease(4.57f,HoldAt,pose);
+            float align=.32f*Ease(2.12f,4.19f,pose)+.68f*Ease(4.21f,HoldAt,pose);
             float release=Ease(ImpactAt,ImpactAt+.11f,pose)*(1-Ease(ImpactAt+.15f,ImpactAt+.69f,pose));
             float assembly=.58f*Ease(ImpactAt+.04f,ImpactAt+.37f,pose)+.42f*Ease(ImpactAt+.37f,ImpactAt+1.12f,pose);
             return new RecordedEchoStory(beat,pose,grip,travel,align,release,assembly,Ease(settle,duration-.22f,pose),
                 ReaderAt(pose).Load,held);
         }
 
-        public static float GuideAt(int index) => 1.78f+index*.86f;
+        public static float GuideAt(int index) => 1.81f+index*1.17f;
 
         internal static (float Load, float Charge) ReaderAt(float time)
         {
@@ -55,28 +56,28 @@ namespace Horizon.Game
             if(time>=ImpactAt) return (braced*(1-Ease(ImpactAt,ImpactAt+.15f,time)),0);
 
             float pose=Math.Min(time,HoldAt);
-            float brace=Ease(GuideAt(GuideCount-1)+.44f,HoldAt,pose);
+            float brace=Ease(GuideAt(GuideCount-1)+.59f,HoldAt,pose);
             float load=braced*brace;
-            float charge=.028f*Ease(.14f,.48f,pose)+.21f*brace;
+            float charge=.025f*Ease(.54f,1.14f,pose)+.29f*brace;
             for(int i=0;i<GuideCount;i++)
             {
                 float contact=GuideAt(i);
-                load+=(.30f+.245f*i)*Ease(contact-.16f,contact+.07f,pose)*
-                    (1-Ease(contact+.17f,contact+.43f,pose));
+                load+=(.28f+.265f*i)*Ease(contact-.30f,contact+.09f,pose)*
+                    (1-Ease(contact+.27f,contact+.59f,pose));
                 // The rim responds after the reader takes the load. Each contact
                 // leaves a small amount of light after the leaf springs back.
-                charge+=.093f*Ease(contact,contact+.39f,pose)+(.15f+.14f*i)*
-                    ImmersiveMotion.Crest(pose,contact-.01f,contact+.19f,contact+.54f);
+                charge+=(.062f+.025f*i)*Ease(contact,contact+.54f,pose)+(.105f+.185f*i)*
+                    Ease(contact-.05f,contact+.17f,pose)*(1-Ease(contact+.37f,contact+.71f,pose));
             }
             return (load,charge);
         }
 
-        public static float ResultTurnAt(int slot,int count) => ImpactAt+ResultSpacing*Math.Min(slot,Math.Max(0,count-1));
+        public static float ResultTurnAt(int slot,int count) => PrizeAt+ResultSpacing*Math.Min(slot,Math.Max(0,count-1));
 
-        public static float ResultShownAt(int slot,int count) => ResultTurnAt(slot,count)+(RevealAt-ImpactAt);
+        public static float ResultShownAt(int slot,int count) => ResultTurnAt(slot,count)+(RevealAt-PrizeAt);
 
         public static float ResultContactAt(int slot,int count) =>
-            ResultTurnAt(slot,count)+1.14f;
+            ResultTurnAt(slot,count)+1.57f;
 
         public static float ConvergenceAt(int count) => ResultContactAt(Math.Max(0,count-1),count)+.38f;
 

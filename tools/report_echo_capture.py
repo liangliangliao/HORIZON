@@ -21,47 +21,49 @@ def main(take):
         assert float(outcome["seconds"]) <= .05
         assert all(row["release"] == "False" and row["field"] == "False" for row in trace)
         assert guides[0] == 3 and landed[0] == landed[-1] > 0
-        assert not any(row["local"] == "True" or int(row["conduits"]) for row in trace)
+        assert not any(int(row["chargeBeams"]) or int(row["conduits"]) for row in trace)
         moments = [("Immediate receipt", trace[0]), ("Stable receipt", trace[-1])]
     else:
         with (take / "cues.csv").open(encoding="utf-8", newline="") as file:
             cues = {row["phase"]: float(row["time"]) for row in csv.DictReader(file)}
-        assert .19 <= float(outcome["seconds"]) - cues["Impact"] <= .35
+        assert 2.60 <= float(outcome["seconds"]) - cues["Impact"] <= 2.80
         assert any(row["release"] == "True" and float(row["seatDistance"]) < .015 for row in trace)
         assert guides == sorted(guides) and set(guides) == {0, 1, 2, 3}
         assert landed == sorted(landed) and set(landed) == set(range(landed[-1] + 1))
         assert visible == sorted(visible) and set(visible) == set(range(landed[-1] + 1))
+        field_frames = [row for row in trace if row["field"] == "True"]
+        first_visible = trace[visible.index(1)]
+        assert field_frames and all(row["visible"] == "0" and not row["receipt"] for row in field_frames)
+        assert float(field_frames[-1]["seconds"]) < float(first_visible["seconds"]) <= float(outcome["seconds"])
         assert float(trace[landed.index(landed[-1])]["seconds"]) < cues["SecondReveal"]
-        first = nearest(trace, cues["Impact"] + .27)
+        contacts = [nearest(trace, float(trace[guides.index(i)]["seconds"]) + .20) for i in (1, 2, 3)]
+        assert float(contacts[0]["seamWidth"]) < float(contacts[1]["seamWidth"]) < float(contacts[2]["seamWidth"])
+        assert all(int(row["chargeBeams"]) > 0 for row in contacts)
+        wave = nearest(trace, cues["Impact"] + .44)
+        first = nearest(trace, float(outcome["seconds"]) + .22)
+        assert float(first["lens"]) < 36 and int(first["visible"]) == len(first["receipt"].split("|")) == 1
         last_visible = float(trace[visible.index(visible[-1])]["seconds"])
-        last = nearest(trace, last_visible + .16)
-        wave_start = next(row for row in trace if row["field"] == "True")
-        wave = nearest(trace, float(wave_start["seconds"]) + .30)
-        assert first["field"] == last["field"] == "False"
-        assert first["local"] == last["local"] == "True"
+        last = nearest(trace, last_visible + .55)
         assert last["opened"] == str(visible[-1])
-        assert int(wave_start["landed"]) == landed[-1] and int(wave_start["conduits"]) > 0
-        assert int(first["visible"]) == len(first["receipt"].split("|")) == 1
-        before_last = nearest(trace, last_visible - .27)
-        assert int(before_last["visible"]) < visible[-1] and before_last["field"] == "False"
+        assert any(int(row["conduits"]) > 0 for row in trace if float(row["seconds"]) > last_visible)
         first_warm = warm_area(take, first)
         wave_warm = warm_area(take, wave)
         assert wave_warm - first_warm > .10, (take, first_warm, wave_warm)
         (take / "intensity.json").write_text(json.dumps({
-            "first_local_seconds": float(first["seconds"]),
-            "last_local_seconds": float(last["seconds"]),
-            "wide_peak_seconds": float(wave["seconds"]),
-            "local_warm_coverage": round(first_warm, 4),
+            "first_prize_seconds": float(first_visible["seconds"]),
+            "first_readout_seconds": float(outcome["seconds"]),
+            "wide_wave_seconds": float(wave["seconds"]),
+            "last_release_frame_seconds": float(field_frames[-1]["seconds"]),
+            "prize_warm_coverage": round(first_warm, 4),
             "wide_warm_coverage": round(wave_warm, 4),
         }, indent=2)+"\n")
         moments = [
             ("Recorded action", nearest(trace, .30)),
-            ("First rim light", nearest(trace, (cues["HitStop"] + cues["Impact"]) / 2)),
-            ("First opening", first),
-            ("Last seal intact", before_last),
-            ("Last opening", last),
-            ("Conduits join", wave_start),
-            ("Wide wave", wave),
+            *[(f"Charge {i+1}", contact) for i, contact in enumerate(contacts)],
+            ("Critical hold", nearest(trace, (cues["HitStop"] + cues["Impact"]) / 2)),
+            ("Wide release", wave),
+            ("First prize close-up", first),
+            ("Last prize close-up", last),
             ("All seated", nearest(trace, cues["SecondReveal"] + .65)),
         ]
     width, height = 174, 410

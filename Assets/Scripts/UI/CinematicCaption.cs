@@ -20,6 +20,7 @@ namespace Horizon.UI
 
         public Text Phase,Title,Story,Multiplier,MultiplierCaption,OutcomeContext,Resources,Explanation,Prediction;
         public Image Flash;
+        public Button ChargeFocus;
         public string EventId;
         public bool HideWhenIdle;
         private readonly Dictionary<Text,TextPose> poses=new Dictionary<Text,TextPose>();
@@ -69,6 +70,7 @@ namespace Horizon.UI
         {
             RestorePage(); plan=null; choreography=null;
             if(releaseField!=null) releaseField.Clear();
+            if(ChargeFocus!=null) ChargeFocus.gameObject.SetActive(false);
             // Clear/Close destroys the old page at end-of-frame. Detach now,
             // otherwise a new Started in that same frame can resurrect the old
             // caption and let it park the new page inside a doomed container.
@@ -203,9 +205,11 @@ namespace Horizon.UI
         private void ApplyFrame(CinematicTextFrame frame)
         {
             if(plan==null) return;
+            if(ChargeFocus!=null) ChargeFocus.gameObject.SetActive(plan.RecordedEcho && director.IsPlaying &&
+                !VisualPreferences.ReducedMotion && frame.Time>=.72f && frame.Time<RecordedEchoStory.HoldAt);
             if(plan.RecordedEcho)
             {
-                float age=frame.Time-RecordedEchoStory.ConvergenceAt(echoGainCount);
+                float age=frame.Time-RecordedEchoStory.ImpactAt;
                 releaseField.Sample(age,0,
                     CinematicEnergy.RecordedEchoRelease(age),revealSeed,director.EchoRevealOrigin,true,VisualPreferences.ReducedMotion);
             }
@@ -232,10 +236,13 @@ namespace Horizon.UI
                 {
                     case RecordedEchoBeat.Origin: Phase.text="来自过去的行动"; break;
                     case RecordedEchoBeat.Prepare: Phase.text="拾起行动印记"; break;
-                    case RecordedEchoBeat.Develop: Phase.text="导轨逐段接通"; break;
-                    case RecordedEchoBeat.Dock: Phase.text="印记即将入槽"; break;
-                    case RecordedEchoBeat.Release: Phase.text=frame.Time>=RecordedEchoStory.ConvergenceAt(echoGainCount)?
-                        "回声汇入记录":"成果逐项揭晓"; break;
+                    case RecordedEchoBeat.Develop:
+                        Phase.text=frame.Time<RecordedEchoStory.GuideAt(1)?"导轨 · 第一处接触":
+                            frame.Time<RecordedEchoStory.GuideAt(2)?"导轨 · 第二处接触":"导轨 · 第三处接触";
+                        break;
+                    case RecordedEchoBeat.Dock: Phase.text="蓄力收束 · 即将释放"; break;
+                    case RecordedEchoBeat.Release: Phase.text="回声释放"; break;
+                    case RecordedEchoBeat.Prize: Phase.text="成果逐项揭晓"; break;
                     default: Phase.text="已经入账"; break;
                 }
                 if(VisualPreferences.ReducedMotion) Phase.text="已经入账";

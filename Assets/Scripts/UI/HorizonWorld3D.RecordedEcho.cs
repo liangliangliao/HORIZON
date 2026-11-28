@@ -23,7 +23,7 @@ namespace Horizon.UI
         private readonly Transform[] echoSockets=new Transform[6];
         private readonly Renderer[] echoSocketInsets=new Renderer[6];
         private readonly EchoAperture[] echoApertures=new EchoAperture[6];
-        private readonly Renderer[] echoMetalSparks=new Renderer[14];
+        private readonly LineRenderer[] echoChargeBeams=new LineRenderer[12];
         private readonly Dictionary<(RewardObjectKind,RewardObjectForm),Transform> echoObjects=
             new Dictionary<(RewardObjectKind,RewardObjectForm),Transform>();
         private readonly List<Transform> echoActiveObjects=new List<Transform>();
@@ -32,7 +32,9 @@ namespace Horizon.UI
         private readonly List<float> echoObjectHeights=new List<float>();
         private readonly List<Vector3> echoObjectCenters=new List<Vector3>();
         private LineRenderer echoRoute, echoPulse;
-        private Renderer echoFire, echoCore, echoLocalCore, echoLocalHalo, echoLocalFlare;
+        private Renderer echoFire, echoCore;
+        private Vector3 echoChargeOrigin;
+        private float echoFocusAt;
         private ScenicEnergy echoScenic;
         private Light echoLamp, echoWindow;
         private HorizonActorPerformance echoActor;
@@ -60,6 +62,7 @@ namespace Horizon.UI
             LifeActionTheme theme=LifeActionStoryboard.ThemeFor(moviePlan.Event);
             echoTint=theme==LifeActionTheme.Connect?new Color(.23f,.85f,.71f):
                 theme==LifeActionTheme.Read || theme==LifeActionTheme.Practice?new Color(.42f,.61f,1):new Color(.59f,.70f,1);
+            echoFocusAt=-10;
             PrepareEchoSubjects();
             PrepareCinemaTension();
             tensionOpeningCharged=true;
@@ -151,9 +154,8 @@ namespace Horizon.UI
             echoScenic=CreateScenicEnergy(echoTrace);
             echoFire=CaseQuad(echoTrace,"Seated echo flame");
             echoCore=CaseQuad(echoTrace,"White light at the seat");
-            echoLocalCore=CaseQuad(echoTrace,"White light at the aperture");
-            echoLocalHalo=CaseQuad(echoTrace,"Archive aperture halo");
-            echoLocalFlare=CaseQuad(echoTrace,"Archive aperture fracture");
+            for(int i=0;i<echoChargeBeams.Length;i++)
+                echoChargeBeams[i]=CaseRibbon(echoTrace,"Reader charge beam "+(i+1));
             BuildEchoApertures(enamel,bronze,indicator);
             echoPaper=ShortCueTone("Folio lifted from leather",316,.20f);
             echoSeat=ShortCueTone("Reader guides meet",278,.19f);
@@ -186,8 +188,6 @@ namespace Horizon.UI
                 LineRenderer conduit=CausalLine(echoTrace,"Echo conduit "+(i+1),Vector3.zero,Vector3.zero,caseEffectMaterial,.037f);
                 echoApertures[i]=new EchoAperture {Body=body,Shutter=shutter,Rim=rim,Inlay=inlay,Conduit=conduit};
             }
-            for(int i=0;i<echoMetalSparks.Length;i++)
-                echoMetalSparks[i]=Soft(echoTrace,"Aperture mica fragment",Vector3.zero,Vector3.one,bronze).GetComponent<Renderer>();
         }
 
         private void MountEchoModel(Transform parent,string name,Vector3 position,Material enamel,Material bronze,
@@ -287,7 +287,10 @@ namespace Horizon.UI
 
             SampleEchoGuides(pose,story,still);
 
-            Vector3 readerContact=PoseEchoReader(story,energyFrame.Inward,age);
+            float touch=age<0 && !still?RewardFocusPulse(pose-echoFocusAt):0;
+            float charge=Mathf.Clamp01(energyFrame.Inward+.15f*touch);
+            Vector3 readerContact=PoseEchoReader(story,charge,age);
+            echoChargeOrigin=readerContact;
             PoseEchoSubjects(story,still);
 
             float lean=still?0:Smooth(.32f,1.28f,pose)*(1-Smooth(1.66f,2.39f,pose));
@@ -304,51 +307,51 @@ namespace Horizon.UI
                 story.Release>.06f?story.Release*.71f:reach*.56f, .9f,echoTrace.TransformPoint(handTarget),reach);
 
             EnergyRelease release=energyFrame.Release;
-            float stage=still?0:Smooth(RecordedEchoStory.DockAt-.39f,RecordedEchoStory.HoldAt,pose)*(1-story.Rest);
             int focus=EchoFocus(pose,results);
-            float opening=pose-RecordedEchoStory.ResultTurnAt(focus,results);
-            float local=still?0:EchoLocalIntensity(opening,focus,results);
+            float resultAge=pose-RecordedEchoStory.ResultTurnAt(focus,results);
+            float leave=focus+1<results?Smooth(1.92f,2.27f,resultAge):Smooth(settle-.20f,settle+.58f,pose);
+            float prize=still?0:Smooth(-.18f,.41f,resultAge)*(1-leave);
+            float impact=still?0:Smooth(0,.31f,age)*(1-Smooth(1.23f,2.18f,age));
             float seatBlend=Smooth(RecordedEchoStory.DevelopAt-.18f,RecordedEchoStory.GuideAt(0)+.34f,pose);
-            Vector3 emitter=Vector3.Lerp(Vector3.Lerp(folio,readerContact,seatBlend),EchoGateCenter(focus,results),
-                Smooth(0,.20f,age));
-            float union=still?0:Smooth(-.12f,.28f,joinAge)*(1-Smooth(.75f,1.42f,joinAge));
-            echoLamp.intensity=Mathf.Lerp(1.26f,.31f,stage)+.43f*story.Rest;
-            echoWindow.intensity=Mathf.Lerp(.51f,.27f,stage)+.32f*story.Rest;
-            movieLight.transform.localPosition=Vector3.Lerp(emitter,EchoArrival,union)+new Vector3(0,.29f,-.31f);
+            Vector3 device=Vector3.Lerp(folio,readerContact,seatBlend);
+            Transform item=echoActiveObjects[focus];
+            Vector3 hero=echoTrace.InverseTransformPoint(item.TransformPoint(echoObjectCenters[focus]));
+            hero=Vector3.Lerp(EchoGateCenter(focus,results),hero,Smooth(RecordedEchoStory.MaterializeAfter,.48f,resultAge));
+            echoLamp.intensity=Mathf.Lerp(1.12f,.37f,Mathf.Max(charge,impact))+.56f*prize+.33f*story.Rest;
+            echoWindow.intensity=Mathf.Lerp(.58f,.25f,Mathf.Max(charge,impact))+.21f*story.Rest;
+            movieLight.transform.localPosition=Vector3.Lerp(Vector3.Lerp(device,EchoArrival,impact),hero,prize)+
+                new Vector3(0,.30f,-.34f);
             movieLight.range=4.4f;
-            movieLight.color=Color.Lerp(Color.Lerp(echoTint,EchoSlotColor(focus,results),stage*.63f),EchoGold,union);
-            movieLight.intensity=.29f+1.84f*energyFrame.Inward+1.48f*local+2.65f*release.Flash+2.43f*release.Fire;
-            if(bloom!=null) bloom.Echo=LowCostEffects?0:.085f*local+.12f*release.Flash+.10f*release.Fire;
+            movieLight.color=Color.Lerp(Color.Lerp(echoTint,EchoGold,Mathf.Max(charge,impact)),
+                new Color(1f,.87f,.71f),prize);
+            movieLight.intensity=.24f+1.93f*charge+2.6f*release.Flash+2.40f*release.Fire+1.05f*prize;
+            if(bloom!=null) bloom.Echo=LowCostEffects?0:.12f*release.Flash+.10f*release.Fire;
             optics.Clear();
 
             bool wide=cinematicOverviewRequested || still;
-            float forward=wide?0:.58f*Smooth(.52f,1.54f,pose)+.42f*Smooth(RecordedEchoStory.DevelopAt,RecordedEchoStory.HoldAt,pose);
+            float forward=wide?0:.46f*Smooth(.64f,1.57f,pose)+.54f*Smooth(1.70f,RecordedEchoStory.HoldAt,pose);
             float back=wide?0:Smooth(settle-.16f,moviePlan.Duration-.32f,pose);
             float aspect=Mathf.Max(.30f,Mathf.Min(.58f,WorldCamera.aspect));
-            float distance=Mathf.Max(3.0f,1.64f/aspect)+.53f*back-.59f*forward+.12f*story.Release+(wide?.78f:0);
-            float lens=43f-6*forward+4*back;
-            Vector3 look=Vector3.Lerp(new Vector3(-.33f,1.51f,2.26f),new Vector3(.13f,1.53f,2.22f),forward);
+            float distance=Mathf.Max(3.0f,1.64f/aspect)+.53f*back-.75f*forward-.16f*touch+.68f*impact+(wide?.78f:0);
+            float lens=43f-6*forward+5*impact+4*back;
+            Vector3 look=Vector3.Lerp(new Vector3(-.33f,1.51f,2.26f),new Vector3(.16f,1.46f,2.22f),forward);
             look=Vector3.Lerp(look,new Vector3(-.05f,1.47f,2.27f),back);
             if(wide) look=new Vector3(-.08f,1.51f,2.26f);
-            Vector3 camera=look+new Vector3(Mathf.Lerp(-.53f,.22f,forward),.87f-.20f*forward+.12f*back,-distance);
-            if(!wide && stage>.001f)
+            Vector3 camera=look+new Vector3(Mathf.Lerp(-.53f,.22f,forward),.87f-.22f*forward+.12f*back,-distance);
+            if(!wide && prize>0)
             {
-                float shift=0;
-                for(int i=0;i<results;i++)
-                {
-                    float center=EchoGateCenter(i,results).x;
-                    float at=RecordedEchoStory.ResultTurnAt(i,results);
-                    shift+=center*.24f*Smooth(at-.32f,at+.19f,pose)*(1-Smooth(at+.40f,at+.93f,pose));
-                }
-                Vector3 panelLook=new Vector3(.02f+shift,1.86f-.13f*union,2.36f);
-                float panelDistance=Mathf.Max(3.45f,2.00f/(aspect*2*Mathf.Tan(41f*Mathf.Deg2Rad*.5f)));
-                Vector3 panelCamera=panelLook+new Vector3(-.09f+shift*.4f,.32f+union*.19f,-panelDistance-.10f*union);
-                camera=Vector3.Lerp(camera,panelCamera,stage);
-                look=Vector3.Lerp(look,panelLook,stage);
-                lens=Mathf.Lerp(lens,41,stage);
+                const float prizeLens=33f;
+                float size=EchoGateSize(results);
+                // A distinct portrait shot follows the object from the gate to its mount.
+                float closeDistance=Mathf.Max(1.34f,size*.74f/(aspect*2*Mathf.Tan(prizeLens*Mathf.Deg2Rad*.5f)*.57f));
+                Vector3 detailLook=hero-Vector3.up*(size*.14f);
+                Vector3 detailCamera=detailLook+new Vector3(.09f,.12f,-closeDistance);
+                camera=Vector3.Lerp(camera,detailCamera,prize);
+                look=Vector3.Lerp(look,detailLook,prize);
+                lens=Mathf.Lerp(lens,prizeLens,prize);
             }
             CurrentCinematicShot=story.Beat.ToString();
-            CurrentCinematicFraming=wide?CinematicFraming.Wide:forward>.67f?CinematicFraming.Close:CinematicFraming.Medium;
+            CurrentCinematicFraming=wide?CinematicFraming.Wide:prize>.62f || forward>.67f?CinematicFraming.Close:CinematicFraming.Medium;
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
             ApplyCinematicCamera(look,lens);
             FrameRecordedEcho();
@@ -418,10 +421,8 @@ namespace Horizon.UI
 
         private static float EchoLocalIntensity(float age,int slot,int count)
         {
-            float strength=Mathf.Lerp(.59f,1,slot/(float)Mathf.Max(1,count-1));
-            float anticipation=Smooth(-.43f,-.06f,age)*(1-Smooth(0,.16f,age));
-            float opening=Smooth(.05f,.22f,age)*(1-Smooth(.26f,.68f,age));
-            return (anticipation*.26f+opening)*strength;
+            float strength=Mathf.Lerp(.62f,.84f,slot/(float)Mathf.Max(1,count-1));
+            return Smooth(.06f,.41f,age)*(1-Smooth(1.71f,2.47f,age))*strength;
         }
 
         private void PoseEchoSubjects(RecordedEchoStory story,bool still)
@@ -429,7 +430,7 @@ namespace Horizon.UI
             int count=echoActiveObjects.Count;
             float pose=story.PoseTime;
             float size=EchoGateSize(count);
-            echoResult.gameObject.SetActive(still || pose>=RecordedEchoStory.ImpactAt+RecordedEchoStory.MaterializeAfter);
+            echoResult.gameObject.SetActive(still || pose>=RecordedEchoStory.PrizeAt+RecordedEchoStory.MaterializeAfter);
             for(int i=0;i<count;i++)
             {
                 float slot=i-(count-1)*.5f;
@@ -439,7 +440,7 @@ namespace Horizon.UI
                 float face=still?1:Smooth(0,.27f,age);
                 float land=still?1:Smooth(contactAt-.50f,contactAt,pose);
                 float compression=still?0:ImmersiveMotion.Punch(pose-contactAt,.22f);
-                float rise=still?0:Smooth(RecordedEchoStory.DevelopAt+.57f+i*.06f,RecordedEchoStory.DockAt-.06f,pose);
+                float rise=still?0:Smooth(RecordedEchoStory.PrizeAt-.49f+i*.06f,RecordedEchoStory.PrizeAt+.10f+i*.06f,pose);
                 float presence=rise*(1-Smooth(RecordedEchoStory.SettleFor(count)-.12f,RecordedEchoStory.SettleFor(count)+.58f,pose));
                 EchoAperture aperture=echoApertures[i];
                 aperture.Body.gameObject.SetActive(!still && presence>.008f);
@@ -452,8 +453,8 @@ namespace Horizon.UI
                 Color color=EchoSlotColor(i,count);
                 float flare=still?0:EchoLocalIntensity(age,i,count);
                 float linked=Smooth(RecordedEchoStory.ConduitAt(i,count),RecordedEchoStory.ConvergenceAt(count),pose);
-                EchoIndicator(aperture.Rim,Color.Lerp(color,EchoGold,linked),.13f+1.48f*flare+.28f*face);
-                EchoIndicator(aperture.Inlay,color,.09f+1.42f*flare);
+                EchoIndicator(aperture.Rim,Color.Lerp(color,EchoGold,linked),.11f+.64f*flare+.12f*face);
+                EchoIndicator(aperture.Inlay,color,.07f+.31f*flare);
                 FrameEchoConduit(aperture.Conduit,gate,i,count,pose,still);
 
                 Transform socket=echoSockets[i];
@@ -461,9 +462,9 @@ namespace Horizon.UI
                 socket.localPosition=new Vector3(gate.x,1.24f+.10f*rise+.10f*(still?1:story.Rest)-.015f*compression,gate.z+.08f);
                 EchoIndicator(echoSocketInsets[i],Color.Lerp(color,EchoGold,linked),land*(.24f+.77f*compression));
                 Transform part=echoActiveObjects[i];
-                float entrance=still?1:Smooth(RecordedEchoStory.MaterializeAfter,.43f,age);
+                float entrance=still?1:Smooth(RecordedEchoStory.MaterializeAfter,.68f,age);
                 part.gameObject.SetActive(still || age>=RecordedEchoStory.MaterializeAfter);
-                float scale=size*.95f/echoObjectScales[i]*Mathf.Lerp(.36f,1,entrance);
+                float scale=size*1.15f/echoObjectScales[i]*Mathf.Lerp(.62f,1,entrance);
                 Vector3 airborne=gate+new Vector3(.035f*slot,.035f+.15f*entrance,-.30f*entrance);
                 Vector3 settled=socket.localPosition+Vector3.up*(.065f+echoObjectHeights[i]*scale);
                 Vector3 at=Vector3.Lerp(airborne,settled,land)+Vector3.up*(.048f*compression);
@@ -522,76 +523,33 @@ namespace Horizon.UI
                 CueSound(revealContacts[i],.43f);
                 MasterHaptics.Cue(16,51,preferences);
             }
-            float convergence=RecordedEchoStory.ConvergenceAt(echoActiveObjects.Count)+.075f;
-            if(CrossedRevealCue(previous,now,convergence))
-            {
-                SetPracticeAudioTime(convergence);
-                PlayRevealStrike(true,.95f);
-            }
         }
 
         private void FrameRecordedEcho()
         {
-            int count=echoActiveObjects.Count;
             float time=energyFrame.Time;
-            bool still=preferences.reducedMotion;
-            float joinAge=time-RecordedEchoStory.ConvergenceAt(count);
-            int focus=EchoFocus(time,count);
-            float opening=time-RecordedEchoStory.ResultTurnAt(focus,count);
-            float local=still?0:EchoLocalIntensity(opening,focus,count);
+            float age=time-RecordedEchoStory.ImpactAt;
+            float touch=age<0 && !preferences.reducedMotion?RewardFocusPulse(time-echoFocusAt):0;
+            float charge=Mathf.Clamp01(energyFrame.Inward+.15f*touch);
             EnergyRelease release=energyFrame.Release;
-            float spread=Smooth(0,.72f,joinAge);
+            float spread=Smooth(0,.85f,age);
+            Color chargeTint=Color.Lerp(echoTint,EchoGold,Smooth(.19f,.68f,charge));
+            SampleRewardChargeBeams(echoChargeBeams,echoChargeOrigin,chargeTint,charge,time,cinematicEnergy.Seed);
             Vector3 worldSeat=echoTrace.TransformPoint(EchoArrival);
-            SampleScenicEnergy(echoScenic,worldSeat,1.101f,EchoGold,0,release,cinematicEnergy.Seed);
+            Vector3 lightSource=age<0?echoTrace.TransformPoint(echoChargeOrigin):worldSeat;
+            SampleScenicEnergy(echoScenic,lightSource,1.101f,age<0?chargeTint:EchoGold,
+                .71f*Smooth(.08f,.78f,charge),release,cinematicEnergy.Seed);
             Vector3 viewport=WorldCamera.WorldToViewportPoint(worldSeat);
             EchoRevealOrigin=new Vector2(Mathf.Clamp(viewport.x,.16f,.84f),Mathf.Clamp(viewport.y,.36f,.71f));
-            echoFire.transform.localPosition=EchoArrival+new Vector3(.018f,.23f+spread*.46f,.22f);
+            echoFire.transform.localPosition=EchoArrival+new Vector3(.018f,.23f+spread*.46f,.07f);
             echoFire.transform.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,-13,-18);
             echoFire.transform.localScale=new Vector3(.89f+spread*.99f,1.09f+spread*.82f,1);
             CaseEffect(echoFire,0,Color.Lerp(new Color(1.89f,1.38f,.83f),new Color(.86f,.93f,1.77f),spread),
-                release.Fire,spread*63,joinAge,cinematicEnergy.Seed);
-            echoCore.transform.localPosition=EchoArrival+new Vector3(0,.022f,-.012f);
+                release.Fire,spread*63,age,cinematicEnergy.Seed);
+            echoCore.transform.localPosition=EchoArrival+new Vector3(0,.082f,-.082f);
             echoCore.transform.rotation=WorldCamera.transform.rotation;
             echoCore.transform.localScale=new Vector3(1.12f,.83f,1)*(1+.22f*release.Flash);
-            CaseEffect(echoCore,1,new Color(2.14f,2.08f,1.88f),release.Flash,0,joinAge,cinematicEnergy.Seed);
-
-            Vector3 gate=EchoGateCenter(focus,count);
-            Color color=EchoSlotColor(focus,count);
-            float radius=EchoGateSize(count)*Mathf.Lerp(1.06f,focus==count-1?1.95f:1.49f,Smooth(.06f,.45f,opening));
-            // Each true aperture has a compact release as its own resource appears.
-            // The wide gold field still belongs to the later convergence.
-            float strength=count==1?.87f:Mathf.Lerp(.56f,.75f,focus/(float)(count-1));
-            EnergyRelease apertureRelease=still?default:EnergyRelease.SampleScenic(opening,strength);
-            echoLocalCore.transform.localPosition=gate+new Vector3(0,.017f,-.27f);
-            echoLocalCore.transform.rotation=WorldCamera.transform.rotation;
-            echoLocalCore.transform.localScale=Vector3.one*radius*.42f;
-            CaseEffect(echoLocalCore,1,Color.Lerp(color,Color.white,.84f)*1.68f,
-                apertureRelease.Flash*.78f,0,opening,cinematicEnergy.Seed);
-            echoLocalHalo.transform.localPosition=gate+new Vector3(0,0,-.12f);
-            echoLocalHalo.transform.rotation=WorldCamera.transform.rotation;
-            echoLocalHalo.transform.localScale=new Vector3(radius,radius,1);
-            CaseEffect(echoLocalHalo,4,color*1.21f,Mathf.Max(local*.83f,apertureRelease.Wave*.75f),
-                0,opening,cinematicEnergy.Seed+focus*.19f);
-            echoLocalFlare.transform.localPosition=gate+new Vector3(.019f,.03f,-.23f);
-            echoLocalFlare.transform.rotation=WorldCamera.transform.rotation*Quaternion.Euler(0,0,-24+focus*41);
-            echoLocalFlare.transform.localScale=new Vector3(radius*.66f,radius*.75f,1);
-            CaseEffect(echoLocalFlare,0,Color.Lerp(color,Color.white,.32f)*1.39f,apertureRelease.Fire,
-                Smooth(.02f,1.14f,opening)*63,opening,cinematicEnergy.Seed);
-            for(int i=0;i<echoMetalSparks.Length;i++)
-            {
-                Renderer fragment=echoMetalSparks[i];
-                Transform shard=fragment.transform;
-                float t=(opening-.10f-(i%3)*.023f)/.57f;
-                bool flying=!still && t>0 && t<1 && i<(LowCostEffects?7:focus==count-1?14:9);
-                shard.gameObject.SetActive(flying);
-                if(!flying) continue;
-                float angle=(i*.618034f+cinematicEnergy.Seed)*2*Mathf.PI;
-                Vector3 direction=new Vector3(Mathf.Cos(angle),Mathf.Sin(angle),-.36f-(i%4)*.11f);
-                shard.localPosition=gate+radius*direction*(.17f+.55f*Smooth(0,1,t)) + Vector3.down*(.24f*t*t);
-                shard.localRotation=Quaternion.Euler(210*t+i*24,260*t+i*17,angle*Mathf.Rad2Deg);
-                shard.localScale=new Vector3(.027f,.077f,.022f)*Mathf.Lerp(1,.23f,t);
-                EchoIndicator(fragment,Color.Lerp(color,EchoGold,.36f),1.4f*(1-t));
-            }
+            CaseEffect(echoCore,1,new Color(2.14f,2.08f,1.88f),release.Flash,0,age,cinematicEnergy.Seed);
         }
 
         private void ApplyRecordedEchoCue(CinematicCue cue)
@@ -600,13 +558,16 @@ namespace Horizon.UI
             {
                 movieMuted=false;
                 UpdateAudio();
-                if(!preferences.reducedMotion) CueSound(echoSeat,.46f);
+                if(!preferences.reducedMotion) PlayRevealStrike(true,.95f);
                 return;
             }
             if(preferences.reducedMotion) return;
             switch(cue.Phase)
             {
-                case CinematicPhase.Charge: CueSound(echoPaper,.46f); break;
+                case CinematicPhase.Charge:
+                    CueSound(echoPaper,.46f);
+                    PlayTensionCharge(RecordedEchoStory.HoldAt-RecordedEchoStory.PrepareAt);
+                    break;
                 case CinematicPhase.HeroMoment: CueSound(echoSeat,.47f); break;
                 case CinematicPhase.HitStop: movieMuted=true; audioSource.Stop(); UpdateAudio(); break;
                 case CinematicPhase.Settlement: CueSound(echoEnd,.36f); break;
