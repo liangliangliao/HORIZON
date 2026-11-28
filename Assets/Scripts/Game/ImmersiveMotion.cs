@@ -8,6 +8,8 @@ namespace Horizon.Game
     {
         public static float Unit(float value) => Math.Max(0, Math.Min(1, value));
         public static float Smooth(float value) { float p=Unit(value); return p*p*(3-2*p); }
+        public static float Crest(float time, float start, float peak, float end) =>
+            Smooth((time-start)/(peak-start))*(1-Smooth((time-peak)/(end-peak)));
         public static float Flight(float value)
         {
             float p=Unit(value);

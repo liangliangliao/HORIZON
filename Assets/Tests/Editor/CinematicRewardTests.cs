@@ -67,13 +67,29 @@ namespace Horizon.Tests
             Assert.Less(RecordedEchoStory.Sample(held+.01f,false).Progress,1f);
             Assert.AreEqual(1,RecordedEchoStory.Sample(cue.ImpactTime,false).Progress);
             Assert.AreEqual(.23f, cue.MultiplierTime - cue.ImpactTime, .001f);
+            var energy=new CinematicEnergy(actual);
+            float previousLoad=0, previousCharge=energy.Sample(.50f).Inward;
             for(int i=0;i<RecordedEchoStory.GuideCount;i++)
             {
                 float at=RecordedEchoStory.GuideAt(i);
                 Assert.That(at,Is.InRange(RecordedEchoStory.DevelopAt,RecordedEchoStory.DockAt));
                 Assert.Greater(RecordedEchoStory.Sample(at+.08f,false).Progress,RecordedEchoStory.Sample(at-.08f,false).Progress);
-                if(i>0) Assert.Greater(at-RecordedEchoStory.GuideAt(i-1),.55f);
+                if(i>0) Assert.Greater(at-RecordedEchoStory.GuideAt(i-1),.80f);
+                float load=RecordedEchoStory.Sample(at+.07f,false).ReaderLoad;
+                float charge=energy.Sample(at+.19f).Inward;
+                Assert.That(load,Is.GreaterThan(previousLoad+.16f));
+                Assert.That(RecordedEchoStory.Sample(at+.15f,false).ReaderLoad,Is.EqualTo(load).Within(.005f));
+                Assert.That(RecordedEchoStory.Sample(at+.47f,false).ReaderLoad,Is.LessThan(load*.5f));
+                Assert.That(charge,Is.GreaterThan(previousCharge+.12f));
+                Assert.That(energy.Sample(at+.56f).Inward,Is.LessThan(charge));
+                previousLoad=load;
+                previousCharge=charge;
             }
+            Assert.That(energy.Sample(held+.05f).Inward,Is.EqualTo(energy.Sample(cue.ImpactTime-.01f).Inward));
+            Assert.AreEqual(0,RecordedEchoStory.Sample(held,true).ReaderLoad);
+            Assert.AreEqual(0,energy.Sample(held,true).Inward);
+            Assert.Greater(RecordedEchoStory.ResultTurnAt(1,6)-RecordedEchoStory.ResultContactAt(0,6),.75f);
+            Assert.Greater(RecordedEchoStory.SettleFor(6)-RecordedEchoStory.ConvergenceAt(6),.8f);
             float second = actual.Cues.Single(item => item.Phase == CinematicPhase.SecondReveal).Time;
             string Read(float at,bool reduced=false) => actual.Outcome.SampleRecordedEcho(at,cue.MultiplierTime,second,cue.SettlementTime,reduced).Copy;
             float firstContact=RecordedEchoStory.ResultContactAt(0,2), lastContact=RecordedEchoStory.ResultContactAt(1,2);
@@ -87,7 +103,6 @@ namespace Horizon.Tests
             Assert.AreEqual(final,Read(lastContact));
             Assert.AreEqual(final,Read(actual.Duration));
             Assert.AreEqual(final,Read(0,true));
-            var energy=new CinematicEnergy(actual);
             Assert.AreEqual(0,energy.Sample(lastContact).Release.Fire);
             Assert.Greater(energy.Sample(RecordedEchoStory.ConvergenceAt(2)+.32f).Release.Wave,.8f);
             Assert.AreEqual(1321, source.receipt.resources.ticks[2]);

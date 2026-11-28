@@ -227,7 +227,7 @@ namespace Horizon
                     PracticeRewardCinematicFrame frame=film.Sample(time,reduced);
                     world.SamplePracticeRewardCinematic(film,frame);
                     float pose=Mathf.Min(time,PracticeRewardCinematic.HoldTime);
-                    float charge=frame.Charge*ImmersiveMotion.Smooth((pose-.89f)/1.49f);
+                    float charge=frame.Charge*ImmersiveMotion.Smooth((pose-.89f)/(PracticeRewardCinematic.HoldTime-.89f));
                     float effectAge=frame.Age<0?pose-PracticeRewardCinematic.ReleaseTime:frame.Age;
                     reveal.Sample(effectAge,charge,frame.Release,film.Seed,world.CaseRevealOrigin,false,reduced);
                     float resultAge=time-PracticeRewardCinematic.GainTime;

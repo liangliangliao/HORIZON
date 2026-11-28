@@ -66,6 +66,10 @@ namespace Horizon.Tests
             var second = film.Sample(PracticeRewardCinematic.LatchTime(1), false);
             var third = film.Sample(PracticeRewardCinematic.LatchTime(2), false);
             Assert.Greater(first.Charge, film.Sample(0, false).Charge);
+            Assert.Less(first.LidStrain,second.LidStrain);
+            Assert.Less(second.LidStrain,third.LidStrain);
+            Assert.Less(film.Sample(1.57f,false).LidStrain, first.LidStrain*.5f);
+            Assert.Less(film.Sample(PracticeRewardCinematic.LatchTime(2)+.43f,false).LidStrain, third.LidStrain*.5f);
             Assert.Less(first.Tilt, 0);
             Assert.Greater(second.Tilt, 0);
             Assert.Less(third.Tilt, first.Tilt);
@@ -73,11 +77,14 @@ namespace Horizon.Tests
             float firstGap=PracticeRewardCinematic.LatchTime(1)-PracticeRewardCinematic.LatchTime(0);
             float secondGap=PracticeRewardCinematic.LatchTime(2)-PracticeRewardCinematic.LatchTime(1);
             Assert.Less(secondGap,firstGap);
+            Assert.Greater(secondGap,.70f);
             var held=film.Sample(PracticeRewardCinematic.HoldTime,false);
             var heldLast=film.Sample(PracticeRewardCinematic.ReleaseTime-.01f,false);
             Assert.AreEqual(held.Compression,heldLast.Compression);
             Assert.AreEqual(held.Tilt,heldLast.Tilt);
             Assert.AreEqual(0,heldLast.Lid);
+            Assert.AreEqual(held.LidStrain,heldLast.LidStrain);
+            Assert.AreEqual(held.LidStrain,film.Sample(PracticeRewardCinematic.ReleaseTime,false).LidStrain);
             Assert.That(film.Sample(PracticeRewardCinematic.ReleaseTime+.14f,false).Lid,Is.GreaterThan(.9f));
             var release = film.Sample(PracticeRewardCinematic.GainTime, false);
             Assert.Greater(release.Lid, 0);
@@ -86,7 +93,7 @@ namespace Horizon.Tests
 
             receipt.actualNow.ticks[2] = 9000;
             var still = film.Sample(PracticeRewardCinematic.GainTime, true);
-            Assert.AreEqual(0, still.Tilt + still.Compression + still.Charge + still.Release.Fire + still.Release.Wave);
+            Assert.AreEqual(0, still.Tilt + still.Compression + still.Charge + still.LidStrain + still.Release.Fire + still.Release.Wave);
             Assert.AreEqual(1, still.Lid);
             Assert.AreEqual("专注 +0.0007", film.Changes(PracticeRewardCinematic.GainTime, true, true));
             Assert.AreEqual("精力 −0.0002", film.Changes(PracticeRewardCinematic.CostTime, false, true));
