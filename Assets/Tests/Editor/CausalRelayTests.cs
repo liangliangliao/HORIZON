@@ -49,6 +49,26 @@ namespace Horizon.Tests
             CollectionAssert.AreEquivalent(new[] {"learn→merge","support→merge"},relay.Edges.Select(e=>relay.Nodes[e.From].Evidence.id+"→"+relay.Nodes[e.To].Evidence.id));
             Assert.AreNotEqual(relay.Nodes[0].X,relay.Nodes[1].X);
         }
+        [Test]
+        public void SameDayMergeWaitsForEveryRecordedParentAndReceivesBothPulses()
+        {
+            var plan=Merge();
+            var evidence=plan.Event.receipt.causes;
+            evidence.Reverse();
+            foreach(var node in evidence) node.day=3;
+            var relay=new CausalRelayPlan(RewardDirector.Direct(plan.Event));
+            Assert.AreEqual("merge",relay.Nodes.Last().Evidence.id);
+            Assert.AreEqual(2,relay.Edges.Count);
+            foreach(var edge in relay.Edges)
+            {
+                float arrival=relay.Nodes[edge.To].ActivationTime;
+                Assert.Less(relay.Nodes[edge.From].ActivationTime,arrival);
+                Assert.That(relay.EdgeArrival(edge,arrival-.12f,false),Is.InRange(.01f,.99f));
+                Assert.AreEqual(0,relay.EdgeArrival(edge,arrival-.12f,true));
+                Assert.AreEqual(1,relay.EdgeArrival(edge,arrival,false));
+            }
+        }
+
         [TestCase(DomainEventKind.Cascade)] [TestCase(DomainEventKind.CausalSingularity)]
         public void ActualLongLifeEventsKeepObservedEdgesAndTheirExactCueTimes(DomainEventKind kind)
         {
@@ -105,18 +125,45 @@ namespace Horizon.Tests
             Assert.Throws<ArgumentOutOfRangeException>(()=>relay.Sample(0,float.NaN,false));
         }
         [Test]
-        public void ActualSecondRevealAndJackpotReigniteTheRecordedNetwork()
+        public void LaterReadingChaptersKeepTheRecordedNetworkLitWithoutASecondClimax()
         {
             var source=ActualCascade(DomainEventKind.CausalSingularity); string before=JsonUtility.ToJson(source);
             RewardPlan plan=RewardDirector.Direct(source); var relay=new CausalRelayPlan(plan);
             foreach(CinematicPhase phase in new[] {CinematicPhase.SecondReveal,CinematicPhase.Jackpot})
             {
                 float cue=plan.Cues.Single(c=>!c.NodeHit && c.Phase==phase).Time;
-                Assert.Greater(relay.Sample(0,cue+.001f,false).Beam,relay.Sample(0,cue-.01f,false).Beam);
+                Assert.LessOrEqual(relay.Sample(0,cue+.001f,false).Beam,relay.Sample(0,cue-.01f,false).Beam);
                 Assert.IsTrue(relay.Nodes.All(n=>relay.Sample(n.Index,cue+.001f,false).Lit));
                 Assert.AreEqual(0,relay.Sample(0,cue+.001f,true).Beam);
             }
             Assert.AreEqual(before,JsonUtility.ToJson(source));
+        }
+        [Test]
+        public void SharedNetworkReleaseKeepsDetailInsteadOfStackingEveryBeamAtFullWhite()
+        {
+            RewardPlan plan=Merge(); var relay=new CausalRelayPlan(plan);
+            Assert.NotNull(relay.MergeNode);
+            Assert.AreEqual("merge",relay.MergeNode.Evidence.id);
+            Assert.That(relay.Sample(relay.MergeNode.Index,relay.ImpactTime,false).Beam,Is.InRange(.1f,.75f));
+            Assert.That(relay.Sample(0,relay.ImpactTime,false).Pulse,Is.LessThan(.02f));
+            Assert.AreEqual(1,relay.Sample(0,relay.Nodes[0].ActivationTime,false).Beam,
+                "An individual recorded cause still receives its full close-up pulse.");
+        }
+        [Test]
+        public void UnsortedReceiptsRevealChronologicallyWithoutRewritingSavedEvidence()
+        {
+            RewardPlan initial=Merge(); DomainEvent source=initial.Event.Copy();
+            source.receipt.causes.Reverse(); string saved=JsonUtility.ToJson(source);
+            RewardPlan plan=RewardDirector.Direct(source); var relay=new CausalRelayPlan(plan);
+            CollectionAssert.IsOrdered(relay.Nodes.Select(n=>n.Evidence.day));
+            for(int i=0;i<relay.Nodes.Count;i++)
+            {
+                float end=i+1<relay.Nodes.Count?relay.Nodes[i+1].ActivationTime:
+                    plan.Cues.Single(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+                Assert.GreaterOrEqual(end-relay.Nodes[i].ActivationTime,
+                    RewardDirector.CausalNodeSeconds(relay.Nodes[i].Evidence.label)-.001f);
+            }
+            Assert.AreEqual(saved,JsonUtility.ToJson(source));
         }
         [Test]
         public void DenseReceiptHasBoundedVisualObjectsAndOnlyRecordedEdges()

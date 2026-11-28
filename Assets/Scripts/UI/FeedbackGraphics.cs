@@ -85,9 +85,10 @@ namespace Horizon.UI
         private void Start() { graphic = GetComponent<Graphic>(); tint = graphic.color; }
         private void Update()
         {
+            if(VisualPreferences.Paused) return;
             age += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(age / 0.75f);
-            transform.localScale = Vector3.one * Mathf.Lerp(0.35f, 2.8f, 1 - (1 - t) * (1 - t));
+            transform.localScale = Vector3.one * (VisualPreferences.ReducedMotion?1:Mathf.Lerp(0.35f, 2.8f, 1 - (1 - t) * (1 - t)));
             graphic.color = new Color(tint.r, tint.g, tint.b, tint.a * (1 - t));
             if (t >= 1) Destroy(gameObject);
         }
@@ -102,6 +103,7 @@ namespace Horizon.UI
             if (VisualPreferences.ReducedMotion) { tint.a = 0; graphic.color = tint; } }
         private void Update()
         {
+            if(VisualPreferences.Paused) return;
             age += Time.unscaledDeltaTime;
             graphic.color = new Color(tint.r, tint.g, tint.b, tint.a * Mathf.Clamp01(1 - age / 0.32f));
             if (age >= 0.32f) Destroy(gameObject);
@@ -116,10 +118,11 @@ namespace Horizon.UI
         private void Awake() { group = gameObject.AddComponent<CanvasGroup>(); group.alpha = 0; }
         private void Update()
         {
+            if(VisualPreferences.Paused) return;
             age += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01((age - Delay) / 0.28f);
             group.alpha = t;
-            transform.localScale = Vector3.one * (0.86f + t * 0.14f + Mathf.Sin(t * Mathf.PI) * 0.08f);
+            transform.localScale = Vector3.one * (VisualPreferences.ReducedMotion?1:Mathf.LerpUnclamped(.86f,1,ImmersiveMotion.Land(t)));
             if (t >= 1) enabled = false;
         }
     }
@@ -132,10 +135,11 @@ namespace Horizon.UI
         private void Awake() { label = GetComponent<Text>(); }
         private void Update()
         {
+            if(VisualPreferences.Paused) return;
             age += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01((age - 0.5f) / 0.7f);
-            label.text = "星尘 " + Mathf.RoundToInt(Mathf.Lerp(From, To, t));
-            transform.localScale = Vector3.one * (1 + Mathf.Sin(t * Mathf.PI) * 0.065f);
+            label.text = "星尘 " + Mathf.RoundToInt(Mathf.Lerp(From, To, ImmersiveMotion.Flight(t)));
+            transform.localScale = Vector3.one * (VisualPreferences.ReducedMotion?1:1+ImmersiveMotion.Punch(age-1.12f,.22f)*.065f);
             if (t >= 1) enabled = false;
         }
     }

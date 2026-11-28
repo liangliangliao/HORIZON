@@ -110,7 +110,11 @@ namespace Horizon.UI
                     Shape(item,"Accumulated cause energy",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.4f,portalLight); break;
                 case RewardObjectKind.OrbitNode:
                     Sculpt(item,"Orbit carrier",rewardRing,Vector3.zero,Vector3.one,gold);
-                    Shape(item,"Future node",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.18f,portalLight); break;
+                    Shape(item,"Future node",PrimitiveType.Sphere,Vector3.zero,Vector3.one*.18f,rewardCrystal);
+                    for(int meridian=0;meridian<3;meridian++)
+                        Sculpt(item,"Future direction meridian "+meridian,Own(HorizonSculpt.Torus(.11f,.008f)),Vector3.zero,Vector3.one,gold)
+                            .localRotation=Quaternion.Euler(0,meridian*60,25);
+                    break;
                 case RewardObjectKind.CausalChain:
                     for(int i=0;i<3;i++) { Sculpt(item,"Causal link "+i,rewardRing,new Vector3((i-1)*.33f,(i-1)*.32f,0),Vector3.one*.84f,i==1?gold:teal).localRotation=Quaternion.Euler(0,i%2*75,-25); } break;
                 case RewardObjectKind.PredictionPanel:
@@ -146,10 +150,15 @@ namespace Horizon.UI
             int[] indices={0,2,1,3,4,5,0,1,4,0,4,3,1,2,5,1,5,4,2,0,3,2,3,5};
             prismMesh=Own(new Mesh { name="HORIZON optical prism",vertices=points,triangles=indices }); prismMesh.RecalculateNormals(); return prismMesh;
         }
-        private void PrepareRewardObjects(RewardPlan plan)
+        private void ClearRewardObjects()
         {
             foreach(Transform item in movieObjects) item.gameObject.SetActive(false);
             movieObjects.Clear(); movieObjectReceipts.Clear();
+        }
+
+        private void PrepareRewardObjects(RewardPlan plan)
+        {
+            ClearRewardObjects();
             var indices=new Dictionary<RewardObjectKind,int>();
             foreach(MaterialReward reward in plan.Objects)
             {

@@ -11,6 +11,7 @@ on:
       - codex/playable-feedback-3d
       - fix/apk-rewards-animation
       - feat/3d-jackpot-animation
+      - feature/reward-cinematic-upgrade
   workflow_dispatch:
     inputs:
       native_check_run:
@@ -263,7 +264,12 @@ jobs:
           test -s artifacts/visuals/71-story-home.png
           test -s artifacts/visuals/72-tall-phone-board.png
           test -s artifacts/visuals/73-tall-phone-home.png
-          test -s artifacts/visuals/90-pattern-3d.png
+          test -s artifacts/visuals/92-pattern-fullscreen-01-charge.png
+          test -s artifacts/visuals/92-pattern-fullscreen-02-breath-hold.png
+          test -s artifacts/visuals/92-pattern-fullscreen-03-impact.png
+          test -s artifacts/visuals/92-pattern-fullscreen-04-multiplier.png
+          test -s artifacts/visuals/92-pattern-fullscreen-05-second-reveal.png
+          test -s artifacts/visuals/92-pattern-fullscreen-06-settlement.png
           test -s artifacts/visuals/91-reality-convergence-3d.png
 
       - name: Decode and verify actual Unity GIF exports
@@ -274,6 +280,115 @@ jobs:
           /tmp/horizon-gif-verification/bin/python tools/verify_timeline_exports.py
           /tmp/horizon-gif-verification/bin/python tools/verify_v03_previews.py
           python3 tools/verify_video_exports.py --ffprobe tools/media/ffprobe
+
+      - name: Encode the interactive card practice filmed in Unity
+        id: practice_movie
+        if: ${{ !cancelled() && hashFiles('artifacts/practice-frames/complete.txt') != '' }}
+        run: |
+          tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 16 -i artifacts/practice-frames/frame-%05d.jpg -c:v libx264 -crf 19 -pix_fmt yuv420p -movflags +faststart artifacts/HORIZON-card-practice.mp4
+          encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 artifacts/HORIZON-card-practice.mp4)
+          test "$encoded" = "$(cat artifacts/practice-frames/complete.txt)"
+          tools/media/ffprobe -v error -show_entries stream=width,height,duration artifacts/HORIZON-card-practice.mp4
+      - name: Upload interactive practice preview
+        if: ${{ !cancelled() && steps.practice_movie.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Card-Practice-Preview
+          path: artifacts/HORIZON-card-practice.mp4
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Encode the V3 case takes and measure their actual frames
+        id: encode_v3
+        run: |
+          export_dir="$RUNNER_TEMP/energy-v3-review"
+          mkdir -p "$export_dir"
+          # The Unity container owns its capture directory. Keep the original
+          # frames readable and write encoded evidence as the host runner.
+          cp -R --no-preserve=mode,ownership artifacts/energy-v3/. "$export_dir/"
+          git rev-parse HEAD > "$export_dir/source.txt"
+          date -u +'%Y-%m-%dT%H:%M:%SZ' >> "$export_dir/source.txt"
+          for profile in normal battery reduced; do
+            take="$export_dir/$profile"
+            /tmp/horizon-gif-verification/bin/python tools/report_case_capture.py "$take"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -f s16le -ar 22050 -ac 1 -i "$take/cues.pcm" -c:v libx264 -crf 18 -pix_fmt yuv420p -af apad -c:a aac -shortest -movflags +faststart "$take/case.mp4"
+            encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/case.mp4")
+            test "$encoded" = "$(cat "$take/complete.txt")"
+          done
+          for direction in 1 2 3; do
+            take="$export_dir/orbit-$direction"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -c:v libx264 -crf 18 -pix_fmt yuv420p "$take/orbit.mp4"
+            encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/orbit.mp4")
+            test "$encoded" = "$(cat "$take/complete.txt")"
+          done
+      - name: Upload HORIZON Energy Cinematic V3 case evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Energy-Cinematic-V3
+          path: |
+            ${{ runner.temp }}/energy-v3-review/source.txt
+            ${{ runner.temp }}/energy-v3-review/*/case.mp4
+            ${{ runner.temp }}/energy-v3-review/*/release-contact.png
+            ${{ runner.temp }}/energy-v3-review/*/*.csv
+            ${{ runner.temp }}/energy-v3-review/*/receipt.json
+            ${{ runner.temp }}/energy-v3-review/*/capture.txt
+            ${{ runner.temp }}/energy-v3-review/orbit-*/orbit.mp4
+            ${{ runner.temp }}/energy-v3-review/orbit-*/source.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain the V3 raw evidence if encoding fails
+        if: ${{ failure() && steps.encode_v3.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Energy-Cinematic-V3-Raw
+          path: artifacts/energy-v3/
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Encode the matured practice echo filmed in Unity
+        id: echo_movie
+        if: ${{ !cancelled() && hashFiles('artifacts/time-echo-frames/normal/complete.txt', 'artifacts/time-echo-frames/battery/complete.txt', 'artifacts/time-echo-frames/reduced/complete.txt') != '' }}
+        run: |
+          if [ ! -x /tmp/horizon-gif-verification/bin/python ]; then
+            python3 -m venv /tmp/horizon-gif-verification
+            /tmp/horizon-gif-verification/bin/python -m pip install pillow==12.3.0
+          fi
+          export_dir="$RUNNER_TEMP/time-echo-v4-review"
+          mkdir -p "$export_dir"
+          cp -R --no-preserve=mode,ownership artifacts/time-echo-frames/. "$export_dir/"
+          git rev-parse HEAD > "$export_dir/source.txt"
+          date -u +'%Y-%m-%dT%H:%M:%SZ' >> "$export_dir/source.txt"
+          for profile in normal battery reduced; do
+            take="$export_dir/$profile"
+            tools/media/ffmpeg -hide_banner -loglevel error -y -framerate 20 -i "$take/frame-%05d.jpg" -f s16le -ar 22050 -ac 1 -i "$take/cues.pcm" -c:v libx264 -crf 18 -pix_fmt yuv420p -af apad -c:a aac -shortest -movflags +faststart "$take/HORIZON-time-echo.mp4"
+            encoded=$(tools/media/ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$take/HORIZON-time-echo.mp4")
+            test "$encoded" = "$(cat "$take/complete.txt")"
+            /tmp/horizon-gif-verification/bin/python tools/report_echo_capture.py "$take"
+          done
+          test -s "$export_dir/receipt.json"
+      - name: Upload the actual TIME ECHO and its receipt
+        if: ${{ !cancelled() && steps.echo_movie.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Actual-Time-Echo
+          path: |
+            ${{ runner.temp }}/time-echo-v4-review/source.txt
+            ${{ runner.temp }}/time-echo-v4-review/*.json
+            ${{ runner.temp }}/time-echo-v4-review/*/HORIZON-time-echo.mp4
+            ${{ runner.temp }}/time-echo-v4-review/*/*.csv
+            ${{ runner.temp }}/time-echo-v4-review/*/capture.txt
+            ${{ runner.temp }}/time-echo-v4-review/*/contact.png
+            ${{ runner.temp }}/time-echo-v4-review/*/intensity.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain the real echo capture if verification fails
+        if: ${{ failure() && steps.echo_movie.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Actual-Time-Echo-Raw
+          path: artifacts/time-echo-frames/
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Upload Unity portrait previews
         if: always()
@@ -307,8 +422,23 @@ jobs:
         with:
           name: HORIZON-Cinematic-Reward-Previews
           path: |
-            artifacts/visuals/9[01]-*.png
+            artifacts/visuals/9[0-2]-*.png
             artifacts/cinematics/
+            !artifacts/cinematics/frames-actual-outcome/**
+            !artifacts/cinematics/frames-walk-outcome/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload full-colour action frames separately for video review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HORIZON-Action-RGB-Frames
+          path: |
+            artifacts/cinematics/frames-actual-outcome/
+            artifacts/cinematics/frames-walk-outcome/
+            artifacts/cinematics/actual-outcome-motion.pcm
+            artifacts/cinematics/walk-outcome-motion.pcm
           if-no-files-found: ignore
           retention-days: 14
 

@@ -78,7 +78,7 @@ namespace Horizon.UI
                 {
                     causalPulse.gameObject.SetActive(impact>0 && impact<1);
                     causalPulse.localPosition=Vector3.Lerp(moviePlayer.localPosition+Vector3.up,movieFriend.localPosition+Vector3.up,reward.Amount>0?impact:1-impact);
-                    int count=Mathf.Clamp(Mathf.Abs(reward.Amount)/3,0,3);
+                    int count=Mathf.Clamp((int)(System.Math.Abs(reward.Amount)/3),0,3);
                     for(int i=0;i<count;i++)
                     {
                         relationshipFriends[i].gameObject.SetActive(true);

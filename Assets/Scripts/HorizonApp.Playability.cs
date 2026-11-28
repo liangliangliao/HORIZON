@@ -46,8 +46,8 @@ namespace Horizon
         private void BuildReadableHand()
         {
             choiceVisibleSince = Time.unscaledTime;
-            boardHint = View.Label(root, "Drag hint", IsPractice ? "练习采用正式规则，退出后原人生保持原样" : "点牌查看 · 向上拖进金色圈行动", 28,
-                Palette.Muted, TextAnchor.MiddleCenter, 0.045f, 0.014f, 0.955f, 0.057f);
+            boardHint=dragHint;
+            if(IsPractice && boardHint!=null) boardHint.text="练习采用正式规则，退出后原人生保持原样";
             trail = View.Fill(root, "Causal light", Palette.Mint, 0.5f, 0.5f, 0.5f, 0.5f).rectTransform;
             trail.gameObject.SetActive(false);
             for (int i = 0; i < session.Hand.Length; i++)
@@ -64,11 +64,11 @@ namespace Horizon
                 View.Label(rect, "Name", card.Name, 40, Palette.Text, TextAnchor.MiddleCenter, 0.07f, 0.63f, 0.93f, 0.87f);
                 var emblem = View.Rect(rect, "Card causal emblem", 0.31f, 0.44f, 0.69f, 0.60f).gameObject.AddComponent<DropRingGraphic>();
                 emblem.color = accent; emblem.raycastTarget = false; emblem.Thickness = 3;
-                View.Label(rect, "Time marker", card.Delay == 0 ? "NOW" : "+" + card.Delay + "D", 26, accent, TextAnchor.MiddleCenter, 0.20f, 0.43f, 0.80f, 0.60f);
-                View.Label(rect, "Now", canImagine ? "先预演失败与恢复" : available ? PlayExperience.NowLabel(session.ImmediateEffect(card)) : "暂不可用 · 点开查看",
+                View.Label(rect, "Time marker", PracticeReward.Timing(card,session.ImmediateEffect(card)), 24, accent, TextAnchor.MiddleCenter, 0.06f, 0.43f, 0.94f, 0.60f);
+                View.Label(rect, "Now", canImagine ? "先预演失败与恢复" : available ? PracticeReward.Label(session.ImmediateEffect(card),true) : "暂不可用 · 点开查看",
                     28, available || canImagine ? Palette.Text : Palette.Coral, TextAnchor.MiddleCenter, 0.06f, 0.23f, 0.94f, 0.41f);
-                string date = card.Delay == 0 ? "现在恢复" : "D" + (session.Day + card.Delay) + (session.Day + card.Delay > session.Deadline ? " · 局后" : " 回来");
-                View.Label(rect, "Future", date + (card.Delay > 0 ? "\n" + PlayExperience.FutureMeaning(card) : ""), 26, accent, TextAnchor.MiddleCenter, 0.07f, 0.03f, 0.93f, 0.21f);
+                string date = card.Delay == 0 ? "今天到账" : "第 " + (session.Day + card.Delay) + " 天" + (session.Day + card.Delay > session.Deadline ? " · 超出本局" : " 到期");
+                View.Label(rect, "Future", date + (card.Delay > 0 && session.Day + card.Delay <= session.Deadline ? "\n" + PracticeReward.Label(card.Later,true) : ""), 26, accent, TextAnchor.MiddleCenter, 0.07f, 0.03f, 0.93f, 0.21f);
                 HorizonCardDrag drag = rect.gameObject.AddComponent<HorizonCardDrag>();
                 drag.Available = available || canImagine; drag.Dragged = CardDragged; drag.Played = CardPlayed; drag.Tapped = CardTapped;
                 drag.IsOverTarget = IsInsideDropZone; drag.CanBegin = item => !busy && overlay == null && (activeDrag == null || activeDrag == item);
@@ -96,7 +96,7 @@ namespace Horizon
         private void ShowPlayOptions()
         {
             MasterPage("Play help", "今天只需要选一个行动");
-            View.Label(overlay, "Playable rules", "今天的结果立即发生。\n牌上的日期，是它下次回来的时候。\n成长需要时间；状态差时可以恢复。\n第 " + session.Deadline + " 天，把准备带到展示日。", 38,
+            View.Label(overlay, "Playable rules", "每天完成一张卡，得 1 星尘换外观。\n散步的恢复当天入账。练习先花精力，能力等回声到期。\n刷到凌晨今天开心，疲惫在以后兑现。\n在「未来安排」查看每笔到期日。", 38,
                 Palette.Text, TextAnchor.MiddleLeft, 0.075f, 0.45f, 0.925f, 0.84f);
             View.Button(overlay, "Read guide", "看看操作与目标说明", ShowPlayGuide, 0.075f, 0.32f, 0.925f, 0.405f, Palette.Panel, Palette.Text, 32);
             View.Button(overlay, "Practice life", IsPractice ? "返回原人生" : "自由练习 · 原人生会保留", IsPractice ? (Action)ExitPractice : StartPractice,

@@ -160,13 +160,25 @@ namespace Horizon
             rewardLife.LockDecision(rewardLife.Hand[1].Id);
             for(int i=0;i<4;i++) rewardLife.ExecuteDecisionStep(); rewardLife.Choose(rewardLife.Master.decision.cardId);
             DomainEvent reward=rewardLife.Master.events.Single(e=>e.kind==DomainEventKind.PatternBroken);
-            androidSmokeRewardReturned=false; PlayMasterSpectacle(reward,AndroidSmokeFinishReward);
-            AndroidSmoke.Require(overlay.GetComponentsInChildren<TMPro.TextMeshProUGUI>().Length>=4,
-                "The reward did not create its cinematic captions.");
-            yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
-            AndroidSmoke.Require(home.All(g=>!g.activeInHierarchy),"Home leaked through the reward movie.");
-            CaptureAndroidFrame("05-reward-visible",world.GetComponentsInChildren<HorizonActor>().Single(a=>a.name=="Cinematic player").transform);
-            SmokeButton("Skip cinematic"); yield return null;
+            androidSmokeRewardReturned=false;
+            // Capture the authored opening on the rendered GLES backbuffer.
+            // A slow shader compilation frame must not advance to the product shot.
+            world.Cinematics.enabled=false;
+            try
+            {
+                PlayMasterSpectacle(reward,AndroidSmokeFinishReward);
+                AndroidSmoke.Require(overlay.GetComponentsInChildren<TMPro.TextMeshProUGUI>().Length>=4,
+                    "The reward did not create its cinematic captions.");
+                world.Cinematics.Advance(.50f);
+                yield return null; yield return new WaitForEndOfFrame();
+                AndroidSmoke.Require(home.All(g=>!g.activeInHierarchy),"Home leaked through the reward movie.");
+                HorizonActor actor=world.GetComponentsInChildren<HorizonActor>().SingleOrDefault(a=>a.name=="Cinematic player");
+                AndroidSmoke.Require(actor!=null,"The reward's opening performance has no visible actor.");
+                CaptureAndroidFrame("05-reward-visible",actor.transform);
+                SmokeButton("Skip cinematic");
+            }
+            finally { world.Cinematics.enabled=true; }
+            yield return null;
             AndroidSmoke.Write("await_back"); deadline=Time.realtimeSinceStartup+30;
             while (!androidSmokeRewardReturned && Time.realtimeSinceStartup<deadline) yield return null;
             AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
@@ -200,10 +212,11 @@ namespace Horizon
                         "The actual native source has no visible renderer.");
                     Shader iris=Resources.Load<Shader>("HorizonCinemaIris");
                     AndroidSmoke.Require(iris!=null && iris.isSupported,"The native attention iris shader is unavailable.");
-                    CaptureAndroidFrame("08-causal-"+kind+"-first",source,Vector3.up*.1f);
+                    Renderer evidence=source.Find("Evidence metal base").GetComponent<Renderer>();
+                    CaptureAndroidFrame("08-causal-"+kind+"-first",source,Vector3.up*.1f,evidence);
                     world.Cinematics.Advance(relay.ImpactTime-first+.03f);
                     yield return null; yield return new WaitForEndOfFrame();
-                    CaptureAndroidFrame("08-causal-"+kind+"-impact",source,Vector3.up*.1f);
+                    CaptureAndroidFrame("08-causal-"+kind+"-impact",source,Vector3.up*.1f,evidence);
                     SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event"); yield return null;
                     AndroidSmoke.Require(androidSmokeRewardReturned && overlay==null && home.All(g=>g.activeInHierarchy),
                         "The native causal movie did not restore the phone controls.");
@@ -239,7 +252,147 @@ namespace Horizon
             File.WriteAllText(Path.Combine(AndroidSmoke.DirectoryPath,"performance.json"),performance);
             SmokeButton("Back from performance"); yield return null;
             SmokeButton("Toggle 4"); yield return null; SmokeButton("Close settings");
+            AndroidSmoke.Write("playing_energy_reveal");
+            IEnumerator reveal=AndroidRevealSmoke();
+            while(reveal.MoveNext()) yield return reveal.Current;
         }
+
+        private IEnumerator AndroidRevealSmoke()
+        {
+            Shader fieldShader=Resources.Load<Shader>("HorizonRevealField");
+            AndroidSmoke.Require(fieldShader!=null && fieldShader.isSupported,"The native reveal field is unavailable.");
+            for(int seed=1;seed<=512;seed++)
+            {
+                session=GameSession.StartMasterLife(2,seed,RunMode.Quick);
+                if(session.Hand.Any(card=>card.Id=="ask" && session.CanPlay(card))) break;
+            }
+            archive.active=session.Snapshot(); archive.pendingFeedback=null; archive.playGuide.completed=true;
+            BuildBoard(); yield return null;
+            CardPlayed(root.GetComponentsInChildren<HorizonCardDrag>().Single(card=>card.name=="ask"));
+            RectTransform take=practicePage;
+            AndroidSmoke.Require(take!=null,"The native practice page did not open.");
+            SmokeButton("Practice difficulty 2");
+            for(int step=0;step<40 && take.Find("Screen energy release")==null;step++)
+            {
+                Button next=take.GetComponentsInChildren<Button>().FirstOrDefault(button=>button.IsInteractable() &&
+                    (button.name=="Next shot" || button.name=="Practice route B"));
+                if(next!=null) next.onClick.Invoke();
+                yield return null;
+            }
+            Transform fieldRect=take.Find("Screen energy release");
+            AndroidSmoke.Require(fieldRect!=null && session.HasChosen && archive.pendingFeedback!=null,"The native case did not reach a committed release.");
+            var field=fieldRect.GetComponent<CinematicRevealGraphic>();
+            Transform body=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Reward case at finished work").Find("Enamel case");
+            var actual=new PracticeRewardCinematic(session.Actions.Single());
+            int captureRate=Time.captureFramerate;
+            try
+            {
+                Time.captureFramerate=12;
+                float[] timings={-.41f,-.20f,0,.48f};
+                string[] phases={"charge","hold","flash","wave"};
+                int index=0;
+                for(int frame=0;frame<150;frame++)
+                {
+                    yield return new WaitForEndOfFrame();
+                    if(index==timings.Length)
+                    {
+                        if(practiceHeading.text!="今日已入账") continue;
+                        AndroidSmoke.Require(!field.gameObject.activeInHierarchy,"The case field is still covering the prize.");
+                        AndroidSmoke.Require(practiceMeter.text==actual.Changes(PracticeRewardCinematic.Duration,true,false),
+                            "The settlement number did not match the committed native receipt.");
+                        CaptureAndroidFrame("09-case-receipt",world.PracticeRewardSubject,Vector3.up*.13f);
+                        index++;
+                        break;
+                    }
+                    if(!field.gameObject.activeInHierarchy || field.material.GetVector("_Cue").x<timings[index]) continue;
+                    if(phases[index]=="hold")
+                        AndroidSmoke.Require(field.material.GetVector("_Cue").x<0 && field.material.GetVector("_Energy").x==0,
+                            "A flash preceded the case's silent hold on Android.");
+                    AndroidSmoke.Require(string.IsNullOrEmpty(practiceMeter.text) &&
+                        !world.PracticeRewardSubject.gameObject.activeInHierarchy,"The case disclosed the prize during the release.");
+                    CaptureAndroidFrame("09-case-"+phases[index++],body,Vector3.zero);
+                }
+                AndroidSmoke.Require(index==timings.Length+1,"The native case did not show all reveal stages.");
+            }
+            finally
+            {
+                Time.captureFramerate=captureRate;
+                practicePage=null; CloseMasterPage(); busy=false;
+            }
+
+            ActionRecord action=session.Actions.Single();
+            while(session.Day<action.echoDay)
+            {
+                if(session.NeedsStation) session.VisitStation();
+                session.Advance();
+                if(session.Day==action.echoDay) break;
+                if(session.HasPredictionReview) session.MarkPredictionReviewed();
+                if(session.CanPredict) session.SkipPrediction();
+                session.Choose(session.Hand.First(session.CanPlay).Id);
+            }
+            DomainEvent echo=session.Master.events.Single(e=>e.kind==DomainEventKind.TimeEcho && e.receipt?.sourceDay==action.day);
+            world.Cinematics.enabled=false;
+            try
+            {
+                PlayMasterSpectacle(echo,()=>{});
+                var plan=world.Cinematics.Current;
+                AndroidSmoke.Require(plan.RecordedEcho,"The native replay lost its real source.");
+                int results=plan.Outcome.Changes.Count(change=>change.Amount>0);
+                world.Cinematics.Advance(.08f);
+                yield return null; yield return new WaitForEndOfFrame();
+                Transform marks=world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Recorded source arriving on the time route");
+                Transform seal=marks.GetChild(0);
+                AndroidSmoke.Require(marks.Find("ArchiveReader/Bronze")?.GetComponentInChildren<MeshRenderer>()!=null,
+                    "The original bronze reader is missing from the APK.");
+                CaptureAndroidFrame("10-echo-origin",seal,Vector3.zero);
+                world.Cinematics.Advance(1.16f-world.Cinematics.Elapsed);
+                yield return null;
+                float focusAt=world.Cinematics.Elapsed;
+                SmokeButton("Focus reward charge");
+                AndroidSmoke.Require(world.Cinematics.Elapsed==focusAt,"Focusing advanced the reveal clock.");
+                world.Cinematics.Advance(.17f);
+                yield return null;
+                AndroidSmoke.Require(marks.Find("Reader seam light 1").GetComponent<LineRenderer>().widthMultiplier>.016f,
+                    "The reader seam did not respond to touch.");
+                world.Cinematics.Advance(RecordedEchoStory.GuideAt(1)+.24f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                CaptureAndroidFrame("10-echo-guides",marks.Find("Echo guide 2"),Vector3.up*.10f);
+                world.Cinematics.Advance(RecordedEchoStory.HoldAt+.07f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                CaptureAndroidFrame("10-echo-charge",seal,Vector3.zero);
+                var caption=overlay.GetComponent<CinematicCaption>();
+                Transform contact=marks.Find("Stable echo receipt anchor");
+                Transform items=marks.Find("Assembled actual resources");
+                Transform echoField=overlay.Find("Screen energy release");
+                world.Cinematics.Advance(RecordedEchoStory.ImpactAt+.075f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                AndroidSmoke.Require(!items.gameObject.activeInHierarchy && caption.Multiplier.text.Length==0,
+                    "The echo prize was exposed at the flash.");
+                CaptureAndroidFrame("10-echo-burst",contact,Vector3.up*.12f);
+                world.Cinematics.Advance(RecordedEchoStory.ImpactAt+.48f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                AndroidSmoke.Require(echoField.gameObject.activeInHierarchy && !items.gameObject.activeInHierarchy,
+                    "The wide release and prize overlapped.");
+                CaptureAndroidFrame("10-echo-wave",contact,Vector3.up*.20f);
+                world.Cinematics.Advance(RecordedEchoStory.RevealAt+.19f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                var beats=new CinematicTextChoreography(plan);
+                float second=plan.Cues.First(cue=>!cue.NodeHit && cue.Phase==CinematicPhase.SecondReveal).Time;
+                string expected=plan.Outcome.SampleRecordedEcho(world.Cinematics.Elapsed,beats.MultiplierTime,second,beats.SettlementTime,false).Copy;
+                string copy=caption.Multiplier.text;
+                AndroidSmoke.Require(!echoField.gameObject.activeInHierarchy && !string.IsNullOrEmpty(copy) &&
+                    copy==expected.Replace('　','\n') && world.WorldCamera.fieldOfView<36,
+                    "The native replay did not hold a clean close-up of the recorded prize.");
+                Transform reward=items.Cast<Transform>().Single(item=>item.gameObject.activeInHierarchy);
+                CaptureAndroidFrame("10-echo-local",reward,Vector3.zero);
+                world.Cinematics.Advance(RecordedEchoStory.SettleFor(results)+.46f-world.Cinematics.Elapsed);
+                yield return null; yield return new WaitForEndOfFrame();
+                CaptureAndroidFrame("10-echo-settle",contact,Vector3.up*.11f);
+                SmokeButton("Skip cinematic"); yield return null; SmokeButton("Continue master event");
+            }
+            finally { world.Cinematics.enabled=true; }
+        }
+
         private void SmokeButton(string name)
         {
             Button button=root.GetComponentsInChildren<Button>().FirstOrDefault(b=>b.name==name && b.interactable);
@@ -314,7 +467,7 @@ namespace Horizon
             }
             yield return new WaitForSecondsRealtime(.5f); yield return new WaitForEndOfFrame();
         }
-        private void CaptureAndroidFrame(string name,Transform actor,Vector3? focusOffset=null)
+        private void CaptureAndroidFrame(string name,Transform actor,Vector3? focusOffset=null,Renderer evidence=null)
         {
             AndroidSmoke.Require(world.WorldCamera.enabled && actor.gameObject.activeInHierarchy,"The scene actor/camera is hidden.");
             Texture2D frame=ScreenCapture.CaptureScreenshotAsTexture();
@@ -334,9 +487,34 @@ namespace Horizon
                 AndroidSmoke.Require(point.z>0 && point.x>0 && point.x<frame.width && point.y>0 && point.y<frame.height,"The scene actor is outside the phone viewport.");
                 float minimum=1,maximum=0;
                 int radius=Mathf.Max(12,frame.width/24);
-                for(int y=Mathf.Max(0,(int)point.y-radius);y<Mathf.Min(frame.height,(int)point.y+radius);y+=3)
-                    for(int x=Mathf.Max(0,(int)point.x-radius);x<Mathf.Min(frame.width,(int)point.x+radius);x+=3)
+                int left=Mathf.Max(0,(int)point.x-radius),right=Mathf.Min(frame.width,(int)point.x+radius);
+                int bottom=Mathf.Max(0,(int)point.y-radius),top=Mathf.Min(frame.height,(int)point.y+radius);
+                if(evidence!=null)
+                {
+                    AndroidSmoke.Require(evidence.enabled && evidence.gameObject.activeInHierarchy,"The native evidence base is hidden: "+name);
+                    // The source centre intentionally flares with uniform
+                    // light. Inspect the actual solid base, not an arbitrary
+                    // central patch or the whole frame (which includes HUD).
+                    Bounds bounds=evidence.bounds; Vector2 min=new Vector2(frame.width,frame.height),max=Vector2.zero;
+                    for(int corner=0;corner<8;corner++)
+                    {
+                        Vector3 at=bounds.center+Vector3.Scale(bounds.extents,new Vector3(
+                            (corner&1)==0?-1:1,(corner&2)==0?-1:1,(corner&4)==0?-1:1));
+                        Vector3 projected=world.WorldCamera.WorldToScreenPoint(at);
+                        AndroidSmoke.Require(projected.z>0 && projected.x>=frame.width*.04f && projected.x<=frame.width*.96f &&
+                            projected.y>=frame.height*.22f && projected.y<=frame.height*.80f,
+                            "The native evidence base is cropped or behind a caption band: "+name);
+                        min=Vector2.Min(min,new Vector2(projected.x,projected.y)); max=Vector2.Max(max,new Vector2(projected.x,projected.y));
+                    }
+                    AndroidSmoke.Require(max.x-min.x>12 && max.y-min.y>12,"The native evidence base is too small to inspect: "+name);
+                    left=Mathf.FloorToInt(min.x); right=Mathf.CeilToInt(max.x);
+                    bottom=Mathf.FloorToInt(min.y); top=Mathf.CeilToInt(max.y);
+                }
+                for(int y=bottom;y<top;y+=3)
+                    for(int x=left;x<right;x+=3)
                     { Color c=frame.GetPixel(x,y); float light=Mathf.Max(c.r,c.g,c.b); minimum=Mathf.Min(minimum,light); maximum=Mathf.Max(maximum,light); }
+                Debug.Log("HORIZON native visibility: "+name+"; region="+left+","+bottom+"–"+right+","+top+
+                    "; min="+minimum.ToString("F4")+"; max="+maximum.ToString("F4"));
                 AndroidSmoke.Require(maximum-minimum>.045f && maximum>.12f,"The Android 3D viewport is blank or uniformly gray: "+name);
                 AndroidSmoke.Frames.Add(name); AndroidSmoke.Write("running");
             }

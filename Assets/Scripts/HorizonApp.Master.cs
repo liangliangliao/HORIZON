@@ -24,7 +24,7 @@ namespace Horizon
         {
             View.Button(root, "Master hub", "HORIZON ME · 想象与现实", ShowMasterHub,
                 0.12f, 0.532f, 0.88f, 0.58f, Palette.Panel, Palette.Mint, 28);
-            View.Label(root, "Master version", "v" + MasterSpecification.Version + "  ·  SEE FARTHER. IMAGINE DEEPER.", 20,
+            View.Label(root, "Master version", "版本 " + MasterSpecification.Version + " · 看得更远，想得更深。", 20,
                 Palette.Muted, TextAnchor.MiddleCenter, 0.05f, 0.018f, 0.95f, 0.06f);
         }
         private void BuildMasterBoard()
@@ -32,15 +32,15 @@ namespace Horizon
             if (!session.UsesMasterRules) return;
             if (session.InExecutionMode)
             {
-                if (boardHint != null) boardHint.text = "EXECUTION MODE · 决定已锁定，完成下一步执行";
+                if (boardHint != null) boardHint.text = "执行模式 · 决定已锁定，完成下一步执行";
                 View.Button(root, "Resume execution", "决定好了 · 继续执行", () => { executionFromBoard = true; ShowExecution(); },
-                    0.065f, 0.754f, 0.49f, 0.788f, Palette.Mint, Palette.Ink, 22);
+                    0.065f, 0.762f, 0.49f, 0.788f, Palette.Mint, Palette.Ink, 22);
             }
             if (session.RunNumber >= 2 || session.Day >= 3)
                 View.Button(root, "Master hub", "ME · 想象", ShowMasterHub, 0.52f, 0.877f, 0.725f, 0.911f, Palette.Deep, Palette.Mint, 20);
             if (CanPrepareMaster && (session.Day >= 3 || session.RunNumber >= 2))
                 View.Button(root, "Prepare with imagination", archive.imagination == null ? "先练一次失败与恢复" : "继续上次失败预演", BeginBoardImagination,
-                    0.52f, 0.754f, 0.945f, 0.788f, Palette.Panel, Palette.Mint, 22);
+                    0.52f, 0.762f, 0.945f, 0.788f, Palette.Panel, Palette.Mint, 22);
             int energy = session.Master.overdriveEnergy;
             bool overdrive = session.Day <= session.Master.overdriveUntilDay;
             world.SetInsightState(energy, overdrive);
@@ -54,7 +54,7 @@ namespace Horizon
             }
         }
         private void CloseMasterPage()
-        { CancelAIRequest(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } RestoreMasterBackground(); }
+        { CancelAIRequest(); if (world != null) { world.Cinematics?.CancelAll(); world.EndImaginationScene(); world.EndPracticeSet(); } if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); overlay = null; } RestoreMasterBackground(); }
         private RectTransform MasterPage(string name, string title, Action back = null)
         {
             CloseMasterPage(); overlay = View.Rect(root, name, 0, 0, 1, 1);
@@ -115,7 +115,7 @@ namespace Horizon
             else View.Label(overlay, "Engine invitation", "已经想做，仍然没有开始？\n先选一张行动牌，再把决定锁定。\n之后只处理执行步骤。", 33, Palette.Text,
                 TextAnchor.MiddleLeft, 0.075f, 0.58f, 0.925f, 0.84f);
             CardSpec locked = session.InExecutionMode ? CardCatalog.FindById(session.Master.decision.cardId) : null;
-            string cost = locked == null ? "查看行动条件与来源" : "执行成本 · " + PlayExperience.NowLabel(session.ImmediateEffect(locked)) +
+            string cost = locked == null ? "查看行动条件与来源" : "执行成本 · " + PracticeReward.Label(session.ImmediateEffect(locked),true) +
                 (session.PreparationSaving(locked) > 0 ? " · 准备已省1精力" : session.PreparationWillSave(locked) ? " · 准备可省1精力" : " · 查看准备条件");
             View.Button(overlay, "Action factors", cost, ShowActionFactors,
                 0.075f, 0.455f, 0.925f, 0.515f, Palette.Deep, Palette.Muted, 24);
@@ -242,20 +242,32 @@ namespace Horizon
             View.Button(overlay, "Personalize imagination situation", "按这个目标生成困难情境", () => ShowContentStudio(NarrativePurpose.Imagination, imagineGoal, ShowImagineSetup),
                 0.075f, 0.501f, 0.925f, 0.554f, Palette.Deep, Palette.Gold, 25);
         }
+        private ImagineRun lastCinematicImagination;
         private void ShowImagineRun()
         {
             ImagineRun run = archive.imagination; if (run == null) { ShowImagineSetup(); return; }
             MasterPage("Imagination run", run.phase == ImaginePhase.VictoryAnchor ? "看见抵达 · VICTORY ANCHOR" : run.phase == ImaginePhase.Recover ? "失败之后 · 选择恢复" : run.phase == ImaginePhase.Retry ? "再次开始 · FAIL & AGAIN" : "走过过程 · BUILD THE PATH", ReturnFromImagination);
             overlay.Find("Master shade").GetComponent<Image>().color = new Color(.009f,.023f,.04f,.04f);
             world.ShowImaginationScene(run);
-            View.Panel(overlay, "Imagine readable copy", new Color(.009f,.023f,.04f,.94f), .045f,.43f,.955f,.56f,20);
-            View.Label(overlay, "Imagine goal title", run.goal, 33, Palette.Gold, TextAnchor.MiddleCenter, 0.075f, 0.77f, 0.925f, 0.86f);
-            Text beatCopy=View.Label(overlay, "Imagine beat", run.timeline.Last().text, 25, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.438f, 0.925f, 0.552f);
-            var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=run.timeline.Last().text;
-            View.Label(overlay, "Imagine resilience", "挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  RECOVERY " + run.recovered + "  ·  ×" + run.multiplier, 26, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.345f, 0.925f, 0.415f);
+            var edge=View.Rect(overlay,"Imagination full-screen reading light",0,0,1,1).gameObject.AddComponent<CinematicCurtainGraphic>(); edge.raycastTarget=false;
+            Text goalTitle=View.Label(overlay, "Imagine goal title", run.goal, 55, Palette.Gold, TextAnchor.MiddleLeft, 0.075f, 0.78f, 0.70f, 0.86f);
+            CinematicTypography.Upgrade(goalTitle,true); CinematicTypography.Emboss(goalTitle);
+            string phaseReading=ImaginationStoryboard.Reading(run);
+            Text beatCopy=View.Label(overlay, "Imagine beat", phaseReading, 34, Palette.Text, TextAnchor.MiddleCenter, 0.075f, 0.418f, 0.925f, 0.475f);
+            var shotCaption=overlay.gameObject.AddComponent<ImaginationCaption>(); shotCaption.World=world; shotCaption.Label=beatCopy; shotCaption.Original=phaseReading;
+            CinematicTypography.Upgrade(beatCopy,true);
+            View.Label(overlay, "Imagine resilience", "预演 · 经历挫折 " + run.failures + "/" + run.RequiredFailures + "  ·  恢复后再行动 " + run.recovered + " 次", 24, Palette.Muted, TextAnchor.MiddleCenter, 0.075f, 0.325f, 0.925f, 0.362f);
             if (run.pathVersion >= 2)
-                View.Label(overlay, "Imagine resources", "预演中的状态 · 精力 " + run.energy + " / 专注 " + run.focus + " / 支援 " + run.support,
-                    24, Palette.Mint, TextAnchor.MiddleCenter, 0.075f, 0.405f, 0.925f, 0.443f);
+            {
+                shotCaption.StateLabel=View.Label(overlay, "Imagine resources", "预演中的状态",27,Palette.Mint,TextAnchor.MiddleCenter,.075f,.37f,.925f,.41f);
+                shotCaption.To=run.Copy(); shotCaption.From=lastCinematicImagination?.id==run.id?lastCinematicImagination:run.Copy();
+            }
+            lastCinematicImagination=run.Copy();
+            UnityEngine.UI.Button framing=null;
+            framing=View.Button(overlay,"Imagination framing","查看全景",()=> {
+                world.ToggleImaginationOverview();
+                framing.GetComponentInChildren<Text>().text=world.ImaginationOverview?"回到特写":"查看全景";
+            },.73f,.795f,.93f,.85f,Palette.Deep,Palette.Mint,23);
             if (run.phase == ImaginePhase.Recover)
             {
                 string[] names = { "休息并安排下一步", "请求帮助", "缩小目标", "改变方法" };

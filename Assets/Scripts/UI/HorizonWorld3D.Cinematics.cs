@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Horizon.Game;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Unity.Cinemachine;
 
 namespace Horizon.UI
@@ -116,11 +117,15 @@ namespace Horizon.UI
         public void BeginCinematic(RewardPlan plan,bool fullscreen)
         {
             EndImaginationScene(); moviePlan=plan; moviePhase=CinematicPhase.Anticipation; moviePhaseTime=0;
+            cinematicOverviewRequested=false;
             movieImpactTime=plan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
             savedCameraPosition=cameraPosition; savedCameraLook=cameraLook; savedCameraRect=WorldCamera.rect;
             savedFov=WorldCamera.fieldOfView; savedFog=RenderSettings.fogDensity;
             if(systemScenery!=null) systemScenery.gameObject.SetActive(false);
-            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=fullscreen?new Rect(0,.18f,1,.64f):new Rect(0,.543f,1,.245f);
+            // The scene itself occupies the complete phone. Typography and
+            // controls are translucent overlays; they no longer crop the movie
+            // into a narrow strip between two black UI regions.
+            cinematicStage.gameObject.SetActive(true); WorldCamera.rect=new Rect(0,0,1,1);
             cinematicCamera.gameObject.SetActive(true);
             movieFuture.localPosition = new Vector3(0,0,6); movieFuture.localScale = Vector3.one;
             movieAnchor.localPosition = Vector3.zero; ResetMovieColor(movieAnchor);
@@ -139,11 +144,24 @@ namespace Horizon.UI
             foreach(Transform x in movieNodes) { x.gameObject.SetActive(false); x.localScale=Vector3.one*.16f; }
             foreach(LineRenderer x in movieLines) { x.gameObject.SetActive(false); x.widthMultiplier=.028f; ResetMovieColor(x.transform); }
             foreach(Transform x in movieTiles) { x.gameObject.SetActive(true); x.localScale=new Vector3(1.25f,.09f,.3f); ResetMovieColor(x); }
-            movieLight.intensity=0; PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
-            PrepareJackpotStage(plan,fullscreen);
+            movieLight.intensity=0; movieLight.transform.localPosition=new Vector3(0,3,0); movieLight.range=10;
+            if(plan.RecordedEcho)
+            {
+                movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
+                PrepareRecordedEcho();
+                SampleCinematic(0);
+                return;
+            }
+            PrepareRewardObjects(plan); PrepareCausalScene(); PrepareCinematicStaging();
+            PrepareJackpotStage(plan,true);
+            PrepareOrbitCinematic();
+            if(plan.Event.kind==DomainEventKind.Victory) PrepareFutureDoor();
             PrepareCausalRelays();
             PrepareCinemaProduction();
             PrepareCinemaTension();
+            PrepareImmersion();
+            PrepareLifeAction();
+            PrepareCinematicOverview();
             movieParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial=spectacle.Style==RewardSpectacleStyle.Loss?pink:
                 spectacle.Style==RewardSpectacleStyle.Legendary?gold:spectacle.Style==RewardSpectacleStyle.Mystery?rewardCrystal:teal;
             movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -188,9 +206,10 @@ namespace Horizon.UI
             if(cue.NodeHit)
             {
                 if(cue.NodeIndex<movieNodes.Count) { SetMovieColor(movieNodes[cue.NodeIndex],Palette.Mint); MovieBurst(movieNodes[cue.NodeIndex].position,8); }
-                CueSound(nodeTone,.65f); MasterHaptics.Cue(28,80,preferences); return;
+                CueSound(RelayVoice(cue.NodeIndex),.65f); MasterHaptics.Cue(28,80,preferences); return;
             }
             moviePhase=cue.Phase; moviePhaseTime=cue.Time;
+            if(moviePlan.RecordedEcho) { ApplyRecordedEchoCue(cue); return; }
             if(cue.Phase==CinematicPhase.Charge) PlayTensionCharge();
             if(cue.Phase==CinematicPhase.Escalation && moviePlan.Event.kind==DomainEventKind.Overdrive)
                 CueSound(nodeTone,.75f);
@@ -207,32 +226,43 @@ namespace Horizon.UI
                 movieMuted=false; UpdateAudio();
                 foreach (HorizonActor actor in cinematicStage.GetComponentsInChildren<HorizonActor>(true)) actor.MotionRate=1;
                 movieParticles.Play();
-                Vector3 hit=cinematicStage.TransformPoint(new Vector3(0,1.3f,2));
-                float strength=Mathf.Clamp01(Mathf.Log10(Mathf.Max(1,moviePlan.PresentationMultiplier))/2.7f);
-                MovieBurst(hit,Mathf.RoundToInt(8+56*strength));
-                CueSound(ImpactVoice(moviePlan.Event.kind),.25f+.75f*strength);
-                if(moviePlan.PresentationMultiplier>=50) CueSound(nodeTone,.3f);
-                if(moviePlan.PresentationMultiplier>=100) CueSound(heartbeatTone,.35f);
-                MasterHaptics.Impact(moviePlan.Event,preferences);
-                if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.11f:.025f; if(bloom!=null) bloom.Echo=.6f; }
-                bool losing = moviePlan.Objects.Any(o => o.Class == RewardObjectClass.Resource && o.Amount < 0);
-                if (losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
-                else if(moviePlan.Event.kind!=DomainEventKind.FailAndAgain) moviePlayer.GetComponent<HorizonActor>().Celebrate();
+                Vector3 hit=cinematicStage.TransformPoint(relayPlan?.MergeNode is CausalRelayNode merge ?
+                    new Vector3(merge.X,merge.Y,merge.Z) : new Vector3(0,1.3f,2));
+                float strength=cinematicEnergy?.Strength??0;
+                bool celebrating=cinematicEnergy?.Celebrates==true;
+                if(celebrating && moviePlan.Orbit==null && !moviePlan.RecordedEcho && (relayPlan==null || relayPlan.Nodes.Count==0 || relayPlan.MergeNode!=null))
+                {
+                    MovieBurst(hit,Mathf.RoundToInt(6+38*strength));
+                    CueSound(ImpactVoice(moviePlan.Event.kind),.26f+.57f*strength);
+                    if(moviePlan.Event.tier>=RewardTier.Major) PlayRevealShimmer(.22f+.3f*strength);
+                    MasterHaptics.Impact(moviePlan.Event,preferences);
+                    if(!preferences.reducedMotion) { shake=moviePlan.Event.tier>=RewardTier.Epic?.085f:.022f; if(bloom!=null) bloom.Echo=.45f; }
+                }
+                bool losing = spectacle.Style==RewardSpectacleStyle.Loss;
+                if(losing) moviePlayer.GetComponent<HorizonActor>().TiredUntil = Time.unscaledTime + moviePlan.Duration;
+                else if(celebrating) moviePlayer.GetComponent<HorizonActor>().Celebrate();
                 foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) SetMovieColor(node,Palette.Mint);
+            }
+            if(LifeActionPlaying && cue.Phase==CinematicPhase.HeroMoment && !preferences.reducedMotion &&
+                (cinemaTension==null || !cinemaTension.Enabled))
+            {
+                float silence=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.HitStop).Time;
+                if(silence>cue.Time) PlayTensionCharge(silence-cue.Time);
+                MasterHaptics.Cue(24,45,preferences);
             }
             if(cue.Phase==CinematicPhase.SecondReveal && moviePlan.Event.tier>=RewardTier.Epic)
             {
                 movieFuture.gameObject.SetActive(true); movieFuture.GetComponent<HorizonActor>().Pointing=true;
                 CueSound(nodeTone,.5f);
-                if(cinemaTension!=null && cinemaTension.SourceCloseup) CueSound(impactTone,.65f);
+                if(cinemaTension!=null && cinemaTension.SourceCloseup) CueSound(impactTone,.33f);
+                else if(cinematicEnergy!=null && cinematicEnergy.Celebrates && !moviePlan.RecordedEcho) PlayRevealShimmer(.6f);
             }
-            if(cue.Phase==CinematicPhase.Jackpot && cinemaTension!=null && cinemaTension.SourceCloseup)
-                CueSound(impactTone,.95f);
         }
         private void CueSound(AudioClip clip,float volume)
         {
 #if UNITY_EDITOR
-            if(moviePlan!=null && !paused && !movieMuted && clip!=null) recordedCinemaSounds.Add(new RecordedCinemaSound { Time=recordedSoundTime,Volume=volume,Clip=clip });
+            if((moviePlan!=null || caseVisualStarted) && !paused && !movieMuted && !caseSilent && clip!=null)
+                recordedCinemaSounds.Add(new RecordedCinemaSound { Time=recordedSoundTime,Volume=volume,Clip=clip });
 #endif
             if(!paused && preferences.sound && !movieMuted) { audioSource.pitch=1; audioSource.PlayOneShot(clip,volume); }
         }
@@ -268,9 +298,20 @@ namespace Horizon.UI
         public void SampleCinematic(float time)
         {
             if(moviePlan==null) return;
+            if(moviePlan.RecordedEcho)
+            {
+                SampleCinemaTension(time);
+                SampleRecordedEchoStage(time);
+                return;
+            }
+            RestoreShotOccluders();
             if (moviePhase == CinematicPhase.HitStop) time = moviePhaseTime;
             SampleCinemaTension(time);
             if(tensionFrame.Silent) time=tensionFrame.PoseTime;
+            // Every staging layer must see this sample, including a seek into
+            // the silent hold. A previous-frame envelope changed the fitted
+            // camera target once even though the subject pose was frozen.
+            energyFrame=cinematicEnergy?.Sample(time,preferences.reducedMotion) ?? default(CinematicEnergyFrame);
             float impactSpan=Mathf.Min(.75f,Mathf.Max(.02f,moviePlan.Duration*.78f-movieImpactTime));
             float progress=time/moviePlan.Duration, impact=Smooth(movieImpactTime,movieImpactTime+impactSpan,time);
             bool frozen=moviePhase==CinematicPhase.HitStop;
@@ -284,11 +325,15 @@ namespace Horizon.UI
             }
             if(kind==DomainEventKind.TimeEcho)
             {
+                float rewindAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Escalation).Time;
+                float sourceAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.HeroMoment).Time;
+                float returnAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.Impact).Time;
+                float attributionAt=moviePlan.Cues.First(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal).Time;
                 Vector3 source=new Vector3(0,1,-1); foreach(Transform node in movieNodes) if(node.gameObject.activeSelf) { source=node.localPosition; break; }
-                look=Vector3.Lerp(new Vector3(0,1,2),source,Smooth(.35f,.8f,time));
-                look=Vector3.Lerp(look,new Vector3(0,1,2),Smooth(1.05f,2.15f,time));
+                look=Vector3.Lerp(new Vector3(0,1,2),source,Smooth(rewindAt,sourceAt,time));
+                look=Vector3.Lerp(look,new Vector3(0,1,2),Smooth(returnAt,attributionAt,time));
                 int count=receipt?.causes.Count??0;
-                for(int i=0;i<Mathf.Min(count,24);i++) if(time>=1.05f+(i/(float)Mathf.Max(1,count))*.95f) SetMovieColor(movieNodes[i],Palette.Mint);
+                for(int i=0;i<Mathf.Min(count,24);i++) if(time>=returnAt+(i/(float)Mathf.Max(1,count))*(attributionAt-returnAt)) SetMovieColor(movieNodes[i],Palette.Mint);
             }
             if(kind==DomainEventKind.PatternBroken)
             {
@@ -340,11 +385,33 @@ namespace Horizon.UI
             SampleCinematicStaging(time,impact,ref camera,ref look);
             SampleCausalRelays(time,ref camera,ref look);
             SampleJackpotStage(time,ref camera,ref look);
-            SampleCinemaProduction(time);
+            SampleImmersion(time,ref camera,ref look);
+            optics.Glow=SystemInfo.graphicsDeviceType==GraphicsDeviceType.OpenGLES3 && !preferences.reducedMotion?
+                Mathf.Clamp01(.24f+energyFrame.Inward*.2f+energyFrame.Burst*.36f):0;
             if(preferences.reducedMotion) camera=new Vector3(5,4,-8);
+            FrameCinematicOverview(time,ref camera,ref look);
+            SampleLifeAction(time,ref camera,ref look);
+            FrameShowcaseInReadingAperture(time,ref camera,ref look);
+            SampleOrbitCinematic(time,ref camera,ref look);
+            SampleVictoryArrival(time,ref camera,ref look);
+            FrameCinematicSafety(time,ref camera,ref look);
             WorldCamera.transform.position=cinematicStage.TransformPoint(camera);
-            if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent) WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*shake;
-            WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=CinematicFieldOfView(time);
+            if(!preferences.reducedMotion && !frozen && !tensionFrame.Silent && moviePlan.Orbit==null)
+            {
+                float anticipation=Mathf.Pow(Mathf.Max(energyFrame.Inward,lifePressure),4)*(.008f+.018f*(int)moviePlan.Event.tier/6f);
+                WorldCamera.transform.position+=new Vector3(Mathf.Sin(time*65),Mathf.Cos(time*73),0)*(shake+anticipation);
+            }
+            ApplyCinematicCamera(look,CinematicFieldOfView(time));
+            if(optics.Defocus>.001f && focusTarget!=null && focusTarget.gameObject.activeSelf)
+                optics.FocusDistance=Mathf.Max(.1f,WorldCamera.WorldToViewportPoint(focusTarget.position).z);
+            SampleCinemaProduction(time);
+            FrameCinematicLabels();
+            shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
+        }
+
+        private void ApplyCinematicCamera(Vector3 look,float lens)
+        {
+            WorldCamera.transform.LookAt(cinematicStage.TransformPoint(look)); WorldCamera.fieldOfView=lens;
             cinematicCamera.transform.SetPositionAndRotation(WorldCamera.transform.position, WorldCamera.transform.rotation);
             cinematicCamera.Lens.FieldOfView = WorldCamera.fieldOfView;
             cinematicCamera.Lens.NearClipPlane = .1f; cinematicCamera.Lens.FarClipPlane = 80;
@@ -353,14 +420,14 @@ namespace Horizon.UI
             // Keep the physical camera on this sampled pose even when the rig
             // returns its earlier same-frame state.
             WorldCamera.transform.SetPositionAndRotation(cinematicCamera.transform.position,cinematicCamera.transform.rotation);
-            WorldCamera.fieldOfView=CinematicFieldOfView(time);
-            if(optics.Active && focusTarget!=null && focusTarget.gameObject.activeSelf)
-                optics.FocusDistance=Mathf.Max(.1f,WorldCamera.WorldToViewportPoint(focusTarget.position).z);
-            FrameCinematicLabels();
-            shake=Mathf.MoveTowards(shake,0,Time.unscaledDeltaTime*.32f);
+            WorldCamera.fieldOfView=lens;
         }
         private float CinematicFieldOfView(float time)
-        { if(tensionFrame.Silent) time=tensionFrame.PoseTime; return moviePlan.Event.tier>=RewardTier.Epic?Mathf.Lerp(39,48,Smooth(.55f,.85f,time/moviePlan.Duration)):38; }
+        {
+            if(tensionFrame.Silent) time=tensionFrame.PoseTime;
+            float authored=moviePlan.Event.tier>=RewardTier.Epic?Mathf.Lerp(39,48,Smooth(.55f,.85f,time/moviePlan.Duration)):38;
+            return preferences.reducedMotion?authored:authored-energyFrame.Inward*2.4f+energyFrame.Recoil*1.5f;
+        }
         private void SampleRewardObjects(float time,float impact)
         {
             float progress=time/moviePlan.Duration;
@@ -406,9 +473,21 @@ namespace Horizon.UI
             if(moviePlan==null) return;
             ResetCinematicStaging();
             ResetCinemaTension();
+            ResetImmersion();
             ResetCinemaProduction();
             ResetCausalRelays();
+            if(orbitCinematicStage!=null) orbitCinematicStage.gameObject.SetActive(false);
+            if(moviePlan.RecordedEcho)
+            {
+                echoActor?.Release();
+                if(echoTrace!=null) echoTrace.gameObject.SetActive(false);
+                if(bloom!=null) bloom.Echo=0;
+            }
+            if(futureDoorFrame!=null) futureDoorFrame.gameObject.SetActive(false);
+            movieAnchor.Find("Possible future doorway").gameObject.SetActive(true);
             ResetJackpotStage();
+            EndLifeAction();
+            cinematicOverviewRequested=false;
             moviePlan=null; cinematicStage.gameObject.SetActive(false); movieParticles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
             cinematicCamera.gameObject.SetActive(false);
             cameraPosition=savedCameraPosition; cameraLook=savedCameraLook; WorldCamera.rect=savedCameraRect; WorldCamera.fieldOfView=savedFov;

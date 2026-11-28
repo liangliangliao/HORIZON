@@ -7,11 +7,14 @@ Shader "HORIZON/LitColor"
         _Metallic ("Metallic", Range(0,1)) = 0.05
         _Coat ("Clear coat", Range(0,1)) = 0.15
         _RimColor ("Edge light", Color) = (0.055,0.09,0.12,1)
+        _ArchiveFinish ("Packed archive finish", 2D) = "white" {}
     }
     SubShader {
         Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
         HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        TEXTURE2D(_ArchiveFinish);
+        SAMPLER(sampler_ArchiveFinish);
         CBUFFER_START(UnityPerMaterial)
             half4 _Color, _Emission, _RimColor;
             half _Smoothness, _Metallic, _Coat;
@@ -29,39 +32,53 @@ Shader "HORIZON/LitColor"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile_local _ _ARCHIVE_FINISH
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-            struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            struct Varyings { float4 positionCS:SV_POSITION; float3 normalWS:TEXCOORD0; float3 positionWS:TEXCOORD1; half fog:TEXCOORD2; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; float2 uv:TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Varyings { float4 positionCS:SV_POSITION; float3 normalWS:TEXCOORD0; float3 positionWS:TEXCOORD1; half fog:TEXCOORD2; float2 uv:TEXCOORD3; UNITY_VERTEX_INPUT_INSTANCE_ID };
             Varyings vert(Attributes i) {
                 Varyings o; UNITY_SETUP_INSTANCE_ID(i); UNITY_TRANSFER_INSTANCE_ID(i,o);
                 o.positionWS=TransformObjectToWorld(i.positionOS.xyz); o.positionCS=TransformWorldToHClip(o.positionWS);
-                o.normalWS=TransformObjectToWorldNormal(i.normalOS); o.fog=ComputeFogFactor(o.positionCS.z); return o;
+                o.normalWS=TransformObjectToWorldNormal(i.normalOS); o.fog=ComputeFogFactor(o.positionCS.z); o.uv=i.uv; return o;
             }
-            half3 SurfaceLight(half3 normal,half3 view,Light light) {
+            half3 SurfaceLight(half3 normal,half3 view,Light light,half3 baseColor) {
                 half ndl=saturate(dot(normal,light.direction));
                 half3 h=normalize(light.direction+view);
                 half ndh=saturate(dot(normal,h)), vdh=saturate(dot(view,h));
-                half3 f0=lerp(half3(.04,.04,.04),_Color.rgb,_Metallic);
+                half3 f0=lerp(half3(.04,.04,.04),baseColor,_Metallic);
                 half3 fresnel=f0+(1-f0)*pow(1-vdh,5);
                 half power=lerp(12,128,_Smoothness);
                 half spec=pow(ndh,power)*(power+2)*.035;
                 half coat=pow(ndh,128)*_Coat*.35;
-                half3 diffuse=_Color.rgb*(1-_Metallic)*ndl;
+                half3 diffuse=baseColor*(1-_Metallic)*ndl;
                 return (diffuse+fresnel*spec*ndl+coat)*light.color*light.distanceAttenuation*light.shadowAttenuation;
             }
             half4 frag(Varyings i):SV_Target {
                 UNITY_SETUP_INSTANCE_ID(i);
                 half3 normal=normalize(i.normalWS), view=GetWorldSpaceNormalizeViewDir(i.positionWS);
+                half3 baseColor=_Color.rgb;
+                half cavity=1;
+                #ifdef _ARCHIVE_FINISH
+                half4 detail=SAMPLE_TEXTURE2D(_ArchiveFinish,sampler_ArchiveFinish,i.uv*3);
+                half3 tangent=normalize(cross(abs(normal.y)>.94?half3(0,0,1):half3(0,1,0),normal));
+                half3 binormal=cross(normal,tangent);
+                normal=normalize(normal+(detail.b-.5)*tangent*.47+(detail.a-.5)*binormal*.47);
+                baseColor*=lerp(.60,1.16,detail.r);
+                cavity=detail.g;
+                #endif
                 Light light=GetMainLight(TransformWorldToShadowCoord(i.positionWS));
                 half3 reflected=reflect(-view,normal);
                 half3 sky=lerp(half3(.045,.07,.12),half3(.68,.79,1),saturate(reflected.y*.5+.5));
                 half studio=pow(saturate(dot(reflected,normalize(half3(-.5,.8,-.3)))),lerp(4,32,_Smoothness));
+                // Broad studio strips describe curved metal between glints.
+                half strip=saturate(1-abs((reflected.x+.24)*4)); strip=strip*strip*strip*strip*smoothstep(-.12,.65,reflected.y);
+                half fill=saturate(1-abs((reflected.x-.68)*6)); fill=fill*fill*fill*fill*smoothstep(-.6,.2,reflected.y)*.45;
                 half rim=pow(1-saturate(dot(normal,view)),3);
-                half3 color=_Color.rgb*SampleSH(normal)*(1-_Metallic*.75)+SurfaceLight(normal,view,light);
-                color+=_Color.rgb*(sky*.32+studio*.8)*_Metallic+_RimColor.rgb*rim+_Emission.rgb;
+                half3 color=baseColor*SampleSH(normal)*(1-_Metallic*.75)*cavity+SurfaceLight(normal,view,light,baseColor);
+                color+=(baseColor*(sky*.22+studio*.65+strip*.65)+half3(1,.91,.7)*(strip+fill)*.3)*_Metallic*cavity+_RimColor.rgb*rim+_Emission.rgb;
                 #ifdef _ADDITIONAL_LIGHTS
                 uint count=GetAdditionalLightsCount();
-                for(uint n=0;n<count;n++) { color+=SurfaceLight(normal,view,GetAdditionalLight(n,i.positionWS)); }
+                for(uint n=0;n<count;n++) { color+=SurfaceLight(normal,view,GetAdditionalLight(n,i.positionWS),baseColor); }
                 #endif
                 return half4(MixFog(color,i.fog),1);
             }

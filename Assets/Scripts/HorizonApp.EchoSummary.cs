@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Horizon.Game;
 using Horizon.UI;
@@ -13,13 +14,16 @@ namespace Horizon
             FeedbackRecord receipt = archive.pendingFeedback;
             if (receipt?.kind != FeedbackKind.Echoes || receipt.detailed || receipt.page > 0 || receipt.beats.Count < 2) return false;
             Clear(); world.ShowBoard(); world.SetTimeline(session.Actions, session.Deadline);
+            // A summary is an information page. Do not put opaque rows over
+            // the 3D stage; reserve that full-screen surface for the movie.
+            View.Fill(root,"Echo summary reading background",Palette.Ink,0,0,1,1,true);
             View.Label(root, "Result day", "DAY " + receipt.day.ToString("00") + " / " + session.Deadline, 37, Palette.Text,
                 TextAnchor.MiddleLeft, 0.06f, 0.95f, 0.94f, 0.985f);
             View.Label(root, "Echo bundle title", receipt.beats.Count + " 条回声 · 一起抵达", 48, Palette.Mint,
-                TextAnchor.MiddleLeft, 0.075f, 0.78f, 0.925f, 0.88f);
-            View.Label(root, "Echo bundle context", "下面每一条，都来自已经发生的行动。", 32, Palette.Text,
-                TextAnchor.MiddleLeft, 0.075f, 0.713f, 0.925f, 0.78f);
-            RectTransform viewport = View.Rect(root, "Echo summary scroll", 0.075f, 0.275f, 0.925f, 0.705f);
+                TextAnchor.MiddleLeft, 0.075f, 0.835f, 0.925f, 0.915f);
+            View.Label(root, "Echo bundle context", "以下是今天到期的后果。每行列出原行动和本次实际入账。", 32, Palette.Text,
+                TextAnchor.MiddleLeft, 0.075f, 0.77f, 0.925f, 0.83f);
+            RectTransform viewport = View.Rect(root, "Echo summary scroll", 0.075f, 0.275f, 0.925f, 0.75f);
             viewport.gameObject.AddComponent<RectMask2D>();
             Image hit = viewport.gameObject.AddComponent<Image>(); hit.color = Color.clear;
             ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>(); scroll.viewport = viewport; scroll.horizontal = false;
@@ -31,7 +35,7 @@ namespace Horizon
                 FeedbackBeat beat = receipt.beats[i];
                 RectTransform row = View.Panel(content, "Resolved echo " + i, Palette.Panel, 0, 1, 1, 1, 23).rectTransform;
                 row.pivot = new Vector2(0.5f, 1); row.sizeDelta = new Vector2(0, 166); row.anchoredPosition = new Vector2(0, -i * 184);
-                View.Label(row, "Echo source", "D" + beat.sourceDay + "「" + beat.source + "」 → 今天", 32, Palette.Gold,
+                View.Label(row, "Echo source", "第 " + beat.sourceDay + " 天 · 「" + beat.source + "」 → 今天", 29, Palette.Gold,
                     TextAnchor.MiddleLeft, 0.035f, 0.51f, 0.965f, 0.96f);
                 View.Label(row, "Echo actual changes", PlayExperience.NowLabel(beat.delta), 34, Palette.Text,
                     TextAnchor.MiddleLeft, 0.035f, 0.07f, 0.965f, 0.52f);
@@ -40,7 +44,7 @@ namespace Horizon
                 TextAnchor.MiddleCenter, 0.075f, 0.226f, 0.925f, 0.27f);
             View.Button(root, "Review echo details", "逐条细看", () => { receipt.detailed = true; Save(); ShowFeedback(); },
                 0.075f, 0.148f, 0.36f, 0.213f, Palette.Panel, Palette.Text, 29);
-            View.Label(root, "Bundle reward", "+" + receipt.stardust + " 星尘 · 已收集", 28, Palette.Gold,
+            View.Label(root, "Bundle reward", receipt.stardust > 0 ? "+" + receipt.stardust + " 星尘 · 已收集" : "到期变化已入账", 28, Palette.Gold,
                 TextAnchor.MiddleRight, 0.39f, 0.148f, 0.925f, 0.213f);
             Button next = View.Button(root, "Continue result", session.HasPredictionReview ? "看看预测与实际" : "回到今天 · 选择下一步", () => {
                 if (busy) return;
@@ -54,13 +58,24 @@ namespace Horizon
         {
             MasterRunState state = CurrentMaster;
             if (state == null) return;
-            var pending = state.events.Where(e => !e.acknowledged && e.tier < RewardTier.Mythic).ToList();
+            var pending = RewardPlayback.Pending(state.events).Where(e=>e.tier<RewardTier.Mythic).ToList();
             BindLocalCinematicCopy();
-            foreach (DomainEvent e in pending)
+            for (int i = 0; i < pending.Count; i++)
             {
-                DomainEvent shown = e;
-                world.PresentMasterEvent(shown, () => {
-                    shown.acknowledged = true;
+                DomainEvent first = pending[i];
+                var shown = new List<DomainEvent> { first };
+                if (OrbitCinematic.HasRecordedNode(first))
+                    while (i + 1 < pending.Count && OrbitCinematic.HasRecordedNode(pending[i + 1]) && pending[i + 1].day == first.day)
+                    {
+                        DomainEvent next = pending[i + 1];
+                        int previous = shown[shown.Count - 1].receipt.orbitBits;
+                        if (next.receipt.orbitBits == previous || next.receipt.orbitBits != (previous | (1 << next.receipt.orbitIndex))) break;
+                        shown.Add(next);
+                        i++;
+                    }
+                var plan = shown.Count > 1 ? RewardDirector.DirectOrbit(shown) : RewardDirector.Direct(first);
+                world.Cinematics.Enqueue(plan, () => {
+                    foreach (DomainEvent item in shown) item.acknowledged = true;
                     if (session != null && session.CompletedRun == null && archive.active?.runNumber == session.RunNumber) archive.active = session.Snapshot();
                     Save();
                 });

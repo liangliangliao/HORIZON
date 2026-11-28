@@ -135,11 +135,11 @@ namespace Horizon
             {
                 if (overlay != page || page == null) yield break;
                 if (userPaused) { yield return null; continue; }
-                cursor.text = "DAY " + Mathf.RoundToInt(Mathf.Lerp(from, to, age / duration)).ToString("00") + " · 另一条路正在展开";
+                cursor.text = "第 " + Mathf.RoundToInt(Mathf.Lerp(from, to, age / duration))+" 天 · 另一条路正在展开";
                 yield return null;
             }
             if (overlay != page || page == null) yield break;
-            cursor.text = "DAY " + to.ToString("00") + " · 这一天留下了不同的东西";
+            cursor.text = "第 " + to + " 天 · 这一天留下了不同的东西";
             next.interactable = true;
         }
 
@@ -147,6 +147,42 @@ namespace Horizon
         { button.interactable = false; StartCoroutine(ArmStoryInput(button, page)); }
         private IEnumerator ArmStoryInput(Button button, RectTransform page)
         { yield return new WaitForSecondsRealtime(0.24f); if (overlay == page && button != null) button.interactable = true; }
+
+        private IEnumerator WaitForStoryCheckpoint(string label)
+        {
+            int generation=viewGeneration; bool continueReading=false;
+            Button next=View.Button(root,"Continue story checkpoint",label,()=> {
+                if(generation==viewGeneration && !userPaused) continueReading=true;
+            },.10f,.045f,.90f,.115f,Palette.Mint,Palette.Ink,30);
+            next.interactable=false;
+            View.Label(root,"Story checkpoint hint","画面会留在这里，等你看清。",23,Palette.Muted,
+                TextAnchor.MiddleCenter,.08f,.009f,.92f,.039f);
+            yield return new WaitForSecondsRealtime(.35f);
+            if(generation!=viewGeneration || next==null) yield break;
+            next.interactable=true;
+            while(generation==viewGeneration && !continueReading) yield return null;
+            if(next!=null) Destroy(next.gameObject);
+        }
+
+        private static string CausalKindCopy(CausalNode node)
+        {
+            switch(node.type)
+            {
+                case CausalNodeKind.Action:return "行动";
+                case CausalNodeKind.Echo:return "回声";
+                case CausalNodeKind.Memory:return "记忆";
+                case CausalNodeKind.Gate:return "结果";
+                case CausalNodeKind.Decision:return "决定";
+                case CausalNodeKind.Execution:return "执行";
+                case CausalNodeKind.Thought:return "想法";
+                case CausalNodeKind.Imagination:return "预演";
+                case CausalNodeKind.Insight:return "理解";
+                case CausalNodeKind.Opportunity:return "机会";
+                case CausalNodeKind.Prediction:return "预测对照";
+                case CausalNodeKind.Reality:return "现实行动";
+                default:return "经历";
+            }
+        }
 
         private void DrawStoryRoute(Transform parent, List<int> days, int selected, string name)
         {

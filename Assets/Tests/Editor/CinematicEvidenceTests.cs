@@ -64,16 +64,36 @@ namespace Horizon.Tests
                     byte[] prior=null;
                     for (int frame=0; frame<3; frame++)
                     {
-                        float time=plan.Duration*(frame==0?.12f:frame==1?.54f:.86f);
+                        float time=plan.Duration*(frame==0?.12f:frame==1?.54f:.94f);
+                        if(source.kind==DomainEventKind.PatternBroken && frame==1)
+                            time=CinematicStoryboard.Pattern(plan)[(int)PatternShot.ShatterHistory].Time+.01f;
                         world.Cinematics.Advance(Mathf.Max(0,time-world.Cinematics.Elapsed));
                         yield return null;
                         Assert.IsTrue(world.Cinematics.IsPlaying);
                         if(source.kind==DomainEventKind.PatternBroken && frame==1)
                             Assert.Greater(world.GetComponentsInChildren<Transform>().Single(t=>t.name=="Cinematic player").localPosition.z,3.5f,
                                 "A rendered Pattern Broken must show the actor beyond the old interruption, not just changing effects.");
-                        Assert.AreEqual(source.title,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
-                        Assert.AreEqual(plan.ResourceCopy,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward actual resources").text);
-                        Assert.AreEqual(source.detail,root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text);
+                        Assert.AreEqual(CinematicOutcome.EventHeading(source),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward event title").text);
+                        Assert.AreEqual(source.detail,plan.Event.detail,"The immutable event explanation must survive direction.");
+                        Assert.IsNotEmpty(root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward story").text,
+                            "Every staged shot must say what the viewer is seeing.");
+                        if(frame==2)
+                        {
+                            Assert.AreEqual(CinematicOutcome.Readable(source.detail),
+                                root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original explanation").text,
+                                "The settlement shot must restore the exact receipt explanation.");
+                            var caption=root.GetComponentsInChildren<CinematicCaption>().Single();
+                            if(plan.RecordedEcho)
+                            {
+                                var gains=plan.Outcome.Changes.Where(change=>change.Amount>0).Select(change=>change.Copy());
+                                Assert.AreEqual(string.Join("\n",gains),caption.Multiplier.text);
+                                string costs=plan.Outcome.EchoCosts;
+                                Assert.AreEqual(costs.Length>0?"本次付出  "+costs:"",caption.Resources.text);
+                            }
+                            else
+                                Assert.AreEqual(plan.ResourceCopy,caption.Resources.text,
+                                    "The settlement shot must show only the resources in the immutable receipt.");
+                        }
                         if(source.receipt!=null && source.receipt.predictionRecorded)
                             Assert.AreEqual(CinematicCaption.PredictionCopy(source.receipt),root.GetComponentsInChildren<Text>(true).Single(t=>t.name=="Reward original prediction").text);
                         foreach (Transform child in canvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer=5;

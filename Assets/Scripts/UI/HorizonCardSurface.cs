@@ -8,9 +8,26 @@ namespace Horizon.UI
     public sealed class HorizonCardSurface : MaskableGraphic
     {
         public Color Accent = Palette.Mint;
-        public float Thickness = 14;
+        public float Thickness = 24;
         public float Radius = 22;
         public bool Available = true;
+        private Quaternion restRotation;
+        private bool initialized;
+        private float clock;
+        private HorizonCardDrag drag;
+
+        private void Start()
+        { restRotation=rectTransform.localRotation; drag=GetComponent<HorizonCardDrag>(); initialized=true; }
+        private void Update()
+        {
+            if(!initialized || VisualPreferences.Paused) return;
+            clock+=Time.unscaledDeltaTime;
+            if(drag!=null && (!drag.Available || drag.IsDragging || drag.IsReturning)) return;
+            rectTransform.localRotation=VisualPreferences.ReducedMotion?restRotation:
+                restRotation*Quaternion.Euler(Mathf.Sin(clock*.72f+transform.GetSiblingIndex())*2.2f,
+                    Mathf.Sin(clock*.55f+transform.GetSiblingIndex())*3.2f,0);
+            if(!VisualPreferences.ReducedMotion) SetVerticesDirty();
+        }
 
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
@@ -40,6 +57,23 @@ namespace Horizon.UI
                 mesh.AddTriangle(0, i + 1, next + 1);
                 Quad(mesh, front[i], front[next], inner[next], inner[i], Color.Lerp(Accent, Palette.Text, i < 14 ? 0.28f : 0.02f));
                 Quad(mesh, back[i], back[next], front[next], front[i], Color.Lerp(Palette.Deep, Accent, i < 14 ? 0.12f : 0.32f));
+                // Machined edge: dark inset between two specular lips gives
+                // thickness even on a screen-space canvas without real lights.
+                Vector3 lipA=Vector3.Lerp(back[i],front[i],.45f),lipB=Vector3.Lerp(back[next],front[next],.45f);
+                Quad(mesh,lipA,lipB,Vector3.Lerp(back[next],front[next],.63f),Vector3.Lerp(back[i],front[i],.63f),Color.Lerp(Accent,Palette.Ink,.2f));
+                float glint=VisualPreferences.ReducedMotion?.15f:Mathf.Pow(Mathf.Max(0,Mathf.Cos(i*Mathf.PI*2/count-clock*.65f)),18);
+                Color rim=Color.Lerp(Accent,Color.white,.75f); rim.a=.14f+glint*.72f;
+                Quad(mesh,front[i],front[next],Vector3.Lerp(front[next],inner[next],.48f),Vector3.Lerp(front[i],inner[i],.48f),rim);
+            }
+            // Broad translucent reflection travels across the card face, never
+            // a white slab over its copy. Geometry stays within the inner face.
+            if(!VisualPreferences.ReducedMotion && Available)
+            {
+                float y=Mathf.Lerp(r.yMin+Radius,r.yMax-Radius,Mathf.Repeat(clock*.13f,1));
+                Color reflection=Accent; reflection.a=.045f;
+                Quad(mesh,new Vector3(r.xMin+Radius,y,-2.2f),new Vector3(r.xMax-Radius,Mathf.Min(r.yMax-Radius,y+18),-2.2f),
+                    new Vector3(r.xMax-Radius,Mathf.Min(r.yMax-Radius,y+38),-2.2f),
+                    new Vector3(r.xMin+Radius,Mathf.Min(r.yMax-Radius,y+20),-2.2f),reflection);
             }
         }
 

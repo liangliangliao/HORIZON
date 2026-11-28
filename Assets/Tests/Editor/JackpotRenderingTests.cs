@@ -110,19 +110,8 @@ namespace Horizon.Tests
             {
                 camera.rect=new Rect(0,0,1,1); camera.targetTexture=target; world.FrameCinematicLabels();
                 Transform plaque=stage.Find("3D presentation multiplier plaque");
-                float bottom=1,top=0;
-                foreach(Renderer renderer in plaque.GetComponentsInChildren<Renderer>())
-                {
-                    Bounds bounds=renderer.localBounds;
-                    for(int i=0;i<8;i++)
-                    {
-                        Vector3 corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
-                        float y=viewport.y+camera.WorldToViewportPoint(renderer.transform.TransformPoint(corner)).y*viewport.height;
-                        bottom=Mathf.Min(bottom,y); top=Mathf.Max(top,y);
-                    }
-                }
-                Assert.Greater(bottom,HorizonCinemaLayout.PredictionTop,"The 3D multiplier must clear the real prediction receipt panel.");
-                Assert.Less(top,HorizonCinemaLayout.TitleBottom,"The 3D multiplier must clear the actual title panel.");
+                Assert.IsFalse(plaque.gameObject.activeSelf,"A decorative multiplier must not replace the actual outcome.");
+                Assert.IsEmpty(plaque.GetComponentsInChildren<Renderer>(true),"Do not merely hide old digits under new text.");
                 Bounds hero=asset.GetComponentsInChildren<Renderer>().First().bounds;
                 foreach(Renderer renderer in asset.GetComponentsInChildren<Renderer>()) hero.Encapsulate(renderer.bounds);
                 float center=viewport.y+camera.WorldToViewportPoint(hero.center).y*viewport.height;
@@ -137,7 +126,9 @@ namespace Horizon.Tests
         {
             yield return new EnterPlayMode(); yield return null;
             var world=new GameObject("Resource material rendering verification").AddComponent<HorizonWorld3D>(); world.Initialize();
-            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false }); world.Cinematics.enabled=false;
+            // Inspect the actual models in one repeatable pose. The continuous
+            // outcome capture exercises the moving shutters, particles and light.
+            world.ApplyPreferences(new PlayerPreferences { sound=false,haptics=false,reducedMotion=true }); world.Cinematics.enabled=false;
             ResourceDelta[] changes={new ResourceDelta(energy:2),new ResourceDelta(mood:2),new ResourceDelta(insight:2),
                 new ResourceDelta(money:2),new ResourceDelta(relation:2),new ResourceDelta(ability:2)};
             RewardObjectKind[] kinds={RewardObjectKind.EnergyCell,RewardObjectKind.WarmLamp,RewardObjectKind.FocusLens,
@@ -149,12 +140,17 @@ namespace Horizon.Tests
                     var source=new DomainEvent { id="resource-render-"+i,kind=DomainEventKind.TimeEcho,tier=RewardTier.Major,day=7,
                         receipt=new RewardReceipt { resourcesRecorded=true,resources=changes[i],sourceDay=3,action="实际行动" } };
                     string before=JsonUtility.ToJson(source);
-                    Assert.IsTrue(world.Cinematics.Enqueue(source,true)); world.Cinematics.Advance(2.85f);
-                    Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Pooled 3D reward spectacle");
-                    Assert.IsNotNull(stage.Find("Reward showcase "+kinds[i]));
-                    Assert.IsTrue(stage.Find("Reward showcase "+kinds[i]).gameObject.activeInHierarchy);
+                    Assert.IsTrue(world.Cinematics.Enqueue(source,true));
+                    world.Cinematics.Advance(0);
+                    Transform stage=world.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Assembled actual resources");
+                    Transform resource=stage.Find(kinds[i].ToString());
+                    Assert.IsNotNull(resource);
+                    Assert.IsTrue(resource.gameObject.activeInHierarchy);
+                    Assert.AreEqual(1,stage.GetComponentsInChildren<Transform>().Count(t=>t.parent==stage));
                     Capture(world,"showcase-resource-"+kinds[i]);
                     Assert.AreEqual(before,JsonUtility.ToJson(source)); world.Cinematics.Skip();
+                    // Capture schedules its readback texture for destruction at the end of the frame.
+                    yield return null;
                 }
             }
             finally { world.Cinematics.CancelAll(); Object.Destroy(world.gameObject); }

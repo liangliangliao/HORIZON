@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 9d8e6452b7e94706b6b242b2ed91b8af
+ModelImporter:
+  serializedVersion: 22200
+  materials:
+    materialImportMode: 0
+  meshes:
+    globalScale: 1
+    meshCompression: 0
+    importVisibility: 0
+    importCameras: 0
+    importLights: 0
+    preserveHierarchy: 1
+  tangentSpace:
+    normalSmoothingAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+  importAnimation: 0

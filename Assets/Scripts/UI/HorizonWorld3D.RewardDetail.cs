@@ -105,6 +105,27 @@ namespace Horizon.UI
             }
         }
 
+        private void PoseResourceMechanism(Transform item,RewardObjectKind kind,float assembled)
+        {
+            float gap=1-assembled;
+            switch(kind)
+            {
+                case RewardObjectKind.FocusLens:
+                    Transform lens=item.Find("Glass optical reticle");
+                    lens.localPosition=rewardRestPositions[lens]+Vector3.back*(gap*.28f);
+                    lens.localScale=rewardRestScales[lens]*(1+gap*.45f);
+                    Transform rear=item.Find("Rear optical bevel");
+                    rear.localPosition=rewardRestPositions[rear]+Vector3.forward*(gap*.31f);
+                    break;
+                case RewardObjectKind.ConnectionRing:
+                    Transform left=item.Find("Player link"), right=item.Find("Other link");
+                    left.localPosition=rewardRestPositions[left]+Vector3.left*(gap*.16f);
+                    right.localPosition=rewardRestPositions[right]+new Vector3(gap*.36f,gap*.16f,-gap*.18f);
+                    right.localRotation=rewardRestRotations[right]*Quaternion.Euler(gap*35,-gap*55,0);
+                    break;
+            }
+        }
+
         private void SampleRewardDetail(Transform item,float time,float open)
         {
             if(!preferences.reducedMotion)

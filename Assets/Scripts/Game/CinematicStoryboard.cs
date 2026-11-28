@@ -42,10 +42,12 @@ namespace Horizon.Game
         public static bool AllowsExtremeWide(DomainEventKind kind)
         { return kind==DomainEventKind.PatternBroken || kind==DomainEventKind.RealityConvergence || kind==DomainEventKind.CausalSingularity; }
         public static int DayDuringRewind(DomainEvent e,float seconds)
+        { return DayDuringRewind(e,seconds,.35f,.8f); }
+        public static int DayDuringRewind(DomainEvent e,float seconds,float rewindStart,float rewindEnd)
         {
             if ((e.receipt?.sourceDay ?? 0) <= 0) return e.day;
             int from=Math.Max(e.day,e.receipt?.sourceDay??e.day), to=Math.Max(1,e.receipt?.sourceDay??e.day);
-            float p=Math.Max(0,Math.Min(1,(seconds-.35f)/.45f));
+            float p=Math.Max(0,Math.Min(1,(seconds-rewindStart)/Math.Max(.001f,rewindEnd-rewindStart)));
             return from-(int)Math.Floor((from-to)*p+.0001f);
         }
     }

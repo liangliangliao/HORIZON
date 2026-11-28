@@ -34,7 +34,7 @@ namespace Horizon.UI
             comfortSeat=Box(systemScenery,"Comfortable resting place",new Vector3(0,.3f,0),new Vector3(2,.6f,1.3f),ivory);
         }
         private void SystemLabel(int index,string text,Vector3 at)
-        { TextMesh label=systemLabels[index]; label.gameObject.SetActive(true); label.text=text; label.color=Palette.Text; label.transform.localPosition=at; }
+        { TextMesh label=systemLabels[index]; label.gameObject.SetActive(true); label.text=PresentationCopy.Chinese(text); label.color=Palette.Text; label.transform.localPosition=at; }
 
         private void BeginSystemScene(string system, Rect viewport)
         {
@@ -135,18 +135,28 @@ namespace Horizon.UI
         private void SampleSystemScene()
         {
             if(inspectedSystem=="reservoir") for(int i=0;i<inspectedValue;i++)
-            { float p=Mathf.Repeat(imaginationTime*.3f+i*.19f,1); movieNodes[i].localPosition=Vector3.Lerp(new Vector3(Mathf.Cos(i*2.4f)*2,.5f,Mathf.Sin(i*2.4f)*2+2),new Vector3(0,1,2),p); }
+            {
+                float phase=Mathf.Repeat(imaginationTime*.3f+i*.19f,1);
+                float p=preferences.reducedMotion?0:ImmersiveMotion.Flight(phase);
+                movieNodes[i].localPosition=Vector3.Lerp(new Vector3(Mathf.Cos(i*2.4f)*2,.5f,Mathf.Sin(i*2.4f)*2+2),new Vector3(0,1,2),p);
+                movieNodes[i].localScale=Vector3.one*.16f*(1-ImmersiveMotion.Smooth((p-.8f)/.2f)*.9f);
+            }
             if(inspectedSystem=="thought:tomorrow") { movieAnchor.localPosition=new Vector3(0,0,Mathf.Min(4,Mathf.Floor(imaginationTime/1.2f)*.65f)); SystemLabel(0,"目标又远了一天",new Vector3(0,2,3)); }
             if(inspectedSystem=="thought:comfort") movieAnchor.localScale=Vector3.one*Mathf.Lerp(1,.3f,Smooth(0,4,imaginationTime));
             if(inspectedSystem=="orbit")
             {
                 int order=0;
-                for(int i=0;i<8;i++) if((inspectedValue&(1<<i))!=0) SetMovieColor(movieOrbit[i],imaginationTime>order++*.22f?Palette.Mint:Palette.Muted*.3f);
+                for(int i=0;i<8;i++) if((inspectedValue&(1<<i))!=0)
+                {
+                    float age=imaginationTime-order++*.22f;
+                    SetMovieColor(movieOrbit[i],age>=0?Palette.Mint:Palette.Muted*.3f);
+                    movieOrbit[i].localScale=Vector3.one*.22f*(preferences.reducedMotion?1:1+ImmersiveMotion.Punch(age,.42f)*.35f);
+                }
             }
             if(inspectedSystem=="council" && councilFocus!=null)
             {
                 int selected=inspectedVoices.ToList().FindIndex(v=>v.name==councilFocus);
-                if(selected>=0 && selected<councilPeople.Count)
+                if(!preferences.reducedMotion && selected>=0 && selected<councilPeople.Count)
                 { Vector3 target=councilPeople[selected].localPosition+Vector3.up; WorldCamera.transform.position=cinematicStage.TransformPoint(Vector3.Lerp(new Vector3(4.4f,3.8f,-5.8f),target+new Vector3(.9f,.6f,-2.8f),Smooth(0,1.4f,imaginationTime))); WorldCamera.transform.LookAt(cinematicStage.TransformPoint(target)); }
             }
             if(inspectedSystem=="forge" && movieObjects.Count>0)

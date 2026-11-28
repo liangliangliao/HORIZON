@@ -68,6 +68,11 @@ namespace Horizon.UI
             // and turns the phone's 3D viewport blank during settings/backgrounding.
             paused = value;
             rewardSparkPool?.SetPaused(value);
+            if (caseVisualStarted)
+            {
+                if (value) audioSource.Pause();
+                else audioSource.UnPause();
+            }
             foreach (HorizonActor actor in GetComponentsInChildren<HorizonActor>(true))
                 actor.MotionRate = value ? 0 : 1;
             Cinematics?.SetPaused(value);
@@ -77,7 +82,7 @@ namespace Horizon.UI
         private void UpdateAudio()
         {
             if (audioSource != null) audioSource.mute = paused || !preferences.sound;
-            if (ambience != null) ambience.mute = paused || movieMuted || !preferences.sound || !preferences.ambience;
+            if (ambience != null) ambience.mute = paused || movieMuted || caseSilent || !preferences.sound || !preferences.ambience;
         }
         private void RestoreRenderQuality()
         {

@@ -12,20 +12,17 @@ namespace Horizon.Game
         public readonly IReadOnlyList<CausalRelayNode> Nodes;
         public readonly IReadOnlyList<CausalRelayEdge> Edges;
         public readonly float ImpactTime, Duration;
-        private readonly float secondRevealTime,jackpotTime;
+        public readonly CausalRelayNode MergeNode;
         public CausalRelayPlan(RewardPlan plan)
         {
             if (plan == null) throw new ArgumentNullException(nameof(plan));
             Duration = plan.Duration;
             ImpactTime = plan.Cues.First(c => !c.NodeHit && c.Phase == CinematicPhase.Impact).Time;
-            secondRevealTime=plan.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.SecondReveal)?.Time??Duration;
-            jackpotTime=plan.Cues.FirstOrDefault(c=>!c.NodeHit && c.Phase==CinematicPhase.Jackpot)?.Time??Duration;
             bool cascade = plan.Event.kind == DomainEventKind.Cascade || plan.Event.kind == DomainEventKind.CausalSingularity;
             var nodes = new List<CausalRelayNode>(); var edges = new List<CausalRelayEdge>();
             if (cascade)
             {
-                List<RewardEvidence> evidence = (plan.Event.receipt?.causes ?? new List<RewardEvidence>())
-                    .Take(MaximumNodes).Select(x => x.Copy()).ToList();
+                var evidence = OrderedEvidence(plan.Event.receipt?.causes).Select(x=>x.Copy()).ToList();
                 for (int i = 0; i < evidence.Count; i++)
                 {
                     RewardEvidence source = evidence[i];
@@ -49,6 +46,35 @@ namespace Horizon.Game
                             edges.Add(new CausalRelayEdge(from, node.Index));
             }
             Nodes = nodes.AsReadOnly(); Edges = edges.AsReadOnly();
+            var merge = edges.GroupBy(edge => edge.To).Where(incoming => incoming.Count() > 1).OrderBy(incoming => incoming.Key).LastOrDefault();
+            if (merge != null) MergeNode = nodes[merge.Key];
+        }
+
+        public static IReadOnlyList<RewardEvidence> OrderedEvidence(IEnumerable<RewardEvidence> causes)
+        {
+            var waiting=(causes??Enumerable.Empty<RewardEvidence>()).Where(node=>node!=null).OrderBy(node=>node.day).ToList();
+            var ordered=new List<RewardEvidence>();
+            var pendingIds=new HashSet<string>(waiting.Where(node=>!string.IsNullOrEmpty(node.id)).Select(node=>node.id));
+            while(waiting.Count>0 && ordered.Count<MaximumNodes)
+            {
+                int next=waiting.FindIndex(node=>node.parentIds==null ||
+                    !node.parentIds.Any(parent=>parent!=node.id && pendingIds.Contains(parent)));
+                // Broken or cyclic historical evidence cannot invent an activation order.
+                if(next<0) break;
+                RewardEvidence node=waiting[next];
+                waiting.RemoveAt(next);
+                pendingIds.Remove(node.id);
+                ordered.Add(node);
+            }
+            return ordered;
+        }
+
+        public float EdgeArrival(CausalRelayEdge edge,float time,bool reducedMotion)
+        {
+            float end=Nodes[edge.To].ActivationTime;
+            if(reducedMotion) return time>=end?1:0;
+            float start=Math.Max(Nodes[edge.From].ActivationTime,end-.83f);
+            return Ease(start,end,time);
         }
 
         public CausalRelayFrame Sample(int index, float seconds, bool reducedMotion)
@@ -58,10 +84,14 @@ namespace Horizon.Game
             float fade = 1 - Ease(Duration * .94f, Duration, time);
             float age = time - node.ActivationTime;
             bool lit = age >= 0;
-            float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 4);
-            float final = time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
-            if(!reducedMotion && time>=secondRevealTime) final=Math.Max(final,(float)Math.Exp(-(time-secondRevealTime)*3.5f));
-            if(!reducedMotion && time>=jackpotTime) final=Math.Max(final,(float)Math.Exp(-(time-jackpotTime)*3.5f));
+            float pulse = !lit || reducedMotion ? 0 : (float)Math.Exp(-age * 1.7f);
+            float final = MergeNode?.Index != index || time < ImpactTime || reducedMotion ? 0 : (float)Math.Exp(-(time - ImpactTime) * 3.5f);
+            // A single relay may flare at full strength. At the shared release,
+            // however, every recorded source lights at once. Capping only that
+            // simultaneous component preserves the climbing node rhythm while
+            // avoiding a featureless white wall on Android additive blending.
+            float networkPeak=Math.Max(.42f,.75f-Math.Max(0,Nodes.Count-3)*.03f);
+            final*=networkPeak;
             float emphasis=Math.Max(pulse,final);
             float beam = lit && !reducedMotion ? Math.Max(emphasis, .1f) * fade : 0;
             return new CausalRelayFrame(lit, fade, emphasis * fade, beam,

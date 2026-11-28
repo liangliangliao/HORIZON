@@ -7,6 +7,7 @@ namespace Horizon.Game
     [Serializable]
     public sealed class ResourceDelta
     {
+        public int[] ticks;
         public int energy;
         public int mood;
         public int insight;
@@ -27,6 +28,7 @@ namespace Horizon.Game
 
         public string ShortLabel()
         {
+            if (ticks != null && ticks.Length == 6) return PracticeReward.Label(this);
             string label = "";
             Append(ref label, "精", energy);
             Append(ref label, "心", mood);
